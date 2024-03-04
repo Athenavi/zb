@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.0.2/dist/tailwind.min.css">
+    <style>
+        body {
+            background-color: rgba(0, 0, 0, 0);
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h2 {
+            color: #333;
+        }
+
+        p {
+            color: #777;
+        }
+
+        form {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        input[type="search"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.375rem;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            font-size: 1rem;
+        }
+
+        .input-group-append button {
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+        }
+
+        .input-group-append button:hover {
+            background-color: #0056b3;
+        }
+
+        .results {
+            margin-top: 20px;
+        }
+
+        .results h3 {
+            color: #333;
+        }
+
+        .results a {
+            color: #007bff;
+        }
+
+        .results a:hover {
+            text-decoration: underline;
+        }
+    </style>
+    <title></title>
+</head>
+<body>
+<div>
+    <form method="post" action="/search" role="search">
+        <h2 class="text-2xl">想要找点什么呢？</h2>
+        <div class="flex items-center border border-gray-300 rounded">
+            <input class="w-full py-2 px-4" type="search" name="keyword" placeholder="搜索" required>
+            <div class="input-group-append">
+                <button class="bg-blue-500 text-white py-2 px-4" type="submit">搜索</button>
+            </div>
+        </div>
+        {% if results %}
+            <div class="results mt-3">
+                <h3 class="text-lg">搜索结果：</h3>
+                <ul>
+                    {% for result in results %}
+                        <li>
+                            <a href="{{ result.link }}" target="_blank" class="text-blue-500">{{ result.title }}</a>
+                            <a href="{{ result.link }}" target="_blank"><img src="../static/image/jump.svg"
+                                                                             style="height: 28px" alt=""></a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% else %}
+            <p class="text-gray-700">No results found</p>
+        {% endif %}
+    </form>
+</div>
+</body>
+</html>

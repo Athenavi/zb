@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<!-- 网站主语言 -->
+<html lang="zh-cn">
+<head>
+    <!-- 网站采用的字符编码 -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <!-- 预留网站标题的位置 -->
+    <title>{% block title %}{% endblock %}</title>
+    <!-- 引入tailwind的css文件 -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="../static/js/main.js"></script>
+    <script src="https://cdn.staticfile.org/jquery/3.2.1/jquery.min.js"></script>
+    <script src="https://cdn.staticfile.org/popper.js/1.15.0/umd/popper.min.js"></script>
+    <!-- 引入layer.js -->
+</head>
+<body class="{{ theme }}" style="background: rgba(114,112,112,0.9)">
+{% from 'header.html' import zytopbar %}
+<!-- 调用topbar -->
+{{ zytopbar() }}
+
+<!-- 引入导航栏 -->
+<!-- 定义导航栏 -->
+
+<div class="container mx-auto">
+    <div class="row justify-center">
+        <style>
+            .carousel-inner .carousel-item img {
+                max-height: 430px;
+                /* 调整图片的最大高度 */
+                object-fit: cover;
+                /* 图片保持比例缩放，并填满容器 */
+            }
+        </style>
+        <div style="width: 1080px; height: 30px; background-color: transparent;">
+            <a></a><span>{{ notice }}</span>
+        </div>
+        <div>
+            <img src="{{ avatar_url }}" style="height: 35px; border-radius: 50%;" alt="">
+            {% if userStatus %}
+                <!-- 展示已登录的内容 -->
+                <a>欢迎您，{{ username }}</a><a href="/logout">点击这里直接注销</a>　　
+                <a href="/change-password">修改我的密码</a>
+            {% else %}
+                <!-- 展示未登录的内容 -->
+                <a href="/login">需要登录</a>
+            {% endif %}
+        </div>
+        <div class="tag_area">
+            {{ articleName }}
+            <hr>
+            <span>最大五个标签，标签不宜过长</span>
+            <img src="../static/image/zytag.svg" style="height: 16px">
+            {% for Tag in tags %}
+                <a href="/?tag={{ Tag }}">{{ Tag }}</a>
+            {% endfor %}
+            <hr>
+            <input id="tagInput" type="text" placeholder="输入标签，用逗号分割">
+            <button id="changeTags">保存</button>
+        </div>
+
+
+        <div class="editor">
+            <button id="manual-refresh-button">预览</button>
+            <button id="save-button">保存</button>
+            <a href="/blog/{{ articleName }}" target="_self">文章页</a>
+            <label for="md-editor"></label>
+            <textarea id="md-editor" style="width:100%">{% if edit_html %}{{ edit_html }}{% endif %}</textarea>
+        </div>
+        <div class="preview">
+            <div id="md-preview">
+                {% if show_edit %}
+                    {{ show_edit|safe }}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <!-- 引入注脚 -->
+</div>
+
+<div>
+    <br><br><br>
+</div>
+<footer class="py-3 bg-dark fixed-bottom">
+    <div class="container">
+        <p class="m-0 text-center text-white">版权所有 &copy;zyBLOG 2024</p>
+    </div>
+</footer>
+</body>
+
+</html>
+<script>
+    // 获取编辑区和展示区的元素
+    var editor = document.getElementById('md-editor');
+    var preview = document.getElementById('md-preview');
+    var manualRefreshButton = document.getElementById('manual-refresh-button');
+    var saveButton = document.getElementById('save-button');
+
+    // 编辑区滚动条同步滚动效果
+    editor.addEventListener('scroll', function () {
+        preview.scrollTop = editor.scrollTop;
+        preview.scrollLeft = editor.scrollLeft;
+    });
+
+    // 展示区滚动条同步滚动效果
+    preview.addEventListener('scroll', function () {
+        editor.scrollTop = preview.scrollTop;
+        editor.scrollLeft = preview.scrollLeft;
+    });
+
+    // 定时发送编辑内容到后端
+    setInterval(function () {
+        var content = editor.value;
+        fetch('/edit/{{ articleName }}', {
+            method: 'POST',
+            body: JSON.stringify({content: content}),
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.show_edit) {
+                    preview.innerHTML = data.show_edit;
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    }, 15000);
+
+    // 手动触发刷新按钮点击事件
+    manualRefreshButton.addEventListener('click', function () {
+        var content = editor.value;
+        fetch('/edit/{{ articleName }}', {
+            method: 'POST',
+            body: JSON.stringify({content: content}),
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.show_edit) {
+                    preview.innerHTML = data.show_edit;
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    });
+
+    // 为保存按钮添加点击事件的监听器
+    // 为保存按钮添加点击事件的监听器
+    saveButton.addEventListener('click', function (event) {
+        event.preventDefault(); // 阻止表单的默认提交行为
+
+        var articleName = '{{articleName}}'; // 替换为你的文章名称
+
+        // 获取编辑器的内容
+        var content = editor.value;
+
+        // 弹出确认对话框
+        var confirmation = confirm('数据无价，谨慎修改。确定要保存吗？');
+        if (!confirmation) {
+            // 用户点击了取消，终止本次请求
+            return;
+        }
+
+        // 发送内容到服务器进行保存
+        fetch('/save/edit', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                article: articleName,
+                content: content
+            })
+        })
+            .then(function (response) {
+                return response.json();
+            })
+            .then(function (data) {
+                if (data.show_edit_code === 'success') {
+                    alert('保存成功');
+                } else {
+                    alert('保存失败');
+                }
+            })
+            .catch(function (error) {
+                console.error('保存失败:', error);
+            });
+    });
+
+</script>
+<script>
+    document.getElementById("changeTags").addEventListener("click", function () {
+        var tagsInput = document.getElementById("tagInput").value;
+        var data = {
+            article: "{{ articleName }}",
+            tags: tagsInput
+        };
+
+        // 发起 PUT 请求
+        fetch('/edit/{{ articleName }}', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        }).then(function (response) {
+            if (response.ok) {
+                location.reload();  // 刷新页面以更新标签
+            }
+        }).catch(function (error) {
+            console.log(error);
+        });
+    });
+</script>

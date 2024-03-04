@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<!-- 网站主语言 -->
+<html lang="zh-cn">
+<head>
+    <!-- 网站采用的字符编码 -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <!-- 预留网站标题的位置 -->
+    <title>{% block title %}{% endblock %}</title>
+    <!-- 引入Tailwind CSS的CDN链接 -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+
+<body>
+<!-- 引入导航栏 -->
+<!-- 定义导航栏 -->
+<nav class="bg-blue-500">
+    <div class="container mx-auto">
+        <!-- 导航栏商标 -->
+        <a class="text-xl text-white font-bold py-4" href="/">奇客舒</a>
+        <!-- 导航入口 -->
+        <div>
+            <!-- 导航入口内容 -->
+        </div>
+    </div>
+</nav>
+
+<!-- 预留具体页面的位置 -->
+<div class="container mx-auto mt-8">
+    <div class="w-2/3 mx-auto">
+        <h1 class="text-red-500 text-lg">未能完成您的请求！错误代码: {{ status_code }}</h1>
+        <h3 class="text-blue-500 text-xl">{{ error }}</h3>
+        <a class="text-blue-500 hover:text-blue-700 text-lg" href="/login">登陆页面</a>
+    </div>
+</div>
+
+<!-- 引入注脚 -->
+<div class="mt-32">
+    <br><br><br>
+</div>
+<footer class="py-3 bg-gray-900 fixed bottom-0 w-full">
+    <div class="container mx-auto">
+        <p class="text-center text-white">版权所有 &copy; zyBLOG 2024</p>
+    </div>
+</footer>
+</body>
+</html>
