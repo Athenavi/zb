@@ -25,7 +25,7 @@ from werkzeug.security import safe_join
 
 from src.AboutLogin import zy_login, zy_register, get_email, profile, zy_mail_login
 from src.AboutPW import zy_change_password, zy_confirm_password
-from src.BlogDeal import get_article_names, get_article_content, clear_html_format, zy_get_comment, zy_post_comment, \
+from src.BlogDeal import get_article_names, get_article_content, clear_html_format, zy_post_comment, \
     get_file_date, get_blog_author, generate_random_text, read_hidden_articles, zy_send_message, auth_articles, \
     zy_show_article, zy_edit_article
 from src.database import get_database_connection
@@ -475,7 +475,7 @@ def blog_detail(article):
         username = None
         if session.get('logged_in'):
             username = session.get('username')
-
+        '''
         # 通过关键字缓存评论内容
         @cache.cached(timeout=180, key_prefix=f"comments_{article_name}_{username}")
         def get_comments_cached():
@@ -483,8 +483,9 @@ def blog_detail(article):
                 return zy_get_comment(article_name, page=page, per_page=per_page)
             else:
                 return None
-
+        
         comments = get_comments_cached()
+        '''
         article_Surl = domain + 'blog/' + article_name
         article_url = "https://api.7trees.cn/qrcode/?data=" + article_Surl
         author = get_blog_author(article_name)
@@ -493,7 +494,7 @@ def blog_detail(article):
 
         response = make_response(render_template('detail.html', title=title, article_content=article_content,
                                                  articleName=article_name, theme=theme,
-                                                 author=author, blogDate=blogDate, comments=comments,
+                                                 author=author, blogDate=blogDate,
                                                  url_for=url_for, article_url=article_url,
                                                  article_Surl=article_Surl, article_summary=article_summary,
                                                  readNav=readNav_html, article_tags=article_tags))
@@ -1137,19 +1138,9 @@ def vip_blog(article_name):
             username = None
             if session.get('logged_in'):
                 username = session.get('username')
-                if username:
-                    comments = zy_get_comment(article_name, page=page, per_page=per_page)
-                else:
-                    comments = None
-            else:
-                comments = None
-
-            if request.method == 'POST':
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return jsonify(comments=comments)  # 返回JSON响应，只包含评论数据
 
             return render_template('detail.html', article_content=article_content, articleName=article_name,
-                                   theme=session['theme'], author=author, blogDate=blogDate, comments=comments,
+                                   theme=session['theme'], author=author, blogDate=blogDate,
                                    url_for=url_for, username=username, article_url=article_url,
                                    article_Surl=article_Surl, article_summary=article_summary, readNav=readNav_html)
 
@@ -1193,19 +1184,9 @@ def zy_pw_blog(article_name):
                 username = None
                 if session.get('logged_in'):
                     username = session.get('username')
-                    if username:
-                        comments = zy_get_comment(article_name, page=page, per_page=per_page)
-                    else:
-                        comments = None
-                else:
-                    comments = None
-
-                if request.method == 'POST':
-                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                        return jsonify(comments=comments)  # 返回JSON响应，只包含评论数据
 
                 return render_template('detail.html', article_content=article_content, articleName=article_name,
-                                       theme=session['theme'], author=author, blogDate=blogDate, comments=comments,
+                                       theme=session['theme'], author=author, blogDate=blogDate,
                                        url_for=url_for, username=username, article_url=article_url,
                                        article_Surl=article_Surl, article_summary=article_summary, readNav=readNav_html)
 

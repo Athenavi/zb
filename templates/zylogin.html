@@ -72,6 +72,9 @@
 
     <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.slim.min.js"></script>
     <script>
+        window.onload = function() {
+        document.getElementById("username").focus();
+        };
         // 前端表单校验函数，可以根据实际需求进行扩展
         function validateForm() {
             var username = document.getElementById("username").value;
