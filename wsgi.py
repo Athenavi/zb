@@ -1,7 +1,6 @@
 """
 Module-level docstring goes here.
 """
-import os
 from waitress import serve
 from src.app import app
 from src.database import test_database_connection, CheckDatabase

@@ -99,27 +99,6 @@
 </body>
 
 </html>
-<script>
-    document.addEventListener('mousedown', function (e) {
-        e.preventDefault(); // 阻止鼠标按下事件的默认行为
-        e.stopPropagation(); // 阻止事件冒泡
-        // 获取当前点击的元素
-        var target = e.target;
-        // 监听mouseup事件，并在释放鼠标时继续阻止默认行为和事件冒泡
-        target.addEventListener('mouseup', function (e) {
-            e.preventDefault();
-            e.stopPropagation();
-        });
-        // 监听mouseout事件，当鼠标离开当前元素时移除阻止默认行为和事件冒泡
-        target.addEventListener('mouseout', function (e) {
-            e.preventDefault();
-            e.stopPropagation();
-            target.removeEventListener('mouseup', arguments.callee);
-            target.removeEventListener('mouseout', arguments.callee);
-        });
-    });
-</script>
-
 <style>
     .card {
         background-color: transparent;

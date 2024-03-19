@@ -32,9 +32,9 @@ CREATE TABLE `cities` (
   `pid` int DEFAULT NULL,
   `city_code` varchar(20) DEFAULT NULL,
   `city_name` varchar(50) DEFAULT NULL,
-  `post_code` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
-  `area_code` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  `post_code` varchar(20) CHARACTER SET utf8mb4  DEFAULT NULL,
+  `area_code` varchar(20) CHARACTER SET utf8mb4  DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 --
 -- 转存表中的数据 `cities`
@@ -2587,7 +2587,7 @@ CREATE TABLE `comments` (
   `article_name` char(255) NOT NULL,
   `comment` tinytext NOT NULL,
   `add_date` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- --------------------------------------------------------
 

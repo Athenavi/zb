@@ -93,13 +93,13 @@
                 <span>隐藏的文章:{{ hiddenList }}</span>
                 <ul>
                     {% for file in aricle_files %}
-                        <li>
-                            {{ aricle_files }}
-                            <form action="{{ url_for('/delete_file', filename=file) }}" method="POST"
-                                  onsubmit="return confirmDelete();">
-                                <button type="submit">删除</button>
-                            </form>
-                        </li>
+                    <li>
+                        {{ aricle_files }}
+                        <form action="{{ url_for('/delete_file', filename=file) }}" method="POST"
+                              onsubmit="return confirmDelete();">
+                            <button type="submit">删除</button>
+                        </form>
+                    </li>
                     {% endfor %}
                 </ul>
             </div>
@@ -136,11 +136,11 @@
             <span>主题与外观: {{ currentDisplay }}</span>
             <ul id="displayList">
                 {% for display in displayList %}
-                    <li>
-                        {{ display }}
-                        <button class="btn btn-primary btn-block" onclick="showDetail('{{ display }}')">查看详情
-                        </button>
-                    </li>
+                <li>
+                    {{ display }}
+                    <button class="btn btn-primary btn-block" onclick="showDetail('{{ display }}')">查看详情
+                    </button>
+                </li>
                 {% endfor %}
             </ul>
         </div>
@@ -234,14 +234,10 @@
         <p class="m-0 text-center text-white">Copyright &copy;zyBLOG 2024</p>
     </div>
 </footer>
-<!-- bootstrap.js 依赖 jquery.js 和popper.js，因此在这里引入 -->
+<!-- bootstrap.js 依赖 jquery.js 和popper.js -->
 <script src="https://cdn.jsdelivr.net/npm/jquery"></script>
 
-<!--
-    popper.js 采用 cdn 远程引入，意思是你不需要把它下载到本地。
-    在实际的开发中推荐静态文件尽量都使用 cdn 的形式。
-    教程采用本地引入是为了让读者了解静态文件本地部署的流程。
--->
+<!-- popper.js 采用 cdn 远程引入-->
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1-lts/dist/umd/popper.min.js"></script>
 
 <!-- 引入bootstrap的js文件 -->
