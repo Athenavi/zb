@@ -31,20 +31,24 @@
         <div class="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
             <h1 class="text-4xl text-center mb-6">注册</h1>
             {% if msg %}
-                <div class="bg-red-500 text-white p-3 mb-4">{{ msg }}</div>
+            <div class="bg-red-500 text-white p-3 mb-4">{{ msg }}</div>
             {% endif %}
             <form method="post" action="/register" onsubmit="return validateForm()" class="w-full max-w-sm">
                 <div class="mb-4">
-                    <input type="text" class="border border-gray-300 rounded-md p-2 w-full" id="username" name="username" placeholder="用户名" required>
+                    <input type="text" class="border border-gray-300 rounded-md p-2 w-full" id="username"
+                           name="username" placeholder="用户名" required>
                 </div>
                 <div class="mb-4">
-                    <input type="password" class="border border-gray-300 rounded-md p-2 w-full" id="password" name="password" placeholder="密码" required>
+                    <input type="password" class="border border-gray-300 rounded-md p-2 w-full" id="password"
+                           name="password" placeholder="密码" required>
                 </div>
                 <div class="mb-4">
-                    <input type="password" class="border border-gray-300 rounded-md p-2 w-full" id="confirm_password" name="confirm_password" placeholder="确认密码" required>
+                    <input type="password" class="border border-gray-300 rounded-md p-2 w-full" id="confirm_password"
+                           name="confirm_password" placeholder="确认密码" required>
                 </div>
                 <div class="mb-4">
-                    <input type="text" class="border border-gray-300 rounded-md p-2 w-full" id="invite_code" name="invite_code" placeholder="邀请码" required>
+                    <input type="text" class="border border-gray-300 rounded-md p-2 w-full" id="invite_code"
+                           name="invite_code" placeholder="邀请码" required>
                 </div>
                 <button type="submit" class="bg-blue-500 text-white rounded-md p-2 w-full mb-4">提交注册</button>
                 <p class="text-center text-sm">已经拥有账号？<a href="/login" class="text-blue-500">前往登录</a></p>

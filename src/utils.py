@@ -217,6 +217,6 @@ def zy_save_edit(article_name, content):
         with open(file_path, 'w', encoding='utf-8') as file:
             file.write(content)
 
-        return make_response('success')
+        return 'success'
 
-    return make_response('failed: articleName or content is empty')
+    return 'failed'

@@ -232,7 +232,7 @@ def get_weather(city_code):
     # Acquire a lock before generating cache file
     lock_file = f'{cache_file}.lock'
     try:
-        with portalocker.Lock(lock_file, timeout=1) as lock:
+        with portalocker.Lock(lock_file, timeout=1):
             # Check again if cache file is created by another request
             check_exist(cache_file)
             apiUrl = f'http://t.weather.itboy.net/api/weather/city/{city_code}'
@@ -855,7 +855,7 @@ def static_from_root():
 
 
 @app.route('/<path:undefined_path>')
-def undefined_route(undefined_path):
+def undefined_route():
     return render_template('error.html', status_code='404'), 404
 
 
@@ -885,7 +885,6 @@ def generate_captcha():
     data = image.getdata()
 
     # 修改图像像素，将白色像素变为透明
-    new_data = []
     theme = session.get('theme', 'day-theme')
     if theme == 'night-theme':
         new_data = data
@@ -957,9 +956,9 @@ def markdown_editor(article):
             return render_template('editor.html', edit_html=edit_html, show_edit=show_edit, articleName=article,
                                    theme=session['theme'], tags=tags)
         elif request.method == 'POST':
-            content = request.json.get('content', '')
-            show_edit = zy_show_article(content)
-            return jsonify({'show_edit': show_edit})
+            content = request.json['content']
+            save_edit_code = zy_save_edit(article, content)
+            return jsonify({'show_edit_code': save_edit_code})
         elif request.method == 'PUT':
             tags_input = request.get_json().get('tags')
             tags_list = []
@@ -1136,7 +1135,6 @@ def vip_blog(article_name):
             per_page = 10  # 每页显示的评论数量
 
             username = None
-            comments = []
             if session.get('logged_in'):
                 username = session.get('username')
                 if username:
@@ -1193,7 +1191,6 @@ def zy_pw_blog(article_name):
                 per_page = 10  # 每页显示的评论数量
 
                 username = None
-                comments = []
                 if session.get('logged_in'):
                     username = session.get('username')
                     if username:
@@ -1308,7 +1305,7 @@ def zy_change_article_pw(filename, new_pw='1234'):
             # Return success message
             return "success"
 
-    except Exception as e:
+    except Exception:
         # Return failure message if any error occurs
         return "failed"
 
@@ -1357,7 +1354,6 @@ def media_space():
 
 
 def get_media_list(username, category, page=1, per_page=10):
-    files = []
     file_suffix = ()
     if category == 'img':
         file_suffix = ('.png', '.jpg', '.webp')
@@ -1495,6 +1491,7 @@ def cc_login(provider):
 
 @app.route('/callback/<provider>')
 def callback(provider):
+    global user_email
     if provider not in ['qq', 'wx', 'alipay', 'sina', 'baidu', 'huawei', 'xiaomi', 'dingtalk']:
         return jsonify({'message': 'Invalid login provider'})
 
@@ -1536,7 +1533,7 @@ def get_user_info(provider, social_uid):
     return faceimg
 
 
-@cache.cached(timeout=300, key_prefix='diplay_detail')
+@cache.cached(timeout=300, key_prefix='display_detail')
 @app.route('/theme/<theme_id>')
 def get_theme_detail(theme_id):
     if os.path.exists(f'templates/theme/{theme_id}'):
@@ -1544,7 +1541,7 @@ def get_theme_detail(theme_id):
         # 读取 template.ini 文件
         theme_detail.read(f'templates/theme/{theme_id}/template.ini', encoding=global_encoding)
         # 获取配置文件中的属性值
-        id = theme_detail.get('default', 'id').strip("'")
+        tid = theme_detail.get('default', 'id').strip("'")
         author = theme_detail.get('default', 'author').strip("'")
         theme_title = theme_detail.get('default', 'title').strip("'")
         authorWebsite = theme_detail.get('default', 'authorWebsite').strip("'")
@@ -1554,7 +1551,7 @@ def get_theme_detail(theme_id):
         screenshot = theme_detail.get('default', 'screenshot').strip("'")
 
         theme_properties = {
-            'id': id,
+            'id': tid,
             'author': author,
             'title': theme_title,
             'authorWebsite': authorWebsite,
