@@ -23,50 +23,6 @@
 {{ zytopbar() }}
 <!-- 引入导航栏 -->
 <!-- 定义导航栏 -->
-<style>
-    html, body {
-        height: 100%;
-        margin: 0;
-        padding: 0;
-    }
-
-    #fullscreen {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: #0c5460;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 9999;
-    }
-
-    #passwordForm {
-        max-width: 300px;
-        padding: 20px;
-        background-color: white;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-    }
-
-    #passwordForm input[type="password"] {
-        width: 100%;
-        padding: 10px;
-        margin-bottom: 10px;
-        box-sizing: border-box;
-    }
-
-    #passwordForm input[type="submit"] {
-        width: 100%;
-        padding: 10px;
-        background-color: #4CAF50;
-        color: white;
-        border: none;
-        cursor: pointer;
-    }
-</style>
 <!-- 预留具体页面的位置 -->
 <div class="container">
     <div class="row justify-content-md-center">
@@ -133,39 +89,43 @@
 <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
 <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
 {% if not article_content %}
-    <div id="fullscreen">
-        <form id="passwordForm">
-            <a>{{ articleName }}需要</a>
-            <label for="password">访问密码:</label>
-            <input type="password" id="password" name="password" placeholder="输入密码" required>
-            <input type="submit" value="提交">
-        </form>
-    </div>
-    <script>
-        function submitForm() {
-            var passwordInput = document.getElementById("password");
-            var password = passwordInput.value;
+<div id="fullscreen">
+    <form id="passwordForm">
+        <a>{{ articleName }}需要</a>
+        <label for="password">访问密码:</label>
+        <input type="password" id="password" name="password" placeholder="输入密码" required>
+        <input type="submit" value="提交">
+    </form>
+</div>
+<script>
+    function submitForm() {
+        var passwordInput = document.getElementById("password");
+        var password = passwordInput.value;
 
-            var xhr = new XMLHttpRequest();
-            xhr.open("POST", "/blog/" + '{{ article }}', true);
-            xhr.setRequestHeader("Content-type", "application/json");
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", "/blog/" + '{{ article }}', true);
+        xhr.setRequestHeader("Content-type", "application/json");
 
-            var data = JSON.stringify({
-                "article": '{{ article }}',   // 替换为实际文章参数值
-                "code": password   // 使用输入的密码作为code参数的值
-            });
+        var data = JSON.stringify({
+            "article": '{{ article }}',   // 替换为实际文章参数值
+            "code": password   // 使用输入的密码作为code参数的值
+        });
 
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState === XMLHttpRequest.DONE) {
-                    if (xhr.status === 200) {
-                        alert("提交成功！");   // 请求成功的处理逻辑
-                    } else {
-                        alert("提交失败。请稍后再试。");   // 请求失败的处理逻辑
-                    }
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+                if (xhr.status === 200) {
+                    alert("提交成功！");   // 请求成功的处理逻辑
+                } else {
+                    alert("提交失败。请稍后再试。");   // 请求失败的处理逻辑
                 }
-            };
+            }
+        };
 
-            xhr.send(data);
-        }
-    </script>
+        xhr.send(data);
+    }
+
+    window.onload = function () {
+        document.getElementById("password").focus();
+    };
+</script>
 {% endif %}

@@ -32,7 +32,7 @@ zyBLOG 使用以下技术组成：
 - **Python Flask**: 作为 Web 框架，提供了构建网页应用的基础功能。
 - **WSGI**: 作为 Python Web 应用程序与 Web 服务器之间的接口标准，实现了 Web 应用程序与服务器之间的通信。
 - **HTML/CSS**: 用于构建博客界面的前端技术。
-- **MySQL**: 作为数据库，用于存储用户、文章评论等数据。
+- **MySQL**: 作为数据库，用于存储用户、~~文章评论~~等数据。
 
 ## 如何运行
 1. 确保你的系统已经安装了 Python 和 pip。
@@ -95,6 +95,30 @@ $ python3.10 -m venv myenv
 $ source myenv/bin/activate
 ```
 现在你可以在虚拟环境下重新安装依赖以及启动程序
+
+## 评论（240319）
+   新版本的评论：
+   由 ```utteranc``` 提供技术支持
+
+   不使用当前提供的评论issue地址？
+   你需要修改```templates/detail.html```文件
+   找到如下代码,修改其中的```repo```为你的github项目地址
+   
+   ```
+   <script src="https://utteranc.es/client.js"
+                    repo="Athenavi/comments"
+                    issue-term="url"
+                    {% if theme=="night-theme" %}
+                    theme="github-dark"
+                    {% else %}
+                    theme="github-light"
+                    {% endif %}
+                    crossorigin="anonymous"
+                    async>
+            </script>
+   ```
+### ！！！注意 在完成之间你可能还需```授权```将 utteranc 应用添加到 github 账户中
+更多细节请查阅官方文档: [https://utteranc.es/](https://utteranc.es/)
 
 ## 鸣谢
 
