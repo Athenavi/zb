@@ -27,7 +27,11 @@ The Work is provided "as is" and without warranties. You bear the risk of using 
 The Licensor shall not be liable for any damages arising from the use of the Work.
 
 # Apache License
-Version 2.0, January 2004
+
+This project includes software developed by Docsify Contributors (https://github.com/docsifyjs/docsify/graphs/contributors).
+
+MIT License
+Copyright (c) 2016 - present Docsify Contributors
 
 ## 使用、修改和分发的条款和条件
 
@@ -57,3 +61,8 @@ Version 2.0, January 2004
 有关完整的 Apache 许可证，请参阅[官方 Apache 许可证 2.0 文档](https://www.apache.org/licenses/LICENSE-2.0)。
 
 For the full Apache License, please refer to the [official Apache License 2.0 document](https://www.apache.org/licenses/LICENSE-2.0).
+
+该项目包含由Docsify贡献者开发的软件（https://github.com/docsifyjs/docsify/graphs/contributors）。
+
+MIT许可证
+版权所有（c）2016年至今Docsify贡献者

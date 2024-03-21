@@ -262,6 +262,23 @@ def get_city_code():
     city_name = clear_html_format(city_name)
     return zy_get_city_code(city_name)
 
+@app.route('/blog/<any>/api/<articleName>', methods=['GET', 'POST'])
+@app.route('/blog/api/<articleName>', methods=['GET', 'POST'])
+@app.route('/api/<articleName>', methods=['GET', 'POST'])
+def sys_out_file(articleName):
+    # 隐藏文章判别
+    hidden_articles = read_hidden_articles()
+    #print(hidden_articles)
+    if articleName[:-3] in hidden_articles:
+        # 隐藏的文章
+        return "我预判到了你。。。"
+    try:
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        articles_dir = os.path.join(base_dir, 'articles')
+        return send_from_directory(articles_dir, articleName)
+    except Exception as e:
+        return "An internal error occurred", 500
+
 
 @app.route('/profile', methods=['GET', 'POST'])
 def space():
@@ -442,6 +459,31 @@ def home():
     else:
         return render_template('zyhome.html')
 
+@app.route('/blog/discord/README.md', methods=['GET', 'POST'])
+def discord_R():
+    return """
+    社区讨论条约
+
+尊重他人意见：在社区讨论中，大家都有权利发表自己的观点，但请避免恶意攻击或侮辱他人。请尊重他人的意见和观点，保持开放、友善的讨论环境。
+
+文明交流：在讨论过程中，请尽量使用文明、礼貌的语言，避免使用粗鲁或攻击性言辞。保持冷静，理性讨论，不要轻易引发争议。
+
+尊重知识产权：在引用他人观点或资料时，请注明出处，并尊重他人的知识产权。禁止抄袭和侵犯他人版权。
+
+禁止谩骂和人身攻击：严禁在讨论中使用谩骂、人身攻击等不当言论，保持理性、平和的态度，避免情绪化的讨论。
+
+尊重社区规则：遵守社区规定，不发表违反法律法规和社区规定的言论，保持社区秩序和正常运转。
+
+尊重他人隐私：在讨论中，不要公开或泄露他人的个人信息，尊重他人的隐私权。
+
+以上是社区讨论的基本条约，希望大家共同遵守，保持社区和谐与发展。
+
+<button id="show_comments" onclick="showComments()">开启评论区</button>
+* 参与讨论表示同意上述观点
+"""
+
+
+
 
 @app.route('/blog/<article>', methods=['GET', 'POST'])
 @app.route('/blog/<article>.html', methods=['GET', 'POST'])
@@ -465,8 +507,8 @@ def blog_detail(article):
             return get_article_content(article, 215)
 
         article_tags = get_tags_by_article('articles/tags.csv', article_name)
-        article_content, readNav_html = get_article_content_cached()
-        article_summary = clear_html_format(article_content)[:30]
+        #article_content, readNav_html = get_article_content_cached()
+        #article_summary = clear_html_format(article_content)[:30]
 
         # 分页参数
         page = request.args.get('page', default=1, type=int)
@@ -492,12 +534,11 @@ def blog_detail(article):
         blogDate = get_file_date(article_name)
         theme = session.get('theme', 'day-theme')  # 获取当前主题
 
-        response = make_response(render_template('detail.html', title=title, article_content=article_content,
+        response = make_response(render_template('zyDetail.html', title=title, article_content=1,
                                                  articleName=article_name, theme=theme,
                                                  author=author, blogDate=blogDate,
                                                  url_for=url_for, article_url=article_url,
-                                                 article_Surl=article_Surl, article_summary=article_summary,
-                                                 readNav=readNav_html, article_tags=article_tags))
+                                                 article_Surl=article_Surl, article_tags=article_tags))
 
         # 设置服务器端缓存时间
         response.cache_control.max_age = 180
@@ -1127,22 +1168,21 @@ def vip_blog(article_name):
             if 'theme' not in session:
                 session['theme'] = 'day-theme'  # 如果不存在，则设置默认主题为白天（day-theme）
 
-            article_content, readNav_html = get_article_content(article_name, 215)
-            article_summary = clear_html_format(article_content)
-            article_summary = article_summary[:30]
-
+            #article_content, readNav_html = get_article_content(article_name, 215)
+            #article_summary = clear_html_format(article_content)
+            #article_summary = article_summary[:30]
             # 分页参数
-            page = request.args.get('page', default=1, type=int)
+            #page = request.args.get('page', default=1, type=int)
             per_page = 10  # 每页显示的评论数量
 
             username = None
             if session.get('logged_in'):
                 username = session.get('username')
 
-            return render_template('detail.html', article_content=article_content, articleName=article_name,
+            return render_template('zyDetail.html', article_content=1, articleName=article_name,
                                    theme=session['theme'], author=author, blogDate=blogDate,
                                    url_for=url_for, username=username, article_url=article_url,
-                                   article_Surl=article_Surl, article_summary=article_summary, readNav=readNav_html)
+                                   article_Surl=article_Surl)
 
         elif request.method == 'POST':
             content = request.json.get('content', '')
@@ -1173,9 +1213,9 @@ def zy_pw_blog(article_name):
                 if 'theme' not in session:
                     session['theme'] = 'day-theme'  # 如果不存在，则设置默认主题为白天（day-theme）
 
-                article_content, readNav_html = get_article_content(article_name, 215)
-                article_summary = clear_html_format(article_content)
-                article_summary = article_summary[:30]
+                #article_content, readNav_html = get_article_content(article_name, 215)
+                #article_summary = clear_html_format(article_content)
+                #article_summary = article_summary[:30]
 
                 # 分页参数
                 page = request.args.get('page', default=1, type=int)
@@ -1185,16 +1225,16 @@ def zy_pw_blog(article_name):
                 if session.get('logged_in'):
                     username = session.get('username')
 
-                return render_template('detail.html', article_content=article_content, articleName=article_name,
+                return render_template('zyDetail.html', article_content=1, articleName=article_name,
                                        theme=session['theme'], author=author, blogDate=blogDate,
                                        url_for=url_for, username=username, article_url=article_url,
-                                       article_Surl=article_Surl, article_summary=article_summary, readNav=readNav_html)
+                                       article_Surl=article_Surl)
 
             except FileNotFoundError:
                 return render_template('error.html', status_code='404'), 404
 
         else:
-            return render_template('detail.html', articleName=article_name,
+            return render_template('zyDetail.html', articleName=article_name,
                                    theme=session['theme'],
                                    url_for=url_for)
 
