@@ -16,7 +16,7 @@ def get_article_names(page=1, per_page=10):
     files = os.listdir('articles')
     markdown_files = [file for file in files if file.endswith('.md')]
 
-    # Sort markdown_files in reverse order based on modified date
+    # 根据修改日期对markdown_files进行逆序排序
     markdown_files = sorted(markdown_files, key=lambda f: datetime.datetime.fromtimestamp(os.path.getmtime(os.path.join(
         'articles', f))), reverse=True)
 
@@ -24,12 +24,15 @@ def get_article_names(page=1, per_page=10):
     end_index = start_index + per_page
 
     for file in markdown_files[start_index:end_index]:
-        article_name = file[:-3]  # Remove the file extension (.md)
+        article_name = file[:-3]  # 去除文件扩展名(.md)
         articles.append(article_name)
 
-    # Check if each article is in hidden.txt and remove it if necessary
+    # 检查每篇文章是否在hidden.txt中，并在必要时将其移除
     hidden_articles = read_hidden_articles()
     articles = [article for article in articles if article not in hidden_articles]
+
+    # 移除文章名称列表中以下划线开头的文章
+    articles = [article for article in articles if not article.startswith('_')]
 
     has_next_page = end_index < len(markdown_files)
     has_previous_page = start_index > 0
@@ -146,6 +149,7 @@ def zy_get_comment(article_name, page=1, per_page=10):
 
 
 def zy_post_comment(article_name, username, comment):
+    ### 已经弃用的功能
     # 检查用户名是否为None
     if username == 'None':
         return "未登录用户无法评论"
