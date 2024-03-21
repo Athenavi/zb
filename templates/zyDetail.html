@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="zyBLOG|基于flask的博客程序">
+    <meta name="keywords" content="zyBLOG{% for Tag in article_tags %},{{ Tag }}{% endfor %}">
+    <meta name="robots" content="index, follow">
+    <title>{{ articleName }} | {{ title }}</title>
+    {% if theme=="night-theme" %}
+    <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/docsify/lib/themes/dark.css">
+    {% else %}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify/themes/vue.css">
+    {% endif %}
+    <script src="//cdn.jsdelivr.net/npm/docsify/lib/plugins/emoji.min.js"></script>
+    <script src="//cdn.jsdelivr.net/npm/docsify/lib/plugins/zoom-image.min.js"></script>
+<body class="{{ theme }}">
+<div id="app" class={{theme}}></div>
+<div id="read">
+<span style="color: #444444">本文来自奇客舒，作者：{{ author }}，转载请注明原文链接：<a href="{{ article_Surl }}"
+                                                                                    target="_blank">{{ article_Surl }}</a>
+</span>
+</div>
+<div id='comments_zone' style="display: none;">
+    <span>author:<a href="/profile?id={{ author }}" target="_blank">{{ author }}</a></span><br/><span>最近一次修订的日期:{{ blogDate }}</span>
+    <img src="../static/image/zytag.svg" style="height: 16px" alt="">
+    <span>
+                {% for Tag in article_tags %}
+                    <a href="/?tag={{ Tag }}">{{ Tag }}</a>
+                {% endfor %}
+                </span>
+    <button id="hide_comments" onclick="hideComments()" style="display: none;">隐藏评论区</button>
+    <script src="https://utteranc.es/client.js"
+            repo="Athenavi/comments"
+            issue-term="url"
+            {% if theme=="night-theme" %}
+            theme="github-dark"
+            {% else %}
+            theme="github-light"
+            {% endif %}
+            crossorigin="anonymous"
+            async>
+    </script>
+</div>
+<script>
+    function showComments() {
+        document.getElementById('comments_zone').style.display = 'block';
+        document.getElementById('show_comments').style.display = 'none';
+        document.getElementById('hide_comments').style.display = 'block';
+    }
+
+    function hideComments() {
+        document.getElementById('comments_zone').style.display = 'none';
+        document.getElementById('show_comments').style.display = 'block';
+        document.getElementById('hide_comments').style.display = 'none';
+    }
+</script>
+<script>
+    window.$docsify = {
+        auto2top: true,
+        name: '{{ articleName }}',
+        nameLink: '/',
+        executeScript: true,
+        mergeNavbar: true,
+        loadNavbar: '../api/_navbar.md',
+        coverpage: '../api/_coverpage.md',
+        loadSidebar: '../api/_sidebar.md',
+        subMaxLevel: 2,
+        alias: {
+            '/': '../api/{{ articleName }}.md',
+        },
+        count: {
+            countable: true,
+            fontsize: '0.9em',
+            color: 'rgb(90,90,90)',
+            language: 'chinese'
+        }
+    };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/docsify/lib/docsify.min.js"></script>
+<script src="//cdn.jsdelivr.net/npm/docsify-copy-code/dist/docsify-copy-code.min.js"></script>
+<script src="//unpkg.com/docsify-count/dist/countable.js"></script>
+</body>
+
+</html>
+{% if not article_content %}
+<div id="fullscreen">
+    <form id="passwordForm">
+        <a>{{ articleName }}需要</a>
+        <label for="password">访问密码:</label>
+        <input type="password" id="password" name="password" placeholder="输入密码" required>
+        <input type="submit" value="提交">
+    </form>
+</div>
+<script>
+    function submitForm() {
+        var passwordInput = document.getElementById("password");
+        var password = passwordInput.value;
+
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", "/blog/" + '{{ article }}', true);
+        xhr.setRequestHeader("Content-type", "application/json");
+
+        var data = JSON.stringify({
+            "article": '{{ article }}',   // 替换为实际文章参数值
+            "code": password   // 使用输入的密码作为code参数的值
+        });
+
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+                if (xhr.status === 200) {
+                    alert("提交成功！");   // 请求成功的处理逻辑
+                } else {
+                    alert("提交失败。请稍后再试。");   // 请求失败的处理逻辑
+                }
+            }
+        };
+
+        xhr.send(data);
+    }
+
+    window.onload = function () {
+        document.getElementById("password").focus();
+    };
+</script>
+{% endif %}
+<style>
+    #comments_zone {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: #0c5460;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    }
+
+    html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+    }
+
+    #fullscreen {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: #0c5460;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    }
+
+    #passwordForm {
+        max-width: 300px;
+        padding: 20px;
+        background-color: white;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+
+    #passwordForm input[type="password"] {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 10px;
+        box-sizing: border-box;
+    }
+
+    #passwordForm input[type="submit"] {
+        width: 100%;
+        padding: 10px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        cursor: pointer;
+    }
+</style>
