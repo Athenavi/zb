@@ -1,8 +1,6 @@
-# zyBLOG - 一个简易的博客程序
-
-**此项目的另一分支 [lite](https://github.com/Athenavi/zb/tree/lite) 现已支持*vercel*,无需繁琐配置**
-
-*此项目 [zb](https://github.com/Athenavi/zb) 基于项目 [zyBLOG](https://github.com/Athenavi/zyBLOG) 更新优化，以提升过去版本的安全性和响应速度*
+# zyBLOG - flask博客
+ 此项目的更新内容请查阅`update.txt`
+*此项目 [zb](https://github.com/Athenavi/zb) 基于项目 [zyBLOG](https://github.com/Athenavi/zyBLOG) ，改进UI以及提升响应速度*
 ## 简介
 
 [zyBLOG](https://github.com/Athenavi/zyBLOG) 是一个基于 Python Flask 和 WSGI 的简易博客程序

@@ -30,7 +30,6 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-
 def zy_upload_file():
     if request.method == 'POST':
         # 检查是否有文件被上传

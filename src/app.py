@@ -262,16 +262,16 @@ def get_city_code():
     city_name = clear_html_format(city_name)
     return zy_get_city_code(city_name)
 
+
 @app.route('/blog/<any>/api/<articleName>', methods=['GET', 'POST'])
 @app.route('/blog/api/<articleName>', methods=['GET', 'POST'])
 @app.route('/api/<articleName>', methods=['GET', 'POST'])
 def sys_out_file(articleName):
     # 隐藏文章判别
     hidden_articles = read_hidden_articles()
-    #print(hidden_articles)
     if articleName[:-3] in hidden_articles:
         # 隐藏的文章
-        return "我预判到了你。。。"
+        return zy_pw_blog(articleName[:-3])
     try:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         articles_dir = os.path.join(base_dir, 'articles')
@@ -398,11 +398,10 @@ def get_list_intersection(list1, list2):
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
-    if 'key' not in request.cookies:
-        return redirect(url_for('diy_space', page='start'))
     # 获取客户端IP地址
     ip = get_client_ip(request, session)
     city_name, city_code = analyze_ip_location(ip)
+
     if request.method == 'GET':
         page = request.args.get('page', default=1, type=int)
         tag = request.args.get('tag')
@@ -410,7 +409,9 @@ def home():
         if page <= 0:
             page = 1
 
-        theme = session.get('theme', 'day-theme')  # 获取当前主题
+        if 'theme' not in session:
+            session['theme'] = 'day-theme'  # 设置默认主题
+        theme = session.get('theme')  # 获取当前主题
         cache_key = f'page_content:{page}:{theme}:{tag}'  # 根据页面值和主题,标签生成缓存键
 
         # 从缓存中获取页面内容
@@ -420,44 +421,56 @@ def home():
 
         # 重新获取页面内容
         articles, has_next_page, has_previous_page = get_article_names(page=page)
+
         # 模版配置
         template = env.get_template('zyhome.html')
-        if display != 'default':
-            template_path = f'templates/theme/{display}/index.html'
-            if os.path.exists(template_path):
-                template = env.get_template(f'theme/{display}/index.html')
-            else:
-                # 处理文件不存在的情况，例如选择默认模板或者其他操作
-                template = env.get_template('zyhome.html')
-        session.setdefault('theme', 'day-theme')
-        notice = read_file('notice/1.txt', 50)
-        tags = get_unique_tags('articles/tags.csv')
+        display = session.get('display', 'default')
+        template_path = f'templates/theme/{display}/index.html'
+        if os.path.exists(template_path):
+            template = env.get_template(f'theme/{display}/index.html')
+
+        notice = ''
+        try:
+            notice = read_file('notice/1.txt', 50)
+        except Exception as e:
+            app.logger.error(f'读取通知文件出错: {e}')
+
+        tags = []
+        try:
+            tags = get_unique_tags('articles/tags.csv')
+        except Exception as e:
+            app.logger.error(f'获取标签出错: {e}')
+
         if tag:
             tag_articles = get_articles_by_tag('articles/tags.csv', tag)
             articles = get_list_intersection(articles, tag_articles)
 
         # 获取用户名
         username = session.get('username')
-        app.logger.info('当前访问的用户:{}, IP:{}, IP归属地:{},城市代码:{}'.format(username, ip, city_name, city_code))
+        app.logger.info(f'当前访问的用户: {username}, IP: {ip}, IP归属地: {city_name}, 城市代码: {city_code}')
 
         # 渲染模板并存储渲染后的页面内容到缓存中
         rendered_content = template.render(
-            title=title, articles=articles, url_for=url_for, theme=session['theme'], IPinfo=city_name,
+            title=title, articles=articles, url_for=url_for, theme=theme, IPinfo=city_name,
             notice=notice, has_next_page=has_next_page, has_previous_page=has_previous_page,
-            current_page=page, city_code=city_code, username=username, tags=tags, CopyRight=CopyRight
+            current_page=page, city_code=city_code, username=username, tags=tags, CopyRight='Your CopyRight'
         )
+
         # 将渲染后的页面内容保存到缓存，并设置过期时间
         cache.set(cache_key, rendered_content, timeout=30)
         resp = make_response(rendered_content)
+
         if username is None:
-            username = 'qks' + format(random.randint(1000, 9999))  # 可以设置一个默认值或者抛出异常，具体根据需求进行处理
+            username = 'qks' + format(random.randint(10000, 99999))
+            app.logger.warning('未找到用户名，生成随机用户名: %s', username)
+            session['username'] = username
 
         resp.set_cookie('key', 'zyBLOG' + username, 7200)
-        # 设置 cookie
         return resp
 
     else:
         return render_template('zyhome.html')
+
 
 @app.route('/blog/discord/README.md', methods=['GET', 'POST'])
 def discord_R():
@@ -483,8 +496,6 @@ def discord_R():
 """
 
 
-
-
 @app.route('/blog/<article>', methods=['GET', 'POST'])
 @app.route('/blog/<article>.html', methods=['GET', 'POST'])
 def blog_detail(article):
@@ -496,7 +507,7 @@ def blog_detail(article):
 
         if article_name in hidden_articles:
             # 隐藏的文章
-            return vip_blog(article_name)
+            return zy_pw_blog(article_name)
 
         if article_name not in article_names[0]:
             return render_template('error.html', status_code='404'), 404
@@ -507,16 +518,6 @@ def blog_detail(article):
             return get_article_content(article, 215)
 
         article_tags = get_tags_by_article('articles/tags.csv', article_name)
-        #article_content, readNav_html = get_article_content_cached()
-        #article_summary = clear_html_format(article_content)[:30]
-
-        # 分页参数
-        page = request.args.get('page', default=1, type=int)
-        per_page = 10  # 每页显示的评论数量
-
-        username = None
-        if session.get('logged_in'):
-            username = session.get('username')
         '''
         # 通过关键字缓存评论内容
         @cache.cached(timeout=180, key_prefix=f"comments_{article_name}_{username}")
@@ -607,7 +608,7 @@ def generate_sitemap():
             return response
 
     files = os.listdir('articles')
-    markdown_files = [file for file in files if file.endswith('.md')]
+    markdown_files = [file for file in files if file.endswith('.md') and not file.startswith('_')]
 
     # 创建XML文件头
     xml_data = '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -658,7 +659,7 @@ def generate_rss():
     hidden_articles = read_hidden_articles()
     hidden_articles = [ha + ".md" for ha in hidden_articles]
     files = os.listdir('articles')
-    markdown_files = [file for file in files if file.endswith('.md')]
+    markdown_files = [file for file in files if file.endswith('.md') and not file.startswith('_')]
     markdown_files = markdown_files[:10]
 
     # 创建XML文件头及其他信息...
@@ -1148,53 +1149,6 @@ def travel():
         return "Failed to fetch sitemap content."
 
 
-def vip_blog(article_name):
-    userStatus = get_user_status()
-    username = get_username()
-    auth = False  # 设置默认值
-
-    if userStatus and username is not None:
-        # Auth 认证
-        auth = auth_articles(article_name, username)
-
-    if auth:
-        if request.method == 'GET':
-            article_Surl = domain + 'blog/' + article_name
-            article_url = "https://api.7trees.cn/qrcode/?data=" + article_Surl
-            author = get_blog_author(article_name)
-            blogDate = get_file_date(article_name) + '——_______该文章处于隐藏模式(他人不可见)______——'
-
-            # 检查session中是否存在theme键
-            if 'theme' not in session:
-                session['theme'] = 'day-theme'  # 如果不存在，则设置默认主题为白天（day-theme）
-
-            #article_content, readNav_html = get_article_content(article_name, 215)
-            #article_summary = clear_html_format(article_content)
-            #article_summary = article_summary[:30]
-            # 分页参数
-            #page = request.args.get('page', default=1, type=int)
-            per_page = 10  # 每页显示的评论数量
-
-            username = None
-            if session.get('logged_in'):
-                username = session.get('username')
-
-            return render_template('zyDetail.html', article_content=1, articleName=article_name,
-                                   theme=session['theme'], author=author, blogDate=blogDate,
-                                   url_for=url_for, username=username, article_url=article_url,
-                                   article_Surl=article_Surl)
-
-        elif request.method == 'POST':
-            content = request.json.get('content', '')
-            show_edit = zy_show_article(content)
-            return jsonify({'show_edit': show_edit})
-        else:
-            # 渲染编辑页面
-            return zy_pw_blog(article_name)
-    else:
-        return zy_pw_blog(article_name)
-
-
 def zy_pw_blog(article_name):
     session.setdefault('theme', 'day-theme')
     if request.method == 'GET':
@@ -1202,41 +1156,15 @@ def zy_pw_blog(article_name):
         codePass = zy_pw_check(article_name, request.args.get('password'))
         if codePass == 'success':
             try:
-                # 根据文章名称获取相应的内容并处理
-                article_name = article_name
-                article_Surl = domain + 'blog/' + article_name
-                article_url = "https://api.7trees.cn/qrcode/?data=" + article_Surl
-                author = get_blog_author(article_name)
-                blogDate = get_file_date(article_name) + '文章密码已认证'
+                base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                articles_dir = os.path.join(base_dir, 'articles')
+                return send_from_directory(articles_dir, article_name + '.md')
+            except Exception as e:
+                return "An internal error occurred", 500
 
-                # 检查session中是否存在theme键
-                if 'theme' not in session:
-                    session['theme'] = 'day-theme'  # 如果不存在，则设置默认主题为白天（day-theme）
-
-                #article_content, readNav_html = get_article_content(article_name, 215)
-                #article_summary = clear_html_format(article_content)
-                #article_summary = article_summary[:30]
-
-                # 分页参数
-                page = request.args.get('page', default=1, type=int)
-                per_page = 10  # 每页显示的评论数量
-
-                username = None
-                if session.get('logged_in'):
-                    username = session.get('username')
-
-                return render_template('zyDetail.html', article_content=1, articleName=article_name,
-                                       theme=session['theme'], author=author, blogDate=blogDate,
-                                       url_for=url_for, username=username, article_url=article_url,
-                                       article_Surl=article_Surl)
-
-            except FileNotFoundError:
-                return render_template('error.html', status_code='404'), 404
-
-        else:
-            return render_template('zyDetail.html', articleName=article_name,
-                                   theme=session['theme'],
-                                   url_for=url_for)
+    return render_template('zyDetail.html', articleName=article_name,
+                           theme=session['theme'],
+                           url_for=url_for)
 
 
 def zy_pw_check(article, code):
@@ -1614,6 +1542,7 @@ def favicon():
     return send_file('../static/favicon.ico', mimetype='image/png')
 
 
+"""
 @app.route('/<page>', methods=['GET', 'POST'])
 def diy_space(page):
     if ContractedAuthor(page) is True:
@@ -1628,6 +1557,7 @@ def diy_space(page):
                 resp.set_cookie('key', 'zyBLOG' + username, 7200)
             return resp
     return render_template('error.html')
+"""
 
 
 def Gen_TempAuthPW():
