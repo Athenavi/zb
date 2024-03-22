@@ -8,9 +8,9 @@ from src.database import get_database_connection
 
 config = ConfigParser()
 try:
-    config.read('config_example.ini', encoding='utf-8')
+    config.read('config.ini', encoding='utf-8')
 except UnicodeDecodeError:
-    config.read('config_example.ini', encoding='gbk')
+    config.read('config.ini', encoding='gbk')
 
 door_key = config.get('admin', 'key').strip("'")
 

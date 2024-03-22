@@ -9,8 +9,6 @@ def get_database_connection():
     except UnicodeDecodeError:
         config.read('config.ini', encoding='gbk')
 
-    door_key = config.get('admin', 'key').strip("'")
-
     db_config = dict(config.items('database'))
 
     zy_db = mysql.connector.connect(
