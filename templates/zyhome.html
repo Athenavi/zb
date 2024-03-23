@@ -41,10 +41,10 @@
                                 {% set i = range(1000)|random %}
                                 {% if loop.index is even %}
                                     <h3 class="card-title">&nbsp;&nbsp;&nbsp;&nbsp;{{ article }}</h3>
-                                    <img src="https://qks.icu/api/file/rand?name=imgs.txt&{{ article }}"
+                                    <img src="http://api.7trees.cn/img?1"
                                          alt="{{ article }}">
                                 {% else %}
-                                    <img src="https://qks.icu/api/file/rand?name=imgs.txt&{{ article }}"
+                                    <img src="http://api.7trees.cn/img?2"
                                          alt="{{ article }}">
                                     <h3 class="card-title">&nbsp;&nbsp;&nbsp;&nbsp;{{ article }}</h3>
                                 {% endif %}
@@ -74,7 +74,7 @@
             <a class="button" href="Mailto:support@7trees.cn">联系我</a>
             <hr>
             <span style="margin-right: 5px;">Ctrl + F 搜索内容</span>
-            <img src="/static/image/wchat.svg"
+            <img src="/static/image/gzh.png"
                  alt="Wx——qrcode" style="height: 95px;">
             <hr>
             <a class="button" href="/travel">随机一篇文章</a><br>
