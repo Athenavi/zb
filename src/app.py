@@ -27,7 +27,7 @@ from src.AboutLogin import zy_login, zy_register, get_email, profile, zy_mail_lo
 from src.AboutPW import zy_change_password, zy_confirm_password
 from src.BlogDeal import get_article_names, get_article_content, clear_html_format, zy_post_comment, \
     get_file_date, get_blog_author, generate_random_text, read_hidden_articles, zy_send_message, auth_articles, \
-    zy_show_article, zy_edit_article
+    zy_show_article, zy_edit_article,get_all_article_names
 from src.database import get_database_connection
 from src.user import zyadmin, zy_delete_file, zy_new_article, error, get_owner_articles
 from src.utils import zy_upload_file, get_user_status, get_username, get_client_ip, read_file, \
@@ -59,9 +59,9 @@ app.logger.setLevel(logging.INFO)
 
 config = ConfigParser()
 try:
-    config.read('config_example.ini', encoding='utf-8')
+    config.read('config.ini', encoding='utf-8')
 except UnicodeDecodeError:
-    config.read('config_example.ini', encoding='gbk')
+    config.read('config.ini', encoding='gbk')
 # 应用分享配置参数
 from datetime import datetime, timedelta
 
@@ -502,33 +502,17 @@ def blog_detail(article):
     try:
         # 根据文章名称获取相应的内容并处理
         article_name = article
-        article_names = get_article_names()
+        article_names = get_all_article_names()
         hidden_articles = read_hidden_articles()
 
         if article_name in hidden_articles:
             # 隐藏的文章
             return zy_pw_blog(article_name)
 
-        if article_name not in article_names[0]:
+        if article_name not in article_names:
             return render_template('error.html', status_code='404'), 404
 
-        # 通过关键字缓存内容
-        @cache.cached(timeout=180, key_prefix=f"article_{article_name}")
-        def get_article_content_cached():
-            return get_article_content(article, 215)
-
         article_tags = get_tags_by_article('articles/tags.csv', article_name)
-        '''
-        # 通过关键字缓存评论内容
-        @cache.cached(timeout=180, key_prefix=f"comments_{article_name}_{username}")
-        def get_comments_cached():
-            if username is not None:
-                return zy_get_comment(article_name, page=page, per_page=per_page)
-            else:
-                return None
-        
-        comments = get_comments_cached()
-        '''
         article_Surl = domain + 'blog/' + article_name
         article_url = "https://api.7trees.cn/qrcode/?data=" + article_Surl
         author = get_blog_author(article_name)
@@ -1414,6 +1398,7 @@ def serve_static(filename):
 
 
 # 彩虹聚合登录
+api_host = config.get('general', 'api_host').strip("'")
 app_id = config.get('general', 'app_id').strip("'")
 app_key = config.get('general', 'app_key').strip("'")
 
@@ -1425,7 +1410,7 @@ def cc_login(provider):
 
     redirect_uri = domain + "callback/" + provider
 
-    login_url = f'https://u.cccyun.cc/connect.php?act=login&appid={app_id}&appkey={app_key}&type={provider}&redirect_uri={redirect_uri}'
+    login_url = f'{api_host}connect.php?act=login&appid={app_id}&appkey={app_key}&type={provider}&redirect_uri={redirect_uri}'
     response = requests.get(login_url)
     data = response.json()
     code = data.get('code')
@@ -1448,7 +1433,7 @@ def callback(provider):
 
     authorization_code = request.args.get('code')
 
-    callback_url = f'https://u.cccyun.cc/connect.php?act=callback&appid={app_id}&appkey={app_key}&type={provider}&code={authorization_code}'
+    callback_url = f'{api_host}connect.php?act=callback&appid={app_id}&appkey={app_key}&type={provider}&code={authorization_code}'
 
     response = requests.get(callback_url)
     data = response.json()
@@ -1471,7 +1456,7 @@ def callback(provider):
 
 
 def get_user_info(provider, social_uid):
-    apiURl = f'https://u.cccyun.cc/connect.php?act=query&appid={app_id}&appkey={app_key}&type={provider}&social_uid={social_uid}'
+    apiURl = f'{api_host}connect.php?act=query&appid={app_id}&appkey={app_key}&type={provider}&social_uid={social_uid}'
     response = requests.get(apiURl)
     data = response.json()
     code = data.get('code')

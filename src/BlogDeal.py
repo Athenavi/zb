@@ -40,6 +40,36 @@ def get_article_names(page=1, per_page=10):
     return articles, has_next_page, has_previous_page
 
 
+def get_all_article_names():
+    articles = []
+    files = os.listdir('articles')
+    markdown_files = [file for file in files if file.endswith('.md')]
+
+    # 根据修改日期对markdown_files进行逆序排序
+    markdown_files = sorted(markdown_files, key=lambda f: datetime.datetime.fromtimestamp(os.path.getmtime(os.path.join(
+        'articles', f))), reverse=True)
+
+    for file in markdown_files:
+        article_name = file[:-3]
+        articles.append(article_name)
+
+    # 检查每篇文章是否在hidden.txt中，并在必要时将其移除
+    hidden_articles = read_hidden_articles()
+    articles = [article for article in articles if article not in hidden_articles]
+
+    # 移除文章名称列表中以下划线开头的文章
+    articles = [article for article in articles if not article.startswith('_')]
+
+    return articles
+
+
+
+
+
+
+
+
+
 def read_hidden_articles():
     with open('articles/hidden.txt', 'r', encoding='utf-8') as hidden_file:
         hidden_articles = hidden_file.read().splitlines()
