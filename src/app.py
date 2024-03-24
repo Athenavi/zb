@@ -27,7 +27,7 @@ from src.AboutLogin import zy_login, zy_register, get_email, profile, zy_mail_lo
 from src.AboutPW import zy_change_password, zy_confirm_password
 from src.BlogDeal import get_article_names, get_article_content, clear_html_format, zy_post_comment, \
     get_file_date, get_blog_author, generate_random_text, read_hidden_articles, zy_send_message, auth_articles, \
-    zy_show_article, zy_edit_article,get_all_article_names
+    zy_show_article, zy_edit_article, get_all_article_names
 from src.database import get_database_connection
 from src.user import zyadmin, zy_delete_file, zy_new_article, error, get_owner_articles
 from src.utils import zy_upload_file, get_user_status, get_username, get_client_ip, read_file, \
@@ -190,24 +190,33 @@ def search():
 
 
 def analyze_ip_location(ip_address):
-    city_name = session.get('city_name')
-    city_code = session.get('city_code')
-    if city_name is not None and city_code is not None:
-        return city_name, city_code
-    else:
-        try:
-            ip_api_url = f'http://whois.pconline.com.cn/ipJson.jsp?ip={ip_address}&json=true'
-            response = requests.get(ip_api_url)
-            data = response.json()
-            city_name = data.get('city')
-            city_code = data.get('cityCode')
-            session['city_name'] = city_name
-            session['city_code'] = city_code
-        except requests.exceptions.ProxyError:
-            city_name = None
-            city_code = None
+    # 使用IP地址作为缓存的键
+    if ip_address in session:
+        return session[ip_address]
 
-        return city_name, city_code
+    try:
+        ip_api_url = f'http://whois.pconline.com.cn/ipJson.jsp?ip={ip_address}&json=true'
+        response = requests.get(ip_api_url, timeout=3)  # 设置超时时间为3秒
+        data = response.json()
+
+        city_name = data.get('city', '未知')
+        city_code = data.get('cityCode', '未知')
+
+        # 如果API没有返回城市名称或代码，则赋值为“未知”
+        if not city_name:
+            city_name = '未知'
+        if not city_code:
+            city_code = '未知'
+
+    except (requests.exceptions.Timeout, requests.exceptions.ProxyError):
+        # 处理超时和代理错误，将城市名称和代码设为“未知”
+        city_name = '接口异常'
+        city_code = '接口异常'
+
+    # 将结果缓存，避免重复查询
+    session[ip_address] = (city_name, city_code)
+
+    return city_name, city_code
 
 
 def check_exist(cache_file):
@@ -411,13 +420,16 @@ def home():
 
         if 'theme' not in session:
             session['theme'] = 'day-theme'  # 设置默认主题
-        theme = session.get('theme')  # 获取当前主题
-        cache_key = f'page_content:{page}:{theme}:{tag}'  # 根据页面值和主题,标签生成缓存键
+        theme = session.get('theme')
+        cache_key = f'page_content:{page}:{theme}:{tag}'  # 根据页面值、主题以及标签生成缓存键
 
-        # 从缓存中获取页面内容
+        # 尝试从缓存中获取页面内容
         content = cache.get(cache_key)
         if content:
-            return content
+            # 设置浏览器缓存
+            resp = make_response(content)
+            resp.headers['Cache-Control'] = 'public, max-age=600'  # 缓存为10分钟
+            return resp
 
         # 重新获取页面内容
         articles, has_next_page, has_previous_page = get_article_names(page=page)
@@ -451,13 +463,12 @@ def home():
 
         # 渲染模板并存储渲染后的页面内容到缓存中
         rendered_content = template.render(
-            title=title, articles=articles, url_for=url_for, theme=theme, IPinfo=city_name,
+            title=title, articles=articles, url_for=url_for, theme=theme,
             notice=notice, has_next_page=has_next_page, has_previous_page=has_previous_page,
-            current_page=page, city_code=city_code, username=username, tags=tags, CopyRight='Your CopyRight'
+            current_page=page, tags=tags, CopyRight='Your CopyRight'
         )
-
-        # 将渲染后的页面内容保存到缓存，并设置过期时间
-        cache.set(cache_key, rendered_content, timeout=30)
+        # 缓存渲染后的页面内容，并设置服务端缓存过期时间
+        cache.set(cache_key, rendered_content, timeout=300)
         resp = make_response(rendered_content)
 
         if username is None:
@@ -496,13 +507,19 @@ def discord_R():
 """
 
 
+@cache.memoize(30)
+def get_a_list():
+    return get_all_article_names()
+
+
 @app.route('/blog/<article>', methods=['GET', 'POST'])
 @app.route('/blog/<article>.html', methods=['GET', 'POST'])
 def blog_detail(article):
     try:
         # 根据文章名称获取相应的内容并处理
         article_name = article
-        article_names = get_all_article_names()
+        article_names = get_a_list()
+        # print(article_names)
         hidden_articles = read_hidden_articles()
 
         if article_name in hidden_articles:
@@ -527,10 +544,10 @@ def blog_detail(article):
 
         # 设置服务器端缓存时间
         response.cache_control.max_age = 180
-        response.expires = datetime.utcnow() + timedelta(seconds=180)
+        response.expires = datetime.utcnow() + timedelta(seconds=300)
 
         # 设置浏览器端缓存时间
-        response.headers['Cache-Control'] = 'public, max-age=180'
+        response.headers['Cache-Control'] = 'public, max-age=300'
 
         return response
 
