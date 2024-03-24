@@ -46,7 +46,7 @@ def zy_login():
     return render_template('zylogin.html', title="登录")
 
 
-def zy_register():
+def zy_register(ip):
     if request.method == 'POST':
         username = bleach.clean(request.form['username'])  # 使用 bleach 进行 XSS 防范
         password = bleach.clean(request.form['password'])
@@ -84,6 +84,10 @@ def zy_register():
                 # 将邀请码标记为已使用
                 update_query = "UPDATE inviteCode SET is_used = TRUE WHERE uuid = %s"
                 cursor.execute(update_query, (result[0],))
+                db.commit()
+                # 记录IP
+                register_ip_query = "INSERT INTO ip (`used`, `ip`, `username`) VALUES (%s, %s, %s);"
+                cursor.execute(register_ip_query, (ip, ip, username))
                 db.commit()
                 session.pop('logged_in', None)
                 session.pop('username', None)
@@ -137,7 +141,7 @@ def profile(email):
     return avatar_url
 
 
-def zy_mail_login(user_email):
+def zy_mail_login(user_email, ip):
     username = 'qks' + format(random.randint(1000, 9999))
     password = '123456'
     db = get_database_connection()
@@ -171,6 +175,9 @@ def zy_mail_login(user_email):
             resp = make_response(render_template('success.html', message=message))
             session['logged_in'] = True
             session['username'] = username
+            register_ip_query = "INSERT INTO ip (`used`, `ip`, `username`) VALUES (%s, %s, %s);"
+            cursor.execute(register_ip_query, (ip, ip, username))
+            db.commit()
             # 设置 cookie
             resp.set_cookie('login_statu', '1', 30)
             return resp

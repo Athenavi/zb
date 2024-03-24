@@ -25,13 +25,14 @@ from werkzeug.security import safe_join
 
 from src.AboutLogin import zy_login, zy_register, get_email, profile, zy_mail_login
 from src.AboutPW import zy_change_password, zy_confirm_password
-from src.BlogDeal import get_article_names, get_article_content, clear_html_format, zy_post_comment, \
+from src.BlogDeal import get_article_names, get_article_content, clear_html_format, \
     get_file_date, get_blog_author, generate_random_text, read_hidden_articles, zy_send_message, auth_articles, \
     zy_show_article, zy_edit_article, get_all_article_names
 from src.database import get_database_connection
 from src.user import zyadmin, zy_delete_file, zy_new_article, error, get_owner_articles
 from src.utils import zy_upload_file, get_user_status, get_username, get_client_ip, read_file, \
     zy_save_edit
+from src.links import create_special_url
 
 global_encoding = 'utf-8'
 template_dir = 'templates'  # 模板文件的目录
@@ -85,7 +86,8 @@ def login():
 # 注册页面
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    return zy_register()
+    ip = get_client_ip(request, session)
+    return zy_register(ip)
 
 
 # 登出页面
@@ -530,8 +532,9 @@ def blog_detail(article):
             return render_template('error.html', status_code='404'), 404
 
         article_tags = get_tags_by_article('articles/tags.csv', article_name)
-        article_Surl = domain + 'blog/' + article_name
-        article_url = "https://api.7trees.cn/qrcode/?data=" + article_Surl
+        article_url = domain + 'blog/' + article_name
+        article_Surl = api_shortlink(article_url)
+        # print(article_Surl)
         author = get_blog_author(article_name)
         blogDate = get_file_date(article_name)
         theme = session.get('theme', 'day-theme')  # 获取当前主题
@@ -539,8 +542,7 @@ def blog_detail(article):
         response = make_response(render_template('zyDetail.html', title=title, article_content=1,
                                                  articleName=article_name, theme=theme,
                                                  author=author, blogDate=blogDate,
-                                                 url_for=url_for, article_url=article_url,
-                                                 article_Surl=article_Surl, article_tags=article_tags))
+                                                 url_for=url_for, article_Surl=article_Surl, article_tags=article_tags))
 
         # 设置服务器端缓存时间
         response.cache_control.max_age = 180
@@ -555,8 +557,8 @@ def blog_detail(article):
         return render_template('error.html', status_code='404'), 404
 
 
+"""
 last_comment_time = {}  # 全局变量，用于记录用户最后评论时间
-
 
 @app.route('/post_comment', methods=['POST'])
 def post_comment():
@@ -589,6 +591,7 @@ def post_comment():
     }
 
     return json.dumps(response)
+"""
 
 
 @app.route('/sitemap.xml')
@@ -620,10 +623,10 @@ def generate_sitemap():
         article_name = file[:-3]  # 移除文件扩展名 (.md)
         article_url = domain + 'blog/' + article_name
         date = get_file_date(article_name)
-
+        article_Surl = api_shortlink(article_url)
         # 创建url标签并包含链接
         xml_data += '<url>\n'
-        xml_data += f'\t<loc>{article_url}</loc>\n'
+        xml_data += f'\t<loc>{article_Surl}</loc>\n'
         xml_data += f'\t<lastmod>{date}</lastmod>\n'  # 添加适当的标签
         xml_data += '\t<changefreq>Monthly</changefreq>\n'  # 添加适当的标签
         xml_data += '\t<priority>0.8</priority>\n'  # 添加适当的标签
@@ -667,7 +670,7 @@ def generate_rss():
     xml_data = '<?xml version="1.0" encoding="UTF-8"?>\n'
     xml_data += '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">\n'
     xml_data += '<channel>\n'
-    xml_data += '<title>Your RSS Feed Title</title>\n'
+    xml_data += '<title>' + title + 'RSS Feed </title>\n'
     xml_data += '<link>' + domain + '</link>\n'
     xml_data += '<description>Your RSS Feed Description</description>\n'
     xml_data += '<language>en-us</language>\n'
@@ -686,10 +689,11 @@ def generate_rss():
             content, *_ = get_article_content(article_name, 10)
             describe = encoded_article_name
 
+        article_Surl = api_shortlink(article_url)
         # 创建item标签并包含内容
         xml_data += '<item>\n'
         xml_data += f'\t<title>{article_name}</title>\n'
-        xml_data += f'\t<link>{article_url}</link>\n'
+        xml_data += f'\t<link>{article_Surl}</link>\n'
         xml_data += f'\t<guid>{article_url}</guid>\n'
         xml_data += f'\t<pubDate>{date}</pubDate>\n'
         xml_data += f'\t<description>{describe}</description>\n'
@@ -715,8 +719,8 @@ def confirm_password():
 
 @app.route('/change-password', methods=['GET', 'POST'])
 def change_password():
-    # 调用已定义的change_password函数
-    return zy_change_password()
+    ip = get_client_ip(request, session)
+    return zy_change_password(ip)
 
 
 @app.route('/admin/<key>', methods=['GET', 'POST'])
@@ -1467,7 +1471,7 @@ def callback(provider):
         elif provider != 'qq' and 'wx':
             user_email = social_uid + "@qks.com"
         face_img = get_user_info(provider, social_uid)
-        return zy_mail_login(user_email)
+        return zy_mail_login(user_email, ip)
 
     return render_template('zylogin.html', error=msg)
 
@@ -1570,11 +1574,79 @@ def Gen_TempAuthPW():
     app.logger.info('更新上传密码:{}'.format(tempAuthPW))
 
 
-def ContractedAuthor(page):
-    authorMapper.read('author/mapper.ini', encoding=global_encoding)
-    AuthorizePage = authorMapper.get('Authorize', 'list')
+@cache.cached(timeout=300, key_prefix='short_link')
+@app.route('/s/<short_url>', methods=['GET', 'POST'])
+def redirect_to_long_url_route(short_url):
+    if len(short_url) != 6:
+        return 'error'
+    user_agent = request.headers.get('User-Agent')
+    db = get_database_connection()
+    cursor = db.cursor()
 
-    if page in AuthorizePage:
-        return True
+    # 根据短网址查询数据库获取对应的长网址
+    query = "SELECT long_url FROM urls WHERE short_url = %s"
+    cursor.execute(query, (short_url,))
+    result = cursor.fetchone()
+
+    if result:
+        # 如果找到对应的长网址，则进行重定向
+        long_url = result[0]
+
+        # 记录响应次数和第一次响应时间到opentimes表
+        insert_query = "INSERT INTO opentimes (short_url, response_count, first_response_time) VALUES (%s, %s, %s) " \
+                       "ON DUPLICATE KEY UPDATE response_count = response_count + 1"
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        cursor.execute(insert_query, (short_url, 1, current_time))
+        db.commit()
+
+        # 获取请求者的 IP 地址
+        ip_address = get_client_ip(request, session)
+        app.logger.info('当前访问的用户:IP:{},UA:{}'.format(ip_address, user_agent))
+        db.commit()
+
+        # 关闭数据库连接
+        cursor.close()
+        db.close()
+
+        return redirect(long_url, code=302)
     else:
-        return False
+        # 如果没有找到对应的长网址，则返回错误页面或其他处理逻辑
+        logging.error(f"Invalid short URL: {short_url}")
+        return "短网址无效"
+
+
+@app.route('/api/shortlink')
+def api_shortlink(long_url):
+    if not long_url.startswith('https://') and not long_url.startswith('http://'):
+        return 'error'
+    username = '7trees'
+    short_url = create_special_url(long_url, username)  # 传递用户名参数
+    article_Surl = domain + 's/' + short_url
+    return article_Surl
+
+
+@cache.cached(timeout=1200)
+def get_link_info(username):
+    db = get_database_connection()
+    cursor = db.cursor()
+
+    # 查询用户是否为管理员
+    query_admin = "SELECT ifAdmin FROM users WHERE username = %s"
+    cursor.execute(query_admin, (username,))
+    admin_result = cursor.fetchone()
+
+    # 如果用户是管理员，则查询所有链接信息
+    if admin_result and admin_result[0] == 1:
+        query = "SELECT created_at, short_url, long_url FROM urls"
+        cursor.execute(query)
+    else:
+        # 否则，查询特定用户的链接信息
+        query = "SELECT created_at, short_url, long_url FROM urls WHERE username = %s"
+        cursor.execute(query, (username,))
+
+    result = cursor.fetchall()
+
+    cursor.close()
+    db.close()
+
+    return jsonify(result)

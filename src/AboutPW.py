@@ -3,7 +3,7 @@ from flask import session, flash, redirect, url_for, render_template, request
 from src.database import get_database_connection
 
 
-def zy_change_password():
+def zy_change_password(ip):
     if 'logged_in' not in session:
         flash('修改密码需要先登录')
         return redirect(url_for('login'))
@@ -42,6 +42,11 @@ def zy_change_password():
                 update_query = "UPDATE users SET password = %s WHERE username = %s"
                 cursor.execute(update_query, (hashed_password.decode('utf-8'), username))
                 db.commit()
+
+                update_ip_query = "UPDATE ip SET used = %s WHERE username = %s"
+                cursor.execute(update_ip_query, (ip, username))
+                db.commit()
+
                 cursor.close()
                 db.close()
 
