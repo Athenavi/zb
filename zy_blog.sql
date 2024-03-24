@@ -2,10 +2,10 @@
 -- version 5.2.1
 -- https://www.phpmyadmin.net/
 --
--- 主机： localhost
--- 生成日期： 2023-10-07 16:22:28
--- 服务器版本： 8.0.34
--- PHP 版本： 8.2.4
+-- 主机： 127.0.0.1
+-- 生成日期： 2024-03-24 14:12:45
+-- 服务器版本： 8.0.36
+-- PHP 版本： 8.2.12
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -32,8 +32,8 @@ CREATE TABLE `cities` (
   `pid` int DEFAULT NULL,
   `city_code` varchar(20) DEFAULT NULL,
   `city_name` varchar(50) DEFAULT NULL,
-  `post_code` varchar(20) CHARACTER SET utf8mb4  DEFAULT NULL,
-  `area_code` varchar(20) CHARACTER SET utf8mb4  DEFAULT NULL
+  `post_code` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
+  `area_code` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 --
@@ -2579,19 +2579,6 @@ INSERT INTO `cities` (`id`, `pid`, `city_code`, `city_name`, `post_code`, `area_
 -- --------------------------------------------------------
 
 --
--- 表的结构 `comments`
---
-
-CREATE TABLE `comments` (
-  `username` varchar(255) NOT NULL,
-  `article_name` char(255) NOT NULL,
-  `comment` tinytext NOT NULL,
-  `add_date` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- --------------------------------------------------------
-
---
 -- 表的结构 `invitecode`
 --
 
@@ -2606,27 +2593,26 @@ CREATE TABLE `invitecode` (
 --
 
 INSERT INTO `invitecode` (`uuid`, `code`, `is_used`) VALUES
-('1', '9988', 1),
-('2', '8989', 0);
+('f4f36405-e9dc-11ee-9225-f80dac08c659', '9988', 1);
 
 -- --------------------------------------------------------
 
 --
--- 表的结构 `ipcount`
+-- 表的结构 `ip`
 --
 
-CREATE TABLE `ipcount` (
-  `used_IP` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci,
+CREATE TABLE `ip` (
+  `used` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci,
   `ip` varchar(45) DEFAULT NULL,
-  `username` char(24) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL
+  `username` char(24) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb3;
 
 --
--- 转存表中的数据 `ipcount`
+-- 转存表中的数据 `ip`
 --
 
-INSERT INTO `ipcount` (`used_IP`, `ip`, `username`) VALUES
-('127.0.0.1;127.0.0.1;127.0.0.1;127.0.0.1;', '127.0.0.1', 'test');
+INSERT INTO `ip` (`used`, `ip`, `username`) VALUES
+('127.0.0.1', '127.0.0.1', 'test');
 
 -- --------------------------------------------------------
 
@@ -2655,6 +2641,13 @@ CREATE TABLE `urls` (
   `username` varchar(255) NOT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb3;
 
+--
+-- 转存表中的数据 `urls`
+--
+
+INSERT INTO `urls` (`id`, `long_url`, `short_url`, `created_at`, `username`) VALUES
+(3, 'https://7trees.cn', '7trees', '2024-03-24 09:56:15', '7trees');
+
 -- --------------------------------------------------------
 
 --
@@ -2674,23 +2667,23 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `username`, `password`, `ifAdmin`, `email`) VALUES
-(1, 'test', '$2b$12$1FjwIi8RHii.F21p1D5c8OXuhM7Ksdyet77AQ4bI6kpFlmv41Bo0i', 1, 'support@7trees.cn');
+(1, 'test', '$2b$12$DN7g21B4E1A04wnXM8MXSOae4lgP/OlZGUmG90aPvrOf1csEGZEBK', 1, 'support@7trees.cn');
 
 --
 -- 转储表的索引
 --
 
 --
--- 表的索引 `comments`
---
-ALTER TABLE `comments`
-  ADD PRIMARY KEY (`add_date`);
-
---
 -- 表的索引 `invitecode`
 --
 ALTER TABLE `invitecode`
   ADD PRIMARY KEY (`uuid`);
+
+--
+-- 表的索引 `ip`
+--
+ALTER TABLE `ip`
+  ADD PRIMARY KEY (`username`);
 
 --
 -- 表的索引 `opentimes`
@@ -2720,19 +2713,19 @@ ALTER TABLE `users`
 -- 使用表AUTO_INCREMENT `opentimes`
 --
 ALTER TABLE `opentimes`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=31;
 
 --
 -- 使用表AUTO_INCREMENT `urls`
 --
 ALTER TABLE `urls`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- 使用表AUTO_INCREMENT `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
