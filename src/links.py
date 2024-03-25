@@ -2,8 +2,8 @@ from datetime import datetime
 
 from flask import render_template
 
-from database import get_database_connection
-from utils import generate_short_url
+from src.database import get_database_connection
+from src.utils import generate_short_url
 
 
 # 专属
