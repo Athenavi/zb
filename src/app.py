@@ -1650,3 +1650,56 @@ def get_link_info(username):
     db.close()
 
     return jsonify(result)
+
+
+@cache.cached(timeout=1200)
+@app.route('/<article_id>.html', methods=['GET', 'POST'])
+def id_find_article(article_id):
+    if re.match(r'^\d{1,4}$', article_id):
+        user_agent = request.headers.get('User-Agent')
+        db = get_database_connection()
+        cursor = db.cursor()
+
+        # 根据短网址查询数据库获取对应的长网址
+        query = "SELECT long_url FROM urls WHERE id = %s"
+        cursor.execute(query, (article_id,))
+        result = cursor.fetchone()
+
+        if result:
+            # 如果找到对应的长网址，则进行重定向
+            long_url = result[0]
+
+            # 获取请求者的 IP 地址
+            ip_address = get_client_ip(request, session)
+            app.logger.info('当前访问的用户:IP:{},UA:{}'.format(ip_address, user_agent))
+            db.commit()
+
+            # 关闭数据库连接
+            cursor.close()
+            db.close()
+
+            return redirect(long_url, code=302)
+    else:
+        # 如果没有找到对应的长网址，则返回错误页面或其他处理逻辑
+        logging.error(f"Invalid short URL: {article_id}")
+        return error(message='无效的文章', status_code=404)
+
+
+@cache.cached(timeout=1200)
+@app.route('/blog/<article_name>/images/<image_name>', methods=['GET', 'POST'])
+def sys_out_article_img(article_name, image_name):
+    author = get_blog_author(article_name)
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    articles_img_dir = os.path.join(base_dir, 'media', author)
+    return send_from_directory(articles_img_dir, image_name)
+
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return "Page not found", 404
+
+
+# 添加一个函数来处理未定义路由的错误
+@app.errorhandler(500)
+def internal_server_error(e):
+    return "Internal server error", 500
