@@ -11,7 +11,7 @@ import re
 import shutil
 import time
 import urllib
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ElementTree
 from configparser import ConfigParser
 import portalocker
 import requests
@@ -114,7 +114,7 @@ if display != 'default':
     # 读取 template.ini 文件
     theme_display.read(f'templates/theme/{display}/template.ini', encoding=global_encoding)
     # 获取配置文件中的属性值
-    CopyRight = ' Theme Author:' + theme_display.get('default', 'author').strip("'")
+    CopyRight = ' Theme By:' + theme_display.get('default', 'author').strip("'")
 
 
 @app.route('/toggle_theme', methods=['POST'])  # 处理切换主题的请求
@@ -149,7 +149,7 @@ def search():
             markdown_files = [file for file in files if file.endswith('.md')]
 
             # 创建XML根元素
-            root = ET.Element('root')
+            root = ElementTree.Element('root')
 
             for file in markdown_files:
                 article_name = file[:-3]  # 移除文件扩展名 (.md)
@@ -161,24 +161,24 @@ def search():
 
                 if keyword.lower() in article_name.lower() or keyword.lower() in describe.lower():
                     # 创建item元素并包含内容
-                    item = ET.SubElement(root, 'item')
-                    ET.SubElement(item, 'title').text = article_name
-                    ET.SubElement(item, 'link').text = article_url
-                    ET.SubElement(item, 'pubDate').text = date
-                    ET.SubElement(item, 'description').text = describe
+                    item = ElementTree.SubElement(root, 'item')
+                    ElementTree.SubElement(item, 'title').text = article_name
+                    ElementTree.SubElement(item, 'link').text = article_url
+                    ElementTree.SubElement(item, 'pubDate').text = date
+                    ElementTree.SubElement(item, 'description').text = describe
 
             # 创建XML树
-            tree = ET.ElementTree(root)
+            tree = ElementTree.ElementTree(root)
 
             # 将XML数据转换为字符串
-            match_data = ET.tostring(tree.getroot(), encoding=global_encoding, method='xml').decode()
+            match_data = ElementTree.tostring(tree.getroot(), encoding=global_encoding, method='xml').decode()
 
             # 写入缓存
             with open(cache_path, 'w') as cache_file:
                 cache_file.write(match_data)
 
         # 解析XML数据
-        parsed_data = ET.fromstring(match_data)
+        parsed_data = ElementTree.fromstring(match_data)
         for item in parsed_data.findall('item'):
             content = {
                 'title': item.find('title').text,
@@ -246,15 +246,15 @@ def get_weather(city_code):
         with portalocker.Lock(lock_file, timeout=1):
             # Check again if cache file is created by another request
             check_exist(cache_file)
-            apiUrl = f'http://t.weather.itboy.net/api/weather/city/{city_code}'
+            weather_api_url = f'http://t.weather.itboy.net/api/weather/city/{city_code}'
             try:
-                response = requests.get(apiUrl)
-                processedData = response.json()
+                response = requests.get(weather_api_url)
+                processed_data = response.json()
 
                 with open(cache_file, 'w') as f:
-                    json.dump(processedData, f)
+                    json.dump(processed_data, f)
 
-                return jsonify(processedData)
+                return jsonify(processed_data)
             except Exception as e:
                 error_message = {'error': str(e)}
                 return jsonify(error_message), 500
@@ -277,17 +277,17 @@ def get_city_code():
 @app.route('/blog/<any>/api/<articleName>', methods=['GET', 'POST'])
 @app.route('/blog/api/<articleName>', methods=['GET', 'POST'])
 @app.route('/api/<articleName>', methods=['GET', 'POST'])
-def sys_out_file(articleName):
+def sys_out_file(article_name):
     # 隐藏文章判别
     hidden_articles = read_hidden_articles()
-    if articleName[:-3] in hidden_articles:
+    if article_name[:-3] in hidden_articles:
         # 隐藏的文章
-        return zy_pw_blog(articleName[:-3])
+        return zy_pw_blog(article_name[:-3])
     try:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         articles_dir = os.path.join(base_dir, 'articles')
-        return send_from_directory(articles_dir, articleName)
-    except Exception as e:
+        return send_from_directory(articles_dir, article_name)
+    except Exception:
         return "An internal error occurred", 500
 
 
@@ -296,27 +296,27 @@ def space():
     avatar_url = profile('guest@7trees.cn')
     template = env.get_template('zyprofile.html')
     session.setdefault('theme', 'day-theme')
-    notice = read_file('notice/1.txt', 50)
+    notice = read_file('notice/1.txt', 300)
     userStatus = get_user_status()
     username = get_username()
-    ownerArticles = None
+    owner_articles = None
 
     if userStatus and username is not None:
-        ownerName = request.args.get('id')
-        if ownerName is None or ownerName == '':
-            ownerName = username
-        ownerArticles = get_owner_articles(ownerName)
-        avatar_url = get_email(ownerName)
+        owner_name = request.args.get('id')
+        if owner_name is None or owner_name == '':
+            owner_name = username
+        owner_articles = get_owner_articles(owner_name)
+        avatar_url = get_email(owner_name)
         avatar_url = profile(avatar_url)
         if 'faceimg' in session:
             avatar_url = session['faceimg']
-    if ownerArticles is None:
-        ownerArticles = []  # 设置为空列表
+    if owner_articles is None:
+        owner_articles = []  # 设置为空列表
 
     return template.render(url_for=url_for, theme=session['theme'],
                            notice=notice, avatar_url=avatar_url,
                            userStatus=userStatus, username=username,
-                           Articles=ownerArticles)
+                           Articles=owner_articles)
 
 
 @app.route('/settingRegion', methods=['POST'])
@@ -430,7 +430,7 @@ def home():
         if content:
             # 设置浏览器缓存
             resp = make_response(content)
-            resp.headers['Cache-Control'] = 'public, max-age=600'  # 缓存为10分钟
+            resp.headers['Cache-Control'] = 'public, max-age=240'  # 缓存为4分钟
             return resp
 
         # 重新获取页面内容
@@ -438,14 +438,14 @@ def home():
 
         # 模版配置
         template = env.get_template('zyhome.html')
-        display = session.get('display', 'default')
-        template_path = f'templates/theme/{display}/index.html'
+        template_display = session.get('display', 'default')
+        template_path = f'templates/theme/{template_display}/index.html'
         if os.path.exists(template_path):
-            template = env.get_template(f'theme/{display}/index.html')
+            template = env.get_template(f'theme/{template_display}/index.html')
 
         notice = ''
         try:
-            notice = read_file('notice/1.txt', 50)
+            notice = read_file('notice/1.txt', 300)
         except Exception as e:
             app.logger.error(f'读取通知文件出错: {e}')
 
@@ -467,10 +467,10 @@ def home():
         rendered_content = template.render(
             title=title, articles=articles, url_for=url_for, theme=theme,
             notice=notice, has_next_page=has_next_page, has_previous_page=has_previous_page,
-            current_page=page, tags=tags, CopyRight='Your CopyRight'
+            current_page=page, tags=tags,
         )
         # 缓存渲染后的页面内容，并设置服务端缓存过期时间
-        cache.set(cache_key, rendered_content, timeout=300)
+        cache.set(cache_key, rendered_content, timeout=60)
         resp = make_response(rendered_content)
 
         if username is None:
@@ -486,7 +486,7 @@ def home():
 
 
 @app.route('/blog/discord/README.md', methods=['GET', 'POST'])
-def discord_R():
+def discord_r():
     return """
     社区讨论条约
 
@@ -533,16 +533,16 @@ def blog_detail(article):
 
         article_tags = get_tags_by_article('articles/tags.csv', article_name)
         article_url = domain + 'blog/' + article_name
-        article_Surl = api_shortlink(article_url)
+        article_surl = api_shortlink(article_url)
         # print(article_Surl)
         author = get_blog_author(article_name)
-        blogDate = get_file_date(article_name)
+        update_date = get_file_date(article_name)
         theme = session.get('theme', 'day-theme')  # 获取当前主题
 
         response = make_response(render_template('zyDetail.html', title=title, article_content=1,
                                                  articleName=article_name, theme=theme,
-                                                 author=author, blogDate=blogDate,
-                                                 url_for=url_for, article_Surl=article_Surl, article_tags=article_tags))
+                                                 author=author, blogDate=update_date,
+                                                 url_for=url_for, article_Surl=article_surl, article_tags=article_tags))
 
         # 设置服务器端缓存时间
         response.cache_control.max_age = 180
@@ -623,10 +623,10 @@ def generate_sitemap():
         article_name = file[:-3]  # 移除文件扩展名 (.md)
         article_url = domain + 'blog/' + article_name
         date = get_file_date(article_name)
-        article_Surl = api_shortlink(article_url)
+        article_surl = api_shortlink(article_url)
         # 创建url标签并包含链接
         xml_data += '<url>\n'
-        xml_data += f'\t<loc>{article_Surl}</loc>\n'
+        xml_data += f'\t<loc>{article_surl}</loc>\n'
         xml_data += f'\t<lastmod>{date}</lastmod>\n'  # 添加适当的标签
         xml_data += '\t<changefreq>Monthly</changefreq>\n'  # 添加适当的标签
         xml_data += '\t<priority>0.8</priority>\n'  # 添加适当的标签
@@ -689,11 +689,11 @@ def generate_rss():
             content, *_ = get_article_content(article_name, 10)
             describe = encoded_article_name
 
-        article_Surl = api_shortlink(article_url)
+        article_surl = api_shortlink(article_url)
         # 创建item标签并包含内容
         xml_data += '<item>\n'
         xml_data += f'\t<title>{article_name}</title>\n'
-        xml_data += f'\t<link>{article_Surl}</link>\n'
+        xml_data += f'\t<link>{article_surl}</link>\n'
         xml_data += f'\t<guid>{article_url}</guid>\n'
         xml_data += f'\t<pubDate>{date}</pubDate>\n'
         xml_data += f'\t<description>{describe}</description>\n'
@@ -1135,7 +1135,7 @@ def is_hidden(article):
 def travel():
     response = requests.get(domain + 'sitemap.xml')  # 发起对/sitemap接口的请求
     if response.status_code == 200:
-        tree = ET.fromstring(response.content)  # 使用xml.etree.ElementTree解析响应内容
+        tree = ElementTree.fromstring(response.content)  # 使用xml.etree.ElementTree解析响应内容
 
         urls = []  # 用于记录提取的URL列表
         for url_element in tree.findall('{http://www.sitemaps.org/schemas/sitemap/0.9}url'):
@@ -1158,13 +1158,13 @@ def zy_pw_blog(article_name):
     session.setdefault('theme', 'day-theme')
     if request.method == 'GET':
         # 在此处添加密码验证的逻辑
-        codePass = zy_pw_check(article_name, request.args.get('password'))
-        if codePass == 'success':
+        article_pwd_check = zy_pw_check(article_name, request.args.get('password'))
+        if article_pwd_check == 'success':
             try:
                 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                 articles_dir = os.path.join(base_dir, 'articles')
                 return send_from_directory(articles_dir, article_name + '.md')
-            except Exception as e:
+            except Exception:
                 return "An internal error occurred", 500
 
     return render_template('zyDetail.html', articleName=article_name,
@@ -1220,10 +1220,10 @@ def change_article_pw(filename):
         auth = auth_articles(article, username)
 
     if auth:
-        newCode = request.get_json()['NewPass']
+        article_pwd = request.get_json()['NewPass']
         article = request.get_json()["Article"]
-        if newCode == '': newCode = '0000'
-        return zy_change_article_pw(article, newCode)
+        if article_pwd == '': article_pwd = '0000'
+        return zy_change_article_pw(article, article_pwd)
 
     else:
         return error(message='您没有权限', status_code=503)
@@ -1446,7 +1446,7 @@ def cc_login(provider):
 
 @app.route('/callback/<provider>')
 def callback(provider):
-    global user_email
+    user_email = ''
     if provider not in ['qq', 'wx', 'alipay', 'sina', 'baidu', 'huawei', 'xiaomi', 'dingtalk']:
         return jsonify({'message': 'Invalid login provider'})
 
@@ -1477,8 +1477,8 @@ def callback(provider):
 
 
 def get_user_info(provider, social_uid):
-    apiURl = f'{api_host}connect.php?act=query&appid={app_id}&appkey={app_key}&type={provider}&social_uid={social_uid}'
-    response = requests.get(apiURl)
+    login_api_url = f'{api_host}connect.php?act=query&appid={app_id}&appkey={app_key}&type={provider}&social_uid={social_uid}'
+    response = requests.get(login_api_url)
     data = response.json()
     code = data.get('code')
     faceimg = None
@@ -1499,20 +1499,20 @@ def get_theme_detail(theme_id):
         tid = theme_detail.get('default', 'id').strip("'")
         author = theme_detail.get('default', 'author').strip("'")
         theme_title = theme_detail.get('default', 'title').strip("'")
-        authorWebsite = theme_detail.get('default', 'authorWebsite').strip("'")
+        author_website = theme_detail.get('default', 'authorWebsite').strip("'")
         version = theme_detail.get('default', 'version').strip("'")
-        versionCode = theme_detail.get('default', 'versionCode').strip("'")
-        updateUrl = theme_detail.get('default', 'updateUrl').strip("'")
+        version_code = theme_detail.get('default', 'versionCode').strip("'")
+        update_url = theme_detail.get('default', 'updateUrl').strip("'")
         screenshot = theme_detail.get('default', 'screenshot').strip("'")
 
         theme_properties = {
             'id': tid,
             'author': author,
             'title': theme_title,
-            'authorWebsite': authorWebsite,
+            'authorWebsite': author_website,
             'version': version,
-            'versionCode': versionCode,
-            'updateUrl': updateUrl,
+            'versionCode': version_code,
+            'updateUrl': update_url,
             'screenshot': screenshot,
         }
 
@@ -1566,14 +1566,6 @@ def diy_space(page):
 """
 
 
-def Gen_TempAuthPW():
-    tempAuthPW = generate_random_text()  # 生成随机文本的函数，需要提供实现
-    session['upload_pw'] = tempAuthPW
-    session['upload_pw_time'] = datetime.now().timestamp()
-    print(tempAuthPW)
-    app.logger.info('更新上传密码:{}'.format(tempAuthPW))
-
-
 @cache.cached(timeout=300, key_prefix='short_link')
 @app.route('/s/<short_url>', methods=['GET', 'POST'])
 def redirect_to_long_url_route(short_url):
@@ -1621,8 +1613,8 @@ def api_shortlink(long_url):
         return 'error'
     username = '7trees'
     short_url = create_special_url(long_url, username)  # 传递用户名参数
-    article_Surl = domain + 's/' + short_url
-    return article_Surl
+    article_surl = domain + 's/' + short_url
+    return article_surl
 
 
 @cache.cached(timeout=1200)
@@ -1695,11 +1687,11 @@ def sys_out_article_img(article_name, image_name):
 
 
 @app.errorhandler(404)
-def page_not_found(e):
+def page_not_found():
     return "Page not found", 404
 
 
 # 添加一个函数来处理未定义路由的错误
 @app.errorhandler(500)
-def internal_server_error(e):
+def internal_server_error():
     return "Internal server error", 500

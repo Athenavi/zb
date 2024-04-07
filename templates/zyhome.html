@@ -14,6 +14,7 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="../static/css/main.css">
     <link rel="stylesheet" href="../static/css/card.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
 </head>
 
@@ -25,7 +26,7 @@
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="block-content block-content-full px-lg-4 py-md-4 py-lg-4">
-                <span>公告:{{ notice|safe }}/官方{{ CopyRight }}</span><br>
+                <span>{{ notice|safe }}</span><br>
                 <hr>
                 {% if has_previous_page %}
                     <a href="{{ url_for('home', page=current_page-1) }}">Previous</a>
@@ -41,6 +42,7 @@
                                 {% set i = range(1000)|random %}
                                 {% if loop.index is even %}
                                     <h3 class="card-title">&nbsp;&nbsp;&nbsp;&nbsp;{{ article }}</h3>
+                                    <i class="iconfont icon-time1"></i>
                                     <img src="http://api.7trees.cn/img?1"
                                          alt="{{ article }}">
                                 {% else %}
