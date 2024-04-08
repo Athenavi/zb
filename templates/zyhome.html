@@ -1,6 +1,5 @@
 <!doctype html>
 <html lang="zh-CN">
-
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
@@ -8,76 +7,73 @@
     <meta name="keywords" content="zyBLOG, flask, 七棵树, 奇客舒, 博客">
     <meta name="robots" content="index, follow">
     <title>{{ title }} | zyBLOG</title>
-    <!-- Bootstrap CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css"
-          integrity="sha384-xOolHFLEh07PJGoPkLv1IbcEPTNtaed2xpHsD9ESMhqIYd0nLMwNLD69Npy4HI+N" crossorigin="anonymous">
-    <!-- Custom CSS -->
-    <link rel="stylesheet" href="../static/css/main.css">
-    <link rel="stylesheet" href="../static/css/card.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="/static/css/card.css">
+    <!-- FontAwesome Icons -->
+    <script src="https://kit.fontawesome.com/9a44b29ba7.js" crossorigin="anonymous"></script>
 </head>
 
 <body class="{{ theme }}">
+
+<!-- Navigation -->
 {% from 'header.html' import zytopbar %}
 {{ zytopbar() }}
-<!-- 顶部导航 -->
-<div class="container">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="block-content block-content-full px-lg-4 py-md-4 py-lg-4">
-                <span>{{ notice|safe }}</span><br>
-                <hr>
-                {% if has_previous_page %}
-                    <a href="{{ url_for('home', page=current_page-1) }}">Previous</a>
-                {% endif %}
-                <span>----------</span>
-                {% if has_next_page %}
-                    <a href="{{ url_for('home', page=current_page+1) }}">Next</a>
-                {% endif %}
-                {% for article in articles %}
-                    <div class="card mb-4">
-                        <a href="{{ url_for('blog_detail', article=article) }}" class="card-link">
-                            <div class="card-body" style="display: flex; background: transparent">
-                                {% set i = range(1000)|random %}
-                                {% if loop.index is even %}
-                                    <h3 class="card-title">&nbsp;&nbsp;&nbsp;&nbsp;{{ article }}</h3>
-                                    <i class="iconfont icon-time1"></i>
-                                    <img src="http://api.7trees.cn/img?1"
-                                         alt="{{ article }}">
-                                {% else %}
-                                    <img src="http://api.7trees.cn/img?2"
-                                         alt="{{ article }}">
-                                    <h3 class="card-title">&nbsp;&nbsp;&nbsp;&nbsp;{{ article }}</h3>
-                                {% endif %}
-                            </div>
-                        </a>
+
+<div class="container-fluid">
+    <div class="row">
+        <span>{{notice|safe}}</span>
+        <!-- Main Content -->
+        <main class="col-md-8">
+            {% for article, time in articles_time_list %}
+            <div class="card mb-4 shadow-sm">
+                <div class="card-body d-flex align-items-center">
+                    <img class="img-fluid" style="max-height: 75px;" src="http://api.7trees.cn/img" alt="{{ article }}">
+                    <div>
+                        <h5 class="card-title ml-3">{{ article }}</h5>
+                        <p class="text-muted mb-2 ml-3">发布于 {{ time }}</p>
+                        <a href="{{ url_for('blog_detail', article=article) }}" class="stretched-link"></a>
                     </div>
-                    <hr>
-                {% endfor %}
-                <a href="#top">回到顶部</a>
-                {% if has_previous_page %}
-                    <a href="{{ url_for('home', page=current_page-1) }}">Previous</a>
-                {% endif %}
-                <span>----------</span>
-                {% if has_next_page %}
-                    <a href="{{ url_for('home', page=current_page+1) }}">Next</a>
-                {% endif %}
+                </div>
             </div>
-        </div>
-        <!-- other -->
-        <div class="col">
-            <hr>
-            <img src="../static/image/zytag.svg" style="height: 16px"/>
-            {% for Tag in tags %}
-                <a href="/?tag={{ Tag }}">{{ Tag }}</a>
             {% endfor %}
+            <!-- Pagination -->
+            <nav aria-label="Page navigation example">
+                <ul class="pagination justify-content-center">
+                    {% if has_previous_page %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('home', page=current_page-1) }}" aria-label="Previous">
+                            <span aria-hidden="true">&laquo; 上一页</span>
+                        </a>
+                    </li>
+                    {% endif %}
+                    {% if has_next_page %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('home', page=current_page+1) }}" aria-label="Next">
+                            <span aria-hidden="true">下一页 &raquo;</span>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </main>
+        <!-- Side Content -->
+        <aside class="col-md-4">
+            <div class="p-4 mb-3 bg-light rounded">
+                <h4 class="font-italic">标签</h4>
+                {% for tag in tags %}
+                <span><a href="/?tag={{tag}}">{{tag}}</a></span>
+                {% endfor %}
+            </div>
             <hr>
             <a class="button" href="Mailto:support@7trees.cn">联系我</a>
             <hr>
             <span style="margin-right: 5px;">Ctrl + F 搜索内容</span>
-            <img src="/static/image/gzh.png"
-                 alt="Wx——qrcode" style="height: 95px;">
+            <img src="/static/image/gzh.png" alt="Wx——qrcode" style="height: 95px;">
             <hr>
             <a class="button" href="/travel">随机一篇文章</a><br>
             <a class="button" href="/newArticle" alt="上传投稿">上传投稿</a><br>
@@ -87,48 +83,14 @@
             <a class="button" href="/sitemap">站点地图</a><br>
             <a class="button" href="/feed">RSS订阅</a><br>
             <br>
-        </div>
+        </aside>
     </div>
 </div>
-<div>
-</div>
+
+<!-- Footer -->
 {% from 'footer.html' import zyfooter %}
 {{ zyfooter() }}
-</body>
-</html>
-<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.slim.min.js"
-        integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj"
-        crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"
-        integrity="sha384-Fy6S3B9q64WdZWQUiU+q4/2Lc9npb8tCaSX9FK7E8HnRr0Jz8D6OP9dO5Vg3Q9ct"
-        crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/jquery"></script>
-<style>
-    .card {
-        background-color: transparent;
-        border: None;
-    }
 
-    .card-body {
-        background-color: rgba(255, 255, 255, 0.8);
-        /* Set the desired transparency value in the last parameter (0.8 in this example) */
-        /* Adjust other styles as needed */
-
-        display: flex;
-        align-items: center;
-    }
-
-    .card-body img {
-        flex: 1;
-        max-width: 50%;
-        max-height: 125%;
-    }
-
-    .card-body h3 {
-        flex: 1;
-    }
-
-    .card:hover {
-        box-shadow: 0 0 10px #877725;
-    }
-</style>
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body></html>

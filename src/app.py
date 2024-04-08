@@ -274,9 +274,9 @@ def get_city_code():
     return zy_get_city_code(city_name)
 
 
-@app.route('/blog/<any>/api/<articleName>', methods=['GET', 'POST'])
-@app.route('/blog/api/<articleName>', methods=['GET', 'POST'])
-@app.route('/api/<articleName>', methods=['GET', 'POST'])
+@app.route('/blog/<any>/api/<article_name>', methods=['GET', 'POST'])
+@app.route('/blog/api/<article_name>', methods=['GET', 'POST'])
+@app.route('/api/<article_name>', methods=['GET', 'POST'])
 def sys_out_file(article_name):
     # 隐藏文章判别
     hidden_articles = read_hidden_articles()
@@ -436,6 +436,9 @@ def home():
         # 重新获取页面内容
         articles, has_next_page, has_previous_page = get_article_names(page=page)
 
+        timeList=get_file_time(articles)
+        articles_time_list = zip(articles, timeList)
+
         # 模版配置
         template = env.get_template('zyhome.html')
         template_display = session.get('display', 'default')
@@ -465,7 +468,7 @@ def home():
 
         # 渲染模板并存储渲染后的页面内容到缓存中
         rendered_content = template.render(
-            title=title, articles=articles, url_for=url_for, theme=theme,
+            title=title, articles_time_list=articles_time_list, url_for=url_for, theme=theme,
             notice=notice, has_next_page=has_next_page, has_previous_page=has_previous_page,
             current_page=page, tags=tags,
         )
@@ -473,7 +476,7 @@ def home():
         cache.set(cache_key, rendered_content, timeout=60)
         resp = make_response(rendered_content)
 
-        if username is None:
+        if (username is None):
             username = 'qks' + format(random.randint(10000, 99999))
             app.logger.warning('未找到用户名，生成随机用户名: %s', username)
             session['username'] = username
@@ -483,6 +486,29 @@ def home():
 
     else:
         return render_template('zyhome.html')
+
+@cache.cached(timeout=600, key_prefix='artile_time')
+def get_file_time(articles):
+    modify_times = []
+    for article in articles:
+        try:
+            decoded_name = urllib.parse.unquote(article)  # 对文件名进行解码处理
+            file_path = os.path.join('articles', decoded_name + '.md')
+            # 获取文件的修改时间
+            modify_time = os.path.getmtime(file_path)
+            formatted_modify_time = datetime.fromtimestamp(modify_time).strftime("%Y-%m-%d %H:%M:%S")
+            modify_times.append(formatted_modify_time)
+        except FileNotFoundError:
+            modify_times.append(None)
+
+    #print(modify_times)
+    return modify_times
+
+
+
+
+
+
 
 
 @app.route('/blog/discord/README.md', methods=['GET', 'POST'])
