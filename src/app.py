@@ -415,7 +415,7 @@ def home():
 
     if request.method == 'GET':
         page = request.args.get('page', default=1, type=int)
-        tag = request.args.get('tag')
+        tag = request.args.get('tag',default='None')
 
         if page <= 0:
             page = 1
@@ -436,9 +436,6 @@ def home():
         # 重新获取页面内容
         articles, has_next_page, has_previous_page = get_article_names(page=page)
 
-        timeList=get_file_time(articles)
-        articles_time_list = zip(articles, timeList)
-
         # 模版配置
         template = env.get_template('zyhome.html')
         template_display = session.get('display', 'default')
@@ -458,9 +455,12 @@ def home():
         except Exception as e:
             app.logger.error(f'获取标签出错: {e}')
 
-        if tag:
+        if tag != 'None':
             tag_articles = get_articles_by_tag('articles/tags.csv', tag)
             articles = get_list_intersection(articles, tag_articles)
+
+        timeList = get_file_time(articles)
+        articles_time_list = zip(articles, timeList)
 
         # 获取用户名
         username = session.get('username')
@@ -470,7 +470,7 @@ def home():
         rendered_content = template.render(
             title=title, articles_time_list=articles_time_list, url_for=url_for, theme=theme,
             notice=notice, has_next_page=has_next_page, has_previous_page=has_previous_page,
-            current_page=page, tags=tags,
+            current_page=page, tags=tags, tag=tag
         )
         # 缓存渲染后的页面内容，并设置服务端缓存过期时间
         cache.set(cache_key, rendered_content, timeout=60)
@@ -487,6 +487,7 @@ def home():
     else:
         return render_template('zyhome.html')
 
+
 @cache.cached(timeout=600, key_prefix='artile_time')
 def get_file_time(articles):
     modify_times = []
@@ -501,14 +502,8 @@ def get_file_time(articles):
         except FileNotFoundError:
             modify_times.append(None)
 
-    #print(modify_times)
+    # print(modify_times)
     return modify_times
-
-
-
-
-
-
 
 
 @app.route('/blog/discord/README.md', methods=['GET', 'POST'])

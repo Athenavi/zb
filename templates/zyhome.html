@@ -46,14 +46,14 @@
                 <ul class="pagination justify-content-center">
                     {% if has_previous_page %}
                     <li class="page-item">
-                        <a class="page-link" href="{{ url_for('home', page=current_page-1) }}" aria-label="Previous">
+                        <a class="page-link" href="/?page={{current_page-1}}&tag={{tag}}" aria-label="Previous">
                             <span aria-hidden="true">&laquo; 上一页</span>
                         </a>
                     </li>
                     {% endif %}
                     {% if has_next_page %}
                     <li class="page-item">
-                        <a class="page-link" href="{{ url_for('home', page=current_page+1) }}" aria-label="Next">
+                        <a class="page-link" href="/?page={{current_page+1}}&tag={{tag}}" aria-label="Next">
                             <span aria-hidden="true">下一页 &raquo;</span>
                         </a>
                     </li>
