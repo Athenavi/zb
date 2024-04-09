@@ -1,18 +1,101 @@
-  .card-link:hover .card {
+.card-link:hover .card {
     box-shadow: 0 0 10px #877725;
-  }
+}
 
-  .card-body {
+.card-body {
     display: flex;
     align-items: center;
-  }
+}
 
-  .card-body img {
+.card-body img {
     flex: 1;
     max-width: 50%;
     max-height: 125%;
-  }
+}
 
-  .card-body h3 {
+.card-body h3 {
     flex: 1;
-  }
+}
+
+body {
+    background-color: #f8f9fa;
+    font-family: "Nunito", sans-serif;
+}
+
+.navbar-dark .navbar-brand {
+    color: #fff;
+    font-weight: bold;
+}
+
+.card {
+    border: 1px solid transparent;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    background-color: transparent;
+}
+
+.card .card-body {
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    background-color: transparent;
+}
+
+.card .card-body img {
+    flex: 0 0 auto;
+    width: auto;
+    height: 75px; /* Adjusted for consistency */
+    margin-right: 15px;
+}
+
+.card .card-body div {
+    flex: 1;
+}
+
+.card-title {
+    color: #333;
+    font-size: 1.25rem;
+    margin-bottom: 10px;
+}
+
+.card-text, .text-muted {
+    color: #6c757d;
+}
+
+.card:hover {
+    border-color: #007bff;
+    box-shadow: 0 6px 12px rgba(0, 107, 255, 0.2);
+}
+
+.text-muted {
+    font-size: 0.85rem;
+    margin-bottom: 15px;
+}
+
+.pagination .page-link {
+    color: #007bff;
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+}
+
+.pagination .page-item.active .page-link {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+.pagination .page-item.disabled .page-link {
+    color: #6c757d;
+}
+
+.pagination .page-link:focus, .pagination .page-link:hover {
+    z-index: 2;
+    color: #0056b3;
+    background-color: #e9ecef;
+    border-color: #dee2e6;
+}
+
+.container-fluid > .row > main {
+    padding-right: 15px;
+    padding-left: 15px;
+}
