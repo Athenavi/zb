@@ -1,132 +1,106 @@
 <!-- header.html -->
-{% macro zytopbar(username) -%}
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <style>
-        #loading {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 10000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-        }
+{% macro zytopbar() -%}
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+<style>
+    #loading {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 10000;
+        background-color: rgba(0, 0, 0, 0.8);
+        color: #fff;
+        font-size: 24px;
+        text-align: center;
+        line-height: 100vh;
+    }
 
-        .fixed-icon {
-            /* 样式待添加 */
-        }
+    .fixed-icon {
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        z-index: 9999;
+    }
 
-        .popup {
-            display: none;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 95%;
-            height: 85%;
-            background-color: #fff;
-            border: 2px solid #000;
-            padding: 20px;
-            z-index: 9999;
-        }
+    .popup {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 95%;
+        max-width: 800px;
+        height: 85%;
+        max-height: 600px;
+        background-color: #fff;
+        border: 2px solid #000;
+        padding: 20px;
+        z-index: 9999;
+        overflow-y: auto;
+    }
 
-        .image-button {
-            cursor: pointer;
-        }
-    </style>
+    .image-button {
+        cursor: pointer;
+    }
+</style>
 
-    <div id="loading"><img src="../static/image/loading.gif" alt=""></div>
+<div id="loading">Loading...</div>
 
-    <div class="fixed-icon">
-        <!-- 这里放置你的图标 -->
-        <a href="#top"><img src="../static/image/rocket.svg" style="height: 40px" alt="回到顶部"></a>
+<div class="fixed-icon">
+    <a href="#top"><img src="../static/image/rocket.svg" style="height: 40px" alt="回到顶部"></a>
+</div>
 
-    </div>
-
-    <nav class="bg-blue-500">
+<nav class="bg-blue-500">
     <div class="container mx-auto flex justify-between items-center">
-        <!-- 导航栏商标 -->
-        <a class="text-xl text-white font-bold py-4" href="/"><img src="../static/favicon.ico" style="height: 32px" alt="{{ title }}"/></a>
-        <!-- 导航入口 -->
+        <a class="text-xl text-white font-bold py-4" href="/"><img src="../static/favicon.ico" style="height: 32px"/></a>
         <div class="flex items-center">
-            <!-- 导航入口内容 -->
-            <a href="/profile">
-                <img id="imageBtn" src="../static/image/author.svg" style="height: 18px" alt="{{ user }}"/>
-            </a>
-            <a class="nav-link" onclick="togglePopup()">
-                <img id="imageBtn" src="../static/image/sch.svg" alt=""/>
-            </a>
+            <a href="/profile"><img class="image-button" src="../static/image/author.svg" style="height: 18px" alt=/></a>
+            <a class="image-button" onclick="togglePopup()"><img class="fixed-icon" src="../static/image/sch.svg" alt="搜索"></a>
             <form id="theme-form" method="post" action="/toggle_theme">
-                <button type="submit" style="border: none; background-color: transparent; height: 20px">
-                    <img src="../static/image/sun.svg" alt="切换主题" style="height: 20px">
+                <button type="submit" style="border: none; background-color: transparent;">
+                    <img src="../static/image/sun.svg" alt="切换主题" style="height: 20px;">
                 </button>
             </form>
         </div>
     </div>
 </nav>
 
+<div id="popup" class="popup">
+    <button id="resetBtn" class="btn btn-primary mb-2" onclick="resetIframe()">重置</button>
+    <img src="../static/image/close.png" style="height: 28px" alt="关闭" class="image-button" onclick="togglePopup()"/>
+    <iframe src="/search" width="100%" height="100%"></iframe>
+</div>
 
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.1/umd/popper.min.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        document.getElementById("loading").style.display = "none";
+    });
 
+    function togglePopup() {
+        var popup = document.getElementById("popup");
+        popup.style.display = (popup.style.display === "none") ? "block" : "none";
+    }
 
+    function resetIframe() {
+        document.querySelector("iframe").src = document.querySelector("iframe").src;
+    }
 
+    document.getElementById("theme-form").addEventListener("submit", function (event) {
+        event.preventDefault();
+        fetch("/toggle_theme", { method: "POST" })
+            .then(function (response) {
+                if (response.ok) { location.reload(); }
+            });
+    });
 
+    document.addEventListener("keydown", function (event) {
+        if (event.ctrlKey && event.key === "f") { togglePopup(); }
+    });
 
-    <div id="popup" class="popup">
-        <button id="resetBtn" class="btn btn-primary mb-2" onclick="resetIframe()">重置</button>
-        <img id="imageBtn" src="../static/image/close.png" style="height: 28px" alt="按钮" class="image-button"
-             onclick="togglePopup()"/>
-        <iframe src="/search" width="100%" height="100%"></iframe>
-    </div>
-
-    <!-- 引入jquery.js的CDN链接 -->
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <!-- 引入popper.js的CDN链接 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.1/umd/popper.min.js"></script>
-
-    <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            var loadingElement = document.getElementById("loading");
-            loadingElement.style.display = "none";
-        });
-
-        function togglePopup() {
-            var popup = document.getElementById("popup");
-            if (popup.style.display === "none") {
-                popup.style.display = "block";
-            } else {
-                popup.style.display = "none";
-            }
-        }
-
-        function resetIframe() {
-            var iframe = document.querySelector("iframe");
-            iframe.src = iframe.src;
-        }
-
-        document.getElementById("theme-form").addEventListener("submit", function (event) {
-            event.preventDefault();
-            fetch("/toggle_theme", {
-                method: "POST"
-            })
-                .then(function (response) {
-                    if (response.ok) {
-                        location.reload();
-                    }
-                });
-        });
-
-        document.addEventListener("keydown", function (event) {
-            if (event.ctrlKey && event.key === "f") {
-                event.preventDefault();
-                togglePopup();
-            }
-        });
-
-        window.addEventListener('contextmenu', function (e) {
-            e.preventDefault();
-        }, false);
-    </script>
+    window.addEventListener('contextmenu', function (e) { e.preventDefault(); }, false);
+</script>
 {% endmacro %}

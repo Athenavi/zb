@@ -415,7 +415,7 @@ def home():
 
     if request.method == 'GET':
         page = request.args.get('page', default=1, type=int)
-        tag = request.args.get('tag',default='None')
+        tag = request.args.get('tag', default='None')
 
         if page <= 0:
             page = 1
@@ -1182,9 +1182,60 @@ def zy_pw_blog(article_name):
         article_pwd_check = zy_pw_check(article_name, request.args.get('password'))
         if article_pwd_check == 'success':
             try:
-                base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                articles_dir = os.path.join(base_dir, 'articles')
-                return send_from_directory(articles_dir, article_name + '.md')
+                theme = session['theme']
+                article_content, readNav = get_article_content(article_name, 300)
+                hidehtml1 = f'''
+                <!DOCTYPE html>
+                <!-- 网站主语言 -->
+                <html lang="zh-cn">
+                <head>
+                <!-- 网站采用的字符编码 -->
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+                <!-- 预留网站标题的位置 -->
+                <title>{article_name}</title>
+                <!-- 引入Tailwind CSS的CDN链接 -->
+                <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+                </head>
+
+                <body class='{theme}'>
+                <!-- 引入导航栏 -->
+                <!-- 定义导航栏 -->
+                <nav class="bg-blue-500">
+                <div class="container mx-auto">
+                <!-- 导航栏商标 -->
+                <a class="text-xl text-white font-bold py-4" href="/">奇客舒</a>
+                <!-- 导航入口 -->
+                <div>
+                <!-- 导航入口内容 -->
+                </div>
+                </div>
+                </nav>
+
+                <!-- 预留具体页面的位置 -->
+                <div class="container mx-auto mt-8">
+                <div class="w-2/3 mx-auto">
+                <h3 class="text-blue-500 text-xl">当前通过密码访问</h3>
+                <div class="container mx-auto">{article_content}</div>
+                </div>
+                </div>
+
+                <!-- 引入注脚 -->
+                <div class="mt-32">
+                <br><br><br>
+                </div>
+                <footer class="py-3 bg-gray-900 fixed bottom-0 w-full">
+                <div class="container mx-auto">
+                <p class="text-center text-white">版权所有 &copy; zyBLOG 2024</p>
+                </div>
+                </footer>
+                </body>
+                </html>
+                '''
+
+                return hidehtml1
+
+                # print(rendered_template)
             except Exception:
                 return "An internal error occurred", 500
 
