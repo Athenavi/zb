@@ -9,7 +9,5 @@ mysql-connector-python~=8.0.26
 bleach==6.0.0
 requests==2.31.0
 portalocker>=2.8.0
-Pillow==10.0.1
-misaka~=2.1.1
 waitress~=2.1.2
 Flask-Caching==2.1.0

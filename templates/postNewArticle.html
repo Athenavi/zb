@@ -32,13 +32,6 @@
                 <label for="file" class="block">选择要上传的文件:</label>
                 <input type="file" id="file" name="file" accept=".md" class="mt-2">
             </div>
-
-            <div class="mt-4">
-                <img id="captcha-image" src="" alt="Captcha Image" onclick="generateCaptcha()" class="cursor-pointer">
-                <label for="captcha" class="block mt-2">验证码:</label>
-                <input type="text" id="captcha" name="captcha" required class="mt-2">
-            </div>
-
             <input type="submit" value="上传"
                    class="mt-4 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
         </form>
@@ -49,69 +42,3 @@
 {{ zyfooter() }}
 </body>
 </html>
-<script>
-    var goPostElement = document.getElementById("goPost");
-    if (goPostElement) {
-        goPostElement.style.display = "none";
-    }
-</script>
-<script>
-    function postComment(event) {
-        event.preventDefault();  // 防止默认的表单提交行为
-        var captcha = document.getElementById('captcha').value;
-
-        // 发送请求以验证验证码
-        fetch('/verify_captcha', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: 'captcha=' + captcha
-        })
-            .then(function (response) {
-                return response.text();
-            })
-            .then(function (result) {
-                // 如果验证码匹配成功，执行评论逻辑
-                if (result === '验证码匹配成功') {
-                    var xhr = new XMLHttpRequest();
-                    xhr.open('POST', '/newArticle', true);
-                    // 刷新验证码图像
-                    generateCaptcha();
-                } else {
-                    // 验证码不匹配，提示用户
-                    alert('验证码不匹配');
-                    // 刷新验证码图像
-                    generateCaptcha();
-                }
-            })
-            .catch(function (error) {
-                console.error(error);
-            })
-            .finally(function () {
-                // 重新注册点击事件，以刷新验证码图像
-                var captchaImage = document.getElementById('captcha-image');
-                captchaImage.addEventListener('click', generateCaptcha);
-            });
-    }
-
-    function generateCaptcha() {
-        var captchaImage = document.getElementById('captcha-image');
-        fetch('/generate_captcha')
-            .then(function (response) {
-                return response.json(); // Parse the response as JSON
-            })
-            .then(function (result) {
-                // Update the captcha image source with the base64 image data
-                captchaImage.src = 'data:image/jpeg;base64,' + result.image;
-                captchaImage.alt = result.captcha_text;
-            })
-            .catch(function (error) {
-                console.error(error);
-                // Handle any errors if necessary
-            });
-    }
-
-    // 生成初始验证码图像
-    generateCaptcha();
-</script>

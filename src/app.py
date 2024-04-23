@@ -15,7 +15,6 @@ import xml.etree.ElementTree as ElementTree
 from configparser import ConfigParser
 import portalocker
 import requests
-from PIL import Image, ImageDraw, ImageFont
 from flask import Flask, render_template, redirect, session, request, url_for, Response, jsonify, send_file, \
     make_response, send_from_directory
 from flask_caching import Cache
@@ -129,7 +128,7 @@ def toggle_theme():
 
 @app.route('/search', methods=['GET', 'POST'])
 def search():
-    if 'username' not in session:
+    if 'logged_in' not in session:
         return render_template('zylogin.html', error='登陆后可以使用此功能')
     matched_content = []
 
@@ -313,6 +312,9 @@ def space():
     if owner_articles is None:
         owner_articles = []  # 设置为空列表
 
+    if 'default' in  owner_articles:
+        owner_articles.remove('default')
+
     return template.render(url_for=url_for, theme=session['theme'],
                            notice=notice, avatar_url=avatar_url,
                            userStatus=userStatus, username=username,
@@ -445,7 +447,7 @@ def home():
 
         notice = ''
         try:
-            notice = read_file('notice/1.txt', 300)
+            notice = read_file('notice/1.txt', 3000)
         except Exception as e:
             app.logger.error(f'读取通知文件出错: {e}')
 
@@ -930,54 +932,6 @@ def undefined_route():
 
 # ...
 
-@app.route('/generate_captcha')
-def generate_captcha():
-    image_base64 = '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'
-    captcha_text = '8er2'
-    if 'logged_in' not in session:
-        return {'image': image_base64, 'captcha_text': captcha_text}
-    # 生成验证码文本
-    captcha_text = generate_random_text()
-
-    # 创建一个新的图像对象
-    image = Image.new('RGB', (135, 80), color=(255, 255, 255))
-
-    # 创建字体对象并设置字体大小
-    font = ImageFont.truetype('static/font/babyground.ttf', size=40)
-
-    # 在图像上绘制验证码文本
-    d = ImageDraw.Draw(image)
-    d.text((35, 20), captcha_text, font=font, fill=(0, 0, 0))
-
-    # 将图像转换为 RGBA 模式
-    image = image.convert('RGBA')
-    data = image.getdata()
-
-    # 修改图像像素，将白色像素变为透明
-    theme = session.get('theme', 'day-theme')
-    if theme == 'night-theme':
-        new_data = data
-    else:
-        new_data = [(255, 255, 255, 0) if item[:3] == (255, 255, 255) else item for item in data]
-
-    # 更新图像数据
-    image.putdata(new_data)
-
-    # 保存图像到内存中
-    image_bytes = io.BytesIO()
-    image.save(image_bytes, format='PNG')
-    image_bytes.seek(0)
-
-    # 将图像转换为 base64 编码字符串
-    image_base64 = base64.b64encode(image_bytes.getvalue()).decode('ascii')
-
-    # 将验证码文本存储在 session 中，用于校对
-    session['captcha_text'] = captcha_text
-    # print(captcha_text)
-    # 返回图像的 base64 编码给用户
-    return {'image': image_base64, 'captcha_text': captcha_text}
-
-
 @app.route('/verify_captcha', methods=['POST'])
 def verify_captcha():
     # 获取前端传来的验证码值
@@ -1003,6 +957,8 @@ def send_message(message):
 
 @app.route('/edit/<article>', methods=['GET', 'POST', 'PUT'])
 def markdown_editor(article):
+    if article=='default':
+        return error(404,status_code=404)
     if 'theme' not in session:
         session['theme'] = 'day-theme'
     # notice = read_file('notice/1.txt', 50)
@@ -1758,12 +1714,39 @@ def sys_out_article_img(article_name, image_name):
     return send_from_directory(articles_img_dir, image_name)
 
 
+@cache.cached(timeout=1200)
+@app.route('/friends-links', methods=['GET', 'POST'])
+def friendslinks():
+    fl_list=get_friendslinks()
+
+    return error(message=fl_list,status_code=404)
+
+
+def get_friendslinks():
+    authorMapper.read('author/mapper.ini', encoding=global_encoding)
+    friendslinks = authorMapper.get('friends', 'list').strip("'")
+    FL_list = []
+    for i in range(1, 50):
+        StrIn = str(i)
+        lfind = friendslinks.find(StrIn + "=")
+        if lfind == -1:
+            break
+        else:
+            lend = friendslinks.find(";", lfind)
+            strout = friendslinks[lfind + len(StrIn) + 1:lend]
+            FL_list.append(strout)
+
+    FL_json = json.dumps(FL_list)
+    return FL_json
+
+
+
+
 @app.errorhandler(404)
 def page_not_found():
     return "Page not found", 404
 
 
-# 添加一个函数来处理未定义路由的错误
 @app.errorhandler(500)
 def internal_server_error():
     return "Internal server error", 500
