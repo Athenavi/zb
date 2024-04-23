@@ -129,7 +129,7 @@ def toggle_theme():
 
 @app.route('/search', methods=['GET', 'POST'])
 def search():
-    if 'username' not in session:
+    if 'logged_in' not in session:
         return render_template('zylogin.html', error='登陆后可以使用此功能')
     matched_content = []
 
@@ -313,6 +313,9 @@ def space():
     if owner_articles is None:
         owner_articles = []  # 设置为空列表
 
+    if 'default' in  owner_articles:
+        owner_articles.remove('default')
+
     return template.render(url_for=url_for, theme=session['theme'],
                            notice=notice, avatar_url=avatar_url,
                            userStatus=userStatus, username=username,
@@ -445,7 +448,7 @@ def home():
 
         notice = ''
         try:
-            notice = read_file('notice/1.txt', 300)
+            notice = read_file('notice/1.txt', 3000)
         except Exception as e:
             app.logger.error(f'读取通知文件出错: {e}')
 
@@ -1003,6 +1006,8 @@ def send_message(message):
 
 @app.route('/edit/<article>', methods=['GET', 'POST', 'PUT'])
 def markdown_editor(article):
+    if article=='default':
+        return error(404,status_code=404)
     if 'theme' not in session:
         session['theme'] = 'day-theme'
     # notice = read_file('notice/1.txt', 50)
@@ -1758,12 +1763,39 @@ def sys_out_article_img(article_name, image_name):
     return send_from_directory(articles_img_dir, image_name)
 
 
+@cache.cached(timeout=1200)
+@app.route('/friends-links', methods=['GET', 'POST'])
+def friendslinks():
+    fl_list=get_friendslinks()
+
+    return error(message=fl_list,status_code=404)
+
+
+def get_friendslinks():
+    authorMapper.read('author/mapper.ini', encoding=global_encoding)
+    friendslinks = authorMapper.get('friends', 'list').strip("'")
+    FL_list = []
+    for i in range(1, 50):
+        StrIn = str(i)
+        lfind = friendslinks.find(StrIn + "=")
+        if lfind == -1:
+            break
+        else:
+            lend = friendslinks.find(";", lfind)
+            strout = friendslinks[lfind + len(StrIn) + 1:lend]
+            FL_list.append(strout)
+
+    FL_json = json.dumps(FL_list)
+    return FL_json
+
+
+
+
 @app.errorhandler(404)
 def page_not_found():
     return "Page not found", 404
 
 
-# 添加一个函数来处理未定义路由的错误
 @app.errorhandler(500)
 def internal_server_error():
     return "Internal server error", 500
