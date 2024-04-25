@@ -47,8 +47,15 @@
                         </div>
                     {% endif %}
                     <div class="px-3 py-4">
+                        {% if closeNormalLogin !='True' %}
                         <input type="text" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline mb-4" id="username" name="username" placeholder="用户名 或 邮箱" required>
                         <input type="password" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline mb-4" id="password" name="password" placeholder="密码" required>
+                        {% endif %}
+                        {% if closeNormalLogin =='True' %}
+                        <div class="alert-danger mb-4" role="alert">
+                            登录及注册功能已停用
+                        </div>
+                        {% endif %}
                         <div class="flex items-center mb-4">
                             <input type="checkbox" class="h-4 w-4 text-blue-500 rounded mr-2" required>
                             <label for="" class="text-gray-700">阅读并接受</label>

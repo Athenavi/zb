@@ -1,4 +1,3 @@
-import base64
 import configparser
 import csv
 import datetime
@@ -15,7 +14,6 @@ import xml.etree.ElementTree as ElementTree
 from configparser import ConfigParser
 import portalocker
 import requests
-from PIL import Image, ImageDraw, ImageFont
 from flask import Flask, render_template, redirect, session, request, url_for, Response, jsonify, send_file, \
     make_response, send_from_directory
 from flask_caching import Cache
@@ -26,13 +24,13 @@ from werkzeug.security import safe_join
 from src.AboutLogin import zy_login, zy_register, get_email, profile, zy_mail_login
 from src.AboutPW import zy_change_password, zy_confirm_password
 from src.BlogDeal import get_article_names, get_article_content, clear_html_format, \
-    get_file_date, get_blog_author, generate_random_text, read_hidden_articles, zy_send_message, auth_articles, \
+    get_file_date, get_blog_author, read_hidden_articles, zy_send_message, auth_articles, \
     zy_show_article, zy_edit_article, get_all_article_names
 from src.database import get_database_connection
+from src.links import create_special_url
 from src.user import zyadmin, zy_delete_file, zy_new_article, error, get_owner_articles
 from src.utils import zy_upload_file, get_user_status, get_username, get_client_ip, read_file, \
     zy_save_edit
-from src.links import create_special_url
 
 global_encoding = 'utf-8'
 template_dir = 'templates'  # 模板文件的目录
@@ -74,11 +72,40 @@ def inject_variables():
         username=get_username(),
     )
 
+base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LoginRegister_lock = os.path.join(base_dir, 'LR.lock')
+def check_NoLR():
+    #关闭注册登录等功能
+    if os.path.exists(LoginRegister_lock):
+        NoLR = True
+        return NoLR
+    else:
+        NoLR = False
+        return NoLR
+
+
+
+
+@app.route('/install', methods=['POST', 'GET'])
+def install():
+    current_step = request.args.get('step', default=0, type=int)
+    install_lock = os.path.join(base_dir, 'install.lock')
+    if os.path.exists(install_lock):
+        return redirect(url_for('home'))
+    else:
+
+        return f'正在进行安装程序(第{current_step}步)'
+
+def install_step(step):
+    print(f'zyblog_install_{step}')
+
 
 @app.route('/login', methods=['POST', 'GET'])
 def login():
     if 'logged_in' in session:
         return redirect(url_for('home'))
+    if check_NoLR()==True:
+        return render_template('zylogin.html',closeNormalLogin='True')
     else:
         return zy_login()
 
@@ -87,6 +114,8 @@ def login():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     ip = get_client_ip(request, session)
+    if check_NoLR()==True:
+        return render_template('zylogin.html',closeNormalLogin='True')
     return zy_register(ip)
 
 
@@ -130,7 +159,7 @@ def toggle_theme():
 @app.route('/search', methods=['GET', 'POST'])
 def search():
     if 'logged_in' not in session:
-        return render_template('zylogin.html', error='登陆后可以使用此功能')
+        return render_template('zylogin.html', error='登陆后可以使用此功能',closeNormalLogin=str(check_NoLR()))
     matched_content = []
 
     if request.method == 'POST':
@@ -284,7 +313,6 @@ def sys_out_file(article_name):
         # 隐藏的文章
         return zy_pw_blog(article_name[:-3])
     try:
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         articles_dir = os.path.join(base_dir, 'articles')
         return send_from_directory(articles_dir, article_name)
     except Exception:
@@ -313,7 +341,7 @@ def space():
     if owner_articles is None:
         owner_articles = []  # 设置为空列表
 
-    if 'default' in  owner_articles:
+    if 'default' in owner_articles:
         owner_articles.remove('default')
 
     return template.render(url_for=url_for, theme=session['theme'],
@@ -479,7 +507,7 @@ def home():
         cache.set(cache_key, rendered_content, timeout=60)
         resp = make_response(rendered_content)
 
-        if (username is None):
+        if username is None:
             username = 'qks' + format(random.randint(10000, 99999))
             app.logger.warning('未找到用户名，生成随机用户名: %s', username)
             session['username'] = username
@@ -509,28 +537,34 @@ def get_file_time(articles):
     return modify_times
 
 
+@cache.cached(timeout=600)
 @app.route('/blog/discord/README.md', methods=['GET', 'POST'])
 def discord_r():
-    return """
-    社区讨论条约
+    _is_discord_Open = config.get('general', 'discord', fallback='ON').strip("'")
 
-尊重他人意见：在社区讨论中，大家都有权利发表自己的观点，但请避免恶意攻击或侮辱他人。请尊重他人的意见和观点，保持开放、友善的讨论环境。
+    if _is_discord_Open.upper() == 'ON':
+        return """
+            社区讨论条约
 
-文明交流：在讨论过程中，请尽量使用文明、礼貌的语言，避免使用粗鲁或攻击性言辞。保持冷静，理性讨论，不要轻易引发争议。
+        尊重他人意见：在社区讨论中，大家都有权利发表自己的观点，但请避免恶意攻击或侮辱他人。请尊重他人的意见和观点，保持开放、友善的讨论环境。
 
-尊重知识产权：在引用他人观点或资料时，请注明出处，并尊重他人的知识产权。禁止抄袭和侵犯他人版权。
+        文明交流：在讨论过程中，请尽量使用文明、礼貌的语言，避免使用粗鲁或攻击性言辞。保持冷静，理性讨论，不要轻易引发争议。
 
-禁止谩骂和人身攻击：严禁在讨论中使用谩骂、人身攻击等不当言论，保持理性、平和的态度，避免情绪化的讨论。
+        尊重知识产权：在引用他人观点或资料时，请注明出处，并尊重他人的知识产权。禁止抄袭和侵犯他人版权。
 
-尊重社区规则：遵守社区规定，不发表违反法律法规和社区规定的言论，保持社区秩序和正常运转。
+        禁止谩骂和人身攻击：严禁在讨论中使用谩骂、人身攻击等不当言论，保持理性、平和的态度，避免情绪化的讨论。
 
-尊重他人隐私：在讨论中，不要公开或泄露他人的个人信息，尊重他人的隐私权。
+        尊重社区规则：遵守社区规定，不发表违反法律法规和社区规定的言论，保持社区秩序和正常运转。
 
-以上是社区讨论的基本条约，希望大家共同遵守，保持社区和谐与发展。
+        尊重他人隐私：在讨论中，不要公开或泄露他人的个人信息，尊重他人的隐私权。
 
-<button id="show_comments" onclick="showComments()">开启评论区</button>
-* 参与讨论表示同意上述观点
-"""
+        以上是社区讨论的基本条约，希望大家共同遵守，保持社区和谐与发展。
+
+        <button id="show_comments" onclick="showComments()">开启评论区</button>
+        * 参与讨论表示同意上述观点
+        """
+    else:
+        return '<span style="color: red">评论区已被站长关闭</span>'
 
 
 @cache.memoize(30)
@@ -748,7 +782,7 @@ def change_password():
 
 
 @app.route('/admin/<key>', methods=['GET', 'POST'])
-def admin(key):
+def admin(key=''):
     method = 'GET'
     if request.method == 'POST':
         method = 'POST'
@@ -925,62 +959,6 @@ def static_from_root():
     response = Response(modified_content, mimetype='text/plain')
     return response
 
-
-@app.route('/<path:undefined_path>')
-def undefined_route():
-    return render_template('error.html', status_code='404'), 404
-
-
-# ...
-
-@app.route('/generate_captcha')
-def generate_captcha():
-    image_base64 = 'iVBORw0KGgoAAAANSUhEUgAAAIcAAABQCAYAAAAz3GadAAAG+klEQVR4nO2cX0hUTxvHv6u1ZuZmpim6m1gaVEqx3YSSdbVBBEJRYAVRrCREkBVkYkVKUQZCoV0k0UVeiGlQF4VYYkV/IDKiP1hdVFIhin8W23Jd3e/v4sfOu6fd8d14Ffddng88sHvmzOwwz+ecMzMH1kQSghCKmNnugBC5iByCFpFD0CJyCFpEDkGLyCFoETkELSKHoEXkELSIHIIWkUPQInIIWkQOQYvIIWgROQQtIoegReQQtIgcghaRQ9AicghaRA5Bi8ghaBE5BC0ih6BF5BC0iByCFpFD0CJyCFpEDkGLyCFoETkELSKHoEXkELREpBwDAwM8dOgQs7KyaDabmZGRwb179/LTp09Bf0NEkh0dHayoqODWrVuZk5PDhQsX0mw202q1sqioiPX19RwdHZW/MPpbSEZUdHd3c/HixQQQFAkJCXz48CEDzz979mzIc/+MEydOcDr65/V62d3dza6uLn79+nVa2ozUmPUOBIbH46HVaiUAWiwWnj59mq2trayoqKDZbCYApqenc3h4WCXl5s2bXLRokZJg9+7dvH37Nu/evcurV6+ypKSEWVlZfPDgwf+USJ/Px9raWqamphqkKygo4OvXr6NSklnvQGC0tLSoQb9z545hwG/cuKHKzpw5Yyh7/vy5Krt///6MJOrgwYPau9L8+fP59OnTqBNk1jsQGNXV1WrAXS5X0GCnp6cTAHNzcw1lzc3Nqt6XL1+mPUn19fWq/bVr1/Lly5d0u91sbm5mYmIiAdBut4scMxnnzp1TSXj//n3QYBcXFxMAY2NjDWW1tbUEwLlz53JiYmJak+R2u5UAaWlp7OvrM7R/4MABAqDJZOLY2FhUCRJRqxW73a4+NzU1BZUPDg4CABITEw3Hv337BgCw2WyIjY01TXe/YmL+Habq6mqkpaUZ2p+cnATw70Xm9Xqn+6dnl9m2MzDGx8e5ZMkSAuCCBQv44cMHdSX29vYyNjaWAFhYWGi4QktKSkIenyqKi4u5bNmysB5DPT097OzsDHneunXrCICJiYlRddcgI+yxQhJVVVXq0ZKfn8+hoSH6fD5u2bJFHb9y5YpKRFlZmXaimJyczLq6uqCkuVwudU5rayuHh4d59OhRWq1Wms1m2u32sCa2vb29NJlMBMDNmzeLHDMZPp+Pa9asMSTYbrdz37596vuKFSsMz3b/lauLbdu2BSVteHjYsPKx2WxB9ebMmcOhoaEpE37y5El1fmNjo8gxk9HR0aEG239FBkZcXByfPHliSMLg4KDaG9mxYwfv3bunor29nSMjI0FJ83q9IWWorKxkc3MzHQ4Hd+3axcnJSW3CXS6X2l9JSkriz58/RY6ZDKfTSQCcN28eOzs71fzDH5cuXQqZgLy8PALgkSNHwk5QfHy8oe3r16//VXKPHz+u6p46dSrqxIg4OVatWkUAdDgcJImPHz8yKytLJSEvL4+jo6NBiSgoKCAAOp3OsJOUmZmp2l29evVfJbenp4dxcXEEwJSUlJB7MtEQEbWU/fHjBwAgPz8fAJCbm2t69OgRsrOzAQBv375FZWVlUL2MjAwA/1nShkNqaqr6vHHjxrDr+Xw+lpaWwuPxAADOnz8Pi8Uy7cvnSCCi5PDvGbhcLnVs6dKlpo6ODiQnJwMAGhsb8fv3b8Mb1pUrVwIA3rx5E/ZvZWZmqs82my3senV1dXj8+DEAYMOGDdi/f3/Ydf/fiCg5/HeM9vZ2TExMKAGWL19uKi0tBQCMjY1hYGDAUK+goAAA8P37d7x79y7kq/m2tjbeunVLlfnvRgBgsVjC6t+rV69YVVUFAIiPj8e1a9dgMpmi8q4BILLmHDU1NWoecPjwYfUc9/l89M8rEhIS6PV6Dc94j8fDlJQUAuCePXsMZX19fdy5c6dq9/PnzySJhoYGdezChQv/dc7gcrmYk5Oj6jQ0NETlPCMwZr0DgdHf38+kpCSVAIfDwba2Nvp3QP+UJjAuXryoznE6nWxpaWF5eTktFos6XlhYyPHxcZLEixcv1PHy8vIpEz02NsZNmzap83NycgxLZn90dXXR5/NFjTSz3oE/49mzZ/S/ff0zCgsL+evXr5CD7/F4WFRUpH2lXl1dbdg8m5ycVL+zffv2KRN67NixKTfaAqOmpkbkmMlwu92sq6vj+vXrGRMTQ5vNxqqqKq0Y/hgZGWFZWRlTU1MZExPD7OxsVlRUsL+/P2S9xsZGms3mkFvsgXH58mW1dJ0qUlJS2NTUFDVymMiQ8zdBiKzVihBZiByCFpFD0CJyCFpEDkGLyCFoETkELSKHoEXkELSIHIIWkUPQInIIWkQOQYvIIWgROQQtIoegReQQtIgcghaRQ9AicghaRA5Bi8ghaBE5BC0ih6BF5BC0/ANjAXGIkxlTwgAAAABJRU5ErkJggg=='
-    captcha_text = '8er2'
-    if 'logged_in' not in session:
-        return {'image': image_base64, 'captcha_text': captcha_text}
-    # 生成验证码文本
-    captcha_text = generate_random_text()
-
-    # 创建一个新的图像对象
-    image = Image.new('RGB', (135, 80), color=(255, 255, 255))
-
-    # 创建字体对象并设置字体大小
-    font = ImageFont.truetype('static/font/babyground.ttf', size=40)
-
-    # 在图像上绘制验证码文本
-    d = ImageDraw.Draw(image)
-    d.text((35, 20), captcha_text, font=font, fill=(0, 0, 0))
-
-    # 将图像转换为 RGBA 模式
-    image = image.convert('RGBA')
-    data = image.getdata()
-
-    # 修改图像像素，将白色像素变为透明
-    theme = session.get('theme', 'day-theme')
-    if theme == 'night-theme':
-        new_data = data
-    else:
-        new_data = [(255, 255, 255, 0) if item[:3] == (255, 255, 255) else item for item in data]
-
-    # 更新图像数据
-    image.putdata(new_data)
-
-    # 保存图像到内存中
-    image_bytes = io.BytesIO()
-    image.save(image_bytes, format='PNG')
-    image_bytes.seek(0)
-
-    # 将图像转换为 base64 编码字符串
-    image_base64 = base64.b64encode(image_bytes.getvalue()).decode('ascii')
-
-    # 将验证码文本存储在 session 中，用于校对
-    session['captcha_text'] = captcha_text
-    # print(captcha_text)
-    # 返回图像的 base64 编码给用户
-    return {'image': image_base64, 'captcha_text': captcha_text}
-
-
 @app.route('/verify_captcha', methods=['POST'])
 def verify_captcha():
     # 获取前端传来的验证码值
@@ -1006,8 +984,8 @@ def send_message(message):
 
 @app.route('/edit/<article>', methods=['GET', 'POST', 'PUT'])
 def markdown_editor(article):
-    if article=='default':
-        return error(404,status_code=404)
+    if article == 'default':
+        return error(404, status_code=404)
     if 'theme' not in session:
         session['theme'] = 'day-theme'
     # notice = read_file('notice/1.txt', 50)
@@ -1422,7 +1400,6 @@ def get_all_video(username, page=1, per_page=10):
 @app.route('/zyImg/<username>/<img_name>')
 def get_image_path(username, img_name):
     try:
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         img_dir = os.path.join(base_dir, 'media', username, img_name)  # 修改为实际的图片目录相对路径
 
         # 从缓存中获取图像数据
@@ -1471,7 +1448,6 @@ def upload_user_path():
 @app.route('/zyVideo/<username>/<video_name>')
 def start_video(username, video_name):
     try:
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         video_dir = os.path.join(base_dir, 'media', username)
         video_path = os.path.join(video_dir, video_name)
 
@@ -1496,9 +1472,9 @@ def serve_static(filename):
 
 
 # 彩虹聚合登录
-api_host = config.get('general', 'api_host').strip("'")
-app_id = config.get('general', 'app_id').strip("'")
-app_key = config.get('general', 'app_key').strip("'")
+api_host = config.get('general', 'api_host', fallback='error').strip("'")
+app_id = config.get('general', 'app_id', fallback='error').strip("'")
+app_key = config.get('general', 'app_key', fallback='error').strip("'")
 
 
 @app.route('/login/<provider>')
@@ -1508,6 +1484,9 @@ def cc_login(provider):
 
     redirect_uri = domain + "callback/" + provider
 
+    api_safeCheck = [api_host, app_id, app_key]
+    if 'error' in api_safeCheck:
+        return render_template('error.html', error='请检查你的第三方登录配置文件')
     login_url = f'{api_host}connect.php?act=login&appid={app_id}&appkey={app_key}&type={provider}&redirect_uri={redirect_uri}'
     response = requests.get(login_url)
     data = response.json()
@@ -1599,7 +1578,6 @@ def get_theme_detail(theme_id):
 @app.route('/theme/<theme_id>/<img_name>')
 def get_screenshot(theme_id, img_name):
     try:
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         img_dir = os.path.join(base_dir, 'templates', 'theme', theme_id, img_name)
 
         # 从缓存中获取图像数据
@@ -1758,7 +1736,6 @@ def id_find_article(article_id):
 @app.route('/blog/<article_name>/images/<image_name>', methods=['GET', 'POST'])
 def sys_out_article_img(article_name, image_name):
     author = get_blog_author(article_name)
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     articles_img_dir = os.path.join(base_dir, 'media', author)
     return send_from_directory(articles_img_dir, image_name)
 
@@ -1766,9 +1743,9 @@ def sys_out_article_img(article_name, image_name):
 @cache.cached(timeout=1200)
 @app.route('/friends-links', methods=['GET', 'POST'])
 def friendslinks():
-    fl_list=get_friendslinks()
+    fl_list = get_friendslinks()
 
-    return error(message=fl_list,status_code=404)
+    return error(message=fl_list, status_code=404)
 
 
 def get_friendslinks():
@@ -1789,13 +1766,20 @@ def get_friendslinks():
     return FL_json
 
 
-
-
 @app.errorhandler(404)
-def page_not_found():
+def page_not_found(error):
+    app.logger.error(error)
     return "Page not found", 404
 
-
 @app.errorhandler(500)
-def internal_server_error():
+def internal_server_error(error):
+    app.logger.error(error)
     return "Internal server error", 500
+@app.route('/<path:undefined_path>')
+def undefined_route(undefined_path):
+    app.logger.error(undefined_path)
+    return render_template('error.html', status_code='404'), 404
+@app.errorhandler(Exception)
+def handle_unexpected_error(error):
+    app.logger.error(error)
+    return "An unexpected error occurred", 500

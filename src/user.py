@@ -2,7 +2,7 @@ import logging
 import os
 from configparser import ConfigParser
 
-from flask import session, render_template
+from flask import session, render_template, redirect, url_for
 
 from src.database import get_database_connection
 
@@ -30,7 +30,7 @@ def zyadmin(key, method):
     if key == door_key:
         return back(method)
     else:
-        return error("页面不存在", 404)
+        return redirect(url_for('space'))
 
 
 def back(method):
@@ -46,7 +46,7 @@ def back(method):
                 if ifAdmin:
                     return admin_dashboard(method), 200
                 else:
-                    return error("非管理员用户禁止访问！！！", 403)
+                    return redirect(url_for('space'))
             except Exception as e:
                 logging.error(f"Error logging in: {e}")
                 return error("未知错误", 500)
@@ -65,7 +65,7 @@ def admin_dashboard(method):
     else:
         if 'theme' not in session:
             session['theme'] = 'night-theme'
-        files = show_files('articles/')
+        #files = show_files('articles/')
         hiddenList = read_hidden_articles()
         display_list = get_all_themes()
         currentDisPlay = config.get('general', 'theme').strip("'")
