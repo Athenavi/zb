@@ -1,4 +1,3 @@
-import base64
 import configparser
 import csv
 import datetime
@@ -20,18 +19,16 @@ from flask import Flask, render_template, redirect, session, request, url_for, R
 from flask_caching import Cache
 from jinja2 import Environment, select_autoescape, FileSystemLoader
 from werkzeug.middleware.proxy_fix import ProxyFix
-from werkzeug.security import safe_join
-
 from src.AboutLogin import zy_login, zy_register, get_email, profile, zy_mail_login
 from src.AboutPW import zy_change_password, zy_confirm_password
 from src.BlogDeal import get_article_names, get_article_content, clear_html_format, \
-    get_file_date, get_blog_author, generate_random_text, read_hidden_articles, zy_send_message, auth_articles, \
+    get_file_date, get_blog_author, read_hidden_articles, auth_articles, \
     zy_show_article, zy_edit_article, get_all_article_names
 from src.database import get_database_connection
+from src.links import create_special_url
 from src.user import zyadmin, zy_delete_file, zy_new_article, error, get_owner_articles
 from src.utils import zy_upload_file, get_user_status, get_username, get_client_ip, read_file, \
     zy_save_edit
-from src.links import create_special_url
 
 global_encoding = 'utf-8'
 template_dir = 'templates'  # 模板文件的目录
@@ -73,11 +70,24 @@ def inject_variables():
         username=get_username(),
     )
 
+base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LoginRegister_lock = os.path.join(base_dir, 'LR.lock')
+def check_NoLR():
+    #关闭注册登录等功能
+    if os.path.exists(LoginRegister_lock):
+        NoLR = True
+        return NoLR
+    else:
+        NoLR = False
+        return NoLR
+
 
 @app.route('/login', methods=['POST', 'GET'])
 def login():
     if 'logged_in' in session:
         return redirect(url_for('home'))
+    if check_NoLR():
+        return render_template('zylogin.html', closeNormalLogin='True')
     else:
         return zy_login()
 
@@ -86,6 +96,8 @@ def login():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     ip = get_client_ip(request, session)
+    if check_NoLR():
+        return render_template('zylogin.html', closeNormalLogin='True')
     return zy_register(ip)
 
 
@@ -129,7 +141,7 @@ def toggle_theme():
 @app.route('/search', methods=['GET', 'POST'])
 def search():
     if 'logged_in' not in session:
-        return render_template('zylogin.html', error='登陆后可以使用此功能')
+        return render_template('zylogin.html', error='登陆后可以使用此功能', closeNormalLogin=str(check_NoLR()))
     matched_content = []
 
     if request.method == 'POST':
@@ -283,7 +295,6 @@ def sys_out_file(article_name):
         # 隐藏的文章
         return zy_pw_blog(article_name[:-3])
     try:
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         articles_dir = os.path.join(base_dir, 'articles')
         return send_from_directory(articles_dir, article_name)
     except Exception:
@@ -312,7 +323,7 @@ def space():
     if owner_articles is None:
         owner_articles = []  # 设置为空列表
 
-    if 'default' in  owner_articles:
+    if 'default' in owner_articles:
         owner_articles.remove('default')
 
     return template.render(url_for=url_for, theme=session['theme'],
@@ -478,7 +489,7 @@ def home():
         cache.set(cache_key, rendered_content, timeout=60)
         resp = make_response(rendered_content)
 
-        if (username is None):
+        if username is None:
             username = 'qks' + format(random.randint(10000, 99999))
             app.logger.warning('未找到用户名，生成随机用户名: %s', username)
             session['username'] = username
@@ -508,28 +519,34 @@ def get_file_time(articles):
     return modify_times
 
 
+@cache.cached(timeout=600)
 @app.route('/blog/discord/README.md', methods=['GET', 'POST'])
 def discord_r():
-    return """
-    社区讨论条约
+    _is_discord_Open = config.get('general', 'discord', fallback='ON').strip("'")
 
-尊重他人意见：在社区讨论中，大家都有权利发表自己的观点，但请避免恶意攻击或侮辱他人。请尊重他人的意见和观点，保持开放、友善的讨论环境。
+    if _is_discord_Open.upper() == 'ON':
+        return """
+            社区讨论条约
 
-文明交流：在讨论过程中，请尽量使用文明、礼貌的语言，避免使用粗鲁或攻击性言辞。保持冷静，理性讨论，不要轻易引发争议。
+        尊重他人意见：在社区讨论中，大家都有权利发表自己的观点，但请避免恶意攻击或侮辱他人。请尊重他人的意见和观点，保持开放、友善的讨论环境。
 
-尊重知识产权：在引用他人观点或资料时，请注明出处，并尊重他人的知识产权。禁止抄袭和侵犯他人版权。
+        文明交流：在讨论过程中，请尽量使用文明、礼貌的语言，避免使用粗鲁或攻击性言辞。保持冷静，理性讨论，不要轻易引发争议。
 
-禁止谩骂和人身攻击：严禁在讨论中使用谩骂、人身攻击等不当言论，保持理性、平和的态度，避免情绪化的讨论。
+        尊重知识产权：在引用他人观点或资料时，请注明出处，并尊重他人的知识产权。禁止抄袭和侵犯他人版权。
 
-尊重社区规则：遵守社区规定，不发表违反法律法规和社区规定的言论，保持社区秩序和正常运转。
+        禁止谩骂和人身攻击：严禁在讨论中使用谩骂、人身攻击等不当言论，保持理性、平和的态度，避免情绪化的讨论。
 
-尊重他人隐私：在讨论中，不要公开或泄露他人的个人信息，尊重他人的隐私权。
+        尊重社区规则：遵守社区规定，不发表违反法律法规和社区规定的言论，保持社区秩序和正常运转。
 
-以上是社区讨论的基本条约，希望大家共同遵守，保持社区和谐与发展。
+        尊重他人隐私：在讨论中，不要公开或泄露他人的个人信息，尊重他人的隐私权。
 
-<button id="show_comments" onclick="showComments()">开启评论区</button>
-* 参与讨论表示同意上述观点
-"""
+        以上是社区讨论的基本条约，希望大家共同遵守，保持社区和谐与发展。
+
+        <button id="show_comments" onclick="showComments()">开启评论区</button>
+        * 参与讨论表示同意上述观点
+        """
+    else:
+        return '<span style="color: red">评论区已被站长关闭</span>'
 
 
 @cache.memoize(30)
@@ -747,7 +764,7 @@ def change_password():
 
 
 @app.route('/admin/<key>', methods=['GET', 'POST'])
-def admin(key):
+def admin(key=''):
     method = 'GET'
     if request.method == 'POST':
         method = 'POST'
@@ -925,13 +942,6 @@ def static_from_root():
     return response
 
 
-@app.route('/<path:undefined_path>')
-def undefined_route():
-    return render_template('error.html', status_code='404'), 404
-
-
-# ...
-
 @app.route('/verify_captcha', methods=['POST'])
 def verify_captcha():
     # 获取前端传来的验证码值
@@ -949,16 +959,10 @@ def verify_captcha():
         return '验证码不匹配'
 
 
-@app.route('/send_message', methods=['POST'])
-def send_message(message):
-    zy_send_message(message)
-    return '1'
-
-
 @app.route('/edit/<article>', methods=['GET', 'POST', 'PUT'])
 def markdown_editor(article):
-    if article=='default':
-        return error(404,status_code=404)
+    if article == 'default':
+        return error(404, status_code=404)
     if 'theme' not in session:
         session['theme'] = 'day-theme'
     # notice = read_file('notice/1.txt', 50)
@@ -993,7 +997,7 @@ def markdown_editor(article):
             # 用正则表达式截断标签信息中超过五个标签的部分
             comma_count = tags_input.count(",")
             if comma_count > 4:
-                tags_input = re.split(",{1}", tags_input, maxsplit=4)[0]
+                tags_input = re.split(",", tags_input, maxsplit=4)[0]
 
             # 限制每个标签最大字符数为10，并添加到标签列表
 
@@ -1373,7 +1377,6 @@ def get_all_video(username, page=1, per_page=10):
 @app.route('/zyImg/<username>/<img_name>')
 def get_image_path(username, img_name):
     try:
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         img_dir = os.path.join(base_dir, 'media', username, img_name)  # 修改为实际的图片目录相对路径
 
         # 从缓存中获取图像数据
@@ -1422,7 +1425,6 @@ def upload_user_path():
 @app.route('/zyVideo/<username>/<video_name>')
 def start_video(username, video_name):
     try:
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         video_dir = os.path.join(base_dir, 'media', username)
         video_path = os.path.join(video_dir, video_name)
 
@@ -1438,18 +1440,10 @@ def jump():
     return render_template('zyJump.html', url=url, domain=domain)
 
 
-@app.route('/static/<path:filename>')
-def serve_static(filename):
-    parts = filename.split('/')
-    directory = safe_join('/'.join(parts[:-1]))
-    file = parts[-1]
-    return send_from_directory(directory, file)
-
-
 # 彩虹聚合登录
-api_host = config.get('general', 'api_host').strip("'")
-app_id = config.get('general', 'app_id').strip("'")
-app_key = config.get('general', 'app_key').strip("'")
+api_host = config.get('general', 'api_host', fallback='error').strip("'")
+app_id = config.get('general', 'app_id', fallback='error').strip("'")
+app_key = config.get('general', 'app_key', fallback='error').strip("'")
 
 
 @app.route('/login/<provider>')
@@ -1459,6 +1453,9 @@ def cc_login(provider):
 
     redirect_uri = domain + "callback/" + provider
 
+    api_safeCheck = [api_host, app_id, app_key]
+    if 'error' in api_safeCheck:
+        return render_template('error.html', error='请检查你的第三方登录配置文件')
     login_url = f'{api_host}connect.php?act=login&appid={app_id}&appkey={app_key}&type={provider}&redirect_uri={redirect_uri}'
     response = requests.get(login_url)
     data = response.json()
@@ -1498,22 +1495,10 @@ def callback(provider):
             user_email = social_uid + "@wx.com"
         elif provider != 'qq' and 'wx':
             user_email = social_uid + "@qks.com"
-        face_img = get_user_info(provider, social_uid)
+        # face_img = get_user_info(provider, social_uid)
         return zy_mail_login(user_email, ip)
 
     return render_template('zylogin.html', error=msg)
-
-
-def get_user_info(provider, social_uid):
-    login_api_url = f'{api_host}connect.php?act=query&appid={app_id}&appkey={app_key}&type={provider}&social_uid={social_uid}'
-    response = requests.get(login_api_url)
-    data = response.json()
-    code = data.get('code')
-    faceimg = None
-    if code == 0:
-        faceimg = data.get('faceimg')
-        session['faceimg'] = faceimg
-    return faceimg
 
 
 @cache.cached(timeout=300, key_prefix='display_detail')
@@ -1550,7 +1535,6 @@ def get_theme_detail(theme_id):
 @app.route('/theme/<theme_id>/<img_name>')
 def get_screenshot(theme_id, img_name):
     try:
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         img_dir = os.path.join(base_dir, 'templates', 'theme', theme_id, img_name)
 
         # 从缓存中获取图像数据
@@ -1709,7 +1693,6 @@ def id_find_article(article_id):
 @app.route('/blog/<article_name>/images/<image_name>', methods=['GET', 'POST'])
 def sys_out_article_img(article_name, image_name):
     author = get_blog_author(article_name)
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     articles_img_dir = os.path.join(base_dir, 'media', author)
     return send_from_directory(articles_img_dir, image_name)
 
@@ -1717,9 +1700,9 @@ def sys_out_article_img(article_name, image_name):
 @cache.cached(timeout=1200)
 @app.route('/friends-links', methods=['GET', 'POST'])
 def friendslinks():
-    fl_list=get_friendslinks()
+    fl_list = get_friendslinks()
 
-    return error(message=fl_list,status_code=404)
+    return error(message=fl_list, status_code=404)
 
 
 def get_friendslinks():
@@ -1740,13 +1723,25 @@ def get_friendslinks():
     return FL_json
 
 
-
-
 @app.errorhandler(404)
-def page_not_found():
+def page_not_found(error):
+    app.logger.error(error)
     return "Page not found", 404
 
 
 @app.errorhandler(500)
-def internal_server_error():
+def internal_server_error(error):
+    app.logger.error(error)
     return "Internal server error", 500
+
+
+@app.route('/<path:undefined_path>')
+def undefined_route(undefined_path):
+    app.logger.error(undefined_path)
+    return render_template('error.html', status_code='404'), 404
+
+
+@app.errorhandler(Exception)
+def handle_unexpected_error(error):
+    app.logger.error(error)
+    return "An unexpected error occurred", 500
