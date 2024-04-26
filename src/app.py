@@ -19,12 +19,10 @@ from flask import Flask, render_template, redirect, session, request, url_for, R
 from flask_caching import Cache
 from jinja2 import Environment, select_autoescape, FileSystemLoader
 from werkzeug.middleware.proxy_fix import ProxyFix
-from werkzeug.security import safe_join
-
 from src.AboutLogin import zy_login, zy_register, get_email, profile, zy_mail_login
 from src.AboutPW import zy_change_password, zy_confirm_password
 from src.BlogDeal import get_article_names, get_article_content, clear_html_format, \
-    get_file_date, get_blog_author, read_hidden_articles, zy_send_message, auth_articles, \
+    get_file_date, get_blog_author, read_hidden_articles, auth_articles, \
     zy_show_article, zy_edit_article, get_all_article_names
 from src.database import get_database_connection
 from src.links import create_special_url
@@ -84,28 +82,12 @@ def check_NoLR():
         return NoLR
 
 
-
-
-@app.route('/install', methods=['POST', 'GET'])
-def install():
-    current_step = request.args.get('step', default=0, type=int)
-    install_lock = os.path.join(base_dir, 'install.lock')
-    if os.path.exists(install_lock):
-        return redirect(url_for('home'))
-    else:
-
-        return f'正在进行安装程序(第{current_step}步)'
-
-def install_step(step):
-    print(f'zyblog_install_{step}')
-
-
 @app.route('/login', methods=['POST', 'GET'])
 def login():
     if 'logged_in' in session:
         return redirect(url_for('home'))
-    if check_NoLR()==True:
-        return render_template('zylogin.html',closeNormalLogin='True')
+    if check_NoLR():
+        return render_template('zylogin.html', closeNormalLogin='True')
     else:
         return zy_login()
 
@@ -114,8 +96,8 @@ def login():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     ip = get_client_ip(request, session)
-    if check_NoLR()==True:
-        return render_template('zylogin.html',closeNormalLogin='True')
+    if check_NoLR():
+        return render_template('zylogin.html', closeNormalLogin='True')
     return zy_register(ip)
 
 
@@ -159,7 +141,7 @@ def toggle_theme():
 @app.route('/search', methods=['GET', 'POST'])
 def search():
     if 'logged_in' not in session:
-        return render_template('zylogin.html', error='登陆后可以使用此功能',closeNormalLogin=str(check_NoLR()))
+        return render_template('zylogin.html', error='登陆后可以使用此功能', closeNormalLogin=str(check_NoLR()))
     matched_content = []
 
     if request.method == 'POST':
@@ -959,6 +941,7 @@ def static_from_root():
     response = Response(modified_content, mimetype='text/plain')
     return response
 
+
 @app.route('/verify_captcha', methods=['POST'])
 def verify_captcha():
     # 获取前端传来的验证码值
@@ -974,12 +957,6 @@ def verify_captcha():
     else:
         # 验证码匹配失败，执行相应逻辑
         return '验证码不匹配'
-
-
-@app.route('/send_message', methods=['POST'])
-def send_message(message):
-    zy_send_message(message)
-    return '1'
 
 
 @app.route('/edit/<article>', methods=['GET', 'POST', 'PUT'])
@@ -1020,7 +997,7 @@ def markdown_editor(article):
             # 用正则表达式截断标签信息中超过五个标签的部分
             comma_count = tags_input.count(",")
             if comma_count > 4:
-                tags_input = re.split(",{1}", tags_input, maxsplit=4)[0]
+                tags_input = re.split(",", tags_input, maxsplit=4)[0]
 
             # 限制每个标签最大字符数为10，并添加到标签列表
 
@@ -1463,14 +1440,6 @@ def jump():
     return render_template('zyJump.html', url=url, domain=domain)
 
 
-@app.route('/static/<path:filename>')
-def serve_static(filename):
-    parts = filename.split('/')
-    directory = safe_join('/'.join(parts[:-1]))
-    file = parts[-1]
-    return send_from_directory(directory, file)
-
-
 # 彩虹聚合登录
 api_host = config.get('general', 'api_host', fallback='error').strip("'")
 app_id = config.get('general', 'app_id', fallback='error').strip("'")
@@ -1526,22 +1495,10 @@ def callback(provider):
             user_email = social_uid + "@wx.com"
         elif provider != 'qq' and 'wx':
             user_email = social_uid + "@qks.com"
-        face_img = get_user_info(provider, social_uid)
+        # face_img = get_user_info(provider, social_uid)
         return zy_mail_login(user_email, ip)
 
     return render_template('zylogin.html', error=msg)
-
-
-def get_user_info(provider, social_uid):
-    login_api_url = f'{api_host}connect.php?act=query&appid={app_id}&appkey={app_key}&type={provider}&social_uid={social_uid}'
-    response = requests.get(login_api_url)
-    data = response.json()
-    code = data.get('code')
-    faceimg = None
-    if code == 0:
-        faceimg = data.get('faceimg')
-        session['faceimg'] = faceimg
-    return faceimg
 
 
 @cache.cached(timeout=300, key_prefix='display_detail')
@@ -1771,14 +1728,19 @@ def page_not_found(error):
     app.logger.error(error)
     return "Page not found", 404
 
+
 @app.errorhandler(500)
 def internal_server_error(error):
     app.logger.error(error)
     return "Internal server error", 500
+
+
 @app.route('/<path:undefined_path>')
 def undefined_route(undefined_path):
     app.logger.error(undefined_path)
     return render_template('error.html', status_code='404'), 404
+
+
 @app.errorhandler(Exception)
 def handle_unexpected_error(error):
     app.logger.error(error)
