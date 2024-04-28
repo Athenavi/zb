@@ -36,7 +36,6 @@
         <a class="text-xl text-white font-bold py-4" href="/"><img src="../static/favicon.ico" style="height: 32px"/></a>
         <div class="flex items-center">
             <a href="/profile"><img class="image-button" src="../static/image/author.svg" style="height: 18px" alt=/></a>
-            <a class="image-button" onclick="togglePopup()"><img class="fixed-icon" src="../static/image/sch.svg" alt="搜索"></a>
             <form id="theme-form" method="post" action="/toggle_theme">
                 <button type="submit" style="border: none; background-color: transparent;">
                     <img src="../static/image/sun.svg" alt="切换主题" style="height: 20px;">
@@ -46,8 +45,8 @@
     </div>
 </nav>
 
-<div class="fixed-icon">
-    <a href="#top"><img src="../static/image/rocket.svg" style="height: 40px" alt="回到顶部"></a>
+<div>
+    <a href="#top"><img src="../static/image/rocket.svg" class="fixed-icon" style="height: 40px" alt="回到顶部"></a>
 </div>
 
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>

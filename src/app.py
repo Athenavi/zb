@@ -633,7 +633,7 @@ def post_comment():
     return json.dumps(response)
 """
 
-
+@cache.cached(timeout=300)
 @app.route('/sitemap.xml')
 @app.route('/sitemap')
 def generate_sitemap():
@@ -682,7 +682,7 @@ def generate_sitemap():
     response = Response(xml_data, mimetype='text/xml')
     return response
 
-
+@cache.cached(timeout=300)
 @app.route('/feed')
 @app.route('/rss')
 def generate_rss():
@@ -691,7 +691,6 @@ def generate_rss():
 
     cache_file = os.path.join(cache_dir, 'feed.xml')
 
-    # Check if cache file exists and is within one hour
     if os.path.exists(cache_file):
         cache_timestamp = os.path.getmtime(cache_file)
         if datetime.now().timestamp() - cache_timestamp <= 3600:
@@ -932,7 +931,7 @@ def delete_file(filename):
     else:
         return error(message='您没有权限', status_code=503)
 
-
+@cache.cached(timeout=4800)
 @app.route('/robots.txt')
 def static_from_root():
     content = "User-agent: *\nDisallow: /admin"
@@ -940,23 +939,6 @@ def static_from_root():
 
     response = Response(modified_content, mimetype='text/plain')
     return response
-
-
-@app.route('/verify_captcha', methods=['POST'])
-def verify_captcha():
-    # 获取前端传来的验证码值
-    user_input = request.form.get('captcha')
-    user_input = clear_html_format(user_input)
-
-    # 获取存储在session中的验证码文本
-    captcha_text = session['captcha_text']
-
-    if user_input.lower() == captcha_text.lower():
-        # 验证码匹配成功，执行相应逻辑
-        return '验证码匹配成功'
-    else:
-        # 验证码匹配失败，执行相应逻辑
-        return '验证码不匹配'
 
 
 @app.route('/edit/<article>', methods=['GET', 'POST', 'PUT'])
@@ -1656,37 +1638,40 @@ def get_link_info(username):
     return jsonify(result)
 
 
-@cache.cached(timeout=1200)
 @app.route('/<article_id>.html', methods=['GET', 'POST'])
+@cache.cached(timeout=1200)
 def id_find_article(article_id):
-    if re.match(r'^\d{1,4}$', article_id):
-        user_agent = request.headers.get('User-Agent')
-        db = get_database_connection()
-        cursor = db.cursor()
+    if not re.match(r'^\d{1,4}$', article_id):
+        logging.error(f"Invalid article ID: {article_id}")
+        return error(message='无效的文章', status_code=404)
 
-        # 根据短网址查询数据库获取对应的长网址
+    user_agent = request.headers.get('User-Agent')
+    db = get_database_connection()
+    cursor = db.cursor()
+    try:
         query = "SELECT long_url FROM urls WHERE id = %s"
         cursor.execute(query, (article_id,))
         result = cursor.fetchone()
 
         if result:
-            # 如果找到对应的长网址，则进行重定向
             long_url = result[0]
-
-            # 获取请求者的 IP 地址
-            ip_address = get_client_ip(request, session)
-            app.logger.info('当前访问的用户:IP:{},UA:{}'.format(ip_address, user_agent))
-            db.commit()
-
-            # 关闭数据库连接
-            cursor.close()
-            db.close()
-
-            return redirect(long_url, code=302)
-    else:
-        # 如果没有找到对应的长网址，则返回错误页面或其他处理逻辑
-        logging.error(f"Invalid short URL: {article_id}")
-        return error(message='无效的文章', status_code=404)
+            last_slash_index = long_url.rfind("/")
+            article = long_url[last_slash_index + 1:]
+            #print(article)
+            return blog_detail(article)
+        else:
+            # If no URL is found
+            logging.error(f"URL not found for: {article_id}")
+            return error(message='没有找到文章', status_code=404)
+    except Exception as e:
+        logging.error(f"An error occurred: {str(e)}")
+        db.rollback()
+        return error(message='服务器内部错误', status_code=500)
+    finally:
+        ip_address = get_client_ip(request, session)
+        app.logger.info(f'IP:{ip_address}, UA:{user_agent}')
+        cursor.close()
+        db.close()
 
 
 @cache.cached(timeout=1200)
