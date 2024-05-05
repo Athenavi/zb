@@ -70,10 +70,13 @@ def inject_variables():
         username=get_username(),
     )
 
+
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LoginRegister_lock = os.path.join(base_dir, 'LR.lock')
+
+
 def check_NoLR():
-    #关闭注册登录等功能
+    # 关闭注册登录等功能
     if os.path.exists(LoginRegister_lock):
         NoLR = True
         return NoLR
@@ -633,6 +636,7 @@ def post_comment():
     return json.dumps(response)
 """
 
+
 @cache.cached(timeout=300)
 @app.route('/sitemap.xml')
 @app.route('/sitemap')
@@ -681,6 +685,7 @@ def generate_sitemap():
 
     response = Response(xml_data, mimetype='text/xml')
     return response
+
 
 @cache.cached(timeout=300)
 @app.route('/feed')
@@ -931,6 +936,7 @@ def delete_file(filename):
     else:
         return error(message='您没有权限', status_code=503)
 
+
 @cache.cached(timeout=4800)
 @app.route('/robots.txt')
 def static_from_root():
@@ -1045,7 +1051,7 @@ def edit_save():
 
 
 @app.route('/hidden/article', methods=['POST'])
-def hideen_article():
+def hidden_article():
     article = request.json.get('article')
     if article is None:
         return jsonify({'message': '404'}), 404
@@ -1063,7 +1069,7 @@ def hideen_article():
 
     if is_hidden(article):
         # 取消隐藏文章
-        unhide_article(article)
+        unhidden_article(article)
         return jsonify({'deal': 'unhide'})
     else:
         # 隐藏文章
@@ -1077,7 +1083,7 @@ def hide_article(article):
         hidden_file.write('\n' + article + '\n')
 
 
-def unhide_article(article):
+def unhidden_article(article):
     with open('articles/hidden.txt', 'r', encoding=global_encoding) as hidden_file:
         hidden_articles = hidden_file.read().splitlines()
 
@@ -1657,7 +1663,7 @@ def id_find_article(article_id):
             long_url = result[0]
             last_slash_index = long_url.rfind("/")
             article = long_url[last_slash_index + 1:]
-            #print(article)
+            # print(article)
             return blog_detail(article)
         else:
             # If no URL is found
