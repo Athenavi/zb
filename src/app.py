@@ -9,6 +9,7 @@ import random
 import re
 import shutil
 import time
+from datetime import datetime, timedelta
 import urllib
 import xml.etree.ElementTree as ElementTree
 from configparser import ConfigParser
@@ -41,7 +42,7 @@ app.config['CACHE_TYPE'] = 'simple'
 cache = Cache(app)
 app.jinja_env = env
 app.secret_key = 'your_secret_key'
-app.permanent_session_lifetime = datetime.timedelta(hours=3)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=3)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)  # 添加 ProxyFix 中间件
 
 # 移除默认的日志处理程序
@@ -59,8 +60,6 @@ try:
     config.read('config.ini', encoding='utf-8')
 except UnicodeDecodeError:
     config.read('config.ini', encoding='gbk')
-# 应用分享配置参数
-from datetime import datetime, timedelta
 
 
 @app.context_processor
@@ -555,6 +554,11 @@ def discord_r():
 @cache.memoize(30)
 def get_a_list():
     return get_all_article_names()
+
+
+@app.route('/blog', methods=['GET', 'POST'])
+def blog_page():
+    return redirect(url_for('login'))
 
 
 @app.route('/blog/<article>', methods=['GET', 'POST'])
@@ -1618,34 +1622,7 @@ def api_shortlink(long_url):
 
 
 @cache.cached(timeout=1200)
-def get_link_info(username):
-    db = get_database_connection()
-    cursor = db.cursor()
-
-    # 查询用户是否为管理员
-    query_admin = "SELECT ifAdmin FROM users WHERE username = %s"
-    cursor.execute(query_admin, (username,))
-    admin_result = cursor.fetchone()
-
-    # 如果用户是管理员，则查询所有链接信息
-    if admin_result and admin_result[0] == 1:
-        query = "SELECT created_at, short_url, long_url FROM urls"
-        cursor.execute(query)
-    else:
-        # 否则，查询特定用户的链接信息
-        query = "SELECT created_at, short_url, long_url FROM urls WHERE username = %s"
-        cursor.execute(query, (username,))
-
-    result = cursor.fetchall()
-
-    cursor.close()
-    db.close()
-
-    return jsonify(result)
-
-
 @app.route('/<article_id>.html', methods=['GET', 'POST'])
-@cache.cached(timeout=1200)
 def id_find_article(article_id):
     if not re.match(r'^\d{1,4}$', article_id):
         logging.error(f"Invalid article ID: {article_id}")
@@ -1698,31 +1675,31 @@ def friendslinks():
 
 def get_friendslinks():
     authorMapper.read('author/mapper.ini', encoding=global_encoding)
-    friendslinks = authorMapper.get('friends', 'list').strip("'")
+    friends_links = authorMapper.get('friends', 'list').strip("'")
     FL_list = []
     for i in range(1, 50):
         StrIn = str(i)
-        lfind = friendslinks.find(StrIn + "=")
-        if lfind == -1:
+        fl_find = friends_links.find(StrIn + "=")
+        if fl_find == -1:
             break
         else:
-            lend = friendslinks.find(";", lfind)
-            strout = friendslinks[lfind + len(StrIn) + 1:lend]
-            FL_list.append(strout)
+            lend = friends_links.find(";", fl_find)
+            f_link = friends_links[fl_find + len(StrIn) + 1:lend]
+            FL_list.append(f_link)
 
     FL_json = json.dumps(FL_list)
     return FL_json
 
 
 @app.errorhandler(404)
-def page_not_found(error):
-    app.logger.error(error)
+def page_not_found(error_message):
+    app.logger.error(error_message)
     return "Page not found", 404
 
 
 @app.errorhandler(500)
-def internal_server_error(error):
-    app.logger.error(error)
+def internal_server_error(error_message):
+    app.logger.error(error_message)
     return "Internal server error", 500
 
 
@@ -1733,6 +1710,6 @@ def undefined_route(undefined_path):
 
 
 @app.errorhandler(Exception)
-def handle_unexpected_error(error):
-    app.logger.error(error)
+def handle_unexpected_error(error_message):
+    app.logger.error(error_message)
     return "An unexpected error occurred", 500
