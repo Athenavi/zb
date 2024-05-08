@@ -2696,8 +2696,8 @@ ALTER TABLE `opentimes`
 -- 表的索引 `urls`
 --
 ALTER TABLE `urls`
-  ADD PRIMARY KEY (`id`);
-
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `short_url` (`short_url`);
 --
 -- 表的索引 `users`
 --

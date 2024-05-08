@@ -9,6 +9,7 @@ import random
 import re
 import shutil
 import time
+from datetime import datetime, timedelta
 import urllib
 import xml.etree.ElementTree as ElementTree
 from configparser import ConfigParser
@@ -41,7 +42,7 @@ app.config['CACHE_TYPE'] = 'simple'
 cache = Cache(app)
 app.jinja_env = env
 app.secret_key = 'your_secret_key'
-app.permanent_session_lifetime = datetime.timedelta(hours=3)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=3)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)  # 添加 ProxyFix 中间件
 
 # 移除默认的日志处理程序
@@ -59,8 +60,6 @@ try:
     config.read('config.ini', encoding='utf-8')
 except UnicodeDecodeError:
     config.read('config.ini', encoding='gbk')
-# 应用分享配置参数
-from datetime import datetime, timedelta
 
 
 @app.context_processor
@@ -70,10 +69,13 @@ def inject_variables():
         username=get_username(),
     )
 
+
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LoginRegister_lock = os.path.join(base_dir, 'LR.lock')
+
+
 def check_NoLR():
-    #关闭注册登录等功能
+    # 关闭注册登录等功能
     if os.path.exists(LoginRegister_lock):
         NoLR = True
         return NoLR
@@ -554,6 +556,11 @@ def get_a_list():
     return get_all_article_names()
 
 
+@app.route('/blog', methods=['GET', 'POST'])
+def blog_page():
+    return redirect(url_for('login'))
+
+
 @app.route('/blog/<article>', methods=['GET', 'POST'])
 @app.route('/blog/<article>.html', methods=['GET', 'POST'])
 def blog_detail(article):
@@ -634,6 +641,7 @@ def post_comment():
 """
 
 
+@cache.cached(timeout=300)
 @app.route('/sitemap.xml')
 @app.route('/sitemap')
 def generate_sitemap():
@@ -683,6 +691,7 @@ def generate_sitemap():
     return response
 
 
+@cache.cached(timeout=300)
 @app.route('/feed')
 @app.route('/rss')
 def generate_rss():
@@ -691,7 +700,6 @@ def generate_rss():
 
     cache_file = os.path.join(cache_dir, 'feed.xml')
 
-    # Check if cache file exists and is within one hour
     if os.path.exists(cache_file):
         cache_timestamp = os.path.getmtime(cache_file)
         if datetime.now().timestamp() - cache_timestamp <= 3600:
@@ -933,6 +941,7 @@ def delete_file(filename):
         return error(message='您没有权限', status_code=503)
 
 
+@cache.cached(timeout=4800)
 @app.route('/robots.txt')
 def static_from_root():
     content = "User-agent: *\nDisallow: /admin"
@@ -940,23 +949,6 @@ def static_from_root():
 
     response = Response(modified_content, mimetype='text/plain')
     return response
-
-
-@app.route('/verify_captcha', methods=['POST'])
-def verify_captcha():
-    # 获取前端传来的验证码值
-    user_input = request.form.get('captcha')
-    user_input = clear_html_format(user_input)
-
-    # 获取存储在session中的验证码文本
-    captcha_text = session['captcha_text']
-
-    if user_input.lower() == captcha_text.lower():
-        # 验证码匹配成功，执行相应逻辑
-        return '验证码匹配成功'
-    else:
-        # 验证码匹配失败，执行相应逻辑
-        return '验证码不匹配'
 
 
 @app.route('/edit/<article>', methods=['GET', 'POST', 'PUT'])
@@ -1063,7 +1055,7 @@ def edit_save():
 
 
 @app.route('/hidden/article', methods=['POST'])
-def hideen_article():
+def hidden_article():
     article = request.json.get('article')
     if article is None:
         return jsonify({'message': '404'}), 404
@@ -1081,7 +1073,7 @@ def hideen_article():
 
     if is_hidden(article):
         # 取消隐藏文章
-        unhide_article(article)
+        unhidden_article(article)
         return jsonify({'deal': 'unhide'})
     else:
         # 隐藏文章
@@ -1095,7 +1087,7 @@ def hide_article(article):
         hidden_file.write('\n' + article + '\n')
 
 
-def unhide_article(article):
+def unhidden_article(article):
     with open('articles/hidden.txt', 'r', encoding=global_encoding) as hidden_file:
         hidden_articles = hidden_file.read().splitlines()
 
@@ -1630,63 +1622,39 @@ def api_shortlink(long_url):
 
 
 @cache.cached(timeout=1200)
-def get_link_info(username):
-    db = get_database_connection()
-    cursor = db.cursor()
-
-    # 查询用户是否为管理员
-    query_admin = "SELECT ifAdmin FROM users WHERE username = %s"
-    cursor.execute(query_admin, (username,))
-    admin_result = cursor.fetchone()
-
-    # 如果用户是管理员，则查询所有链接信息
-    if admin_result and admin_result[0] == 1:
-        query = "SELECT created_at, short_url, long_url FROM urls"
-        cursor.execute(query)
-    else:
-        # 否则，查询特定用户的链接信息
-        query = "SELECT created_at, short_url, long_url FROM urls WHERE username = %s"
-        cursor.execute(query, (username,))
-
-    result = cursor.fetchall()
-
-    cursor.close()
-    db.close()
-
-    return jsonify(result)
-
-
-@cache.cached(timeout=1200)
 @app.route('/<article_id>.html', methods=['GET', 'POST'])
 def id_find_article(article_id):
-    if re.match(r'^\d{1,4}$', article_id):
-        user_agent = request.headers.get('User-Agent')
-        db = get_database_connection()
-        cursor = db.cursor()
+    if not re.match(r'^\d{1,4}$', article_id):
+        logging.error(f"Invalid article ID: {article_id}")
+        return error(message='无效的文章', status_code=404)
 
-        # 根据短网址查询数据库获取对应的长网址
+    user_agent = request.headers.get('User-Agent')
+    db = get_database_connection()
+    cursor = db.cursor()
+    try:
         query = "SELECT long_url FROM urls WHERE id = %s"
         cursor.execute(query, (article_id,))
         result = cursor.fetchone()
 
         if result:
-            # 如果找到对应的长网址，则进行重定向
             long_url = result[0]
-
-            # 获取请求者的 IP 地址
-            ip_address = get_client_ip(request, session)
-            app.logger.info('当前访问的用户:IP:{},UA:{}'.format(ip_address, user_agent))
-            db.commit()
-
-            # 关闭数据库连接
-            cursor.close()
-            db.close()
-
-            return redirect(long_url, code=302)
-    else:
-        # 如果没有找到对应的长网址，则返回错误页面或其他处理逻辑
-        logging.error(f"Invalid short URL: {article_id}")
-        return error(message='无效的文章', status_code=404)
+            last_slash_index = long_url.rfind("/")
+            article = long_url[last_slash_index + 1:]
+            # print(article)
+            return blog_detail(article)
+        else:
+            # If no URL is found
+            logging.error(f"URL not found for: {article_id}")
+            return error(message='没有找到文章', status_code=404)
+    except Exception as e:
+        logging.error(f"An error occurred: {str(e)}")
+        db.rollback()
+        return error(message='服务器内部错误', status_code=500)
+    finally:
+        ip_address = get_client_ip(request, session)
+        app.logger.info(f'IP:{ip_address}, UA:{user_agent}')
+        cursor.close()
+        db.close()
 
 
 @cache.cached(timeout=1200)
@@ -1707,31 +1675,31 @@ def friendslinks():
 
 def get_friendslinks():
     authorMapper.read('author/mapper.ini', encoding=global_encoding)
-    friendslinks = authorMapper.get('friends', 'list').strip("'")
+    friends_links = authorMapper.get('friends', 'list').strip("'")
     FL_list = []
     for i in range(1, 50):
         StrIn = str(i)
-        lfind = friendslinks.find(StrIn + "=")
-        if lfind == -1:
+        fl_find = friends_links.find(StrIn + "=")
+        if fl_find == -1:
             break
         else:
-            lend = friendslinks.find(";", lfind)
-            strout = friendslinks[lfind + len(StrIn) + 1:lend]
-            FL_list.append(strout)
+            lend = friends_links.find(";", fl_find)
+            f_link = friends_links[fl_find + len(StrIn) + 1:lend]
+            FL_list.append(f_link)
 
     FL_json = json.dumps(FL_list)
     return FL_json
 
 
 @app.errorhandler(404)
-def page_not_found(error):
-    app.logger.error(error)
+def page_not_found(error_message):
+    app.logger.error(error_message)
     return "Page not found", 404
 
 
 @app.errorhandler(500)
-def internal_server_error(error):
-    app.logger.error(error)
+def internal_server_error(error_message):
+    app.logger.error(error_message)
     return "Internal server error", 500
 
 
@@ -1742,6 +1710,6 @@ def undefined_route(undefined_path):
 
 
 @app.errorhandler(Exception)
-def handle_unexpected_error(error):
-    app.logger.error(error)
+def handle_unexpected_error(error_message):
+    app.logger.error(error_message)
     return "An unexpected error occurred", 500
