@@ -3,8 +3,8 @@
 -- https://www.phpmyadmin.net/
 --
 -- 主机： 127.0.0.1
--- 生成日期： 2024-03-24 14:12:45
--- 服务器版本： 8.0.36
+-- 生成日期： 2024-05-17 12:58:53
+-- 服务器版本： 8.0.21
 -- PHP 版本： 8.2.12
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -32,8 +32,8 @@ CREATE TABLE `cities` (
   `pid` int DEFAULT NULL,
   `city_code` varchar(20) DEFAULT NULL,
   `city_name` varchar(50) DEFAULT NULL,
-  `post_code` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
-  `area_code` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL
+  `post_code` varchar(20) CHARACTER SET utf8mb4  DEFAULT NULL,
+  `area_code` varchar(20) CHARACTER SET utf8mb4  DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 --
@@ -2586,14 +2586,14 @@ CREATE TABLE `invitecode` (
   `uuid` char(36) NOT NULL,
   `code` char(4) NOT NULL,
   `is_used` tinyint(1) NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb3;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- 转存表中的数据 `invitecode`
 --
 
 INSERT INTO `invitecode` (`uuid`, `code`, `is_used`) VALUES
-('f4f36405-e9dc-11ee-9225-f80dac08c659', '9988', 1);
+('f4f36405-e9dc-11ee-9225-f80dac08c659', '9988', 0);
 
 -- --------------------------------------------------------
 
@@ -2602,10 +2602,10 @@ INSERT INTO `invitecode` (`uuid`, `code`, `is_used`) VALUES
 --
 
 CREATE TABLE `ip` (
-  `used` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci,
+  `used` text CHARACTER SET utf8 COLLATE utf8_general_ci,
   `ip` varchar(45) DEFAULT NULL,
-  `username` char(24) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb3;
+  `username` char(24) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- 转存表中的数据 `ip`
@@ -2625,7 +2625,7 @@ CREATE TABLE `opentimes` (
   `short_url` varchar(10) NOT NULL,
   `response_count` int NOT NULL DEFAULT '0',
   `first_response_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb3;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
 
@@ -2639,7 +2639,7 @@ CREATE TABLE `urls` (
   `short_url` varchar(10) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `username` varchar(255) NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb3;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- 转存表中的数据 `urls`
@@ -2660,14 +2660,14 @@ CREATE TABLE `users` (
   `password` varchar(255) NOT NULL,
   `ifAdmin` tinyint(1) NOT NULL DEFAULT '0',
   `email` varchar(255) NOT NULL DEFAULT 'guest@7trees.cn'
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb3;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- 转存表中的数据 `users`
 --
 
 INSERT INTO `users` (`id`, `username`, `password`, `ifAdmin`, `email`) VALUES
-(1, 'test', '$2b$12$DN7g21B4E1A04wnXM8MXSOae4lgP/OlZGUmG90aPvrOf1csEGZEBK', 1, 'support@7trees.cn');
+(1, 'test', '$2a$04$WWv/DDjich0uPMGpb4NhnOPiUFEzzIzfAVpLLDiIUo49wz5CEZ7sW', 1, 'support@7trees.cn');
 
 --
 -- 转储表的索引
@@ -2698,6 +2698,7 @@ ALTER TABLE `opentimes`
 ALTER TABLE `urls`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `short_url` (`short_url`);
+
 --
 -- 表的索引 `users`
 --
@@ -2719,7 +2720,7 @@ ALTER TABLE `opentimes`
 -- 使用表AUTO_INCREMENT `urls`
 --
 ALTER TABLE `urls`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- 使用表AUTO_INCREMENT `users`
