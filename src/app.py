@@ -308,7 +308,6 @@ def space():
     avatar_url = profile('guest@7trees.cn')
     template = env.get_template('zyprofile.html')
     session.setdefault('theme', 'day-theme')
-    notice = read_file('notice/1.txt', 300)
     userStatus = get_user_status()
     username = get_username()
     owner_articles = None
@@ -328,8 +327,7 @@ def space():
     if 'default' in owner_articles:
         owner_articles.remove('default')
 
-    return template.render(url_for=url_for, theme=session['theme'],
-                           notice=notice, avatar_url=avatar_url,
+    return template.render(url_for=url_for, theme=session['theme'], avatar_url=avatar_url,
                            userStatus=userStatus, username=username,
                            Articles=owner_articles)
 
@@ -545,6 +543,7 @@ def discord_r():
         以上是社区讨论的基本条约，希望大家共同遵守，保持社区和谐与发展。
 
         <button id="show_comments" onclick="showComments()">开启评论区</button>
+        
         * 参与讨论表示同意上述观点
         """
     else:
@@ -561,8 +560,12 @@ def blog_page():
     return redirect(url_for('login'))
 
 
-@app.route('/blog/<article>', methods=['GET', 'POST'])
 @app.route('/blog/<article>.html', methods=['GET', 'POST'])
+def blog_detail_seo(article):
+    return redirect(f'/blog/{article}')
+
+
+@app.route('/blog/<article>', methods=['GET', 'POST'])
 def blog_detail(article):
     try:
         # 根据文章名称获取相应的内容并处理
