@@ -8,24 +8,43 @@
     <meta name="robots" content="index, follow">
     <title>{{ articleName }} | {{ title }}</title>
     {% if theme=="night-theme" %}
-    <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/docsify/lib/themes/dark.css">
+        <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/docsify/lib/themes/dark.css">
     {% else %}
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify/themes/vue.css">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify/themes/vue.css">
     {% endif %}
     <script src="//cdn.jsdelivr.net/npm/docsify/lib/plugins/emoji.min.js"></script>
     <script src="//cdn.jsdelivr.net/npm/docsify/lib/plugins/zoom-image.min.js"></script>
 <body class="{{ theme }}">
-<span style="background-color: #ceffd6;color: #444444">本文最近更新日期:{{ blogDate }},与本文有关的标签{% for Tag in article_tags %}
-                    <a href="/?tag={{ Tag }}">{{ Tag }}</a>
-                {% endfor %}/<<--点击标签获取更多文章|/本文作者：<a href="/profile?id={{ author }}" target="_blank">{{ author }}</a>，转载请注明原文链接：<a href="{{ article_Surl }}"
-                                                                                    target="_blank">{{ article_Surl }}</a></span>
-<div id="app" class={{theme}}></div>
+<span style="background-color: #ceffd6;color: #444444">本文最近更新日期:{{ blogDate }},与本文有关的标签
+    {% for Tag in article_tags %}
+        <a href="/?tag={{ Tag }}">{{ Tag }}</a>
+    {% endfor %}/<<--点击标签获取更多文章|/本文作者：<a href="/profile?id={{ author }}" target="_blank">{{ author }}</a>，转载请注明原文链接：<a
+            href="{{ article_Surl }}"
+            target="_blank">{{ article_Surl }}</a></span>
+<div id="app" class={{ theme }}></div>
 <div id="read">
 
 
 </div>
-<div id='comments_zone' style="display: none;">
-    <img src="../static/image/zytag.svg" style="height: 16px" alt="">
+
+<div id='comments_zone' style="display: none;">🏷️
+    <span style="color:black">社区讨论条约
+        <br/>
+        尊重他人意见：在社区讨论中，大家都有权利发表自己的观点，但请避免恶意攻击或侮辱他人。请尊重他人的意见和观点，保持开放、友善的讨论环境。
+        <br/>
+        文明交流：在讨论过程中，请尽量使用文明、礼貌的语言，避免使用粗鲁或攻击性言辞。保持冷静，理性讨论，不要轻易引发争议。
+        <br/>
+        尊重知识产权：在引用他人观点或资料时，请注明出处，并尊重他人的知识产权。禁止抄袭和侵犯他人版权。
+        <br/>
+        禁止谩骂和人身攻击：严禁在讨论中使用谩骂、人身攻击等不当言论，保持理性、平和的态度，避免情绪化的讨论。
+        <br/>
+        尊重社区规则：遵守社区规定，不发表违反法律法规和社区规定的言论，保持社区秩序和正常运转。
+        <br/>
+        尊重他人隐私：在讨论中，不要公开或泄露他人的个人信息，尊重他人的隐私权。
+        <br/>
+        以上是社区讨论的基本条约，希望大家共同遵守，保持社区和谐与发展。
+        <br/>
+        * 参与讨论表示同意上述观点</span>
     <button id="hide_comments" onclick="hideComments()" style="display: none;">隐藏评论区</button>
     <script src="https://utteranc.es/client.js"
             repo="Athenavi/comments"
@@ -44,6 +63,8 @@
         document.getElementById('comments_zone').style.display = 'block';
         document.getElementById('show_comments').style.display = 'none';
         document.getElementById('hide_comments').style.display = 'block';
+        document.body.scrollTop = 0;
+        document.documentElement.scrollTop = 0;
     }
 
     function hideComments() {
@@ -63,6 +84,7 @@
         coverpage: '../api/_coverpage.md',
         loadSidebar: '../api/_sidebar.md',
         subMaxLevel: 2,
+        repo: 'https://github.com/Athenavi/zb/',
         alias: {
             '/': '../api/{{ articleName }}.md',
         },
@@ -71,55 +93,72 @@
             fontsize: '0.9em',
             color: 'rgb(90,90,90)',
             language: 'chinese'
-        }
+        },
+        beian: {
+            ICP: "京ICP备-888888888",
+        },
+        busuanzi: true,
     };
 </script>
 <script src="https://cdn.jsdelivr.net/npm/docsify/lib/docsify.min.js"></script>
 <script src="//cdn.jsdelivr.net/npm/docsify-copy-code/dist/docsify-copy-code.min.js"></script>
 <script src="//unpkg.com/docsify-count/dist/countable.js"></script>
+<script src="//cdn.jsdelivr.net/npm/docsify/lib/plugins/zoom-image.min.js"></script>
+<script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+
+    mermaid.initialize({startOnLoad: true});
+    window.mermaid = mermaid;
+</script>
+<script src="//unpkg.com/docsify-mermaid@2.0.1/dist/docsify-mermaid.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docsify-beian@latest/dist/beian.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docsify-terminal-block@1.0.3"></script>
+<script src="https://unpkg.com/docsify-busuanzi@1.0.1/dist/docsify-busuanzi.min.js"></script>
+
+
 </body>
 
 </html>
 {% if not article_content %}
-<div id="fullscreen">
-    <form id="passwordForm">
-        <a>{{ articleName }}需要</a>
-        <label for="password">访问密码:</label>
-        <input type="password" id="password" name="password" placeholder="输入密码" required>
-        <input type="submit" value="提交">
-    </form>
-</div>
-<script>
-    function submitForm() {
-        var passwordInput = document.getElementById("password");
-        var password = passwordInput.value;
+    <div id="fullscreen">
+        <form id="passwordForm">
+            <a>{{ articleName }}需要</a>
+            <label for="password">访问密码:</label>
+            <input type="password" id="password" name="password" placeholder="输入密码" required>
+            <input type="submit" value="提交">
+        </form>
+    </div>
+    <script>
+        function submitForm() {
+            var passwordInput = document.getElementById("password");
+            var password = passwordInput.value;
 
-        var xhr = new XMLHttpRequest();
-        xhr.open("POST", "/blog/" + '{{ article }}', true);
-        xhr.setRequestHeader("Content-type", "application/json");
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/blog/" + '{{ article }}', true);
+            xhr.setRequestHeader("Content-type", "application/json");
 
-        var data = JSON.stringify({
-            "article": '{{ article }}',   // 替换为实际文章参数值
-            "code": password   // 使用输入的密码作为code参数的值
-        });
+            var data = JSON.stringify({
+                "article": '{{ article }}',   // 替换为实际文章参数值
+                "code": password   // 使用输入的密码作为code参数的值
+            });
 
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState === XMLHttpRequest.DONE) {
-                if (xhr.status === 200) {
-                    alert("提交成功！");   // 请求成功的处理逻辑
-                } else {
-                    alert("提交失败。请稍后再试。");   // 请求失败的处理逻辑
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === XMLHttpRequest.DONE) {
+                    if (xhr.status === 200) {
+                        alert("提交成功！");   // 请求成功的处理逻辑
+                    } else {
+                        alert("提交失败。请稍后再试。");   // 请求失败的处理逻辑
+                    }
                 }
-            }
+            };
+
+            xhr.send(data);
+        }
+
+        window.onload = function () {
+            document.getElementById("password").focus();
         };
-
-        xhr.send(data);
-    }
-
-    window.onload = function () {
-        document.getElementById("password").focus();
-    };
-</script>
+    </script>
 {% endif %}
 <style>
     #comments_zone {

@@ -26,37 +26,38 @@
 
 <div class="container-fluid">
     <div class="row">
-        <span>{{notice|safe}}</span>
+        <span>{{ notice|safe }}</span>
         <!-- Main Content -->
         <main class="col-md-8">
             {% for article, time in articles_time_list %}
-            <div class="card mb-4 shadow-sm">
-                <div class="card-body d-flex align-items-center">
-                    <img class="img-fluid" style="max-height: 75px;" src="http://api.7trees.cn/img" alt="{{ article }}">
-                    <div>
-                        <h5 class="card-title ml-3">{{ article }}</h5>
-                        <p class="text-muted mb-2 ml-3">发布于 {{ time }}</p>
-                        <a href="{{ url_for('blog_detail', article=article) }}" class="stretched-link"></a>
+                <div class="card mb-4 shadow-sm">
+                    <div class="card-body d-flex align-items-center">
+                        <img class="img-fluid" style="max-height: 75px;" src="http://api.7trees.cn/img"
+                             alt="{{ article }}">
+                        <div>
+                            <h5 class="card-title ml-3">{{ article }}</h5>
+                            <p class="text-muted mb-2 ml-3">发布于 {{ time }}</p>
+                            <a href="{{ url_for('blog_detail', article=article) }}" class="stretched-link"></a>
+                        </div>
                     </div>
                 </div>
-            </div>
             {% endfor %}
             <!-- Pagination -->
             <nav aria-label="Page navigation example">
                 <ul class="pagination justify-content-center">
                     {% if has_previous_page %}
-                    <li class="page-item">
-                        <a class="page-link" href="/?page={{current_page-1}}&tag={{tag}}" aria-label="Previous">
-                            <span aria-hidden="true">&laquo; 上一页</span>
-                        </a>
-                    </li>
+                        <li class="page-item">
+                            <a class="page-link" href="/?page={{ current_page-1 }}&tag={{ tag }}" aria-label="Previous">
+                                <span aria-hidden="true">&laquo; 上一页</span>
+                            </a>
+                        </li>
                     {% endif %}
                     {% if has_next_page %}
-                    <li class="page-item">
-                        <a class="page-link" href="/?page={{current_page+1}}&tag={{tag}}" aria-label="Next">
-                            <span aria-hidden="true">下一页 &raquo;</span>
-                        </a>
-                    </li>
+                        <li class="page-item">
+                            <a class="page-link" href="/?page={{ current_page+1}}&tag={{ tag }}" aria-label="Next">
+                                <span aria-hidden="true">下一页 &raquo;</span>
+                            </a>
+                        </li>
                     {% endif %}
                 </ul>
             </nav>
@@ -66,7 +67,7 @@
             <div class="p-4 mb-3 bg-light rounded">
                 <h4 class="font-italic">标签</h4>
                 {% for tag in tags %}
-                <span><a href="/?tag={{tag}}">{{tag}}</a></span>
+                    <span>🏷️<a href="/?tag={{ tag }}">{{ tag }}</a></span>
                 {% endfor %}
             </div>
             <hr>
@@ -76,8 +77,6 @@
             <img src="/static/image/gzh.png" alt="Wx——qrcode" style="height: 95px;">
             <hr>
             <a class="button" href="/travel">随机一篇文章</a><br>
-            <a class="button" href="/newArticle" alt="上传投稿">上传投稿</a><br>
-            <a class="button" href="https://github.com/Athenavi/zyBLOG/" target="_blank">Github开源地址</a><br>
             <a class="button" href="/blog/privacy">隐私协议</a><br>
             <a class="button" href="/blog/legal-agreement">法律声明</a><br>
             <a class="button" href="/sitemap">站点地图</a><br>
@@ -93,4 +92,5 @@
 
 <!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-</body></html>
+</body>
+</html>

@@ -1,68 +1,81 @@
 <!-- header.html -->
 {% macro zytopbar() -%}
-<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-<style>
-    #loading {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        z-index: 10000;
-        background-color: rgba(0, 0, 0, 0.8);
-        color: #fff;
-        font-size: 24px;
-        text-align: center;
-        line-height: 100vh;
-    }
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        #loading {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10000;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            font-size: 24px;
+            text-align: center;
+            line-height: 100vh;
+        }
 
-    .fixed-icon {
-        position: fixed;
-        bottom: 10px;
-        right: 10px;
-        z-index: 9999;
-    }
+        .fixed-icon {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            font-size: 45px;
+            z-index: 999999;
+        }
 
-    .image-button {
-        cursor: pointer;
-    }
-</style>
+        .image-button {
+            cursor: pointer;
+        }
+    </style>
 
-<div id="loading">Loading...</div>
+    <div id="loading">Loading...</div>
 
-<nav class="bg-blue-500">
-    <div class="container mx-auto flex justify-between items-center">
-        <a class="text-xl text-white font-bold py-4" href="/"><img src="../static/favicon.ico" style="height: 32px"/></a>
-        <div class="flex items-center">
-            <a href="/profile"><img class="image-button" src="../static/image/author.svg" style="height: 18px" alt=/></a>
-            <form id="theme-form" method="post" action="/toggle_theme">
-                <button type="submit" style="border: none; background-color: transparent;">
-                    <img src="../static/image/sun.svg" alt="切换主题" style="height: 20px;">
-                </button>
-            </form>
+    <nav class="bg-blue-500">
+        <div class="container mx-auto flex justify-between items-center">
+            <a class="text-xl text-white font-bold py-4" href="/"><img src="../static/favicon.ico"
+                                                                       style="height: 32px"/></a>
+            <div class="flex items-center">
+                <a href="/profile">🛖</a>
+                <form id="theme-form" method="post" action="/toggle_theme">
+                    <button type="submit" style="border: none; background-color: transparent;">
+                        ⚙
+                    </button>
+                </form>
+            </div>
         </div>
+    </nav>
+
+    <div class="fixed-icon">
+        <a onclick="scrollToTop()">🔝</a>
+
+        <script>
+            function scrollToTop() {
+                document.body.scrollTop = 0;
+                document.documentElement.scrollTop = 0;
+            }
+        </script>
     </div>
-</nav>
 
-<div>
-    <a href="#top"><img src="../static/image/rocket.svg" class="fixed-icon" style="height: 40px" alt="回到顶部"></a>
-</div>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.1/umd/popper.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            document.getElementById("loading").style.display = "none";
+        });
 
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.1/umd/popper.min.js"></script>
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-        document.getElementById("loading").style.display = "none";
-    });
-
-    document.getElementById("theme-form").addEventListener("submit", function (event) {
-        event.preventDefault();
-        fetch("/toggle_theme", { method: "POST" })
-            .then(function (response) {
-                if (response.ok) { location.reload(); }
-            });
-    });
-    window.addEventListener('contextmenu', function (e) { e.preventDefault(); }, false);
-</script>
+        document.getElementById("theme-form").addEventListener("submit", function (event) {
+            event.preventDefault();
+            fetch("/toggle_theme", {method: "POST"})
+                .then(function (response) {
+                    if (response.ok) {
+                        location.reload();
+                    }
+                });
+        });
+        window.addEventListener('contextmenu', function (e) {
+            e.preventDefault();
+        }, false);
+    </script>
 {% endmacro %}

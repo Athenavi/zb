@@ -308,7 +308,6 @@ def space():
     avatar_url = profile('guest@7trees.cn')
     template = env.get_template('zyprofile.html')
     session.setdefault('theme', 'day-theme')
-    notice = read_file('notice/1.txt', 300)
     userStatus = get_user_status()
     username = get_username()
     owner_articles = None
@@ -328,8 +327,7 @@ def space():
     if 'default' in owner_articles:
         owner_articles.remove('default')
 
-    return template.render(url_for=url_for, theme=session['theme'],
-                           notice=notice, avatar_url=avatar_url,
+    return template.render(url_for=url_for, theme=session['theme'], avatar_url=avatar_url,
                            userStatus=userStatus, username=username,
                            Articles=owner_articles)
 
@@ -521,36 +519,6 @@ def get_file_time(articles):
     return modify_times
 
 
-@cache.cached(timeout=600)
-@app.route('/blog/discord/README.md', methods=['GET', 'POST'])
-def discord_r():
-    _is_discord_Open = config.get('general', 'discord', fallback='ON').strip("'")
-
-    if _is_discord_Open.upper() == 'ON':
-        return """
-            社区讨论条约
-
-        尊重他人意见：在社区讨论中，大家都有权利发表自己的观点，但请避免恶意攻击或侮辱他人。请尊重他人的意见和观点，保持开放、友善的讨论环境。
-
-        文明交流：在讨论过程中，请尽量使用文明、礼貌的语言，避免使用粗鲁或攻击性言辞。保持冷静，理性讨论，不要轻易引发争议。
-
-        尊重知识产权：在引用他人观点或资料时，请注明出处，并尊重他人的知识产权。禁止抄袭和侵犯他人版权。
-
-        禁止谩骂和人身攻击：严禁在讨论中使用谩骂、人身攻击等不当言论，保持理性、平和的态度，避免情绪化的讨论。
-
-        尊重社区规则：遵守社区规定，不发表违反法律法规和社区规定的言论，保持社区秩序和正常运转。
-
-        尊重他人隐私：在讨论中，不要公开或泄露他人的个人信息，尊重他人的隐私权。
-
-        以上是社区讨论的基本条约，希望大家共同遵守，保持社区和谐与发展。
-
-        <button id="show_comments" onclick="showComments()">开启评论区</button>
-        * 参与讨论表示同意上述观点
-        """
-    else:
-        return '<span style="color: red">评论区已被站长关闭</span>'
-
-
 @cache.memoize(30)
 def get_a_list():
     return get_all_article_names()
@@ -561,8 +529,12 @@ def blog_page():
     return redirect(url_for('login'))
 
 
-@app.route('/blog/<article>', methods=['GET', 'POST'])
 @app.route('/blog/<article>.html', methods=['GET', 'POST'])
+def blog_detail_seo(article):
+    return redirect(f'/blog/{article}')
+
+
+@app.route('/blog/<article>', methods=['GET', 'POST'])
 def blog_detail(article):
     try:
         # 根据文章名称获取相应的内容并处理

@@ -77,9 +77,7 @@
                 <ul>
                     {% for result in results %}
                         <li>
-                            <a href="{{ result.link }}" target="_blank" class="text-blue-500">{{ result.title }}</a>
-                            <a href="{{ result.link }}" target="_blank"><img src="../static/image/jump.svg"
-                                                                             style="height: 28px" alt=""></a>
+                            <a href="{{ result.link }}" target="_blank" class="text-blue-500">{{ result.title }}↗️</a>
                         </li>
                     {% endfor %}
                 </ul>
