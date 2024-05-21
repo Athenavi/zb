@@ -519,6 +519,37 @@ def get_file_time(articles):
     return modify_times
 
 
+@cache.cached(timeout=600)
+@app.route('/blog/discord/README.md', methods=['GET', 'POST'])
+def discord_r():
+    _is_discord_Open = config.get('general', 'discord', fallback='ON').strip("'")
+
+    if _is_discord_Open.upper() == 'ON':
+        return """
+            社区讨论条约
+
+        尊重他人意见：在社区讨论中，大家都有权利发表自己的观点，但请避免恶意攻击或侮辱他人。请尊重他人的意见和观点，保持开放、友善的讨论环境。
+
+        文明交流：在讨论过程中，请尽量使用文明、礼貌的语言，避免使用粗鲁或攻击性言辞。保持冷静，理性讨论，不要轻易引发争议。
+
+        尊重知识产权：在引用他人观点或资料时，请注明出处，并尊重他人的知识产权。禁止抄袭和侵犯他人版权。
+
+        禁止谩骂和人身攻击：严禁在讨论中使用谩骂、人身攻击等不当言论，保持理性、平和的态度，避免情绪化的讨论。
+
+        尊重社区规则：遵守社区规定，不发表违反法律法规和社区规定的言论，保持社区秩序和正常运转。
+
+        尊重他人隐私：在讨论中，不要公开或泄露他人的个人信息，尊重他人的隐私权。
+
+        以上是社区讨论的基本条约，希望大家共同遵守，保持社区和谐与发展。
+
+        <button id="show_comments" onclick="showComments()">开启评论区</button>
+        
+        * 参与讨论表示同意上述观点
+        """
+    else:
+        return '<span style="color: red">评论区已被站长关闭</span>'
+
+
 @cache.memoize(30)
 def get_a_list():
     return get_all_article_names()
