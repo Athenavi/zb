@@ -20,7 +20,7 @@ from flask import Flask, render_template, redirect, session, request, url_for, R
 from flask_caching import Cache
 from jinja2 import Environment, select_autoescape, FileSystemLoader
 from werkzeug.middleware.proxy_fix import ProxyFix
-from src.AboutLogin import zy_login, zy_register, get_email, profile, zy_mail_login
+from src.AboutLogin import zy_login, zy_register, get_email, zy_mail_login
 from src.AboutPW import zy_change_password, zy_confirm_password
 from src.BlogDeal import get_article_names, get_article_content, clear_html_format, \
     get_file_date, get_blog_author, read_hidden_articles, auth_articles, \
@@ -303,9 +303,22 @@ def sys_out_file(article_name):
         return "An internal error occurred", 500
 
 
+def get_avatar():
+    username = get_username()
+    if username:
+        avatar = os.path.join(base_dir, 'media', username, 'avatar.png')
+        if os.path.exists(avatar):
+            avatar_url = domain + 'zyImg/' + username + '/avatar.png'
+        else:
+            avatar_url = None
+    else:
+        avatar_url = domain + 'static/favicon.ico'
+    return avatar_url
+
+
 @app.route('/profile', methods=['GET', 'POST'])
 def space():
-    avatar_url = profile('guest@7trees.cn')
+    avatar_url = get_avatar() or domain + 'static/favicon.ico'
     template = env.get_template('zyprofile.html')
     session.setdefault('theme', 'day-theme')
     userStatus = get_user_status()
@@ -317,10 +330,7 @@ def space():
         if owner_name is None or owner_name == '':
             owner_name = username
         owner_articles = get_owner_articles(owner_name)
-        avatar_url = get_email(owner_name)
-        avatar_url = profile(avatar_url)
-        if 'faceimg' in session:
-            avatar_url = session['faceimg']
+
     if owner_articles is None:
         owner_articles = []  # 设置为空列表
 
@@ -450,7 +460,7 @@ def home():
         articles, has_next_page, has_previous_page = get_article_names(page=page)
 
         # 模版配置
-        template = env.get_template('zyhome.html')
+        template = env.get_template('zyIndex.html')
         template_display = session.get('display', 'default')
         template_path = f'templates/theme/{template_display}/index.html'
         if os.path.exists(template_path):
@@ -498,7 +508,7 @@ def home():
         return resp
 
     else:
-        return render_template('zyhome.html')
+        return render_template('zyIndex.html')
 
 
 @cache.cached(timeout=600, key_prefix='artile_time')

@@ -128,19 +128,6 @@ def get_email(username):
     return email
 
 
-import hashlib
-
-
-def profile(email):
-    email = email  # 用户的电子邮件地址
-    # 将电子邮件地址转换为小写，并使用 MD5 哈希算法生成哈希值
-    email_hash = hashlib.md5(email.lower().encode('utf-8')).hexdigest()
-    # 构建 Gravatar 头像的 URL
-    avatar_url = f'https://www.gravatar.com/avatar/{email_hash}?s=100&r=g&d=retro'
-
-    return avatar_url
-
-
 def zy_mail_login(user_email, ip):
     username = 'qks' + format(random.randint(1000, 9999))
     password = '123456'
