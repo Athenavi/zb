@@ -28,11 +28,12 @@
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="block-content block-content-full px-lg-4 py-md-4 py-lg-4">
-                <span>公告:{{ notice|safe }}</span><br>
-                <img src="{{ avatar_url }}" style="height: 35px; border-radius: 50%;" alt="">
                 {% if userStatus %}
                     <!-- 展示已登录的内容 -->
-                    <a>{{ username }}</a>   <a href="/media">媒体文件</a>  <a href="/logout">点击这里直接注销</a>　　
+                    <a><img src="{{ avatar_url }}" style="height: 42px; border-radius: 50%;" alt=""
+                            ondblclick="avatarInfo()">{{ username }}</a>
+                    <a href="/media">媒体文件</a>
+                    <a href="/logout">点击这里直接注销</a>　　
                     <a href="/change-password">修改我的密码</a>
                 {% else %}
                     <!-- 展示未登录的内容 -->
@@ -99,37 +100,12 @@
 </body>
 
 </html>
-<style>
-    .card {
-        background-color: transparent;
-        border: None;
-    }
-
-    .card-body {
-        background-color: rgba(255, 255, 255, 0.8);
-        /* Set the desired transparency value in the last parameter (0.8 in this example) */
-        /* Adjust other styles as needed */
-
-        display: flex;
-        align-items: center;
-    }
-
-    .card-body img {
-        flex: 1;
-        max-width: 50%;
-        max-height: 125%;
-    }
-
-    .card-body h3 {
-        flex: 1;
-    }
-
-    .card:hover {
-        box-shadow: 0 0 10px #877725;
-    }
-</style>
-
 <script>
+
+    function avatarInfo() {
+        alert('如何修改我的头像？ \n上传名字为avatar.png到媒体文件中')
+    }
+
     // 获取URL参数的函数
     function getParameterByName(name) {
         name = name.replace(/[\[\]]/g, "\\$&");

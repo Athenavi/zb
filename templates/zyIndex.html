@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="zyBLOG|基于flask的博客程序">
+    <meta name="keywords" content="zyBLOG, flask, 七棵树, 奇客舒, 博客">
+    <meta name="robots" content="index, follow">
+    <title>{{ title }} | zyBLOG</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="/static/css/card.css">
+    <!-- Tailwind CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@latest/dist/tailwind.min.css" rel="stylesheet">
+</head>
+
+<body class={{ theme }}>
+<!-- Navigation -->
+{% from 'header.html' import zytopbar %}
+{{ zytopbar() }}
+
+<div class="container mx-auto px-4">
+    <div class="flex flex-col md:flex-row">
+        <span>{{ notice|safe }}</span>
+        <!-- Main Content -->
+        <main class="w-full md:w-2/3">
+            {% for article, time in articles_time_list %}
+                <div class="card mb-4 shadow-sm">
+                    <a href="{{ url_for('blog_detail', article=article) }}"
+                       class="text-blue-500">
+                        <div class="card-body flex items-center">
+                            <img class="w-16 h-16 mr-4" src="http://api.7trees.cn/img" alt="{{ article }}">
+                            <div>
+                                <h5 class="card-title">{{ article }}</h5>
+                                <p class="text-gray-600 mb-2">发布于 {{ time }}</p>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            {% endfor %}
+            <!-- Pagination -->
+            <nav aria-label="Page navigation example">
+                <ul class="pagination justify-center">
+                    {% if has_previous_page %}
+                        <li class="page-item">
+                            <a class="page-link" href="/?page={{ current_page-1 }}&tag={{ tag }}" aria-label="Previous">
+                                <span aria-hidden="true">&laquo; 上一页</span>
+                            </a>
+                        </li>
+                    {% endif %}
+                    {% if has_next_page %}
+                        <li class="page-item">
+                            <a class="page-link" href="/?page={{ current_page+1}}&tag={{ tag }}" aria-label="Next">
+                                <span aria-hidden="true">下一页 &raquo;</span>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </main>
+        <!-- Side Content -->
+        <aside class="w-full md:w-1/4 lg:w-1/5 md:pl-8 lg:pl-12">
+            <div class="p-6 mb-6 bg-gray-100 rounded-lg">
+                <h4 class="font-bold text-gray-800 mb-4">标签</h4>
+                <div class="flex flex-wrap">
+                    {% for tag in tags %}
+                        <a href="/?tag={{ tag }}"
+                           class="bg-gray-200 text-blue-700 px-3 py-1 mr-2 mb-2 rounded-full hover:bg-blue-200 hover:text-blue-800">
+                            {{ tag }}
+                        </a>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="p-6 bg-gray-50 rounded-lg">
+                <a href="Mailto:support@7trees.cn"
+                   class="bg-blue-500 text-white px-4 py-2 block w-full rounded-lg hover:bg-blue-600 mb-4">
+                    联系我
+                </a>
+                <p class="text-gray-600 mb-4">Ctrl + F 搜索内容</p>
+                <img src="/static/image/gzh.png" alt="Wx——qrcode" class="w-full h-auto mb-4">
+                <div>
+                    <a href="/travel"
+                       class="bg-green-500 text-white px-4 py-2 block w-full rounded-lg hover:bg-green-600 mb-2">
+                        随机一篇文章
+                    </a>
+                    <a href="/blog/privacy"
+                       class="bg-yellow-500 text-white px-4 py-2 block w-full rounded-lg hover:bg-yellow-600 mb-2">
+                        隐私协议
+                    </a>
+                    <a href="/blog/legal-agreement"
+                       class="bg-red-500 text-white px-4 py-2 block w-full rounded-lg hover:bg-red-600 mb-2">
+                        法律声明
+                    </a>
+                    <a href="/sitemap"
+                       class="bg-purple-500 text-white px-4 py-2 block w-full rounded-lg hover:bg-purple-600 mb-2">
+                        站点地图
+                    </a>
+                    <a href="/feed" class="bg-pink-500 text-white px-4 py-2 block w-full rounded-lg hover:bg-pink-600">
+                        RSS订阅
+                    </a>
+                </div>
+            </div>
+        </aside>
+    </div>
+</div>
+
+<!-- Footer -->
+{% from 'footer.html' import zyfooter %}
+{{ zyfooter('ICP备案号') }}
+
+<!-- Tailwind CSS -->
+<script src="https://cdn.jsdelivr.net/npm/tailwindcss@latest/dist/tailwind.min.js"></script>
+</body>
+</html>
