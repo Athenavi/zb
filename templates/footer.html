@@ -1,26 +1,12 @@
 <!-- header.html -->
-{% macro zyfooter(ICP) -%}
+{% macro zyfooter() -%}
 
 <footer id="myFooter" class="py-3 bg-dark fixed-bottom">
     <div class="container">
-        <p class="m-0 text-center text-white"><a href="https://github.com/Athenavi/zyBLOG/" target="_blank">Copyright
-            &copy; zyBLOG 2024 </a>{{ICP}}</p>
+        <p class="m-0 text-center text-white"><a href="https://github.com/Athenavi/zyBLOG/" target="_blank">
+            © CopyRight 2024, zyBLOG  All Rights Reserved.</a>{{ beian }}</p>
     </div>
 </footer>
-
-<script>
-    // 隐藏下栏
-    let timeoutId;
-    window.addEventListener('scroll', function () {
-        clearTimeout(timeoutId);
-        const footer = document.getElementById('myFooter');
-        footer.style.display = 'none';
-
-        timeoutId = setTimeout(function () {
-            footer.style.display = 'block';
-        }, 3200);
-    });
-</script>
 <div class="top-bar">
     <script>
         function copyAndAlert() {

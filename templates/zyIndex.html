@@ -39,20 +39,16 @@
                 </div>
             {% endfor %}
             <!-- Pagination -->
-            <nav aria-label="Page navigation example">
-                <ul class="pagination justify-center">
+            <nav aria-label="Page navigation example" class="pagination">
+                <ul class="flex justify-center">
                     {% if has_previous_page %}
-                        <li class="page-item">
-                            <a class="page-link" href="/?page={{ current_page-1 }}&tag={{ tag }}" aria-label="Previous">
-                                <span aria-hidden="true">&laquo; 上一页</span>
-                            </a>
+                        <li>
+                            <a href="/?page={{ current_page-1 }}&tag={{ tag }}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700">&laquo; 上一页</a>
                         </li>
                     {% endif %}
                     {% if has_next_page %}
-                        <li class="page-item">
-                            <a class="page-link" href="/?page={{ current_page+1}}&tag={{ tag }}" aria-label="Next">
-                                <span aria-hidden="true">下一页 &raquo;</span>
-                            </a>
+                        <li>
+                            <a href="/?page={{ current_page+1}}&tag={{ tag }}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700">下一页 &raquo;</a>
                         </li>
                     {% endif %}
                 </ul>
@@ -61,12 +57,16 @@
         <!-- Side Content -->
         <aside class="w-full md:w-1/4 lg:w-1/5 md:pl-8 lg:pl-12">
             <div class="p-6 mb-6 bg-gray-100 rounded-lg">
-                <h4 class="font-bold text-gray-800 mb-4">标签</h4>
+                <h4 class="font-bold text-gray-800 mb-4">归档</h4>
                 <div class="flex flex-wrap">
+                <a href="/?page=1&tag=None"
+                           class="bg-gray-200 text-blue-700 px-3 py-1 mr-2 mb-2 rounded-full hover:bg-blue-200 hover:text-blue-800">
+                            🏠
+                        </a>
                     {% for tag in tags %}
                         <a href="/?tag={{ tag }}"
                            class="bg-gray-200 text-blue-700 px-3 py-1 mr-2 mb-2 rounded-full hover:bg-blue-200 hover:text-blue-800">
-                            {{ tag }}
+                            🗂️{{ tag }}
                         </a>
                     {% endfor %}
                 </div>
@@ -75,9 +75,9 @@
             <div class="p-6 bg-gray-50 rounded-lg">
                 <a href="Mailto:support@7trees.cn"
                    class="bg-blue-500 text-white px-4 py-2 block w-full rounded-lg hover:bg-blue-600 mb-4">
-                    联系我
+                    📧 Contact me
                 </a>
-                <p class="text-gray-600 mb-4">Ctrl + F 搜索内容</p>
+                <p class="text-gray-600 mb-4">关注微信订阅号⬇️</p>
                 <img src="/static/image/gzh.png" alt="Wx——qrcode" class="w-full h-auto mb-4">
                 <div>
                     <a href="/travel"
@@ -107,7 +107,7 @@
 
 <!-- Footer -->
 {% from 'footer.html' import zyfooter %}
-{{ zyfooter('ICP备案号') }}
+{{ zyfooter() }}
 
 <!-- Tailwind CSS -->
 <script src="https://cdn.jsdelivr.net/npm/tailwindcss@latest/dist/tailwind.min.js"></script>

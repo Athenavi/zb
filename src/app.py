@@ -114,20 +114,18 @@ try:
     domain = config.get('general', 'domain').strip("'")
     title = config.get('general', 'title').strip("'")
     display = config.get('general', 'theme').strip("'")
+    app.jinja_env.globals['beian'] = config.get('general', 'beian').strip("'")
 except (configparser.NoSectionError, configparser.NoOptionError):
     domain = '127.0.0.1'
     title = '您的配置文件出现问题！！！'
     display = 'default'
+    app.jinja_env.globals['beian'] = ''
 
-theme_display = configparser.ConfigParser()
-CopyRight = 'Powered by zyBLOG'
 
-# 读取template.ini文件
-if display != 'default':
-    # 读取 template.ini 文件
-    theme_display.read(f'templates/theme/{display}/template.ini', encoding=global_encoding)
-    # 获取配置文件中的属性值
-    CopyRight = ' Theme By:' + theme_display.get('default', 'author').strip("'")
+def getThemeDisplay():
+    session['display'] = 'default'
+    session['display'] = config.get('general', 'theme').strip("'")
+    pass
 
 
 @app.route('/toggle_theme', methods=['POST'])  # 处理切换主题的请求
@@ -461,6 +459,7 @@ def home():
 
         # 模版配置
         template = env.get_template('zyIndex.html')
+        getThemeDisplay()
         template_display = session.get('display', 'default')
         template_path = f'templates/theme/{template_display}/index.html'
         if os.path.exists(template_path):
