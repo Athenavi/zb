@@ -1,25 +1,37 @@
 import mysql.connector
 import configparser
-
+import os
 
 def get_database_connection():
-    config = configparser.ConfigParser()
-    try:
-        config.read('config.ini', encoding='utf-8')
-    except UnicodeDecodeError:
-        config.read('config.ini', encoding='gbk')
+    db_host = os.environ.get('db_host', '').strip("'")
+    db_port = int(os.environ.get('db_port', '3306').strip("'"))
+    db_name = os.environ.get('db_name', '').strip("'")
+    db_user = os.environ.get('db_user', '').strip("'")
+    db_password = os.environ.get('db_password', '').strip("'")
 
-    db_config = dict(config.items('database'))
+    if not all([db_host, db_port, db_name, db_user, db_password]):
+        config = configparser.ConfigParser()
+        try:
+            config.read('config.ini', encoding='utf-8')
+        except UnicodeDecodeError:
+            config.read('config.ini', encoding='gbk')
+
+        db_config = dict(config.items('database'))
+
+        db_host = db_config.get('host', '').strip("'")
+        db_port = int(db_config.get('port', '').strip("'"))
+        db_name = db_config.get('database', '').strip("'")
+        db_user = db_config.get('user', '').strip("'")
+        db_password = db_config.get('password', '').strip("'")
 
     zy_db = mysql.connector.connect(
-        host=db_config['host'].strip("'"),
-        port=int(db_config['port'].strip("'")),  # 将端口转换为整数类型，并去除单引号
-        user=db_config['user'].strip("'"),
-        password=db_config['password'].strip("'"),
-        database=db_config['database'].strip("'")
+        host=db_host,
+        port=db_port,
+        user=db_user,
+        password=db_password,
+        database=db_name
     )
     return zy_db
-
 
 def test_database_connection():
     try:
