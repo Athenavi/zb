@@ -9,10 +9,11 @@ import random
 import re
 import shutil
 import time
-from datetime import datetime, timedelta
 import urllib
 import xml.etree.ElementTree as ElementTree
 from configparser import ConfigParser
+from datetime import datetime, timedelta
+
 import portalocker
 import requests
 from flask import Flask, render_template, redirect, session, request, url_for, Response, jsonify, send_file, \
@@ -20,7 +21,8 @@ from flask import Flask, render_template, redirect, session, request, url_for, R
 from flask_caching import Cache
 from jinja2 import Environment, select_autoescape, FileSystemLoader
 from werkzeug.middleware.proxy_fix import ProxyFix
-from src.AboutLogin import zy_login, zy_register, get_email, zy_mail_login
+
+from src.AboutLogin import zy_login, zy_register, zy_mail_login
 from src.AboutPW import zy_change_password, zy_confirm_password
 from src.BlogDeal import get_article_names, get_article_content, clear_html_format, \
     get_file_date, get_blog_author, read_hidden_articles, auth_articles, \
@@ -122,12 +124,17 @@ except (configparser.NoSectionError, configparser.NoOptionError):
 theme_display = configparser.ConfigParser()
 CopyRight = 'Powered by zyBLOG'
 
-# 读取template.ini文件
-if display != 'default':
+try:
     # 读取 template.ini 文件
     theme_display.read(f'templates/theme/{display}/template.ini', encoding=global_encoding)
     # 获取配置文件中的属性值
-    CopyRight = ' Theme By:' + theme_display.get('default', 'author').strip("'")
+    if 'default' in theme_display:
+        title += '|' + theme_display.get('default', 'author').strip("'")
+    else:
+        title += '_主题不存在或者已损坏!'
+except FileNotFoundError:
+    # 处理文件路径不存在的情况
+    title += '_主题不存在或者已损坏!'
 
 
 @app.route('/toggle_theme', methods=['POST'])  # 处理切换主题的请求
@@ -428,10 +435,22 @@ def get_list_intersection(list1, list2):
     return intersection
 
 
+def is_valid_domain_with_slash(url):
+    pattern = r"^(https?://)?([a-zA-Z0-9-]+\.)*[a-zA-Z]{2,}(\/)$"
+
+    if re.match(pattern, url):
+        return True
+    else:
+        return False
+
 # 主页
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
+    if is_valid_domain_with_slash(domain):
+        pass
+    else:
+        return render_template('error.html', status_code='域名配置出错,您的程序将无法正常运行'), 404
     # 获取客户端IP地址
     ip = get_client_ip(request, session)
     city_name, city_code = analyze_ip_location(ip)
@@ -1453,6 +1472,10 @@ app_key = config.get('general', 'app_key', fallback='error').strip("'")
 
 @app.route('/login/<provider>')
 def cc_login(provider):
+    if is_valid_domain_with_slash(api_host):
+        pass
+    else:
+        return render_template('error.html', status_code='彩虹聚合登录API接口配置错误,您的程序无法使用第三方登录'), 404
     if provider not in ['qq', 'wx', 'alipay', 'sina', 'baidu', 'huawei', 'xiaomi', 'dingtalk']:
         return jsonify({'message': 'Invalid login provider'})
 
