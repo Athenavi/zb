@@ -75,23 +75,10 @@ def inject_variables():
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LoginRegister_lock = os.path.join(base_dir, 'LR.lock')
 
-
-def check_NoLR():
-    # 关闭注册登录等功能
-    if os.path.exists(LoginRegister_lock):
-        NoLR = True
-        return NoLR
-    else:
-        NoLR = False
-        return NoLR
-
-
 @app.route('/login', methods=['POST', 'GET'])
 def login():
     if 'logged_in' in session:
         return redirect(url_for('home'))
-    if check_NoLR():
-        return render_template('zylogin.html', closeNormalLogin='True')
     else:
         return zy_login()
 
@@ -100,8 +87,6 @@ def login():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     ip = get_client_ip(request, session)
-    if check_NoLR():
-        return render_template('zylogin.html', closeNormalLogin='True')
     return zy_register(ip)
 
 
@@ -131,7 +116,7 @@ try:
     if 'default' in theme_display:
         title += '|' + theme_display.get('default', 'author').strip("'")
     else:
-        title += '_主题不存在或者已损坏!'
+        pass
 except FileNotFoundError:
     # 处理文件路径不存在的情况
     title += '_主题不存在或者已损坏!'
@@ -150,7 +135,7 @@ def toggle_theme():
 @app.route('/search', methods=['GET', 'POST'])
 def search():
     if 'logged_in' not in session:
-        return render_template('zylogin.html', error='登陆后可以使用此功能', closeNormalLogin=str(check_NoLR()))
+        return render_template('zylogin.html', error='登陆后可以使用此功能')
     matched_content = []
 
     if request.method == 'POST':
