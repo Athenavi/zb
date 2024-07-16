@@ -11,6 +11,11 @@
     padding: 1rem;
 }
 
+.card img {
+    padding: 1rem;
+}
+
+
 .card:hover {
     border-color: #007bff;
     box-shadow: 0 6px 12px rgba(0, 107, 255, 0.2);
@@ -115,4 +120,12 @@
     transform: translateY(-50%);
     opacity: 1;
     transition: opacity 0.5s;
+}
+
+#articleDIV {
+    padding: 45px;
+}
+
+#sideDIV {
+    padding: 35px;
 }

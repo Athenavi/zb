@@ -22,13 +22,13 @@
     <div class="flex flex-col md:flex-row">
         <span>{{ notice|safe }}</span>
         <!-- Main Content -->
-        <main class="w-full md:w-2/3">
+        <main class="w-full md:w-2/3" id="articleDIV">
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {% for article, time in articles_time_list %}
                     <div class="card mb-4 shadow-sm flex">
                         <a href="{{ url_for('blog_detail', article=article) }}" class="text-blue-500">
                             <div class="card flex card-body">
-                                <img src="http://api.7trees.cn/img" alt="{{ article }}">
+                                <img src="http://api.7trees.cn/img?{{ article }}" alt="{{ article }}">
                                 <div>
                                     <h5 class="card-title">{{ article }}</h5>
                                     <p class="text-gray-600 mb-2">发布于 {{ time }}</p>
@@ -60,7 +60,7 @@
             </nav>
         </main>
         <!-- Side Content -->
-        <aside class="w-full md:w-1/4 lg:w-1/5 md:pl-8 lg:pl-12">
+        <aside class="w-full md:w-1/4 lg:w-1/5 md:pl-8 lg:pl-12" id="sideDIV">
             <div class="p-6 mb-6 bg-gray-100 rounded-lg">
                 <h4 class="font-bold text-gray-800 mb-4">标签</h4>
                 <div class="flex flex-wrap">
