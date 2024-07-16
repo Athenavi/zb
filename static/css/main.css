@@ -1,8 +1,91 @@
-body {
-    position: relative;
-    min-height: 100vh;
-    margin: 0;
-    padding: 0;
+.body {
+    background-color: #f8f9fa;
+    font-family: "Nunito", sans-serif;
+}
+
+.card .card-body {
+    align-items: center;
+    background-color: transparent;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+}
+
+.card:hover {
+    border-color: #007bff;
+    box-shadow: 0 6px 12px rgba(0, 107, 255, 0.2);
+}
+
+.close-button {
+    cursor: pointer;
+}
+
+.day-theme {
+    background-color: #ffffff;
+    background-image: url("../image/day.jpg");
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    color: #1e1f22;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: -1;
+}
+
+.hidden {
+    opacity: 0;
+}
+
+.navbar-dark .navbar-brand {
+    color: #fff;
+    font-weight: bold;
+}
+
+.night-theme {
+    background-color: #1b1e21;
+    background-image: url("../image/dark.jpg");
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    color: #498ef6;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: -1;
+}
+
+.pagination .page-item.disabled .page-link {
+    color: #6c757d;
+}
+
+.pagination .page-item.active .page-link {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+.pagination .page-link, .pagination .page-link:focus, .pagination .page-link:hover {
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    color: #007bff;
+}
+
+.table {
+    border-collapse: collapse;
+    border: none;
+    background-color: transparent;
+}
+
+.table th,
+.table td {
+    border: none;
+}
+
+.text-muted {
+    font-size: 0.85rem;
+    margin-bottom: 15px;
 }
 
 .top-bar {
@@ -18,10 +101,12 @@ body {
     align-items: center;
 }
 
-.close-button {
-    cursor: pointer;
+@media (max-width: 768px) {
+    .card {
+        flex: 1 1 90%;
+        max-width: calc(90% - 2%);
+    }
 }
-
 
 .fixed-icon {
     position: fixed;
@@ -30,54 +115,4 @@ body {
     transform: translateY(-50%);
     opacity: 1;
     transition: opacity 0.5s;
-}
-
-.hidden {
-    opacity: 0;
-}
-
-.day-theme {
-    color: #1e1f22;
-    background-image: url("../image/day.jpg");
-    background-color: #ffffff;
-    background-size: cover;
-    background-repeat: no-repeat;
-}
-
-.night-theme {
-    background-color: #1b1e21;
-    color: #498ef6;
-    background-image: url("../image/dark.jpg");
-    background-size: cover;
-    background-repeat: no-repeat;
-}
-
-.day-theme div {
-    background-image: none;
-}
-
-.night-theme div {
-    background-image: none;
-    background-color: rgba(42, 40, 40, 0.9);
-}
-
-.night-theme div {
-    background-image: none;
-    background-color: rgba(42, 40, 40, 0.9);
-}
-
-
-.card-body div {
-    padding: 20px;
-}
-
-.table {
-    border-collapse: collapse;
-    border: none;
-    background-color: transparent;
-}
-
-.table th,
-.table td {
-    border: none;
 }
