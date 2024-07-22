@@ -1,4 +1,3 @@
-import configparser
 import random
 import urllib
 import markdown
@@ -63,16 +62,27 @@ def get_all_article_names():
     return articles
 
 
-
-
-
-
-
-
-
 def read_hidden_articles():
-    with open('articles/hidden.txt', 'r', encoding='utf-8') as hidden_file:
-        hidden_articles = hidden_file.read().splitlines()
+    db = get_database_connection()
+    hidden_articles = []
+
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT Title FROM articles WHERE Hidden = 1"
+            cursor.execute(query)
+            results = cursor.fetchall()
+
+            for result in results:
+                hidden_articles.append(result[0])
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        try:
+            cursor.close()
+        except NameError:
+            pass
+        db.close()
+
     return hidden_articles
 
 
@@ -225,20 +235,28 @@ def generate_random_text():
     return captcha_text
 
 
-def get_blog_author(article_name):
-    # 创建ConfigParser对象
-    config = configparser.ConfigParser()
+def get_blog_author(title):
+    db = get_database_connection()
 
-    # 读取配置文件
-    config.read('author/mapper.ini', encoding='utf-8')
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT Author FROM articles WHERE Title = %s"
+            cursor.execute(query, (title,))
+            result = cursor.fetchone()
 
-    # 获取article_name对应的作者
-    articleAuthor = config.get('author', article_name, fallback=config.get('default', 'default'))
-
-    # 移除单引号
-    articleAuthor = articleAuthor.replace("'", "")
-
-    return articleAuthor
+            if result:
+                return result['Author']
+            else:
+                return None
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
+    finally:
+        try:
+            cursor.close()
+        except NameError:
+            pass
+        db.close()
 
 
 def get_file_date(file_path):
@@ -268,26 +286,28 @@ def zy_send_message(message):
     return 1
 
 
-def auth_articles(current_article_name, username):
-    article_map = {}
-    with open('author/mapper.ini', 'r', encoding='utf-8') as file:
-        lines = file.readlines()
+def auth_articles(title, username):
+    db = get_database_connection()
 
-    for line in lines:
-        line = line.strip()
-        if line and '=' in line:
-            article_info = line.split('=')
-            if len(article_info) == 2:
-                article_name = article_info[0].strip()
-                article_owner = article_info[1].strip().strip('\'')
-                article_map[article_name] = article_owner
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT Author FROM articles WHERE Title = %s"
+            cursor.execute(query, (title,))
+            result = cursor.fetchone()
 
-    # Check if articleName exists in the article_map and owner matches the username
-    if current_article_name in article_map and article_map[current_article_name] == username:
-        # print("edit Author check")
-        return True
-
-    return False
+            if result and result[0] == username:
+                return True
+            else:
+                return False
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return False
+    finally:
+        try:
+            cursor.close()
+        except NameError:
+            pass
+        db.close()
 
 
 def zy_show_article(content):

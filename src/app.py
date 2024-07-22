@@ -75,6 +75,7 @@ def inject_variables():
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LoginRegister_lock = os.path.join(base_dir, 'LR.lock')
 
+
 @app.route('/login', methods=['POST', 'GET'])
 def login():
     if 'logged_in' in session:
@@ -427,6 +428,7 @@ def is_valid_domain_with_slash(url):
         return True
     else:
         return False
+
 
 # 主页
 
@@ -898,23 +900,45 @@ def new_article():
                     # 如果文件不存在，将文件复制到articles文件夹下，并提示上传成功
                     shutil.copy(os.path.join(app.config['UPLOAD_FOLDER'], file.filename), 'articles')
                     file_name = os.path.splitext(file.filename)[0]  # 获取文件名（不包含后缀）
-                    with open('articles/hidden.txt', 'a', encoding=global_encoding) as f:
-                        f.write('\n' + file_name + '\n')
-                    authorMapper.read('author/mapper.ini', encoding=global_encoding)
+
                     author_value = session.get('username')
-                    # 更新 [author] 节中的键值对
-                    authorMapper.set('author', file_name, f"'{author_value}'")
+                    # 更新 [author]
+                    set_article_author(file_name, author_value)
 
-                    # 将更改保存到文件
-                    with open('author/mapper.ini', 'w', encoding=global_encoding) as configfile:
-                        authorMapper.write(configfile)
-
-                    message = '上传成功。但目前处于隐藏状态，以便于你检查错误以及编辑'
+                    message = '上传成功。但请你检查错误以及编辑'
 
                 return render_template('postNewArticle.html', message=message)
 
             else:
                 return redirect('/newArticle')
+
+
+def set_article_author(title, username):
+    db = get_database_connection()
+
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT * FROM articles WHERE Title = %s"
+            cursor.execute(query, (title,))
+            result = cursor.fetchone()
+
+            if result:
+                # Update the author
+                update_query = "UPDATE articles SET Author = %s WHERE Title = %s"
+                cursor.execute(update_query, (username, title))
+            else:
+                # Create a new record
+                insert_query = "INSERT INTO articles (Title, Author) VALUES (%s, %s)"
+                cursor.execute(insert_query, (title, username))
+            db.commit()
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        try:
+            cursor.close()
+        except NameError:
+            pass
+        db.close()
 
 
 @app.route('/Admin_upload', methods=['GET', 'POST'])
@@ -1099,26 +1123,78 @@ def hidden_article():
 
 
 def hide_article(article):
-    with open('articles/hidden.txt', 'a', encoding=global_encoding) as hidden_file:
-        # 将文章名写入hidden.txt的新的一行中
-        hidden_file.write('\n' + article + '\n')
+    db = get_database_connection()
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT * FROM articles WHERE Title = %s"
+            cursor.execute(query, (article,))
+            result = cursor.fetchone()
+
+            if result is None:
+                query = "INSERT INTO articles (Title, Author, Hidden) VALUES (%s, 'test', 1)"
+                cursor.execute(query, (article,))
+            elif result[3] == 0:
+                query = "UPDATE articles SET Hidden = 1 WHERE Title = %s"
+                cursor.execute(query, (article,))
+
+            db.commit()
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        try:
+            cursor.close()
+        except NameError:
+            pass
+        db.close()
 
 
 def unhidden_article(article):
-    with open('articles/hidden.txt', 'r', encoding=global_encoding) as hidden_file:
-        hidden_articles = hidden_file.read().splitlines()
+    db = get_database_connection()
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT * FROM articles WHERE Title = %s"
+            cursor.execute(query, (article,))
+            result = cursor.fetchone()
 
-    with open('articles/hidden.txt', 'w', encoding=global_encoding) as hidden_file:
-        # 从hidden中移除完全匹配文章名的一行
-        for hidden_article in hidden_articles:
-            if hidden_article != article:
-                hidden_file.write(hidden_article + '\n')
+            if result is not None and result[3] == 1:
+                query = "UPDATE articles SET Hidden = 0 WHERE Title = %s"
+                cursor.execute(query, (article,))
+            elif result is None:
+                query = "INSERT INTO articles (Title, Author, Hidden) VALUES (%s, 'test', 0)"
+                cursor.execute(query, (article,))
+
+            db.commit()
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        try:
+            cursor.close()
+        except NameError:
+            pass
+        db.close()
 
 
 def is_hidden(article):
-    with open('articles/hidden.txt', 'r', encoding=global_encoding) as hidden_file:
-        hidden_articles = hidden_file.read().splitlines()
-        return article in hidden_articles
+    db = get_database_connection()
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT Hidden FROM articles WHERE Title = %s"
+            cursor.execute(query, (article,))
+            result = cursor.fetchone()
+
+            if result is not None and result[0] == 1:
+                return True
+            else:
+                return False
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return False
+    finally:
+        try:
+            cursor.close()
+        except NameError:
+            pass
+        db.close()
 
 
 @app.route('/travel', methods=['GET'])
@@ -1684,32 +1760,6 @@ def sys_out_article_img(article_name, image_name):
     author = get_blog_author(article_name)
     articles_img_dir = os.path.join(base_dir, 'media', author)
     return send_from_directory(articles_img_dir, image_name)
-
-
-@cache.cached(timeout=1200)
-@app.route('/friends-links', methods=['GET', 'POST'])
-def friendslinks():
-    fl_list = get_friendslinks()
-
-    return error(message=fl_list, status_code=404)
-
-
-def get_friendslinks():
-    authorMapper.read('author/mapper.ini', encoding=global_encoding)
-    friends_links = authorMapper.get('friends', 'list').strip("'")
-    FL_list = []
-    for i in range(1, 50):
-        StrIn = str(i)
-        fl_find = friends_links.find(StrIn + "=")
-        if fl_find == -1:
-            break
-        else:
-            lend = friends_links.find(";", fl_find)
-            f_link = friends_links[fl_find + len(StrIn) + 1:lend]
-            FL_list.append(f_link)
-
-    FL_json = json.dumps(FL_list)
-    return FL_json
 
 
 @app.errorhandler(404)
