@@ -20,9 +20,26 @@ def error(message, status_code):
 
 
 def read_hidden_articles():
+    db = get_database_connection()
     hidden_articles = []
-    with open('articles/hidden.txt', 'r') as hidden_file:
-        hidden_articles = hidden_file.read().splitlines()
+
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT Title FROM articles WHERE Hidden = 1"
+            cursor.execute(query)
+            results = cursor.fetchall()
+
+            for result in results:
+                hidden_articles.append(result[0])
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        try:
+            cursor.close()
+        except NameError:
+            pass
+        db.close()
+
     return hidden_articles
 
 
@@ -65,7 +82,7 @@ def admin_dashboard(method):
     else:
         if 'theme' not in session:
             session['theme'] = 'night-theme'
-        #files = show_files('articles/')
+        # files = show_files('articles/')
         hiddenList = read_hidden_articles()
         display_list = get_all_themes()
         currentDisPlay = config.get('general', 'theme').strip("'")
@@ -114,47 +131,47 @@ def zy_delete_file(filename):
     # 指定目录的路径
     directory = 'articles/'
 
-    mapper = 'author/mapper.ini'
-    lines = []
-    with open(mapper, 'r', encoding='utf-8') as file:
-        for line in file:
-            if not line.strip().startswith(filename + '='):
-                lines.append(line)
-
-    with open(mapper, 'w', encoding='utf-8') as file:
-        file.writelines(lines)
-
     filename = filename + '.md'
     # 构建文件的完整路径
     file_path = os.path.join(directory, filename)
-
     try:
-        # 删除文件
-        os.remove(file_path)
+        db = get_database_connection()
+        with db.cursor() as cursor:
+            query = "DELETE FROM articles WHERE Title = %s;"
+            cursor.execute(query, (filename,))
+            db.commit()
+            # 删除文件
+            os.remove(file_path)
+            return 'success'
+    except Exception as e:
+        return 'failed: ' + str(e)
+    finally:
+        try:
+            cursor.close()
+        except NameError:
+            pass
+        db.close()
 
-        return 'success'
 
-    except OSError as error:
-        # 处理出错的情况
-        return 'failed: ' + str(error)
-
-
-def get_owner_articles(owner_name):
+def get_owner_articles(Author):
+    db = get_database_connection()
     articles = []
 
-    # 读取mapper.ini文件内容
-    with open('author/mapper.ini', 'r', encoding='utf-8') as file:
-        lines = file.readlines()
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT Title FROM articles WHERE Author = %s"
+            cursor.execute(query, (Author,))
+            results = cursor.fetchall()
 
-    # 根据name获取拥有者的文章列表
-    for line in lines:
-        line = line.strip()
-        if line and '=' in line:  # 修改这行代码
-            article_info = line.split('=')
-            if len(article_info) == 2:
-                article_name = article_info[0].strip()
-                article_owner = article_info[1].strip().strip('\'')
-                if article_owner == owner_name:
-                    articles.append(article_name)
+            for result in results:
+                articles.append(result[0])
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        try:
+            cursor.close()
+        except NameError:
+            pass
+        db.close()
 
     return articles

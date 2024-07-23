@@ -1,5 +1,4 @@
 import configparser
-import csv
 import datetime
 import io
 import json
@@ -74,6 +73,7 @@ def inject_variables():
 
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LoginRegister_lock = os.path.join(base_dir, 'LR.lock')
+
 
 @app.route('/login', methods=['POST', 'GET'])
 def login():
@@ -235,50 +235,6 @@ def check_exist(cache_file):
                 return jsonify(cache_data)
 
 
-@app.route('/api/weather/<city_code>', methods=['GET', 'POST'])
-def get_weather(city_code):
-    cache_dir = 'temp'
-    os.makedirs(cache_dir, exist_ok=True)
-
-    cache_file = os.path.join(cache_dir, f'{city_code}.json')
-
-    # Check if cache file exists and is within one hour
-    check_exist(cache_file)
-
-    # Acquire a lock before generating cache file
-    lock_file = f'{cache_file}.lock'
-    try:
-        with portalocker.Lock(lock_file, timeout=1):
-            # Check again if cache file is created by another request
-            check_exist(cache_file)
-            weather_api_url = f'http://t.weather.itboy.net/api/weather/city/{city_code}'
-            try:
-                response = requests.get(weather_api_url)
-                processed_data = response.json()
-
-                with open(cache_file, 'w') as f:
-                    json.dump(processed_data, f)
-
-                return jsonify(processed_data)
-            except Exception as e:
-                error_message = {'error': str(e)}
-                return jsonify(error_message), 500
-    except portalocker.exceptions.LockException:
-        # Another request is already creating the cache file
-        pass
-
-    # If cache file creation failed, return error
-    error_message = {'error': 'Failed to create cache file'}
-    return jsonify(error_message), 500
-
-
-@app.route('/api/get_city_code', methods=['GET', 'POST'])
-def get_city_code():
-    city_name = request.args.get('city_name')
-    city_name = clear_html_format(city_name)
-    return zy_get_city_code(city_name)
-
-
 @app.route('/blog/<any>/api/<article_name>', methods=['GET', 'POST'])
 @app.route('/blog/api/<article_name>', methods=['GET', 'POST'])
 @app.route('/api/<article_name>', methods=['GET', 'POST'])
@@ -342,76 +298,82 @@ def setting_region():
     return 1
 
 
-@cache.cached(timeout=None, key_prefix='cities')
-def get_table_data():
+def get_unique_tags():
     db = get_database_connection()
-
     cursor = db.cursor()
-    # 执行 MySQL 查询获取你想要缓存的表数据
-    query = "SELECT * FROM cities"
-    cursor.execute(query)
+    unique_tags = []
 
-    # 构建数据字典列表
-    data = []
-    columns = [desc[0] for desc in cursor.description]
-    for row in cursor.fetchall():
-        data.append(dict(zip(columns, row)))
+    try:
+        query = "SELECT Tags FROM articles"
+        cursor.execute(query)
 
-    cursor.close()
-    db.close()
+        results = cursor.fetchall()
+        for result in results:
+            tags_str = result[0]
+            if tags_str:
+                tags_list = tags_str.split(';')
+                unique_tags.extend(tags for tags in tags_list if tags)
 
-    return data
+        unique_tags = list(set(unique_tags))
 
+    except Exception as e:
+        logging.error(f"Error logging in: {e}")
+        return "未知错误"
 
-def zy_get_city_code(city_name):
-    table_data = get_table_data()
+    finally:
+        cursor.close()
+        db.close()
 
-    # 在缓存的数据中查询城市代码
-    result = next((item for item in table_data if item['city_name'] == city_name), None)
-
-    # 检查查询结果
-    if result:
-        return jsonify({'city_code': result['city_code']})
-    else:
-        return jsonify({'error': '城市不存在'})
-
-
-def get_unique_tags(csv_filename):
-    tags = []
-    with open(csv_filename, 'r', encoding=global_encoding) as file:
-        reader = csv.reader(file)
-        next(reader)  # Skip the header line
-        for row in reader:
-            tags.extend(row[1:])  # Append tags from the row (excluding the article name)
-
-    unique_tags = list(set(tags))  # Remove duplicates
     return unique_tags
 
 
-def get_articles_by_tag(csv_filename, tag_name):
+def get_articles_by_tag(tag_name):
+    db = get_database_connection()
+    cursor = db.cursor()
     tag_articles = []
-    with open(csv_filename, 'r', encoding=global_encoding) as file:
-        reader = csv.reader(file)
-        next(reader)  # Skip the header line
-        for row in reader:
-            if tag_name in row[1:]:
-                tag_articles.append(row[0])  # Append the article name
+
+    try:
+        query = "SELECT Title FROM articles WHERE Tags LIKE %s"
+        cursor.execute(query, ('%' + tag_name + '%',))
+
+        results = cursor.fetchall()
+        for result in results:
+            tag_articles.append(result[0])
+
+    except Exception as e:
+        logging.error(f"Error logging in: {e}")
+        return "未知错误"
+
+    finally:
+        cursor.close()
+        db.close()
 
     return tag_articles
 
 
-def get_tags_by_article(csv_filename, article_name):
-    tags = []
-    with open(csv_filename, 'r', encoding=global_encoding) as file:
-        reader = csv.reader(file)
-        next(reader)  # Skip the header line
-        for row in reader:
-            if row[0] == article_name:
-                tags.extend(row[1:])  # Append tags from the row (excluding the article name)
-                break  # Break the loop if the article is found
+def get_tags_by_article(articleTitle):
+    db = get_database_connection()
+    cursor = db.cursor()
+    unique_tags = []
 
-    unique_tags = list(set(tags))  # Remove duplicates
-    unique_tags = [tag for tag in unique_tags if tag]  # Remove empty tags
+    try:
+        query = "SELECT Tags FROM articles WHERE Title = %s"
+        cursor.execute(query, (articleTitle,))
+
+        result = cursor.fetchone()
+        if result:
+            tags_str = result[0]
+            if tags_str:
+                tags_list = tags_str.split(';')
+                unique_tags = list(set(tags_list))
+
+    except Exception as e:
+        logging.error(f"Error logging in: {e}")
+        return error("未知错误", 500)
+    finally:
+        cursor.close()
+        db.close()
+
     return unique_tags
 
 
@@ -427,6 +389,7 @@ def is_valid_domain_with_slash(url):
         return True
     else:
         return False
+
 
 # 主页
 
@@ -478,12 +441,12 @@ def home():
 
         tags = []
         try:
-            tags = get_unique_tags('articles/tags.csv')
+            tags = get_unique_tags()
         except Exception as e:
             app.logger.error(f'获取标签出错: {e}')
 
         if tag != 'None':
-            tag_articles = get_articles_by_tag('articles/tags.csv', tag)
+            tag_articles = get_articles_by_tag(tag)
             articles = get_list_intersection(articles, tag_articles)
 
         timeList = get_file_time(articles)
@@ -595,7 +558,7 @@ def blog_detail(article):
         if article_name not in article_names:
             return render_template('error.html', status_code='404'), 404
 
-        article_tags = get_tags_by_article('articles/tags.csv', article_name)
+        article_tags = get_tags_by_article(article_name)
         article_url = domain + 'blog/' + article_name
         article_surl = api_shortlink(article_url)
         # print(article_Surl)
@@ -898,23 +861,45 @@ def new_article():
                     # 如果文件不存在，将文件复制到articles文件夹下，并提示上传成功
                     shutil.copy(os.path.join(app.config['UPLOAD_FOLDER'], file.filename), 'articles')
                     file_name = os.path.splitext(file.filename)[0]  # 获取文件名（不包含后缀）
-                    with open('articles/hidden.txt', 'a', encoding=global_encoding) as f:
-                        f.write('\n' + file_name + '\n')
-                    authorMapper.read('author/mapper.ini', encoding=global_encoding)
+
                     author_value = session.get('username')
-                    # 更新 [author] 节中的键值对
-                    authorMapper.set('author', file_name, f"'{author_value}'")
+                    # 更新 [author]
+                    set_article_author(file_name, author_value)
 
-                    # 将更改保存到文件
-                    with open('author/mapper.ini', 'w', encoding=global_encoding) as configfile:
-                        authorMapper.write(configfile)
-
-                    message = '上传成功。但目前处于隐藏状态，以便于你检查错误以及编辑'
+                    message = '上传成功。但请你检查错误以及编辑'
 
                 return render_template('postNewArticle.html', message=message)
 
             else:
                 return redirect('/newArticle')
+
+
+def set_article_author(title, username):
+    db = get_database_connection()
+
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT * FROM articles WHERE Title = %s"
+            cursor.execute(query, (title,))
+            result = cursor.fetchone()
+
+            if result:
+                # Update the author
+                update_query = "UPDATE articles SET Author = %s WHERE Title = %s"
+                cursor.execute(update_query, (username, title))
+            else:
+                # Create a new record
+                insert_query = "INSERT INTO articles (Title, Author) VALUES (%s, %s)"
+                cursor.execute(insert_query, (title, username))
+            db.commit()
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        try:
+            cursor.close()
+        except NameError:
+            pass
+        db.close()
 
 
 @app.route('/Admin_upload', methods=['GET', 'POST'])
@@ -988,7 +973,7 @@ def markdown_editor(article):
             edit_html = zy_edit_article(article)
             show_edit = zy_show_article(article)
 
-            tags = get_tags_by_article("articles/tags.csv", article)
+            tags = get_tags_by_article(article)
 
             # 渲染编辑页面并将转换后的HTML传递到模板中
             return render_template('editor.html', edit_html=edit_html, show_edit=show_edit, articleName=article,
@@ -1015,25 +1000,8 @@ def markdown_editor(article):
                 if len(tag) <= 10:
                     tags_list.append(tag)
 
-            # 读取标签文件，查找文章名是否存在
-            exists = False
-            with open('articles/tags.csv', 'r', encoding=global_encoding) as file:
-                reader = csv.reader(file)
-                rows = list(reader)
-                for row in rows:
-                    if row[0] == article:
-                        row[1:] = tags_list  # 替换现有标签
-                        exists = True
-                        break
-
-                # 文章名不存在，创建新行
-                if not exists:
-                    rows.append([article] + tags_list)
-
-            # 写入更新后的标签文件
-            with open('articles/tags.csv', 'w', encoding=global_encoding, newline='') as file:
-                writer = csv.writer(file)
-                writer.writerows(rows)
+            # 写入更新后的标签到数据库
+            write_tags_to_database(tags_list, article)
             return jsonify({'show_edit': "success"})
 
         else:
@@ -1042,6 +1010,37 @@ def markdown_editor(article):
 
     else:
         return error(message='您没有权限', status_code=503)
+
+
+def write_tags_to_database(tags_list, title):
+    tags_str = ';'.join(tags_list)
+
+    db = get_database_connection()
+    cursor = db.cursor()
+
+    try:
+        # 检查文章是否存在
+        query = "SELECT * FROM articles WHERE Title = %s"
+        cursor.execute(query, (title,))
+        result = cursor.fetchone()
+
+        if result:
+            # 如果文章存在，则更新标签
+            update_query = "UPDATE articles SET Tags = %s WHERE Title = %s"
+            cursor.execute(update_query, (tags_str, title))
+            db.commit()
+        else:
+            # 如果文章不存在，则创建新文章记录
+            insert_query = "INSERT INTO articles (Title, Tags) VALUES (%s, %s)"
+            cursor.execute(insert_query, (title, tags_str))
+            db.commit()
+
+    except Exception as e:
+        logging.error(f"Error writing tags to database: {e}")
+
+    finally:
+        cursor.close()
+        db.close()
 
 
 @app.route('/save/edit', methods=['POST'])
@@ -1099,26 +1098,78 @@ def hidden_article():
 
 
 def hide_article(article):
-    with open('articles/hidden.txt', 'a', encoding=global_encoding) as hidden_file:
-        # 将文章名写入hidden.txt的新的一行中
-        hidden_file.write('\n' + article + '\n')
+    db = get_database_connection()
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT * FROM articles WHERE Title = %s"
+            cursor.execute(query, (article,))
+            result = cursor.fetchone()
+
+            if result is None:
+                query = "INSERT INTO articles (Title, Author, Hidden) VALUES (%s, 'test', 1)"
+                cursor.execute(query, (article,))
+            elif result[3] == 0:
+                query = "UPDATE articles SET Hidden = 1 WHERE Title = %s"
+                cursor.execute(query, (article,))
+
+            db.commit()
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        try:
+            cursor.close()
+        except NameError:
+            pass
+        db.close()
 
 
 def unhidden_article(article):
-    with open('articles/hidden.txt', 'r', encoding=global_encoding) as hidden_file:
-        hidden_articles = hidden_file.read().splitlines()
+    db = get_database_connection()
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT * FROM articles WHERE Title = %s"
+            cursor.execute(query, (article,))
+            result = cursor.fetchone()
 
-    with open('articles/hidden.txt', 'w', encoding=global_encoding) as hidden_file:
-        # 从hidden中移除完全匹配文章名的一行
-        for hidden_article in hidden_articles:
-            if hidden_article != article:
-                hidden_file.write(hidden_article + '\n')
+            if result is not None and result[3] == 1:
+                query = "UPDATE articles SET Hidden = 0 WHERE Title = %s"
+                cursor.execute(query, (article,))
+            elif result is None:
+                query = "INSERT INTO articles (Title, Author, Hidden) VALUES (%s, 'test', 0)"
+                cursor.execute(query, (article,))
+
+            db.commit()
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        try:
+            cursor.close()
+        except NameError:
+            pass
+        db.close()
 
 
 def is_hidden(article):
-    with open('articles/hidden.txt', 'r', encoding=global_encoding) as hidden_file:
-        hidden_articles = hidden_file.read().splitlines()
-        return article in hidden_articles
+    db = get_database_connection()
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT Hidden FROM articles WHERE Title = %s"
+            cursor.execute(query, (article,))
+            result = cursor.fetchone()
+
+            if result is not None and result[0] == 1:
+                return True
+            else:
+                return False
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return False
+    finally:
+        try:
+            cursor.close()
+        except NameError:
+            pass
+        db.close()
 
 
 @app.route('/travel', methods=['GET'])
@@ -1684,32 +1735,6 @@ def sys_out_article_img(article_name, image_name):
     author = get_blog_author(article_name)
     articles_img_dir = os.path.join(base_dir, 'media', author)
     return send_from_directory(articles_img_dir, image_name)
-
-
-@cache.cached(timeout=1200)
-@app.route('/friends-links', methods=['GET', 'POST'])
-def friendslinks():
-    fl_list = get_friendslinks()
-
-    return error(message=fl_list, status_code=404)
-
-
-def get_friendslinks():
-    authorMapper.read('author/mapper.ini', encoding=global_encoding)
-    friends_links = authorMapper.get('friends', 'list').strip("'")
-    FL_list = []
-    for i in range(1, 50):
-        StrIn = str(i)
-        fl_find = friends_links.find(StrIn + "=")
-        if fl_find == -1:
-            break
-        else:
-            lend = friends_links.find(";", fl_find)
-            f_link = friends_links[fl_find + len(StrIn) + 1:lend]
-            FL_list.append(f_link)
-
-    FL_json = json.dumps(FL_list)
-    return FL_json
 
 
 @app.errorhandler(404)
