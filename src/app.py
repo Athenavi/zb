@@ -13,7 +13,6 @@ import xml.etree.ElementTree as ElementTree
 from configparser import ConfigParser
 from datetime import datetime, timedelta
 
-import portalocker
 import requests
 from flask import Flask, render_template, redirect, session, request, url_for, Response, jsonify, send_file, \
     make_response, send_from_directory
@@ -548,7 +547,6 @@ def blog_detail(article):
         # 根据文章名称获取相应的内容并处理
         article_name = article
         article_names = get_a_list()
-        # print(article_names)
         hidden_articles = read_hidden_articles()
 
         if article_name in hidden_articles:
