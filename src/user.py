@@ -134,16 +134,23 @@ def zy_delete_file(filename):
     filename = filename + '.md'
     # 构建文件的完整路径
     file_path = os.path.join(directory, filename)
-
     try:
-        # 删除文件
-        os.remove(file_path)
-
-        return 'success'
-
-    except OSError as error:
-        # 处理出错的情况
-        return 'failed: ' + str(error)
+        db = get_database_connection()
+        with db.cursor() as cursor:
+            query = "DELETE FROM articles WHERE Title = %s;"
+            cursor.execute(query, (filename,))
+            db.commit()
+            # 删除文件
+            os.remove(file_path)
+            return 'success'
+    except Exception as e:
+        return 'failed: ' + str(e)
+    finally:
+        try:
+            cursor.close()
+        except NameError:
+            pass
+        db.close()
 
 
 def get_owner_articles(Author):

@@ -9,7 +9,7 @@
 > 如果您觉得 `zyblog`对您有所帮助，或者您喜欢我们的项目，请在 GitHub 上给我们一个 ⭐️。您的支持是我们持续改进和增加新功能的动力！感谢您的支持！
 
 - **更新日志**
-  - [更新详情](./README.md)
+  - [更新详情](./update.txt)
   - [旧版](https://github.com/Athenavi/zyBLOG)
 
 
