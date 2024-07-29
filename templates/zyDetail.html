@@ -27,7 +27,7 @@
 
 </div>
 
-<div id='comments_zone' style="display: none;">🏷️
+<div id='comments_zone' style="display: none;">
     <span style="color:black">社区讨论条约
         <br/>
         尊重他人意见：在社区讨论中，大家都有权利发表自己的观点，但请避免恶意攻击或侮辱他人。请尊重他人的意见和观点，保持开放、友善的讨论环境。
@@ -65,6 +65,8 @@
         document.getElementById('hide_comments').style.display = 'block';
         document.body.scrollTop = 0;
         document.documentElement.scrollTop = 0;
+        var element = document.getElementById('comments_zone');
+        element.scrollIntoView({behavior: 'smooth'});
     }
 
     function hideComments() {
