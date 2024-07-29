@@ -56,25 +56,15 @@
             <hr>
             {% for article in Articles %}
                 <a href="{{ url_for('blog_detail', article=article) }}" class="card-link">
-                    <div class="card mb-4">
-                        <div class="card-body" style="display: flex; background: transparent">
-                            <img src="https://api.maho.cc/random-img/pc.php?i={{ i }}" alt="{{ article }}">
-                            <h3 class="card-title">&nbsp;&nbsp;&nbsp;&nbsp;{{ article }}</h3>
-                        </div>
-                    </div>
+                    <h3 class="card-title">&nbsp;&nbsp;&nbsp;&nbsp;{{ article }}</h3>
                 </a>
                 <a href="/edit/{{ article }}" style="color:greenyellow">编辑</a>
                 <a href="#" data-article={{ article }} class='hidden121'>隐藏/取消隐藏此文章</a>
                 <a href="#" data-article={{ article }} class='delete121' style="color:red">删除此文章</a>
                 <a href="#" data-article="{{ article }}" class="changeCode" style="color:cadetblue">修改此文章密码</a>
             {% endfor %}
-
-            <div class="col">
-
-            </div>
         </div>
     </div>
-</div>
 </div>
 <!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.slim.min.js"
