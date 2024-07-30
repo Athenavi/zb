@@ -234,20 +234,39 @@ def check_exist(cache_file):
                 return jsonify(cache_data)
 
 
-@app.route('/blog/<any>/api/<article_name>', methods=['GET', 'POST'])
 @app.route('/blog/api/<article_name>', methods=['GET', 'POST'])
 @app.route('/api/<article_name>', methods=['GET', 'POST'])
 def sys_out_file(article_name):
+    if article_name.startswith("tempPrev_"):
+        return tempPreview(article_name[:-3])
+
     # 隐藏文章判别
     hidden_articles = read_hidden_articles()
+
     if article_name[:-3] in hidden_articles:
         # 隐藏的文章
         return zy_pw_blog(article_name[:-3])
+
     try:
         articles_dir = os.path.join(base_dir, 'articles')
         return send_from_directory(articles_dir, article_name)
     except Exception:
         return "An internal error occurred", 500
+
+
+def tempPreview(file_name):
+    parts = file_name.rsplit('_', 1)
+    if len(parts) == 2:
+        author, file_name = parts
+        print(author, file_name)
+    author = get_username()
+    prev = f"""
+```xmind preview
+../blog/f/{author}/{file_name}
+```
+
+"""
+    return prev
 
 
 def get_avatar():
@@ -1516,7 +1535,7 @@ def upload_user_path():
             try:
                 for f in request.files.getlist('file'):
                     if f.filename.lower().endswith(
-                            ('.jpg', '.png', '.webp', '.jfif', '.pjpeg', '.jpeg', '.pjp', '.mp4')):
+                            ('.jpg', '.png', '.webp', '.jfif', '.pjpeg', '.jpeg', '.pjp', '.mp4', '.xmind')):
                         if f.content_length > 60 * 1024 * 1024:
                             return 'File size exceeds the limit of 60MB'
                         else:
@@ -1799,6 +1818,20 @@ def sys_out_user_file(author, file_name):
     except Exception as e:
         logging.error("An error occurred: %s", str(e))
         return "An error occurred while trying to access the file."
+
+
+@app.route('/preview', methods=['GET'])
+def sys_out_prev_page():
+    type = request.args.get('type')
+    user = request.args.get('user')
+    file_name = request.args.get('file_name')
+    prev_file_path = os.path.join(base_dir, 'media', str(user), file_name)  # 确保author是字符串
+    if not os.path.exists(prev_file_path):
+        return render_template('error.html', message=f'{file_name}不存在', status_code=404)
+    else:
+        return render_template('zyDetail.html', title=title, article_content=1,
+                               articleName=f"tempPrev_{file_name}", domain=domain,
+                               url_for=url_for, article_Surl='-')
 
 
 @app.errorhandler(404)
