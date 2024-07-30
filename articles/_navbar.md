@@ -1,6 +1,6 @@
 <!-- _navbar.md -->
-* <a href="/">🏠</a>
-* <a href="/profile">🔒‍</a>
-* <a href="/search">🔍</a>
-* <a href="/media">📂</a>
-* <a class="button" href="/newArticle" alt="上传投稿">🔼</a>
+* <a href="/">🏠 主页</a>
+* <a href="/profile">🔒 我的</a>
+* <a href="/search">🔍 搜索</a>
+* <a href="/media">📂 媒体</a>
+* <a class="button" href="/newArticle">🔼 上传投稿</a>

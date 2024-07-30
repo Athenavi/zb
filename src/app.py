@@ -566,7 +566,7 @@ def blog_detail(article):
 
         response = make_response(render_template('zyDetail.html', title=title, article_content=1,
                                                  articleName=article_name, theme=theme,
-                                                 author=author, blogDate=update_date,
+                                                 author=author, blogDate=update_date, domain=domain,
                                                  url_for=url_for, article_Surl=article_surl, article_tags=article_tags))
 
         # 设置服务器端缓存时间
@@ -1213,7 +1213,7 @@ def zy_pw_blog(article_name):
                 <!-- 预留网站标题的位置 -->
                 <title>{article_name}</title>
                 <!-- 引入Tailwind CSS的CDN链接 -->
-                <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+                <link href="../static/css/tailwind.min.css" rel="stylesheet">
                 </head>
 
                 <body class='{theme}'>
@@ -1253,13 +1253,48 @@ def zy_pw_blog(article_name):
 
                 return hidehtml1
 
-                # print(rendered_template)
             except Exception:
                 return "An internal error occurred", 500
 
-    return render_template('zyDetail.html', articleName=article_name,
-                           theme=session['theme'],
-                           url_for=url_for)
+    theme = session['theme']
+    hidehtml2 = f'''
+            <!DOCTYPE html>
+<!-- 网站主语言 -->
+<html lang="zh-cn">
+<head>
+    <!-- 网站采用的字符编码 -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <!-- 预留网站标题的位置 -->
+    <title>{article_name}</title>
+    <!-- 引入Tailwind CSS的CDN链接 -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="../static/css/hiddenForm.css" rel="stylesheet">
+    <script src="../static/pw/pw.js"></script>
+</head>
+<body class='{theme}'>
+<!-- 预留具体页面的位置 -->
+<div class="container mx-auto mt-8">
+    <div class="w-2/3 mx-auto">
+        <h3 class="text-blue-500 text-xl"></h3>
+        <div class="container mx-auto">
+            <div id="fullscreen">
+                <form id="passwordForm" onsubmit="return submitForm('{article_name}')">
+                <a class="text-xl text-black font-bold py-4">{article_name}</a>
+                <label for="password">需要访问密码:</label>
+                <input type="password" id="password" name="password" placeholder="输入密码" required>
+                <input type="submit" value="提交">
+                <a href="/">逛逛其他</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
+            '''
+
+    return hidehtml2
 
 
 def zy_pw_check(article, code):
@@ -1383,6 +1418,15 @@ def media_space():
                                        has_previous_page=has_previous_page, current_page=page, userid=username,
                                        domain=domain)
 
+            if type == 'xmind':
+                xminds, has_next_page, has_previous_page = get_all_xmind(username, page=page)
+
+                return render_template('zymedia.html', xminds=xminds, title='Media', url_for=url_for,
+                                       theme=session.get('theme'), has_next_page=has_next_page,
+                                       has_previous_page=has_previous_page, current_page=page, userid=username,
+                                       domain=domain)
+
+
         elif request.method == 'POST':
             img_name = request.json.get('img_name')
             if not img_name:
@@ -1403,6 +1447,8 @@ def get_media_list(username, category, page=1, per_page=10):
         file_suffix = ('.png', '.jpg', '.webp')
     elif category == 'video':
         file_suffix = ('.mp4', '.avi', '.mkv', '.webm', '.flv')
+    elif category == 'xmind':
+        file_suffix = ('.xmind')
     file_dir = os.path.join('media', username)
     if not os.path.exists(file_dir):
         os.makedirs(file_dir)
@@ -1429,6 +1475,11 @@ def get_all_img(username, page=1, per_page=10):
 
 def get_all_video(username, page=1, per_page=10):
     videos, has_next_page, has_previous_page = get_media_list(username, category='video')
+    return videos, has_next_page, has_previous_page
+
+
+def get_all_xmind(username, page=1, per_page=10):
+    videos, has_next_page, has_previous_page = get_media_list(username, category='xmind')
     return videos, has_next_page, has_previous_page
 
 
@@ -1728,11 +1779,26 @@ def id_find_article(article_id):
 
 
 @cache.cached(timeout=1200)
-@app.route('/blog/<article_name>/images/<image_name>', methods=['GET', 'POST'])
+@app.route('/blog/<article_name>/images/<image_name>', methods=['GET'])
 def sys_out_article_img(article_name, image_name):
     author = get_blog_author(article_name)
-    articles_img_dir = os.path.join(base_dir, 'media', author)
+
+    if author is None:
+        author = 'test'
+
+    articles_img_dir = os.path.join(base_dir, 'media', str(author))  # 确保author是字符串
     return send_from_directory(articles_img_dir, image_name)
+
+
+@app.route('/blog/f/<author>/<file_name>', methods=['GET'])
+def sys_out_user_file(author, file_name):
+    xmind_file_path = os.path.join(base_dir, 'media', str(author), file_name)  # 确保author是字符串
+    # 返回 用户 文件
+    try:
+        return send_file(xmind_file_path, as_attachment=True)
+    except Exception as e:
+        logging.error("An error occurred: %s", str(e))
+        return "An error occurred while trying to access the file."
 
 
 @app.errorhandler(404)
