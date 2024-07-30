@@ -32,6 +32,7 @@
                     <a href="/profile">{{ userid }}</a>
                     <a href="{{ url_for('media_space', username=userid, page=1) }}">仅图片</a>
                     <a href="{{ url_for('media_space', username=userid, page=1,type='video') }}">仅视频</a>
+                    <a href="{{ url_for('media_space', username=userid, page=1,type='xmind') }}">Xmind文件</a>
                 {% else %}
                     <!-- 展示未登录的内容 -->
                     <a href="/login">您还没有登录呢</a>
@@ -79,6 +80,15 @@
                 {% if has_next_page and videos %}
                     <a href="{{ url_for('media_space', username=userid, page=current_page+1,type='video')}}">Next</a>
                 {% endif %}
+
+
+                {% if has_previous_page and xminds %}
+                    <a href="{{ url_for('media_space', username=userid, page=current_page-1,type='xmind') }}">Previous</a>
+                {% endif %}
+                <span>----------</span>
+                {% if has_next_page and videos %}
+                    <a href="{{ url_for('media_space', username=userid, page=current_page+1,type='xmind')}}">Next</a>
+                {% endif %}
             </div>
 
             {% for img in imgs %}
@@ -110,6 +120,22 @@
                     </a>
                 </div>
             {% endfor %}
+
+            {% for xmind in xminds %}
+                <div class="col-md-6">
+                    <a class="card-link" onclick="startXmind('{{ xmind }}')">
+                        <div class="card mb-4">
+                            <div class="card-body" style="display: flex;background:transparent;">
+
+                                <h3 class="card-title">&nbsp;&nbsp;&nbsp;&nbsp;{{ xmind }}</h3>
+                                <button class="btn btn-primary" onclick="copyXmindURL('{{ xmind }}')">复制外链</button>
+
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            {% endfor %}
+
             <!-- 翻页按钮 -->
             {% if has_previous_page and imgs %}
                 <a href="{{ url_for('media_space', username=userid, page=current_page-1) }}">Previous</a>
@@ -125,6 +151,14 @@
             <span>----------</span>
             {% if has_next_page and videos %}
                 <a href="{{ url_for('media_space', username=userid, page=current_page+1,type='video')}}">Next</a>
+            {% endif %}
+
+            {% if has_previous_page and xminds %}
+                <a href="{{ url_for('media_space', username=userid, page=current_page-1,type='xmind') }}">Previous</a>
+            {% endif %}
+            <span>----------</span>
+            {% if has_next_page and videos %}
+                <a href="{{ url_for('media_space', username=userid, page=current_page+1,type='xmind')}}">Next</a>
             {% endif %}
         </div>
     </div>
@@ -305,6 +339,15 @@
         });
     }
 
+    function copyXmindURL(xmind) {
+        const URL = "{{ domain }}" + "blog/f/{{ userid }}/" + xmind;
+        navigator.clipboard.writeText(URL).then(function () {
+            alert("已复制到剪切板，可在在博客中使用此外链 Xmind");
+        }).catch(function (error) {
+            alert("复制失败：" + error);
+        });
+    }
+
 
     function startVideo(video) {
         var username = "{{ username }}";  // Replace with the actual username
@@ -316,6 +359,11 @@
         var videoPopup = document.getElementById("video-popup");
         videoPopup.style.display = "block";
     }
+
+    function startXmind(xmind) {
+        alert("此功能未能实现")
+    }
+
 
     document.addEventListener('DOMContentLoaded', function () {
         const h3Elements = document.querySelectorAll('.card-title');
