@@ -16,34 +16,10 @@
     <script src="//cdn.jsdelivr.net/npm/docsify/lib/plugins/emoji.min.js"></script>
     <script src="../static/js/zoom-image.min.js"></script>
 <body class="{{ theme }}">
-
-<div id="app" class={{ theme }}></div>
-<div id="read">
-
-
-</div>
-
+<div id="app" class={{ theme }}>🏃‍🏃‍🏃‍💨加载中...</div>
 <div id='comments_zone' style="display: none;">
     与本文有关的标签{% for Tag in article_tags %}<a href="/?tag={{ Tag }}">{{ Tag }}</a>{% endfor %}
     /<<--点击标签获取更多文章|/本文作者：<a href="/profile?id={{ author }}" target="_blank">{{ author }}</a>
-    <span style="color:black">社区讨论条约
-        <br/>
-        尊重他人意见：在社区讨论中，大家都有权利发表自己的观点，但请避免恶意攻击或侮辱他人。请尊重他人的意见和观点，保持开放、友善的讨论环境。
-        <br/>
-        文明交流：在讨论过程中，请尽量使用文明、礼貌的语言，避免使用粗鲁或攻击性言辞。保持冷静，理性讨论，不要轻易引发争议。
-        <br/>
-        尊重知识产权：在引用他人观点或资料时，请注明出处，并尊重他人的知识产权。禁止抄袭和侵犯他人版权。
-        <br/>
-        禁止谩骂和人身攻击：严禁在讨论中使用谩骂、人身攻击等不当言论，保持理性、平和的态度，避免情绪化的讨论。
-        <br/>
-        尊重社区规则：遵守社区规定，不发表违反法律法规和社区规定的言论，保持社区秩序和正常运转。
-        <br/>
-        尊重他人隐私：在讨论中，不要公开或泄露他人的个人信息，尊重他人的隐私权。
-        <br/>
-        以上是社区讨论的基本条约，希望大家共同遵守，保持社区和谐与发展。
-        <br/>
-        * 参与讨论表示同意上述观点</span>
-    <button id="hide_comments" onclick="hideComments()" style="display: none;">隐藏评论区</button>
     <script src="https://utteranc.es/client.js"
             repo="Athenavi/comments"
             issue-term="url"
@@ -55,7 +31,10 @@
             crossorigin="anonymous"
             async>
     </script>
+    <button id="hide_comments" onclick="hideComments()" style="display: none;">隐藏评论区</button>
 </div>
+
+
 <script>
     function showComments() {
         document.getElementById('comments_zone').style.display = 'block';
@@ -82,7 +61,7 @@
         mergeNavbar: true,
         loadNavbar: '../api/_navbar.md',
         loadSidebar: '../api/_sidebar.md',
-        subMaxLevel: 2,
+        subMaxLevel: 4,
         repo: 'https://github.com/Athenavi/zb/',
         alias: {
             '/': '../api/{{ articleName }}.md',
@@ -94,18 +73,18 @@
             language: 'chinese'
         },
         topBanner: {
-            content: "本文最近更新日期:{{ blogDate }},转载请注明原文链接：{{ article_Surl }}"
+            content: '本文最近更新日期:{{ blogDate }}   转载请注明原文链接：{{ article_Surl }}   {{ beian }}',
         },
         autoFooter: {
             name: '{{ title }}',
             url: '{{ domain }}',
             copyYear: '2022',
-            privacy: '{{ domain }}/blog/privacy',
+            privacy: false,
             terms: false,
             cookies: false,
             customStyle: false
         },
-    };
+    }
 </script>
 <script src="../static/js/docsify.min.js"></script>
 <script src="//cdn.jsdelivr.net/npm/docsify-copy-code/dist/docsify-copy-code.min.js"></script>
@@ -119,10 +98,6 @@
 </script>
 <script src="//unpkg.com/docsify-mermaid@2.0.1/dist/docsify-mermaid.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/docsify-terminal-block@1.0.3"></script>
-<!--<script src="https://cdn.jsdelivr.net/npm/docsify-beian@latest/dist/beian.min.js"></script>-->
-
-<!--<script src="https://unpkg.com/docsify-busuanzi@1.0.1/dist/docsify-busuanzi.min.js"></script> -->
-
 <script src="//cdn.jsdelivr.net/gh/AntHubTC/docsify-xmind@1.0/example/dist/index.min.js"></script>
 <link rel="stylesheet" href="../static/js/docsify-xmind.js"/>
 
@@ -137,6 +112,8 @@
 <script src="../static/js/top-banner.js"></script>
 <!-- jsDelivr -->
 <script src="../static/js/docsify-sidebarfooter.js"></script>
+<script src="//cdn.jsdelivr.net/gh/jerryc127/butterfly_cdn@2.1.0/js/click_heart.js"></script>
+<script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
 </html>
 <style>
     #comments_zone {
@@ -145,7 +122,7 @@
         left: 0;
         width: 100%;
         height: 100%;
-        background-color: #0c5460;
+        background-color: transparent;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -159,4 +136,44 @@
     }
 
 </style>
+<script language=javascript>
+    function siteTime() {
+        window.setTimeout("siteTime()", 1000);
+        var seconds = 1000;
+        var minutes = seconds * 60;
+        var hours = minutes * 60;
+        var days = hours * 24;
+        var years = days * 365;
+        var today = new Date();
+        var todayYear = today.getFullYear();
+        var todayMonth = today.getMonth() + 1;
+        var todayDate = today.getDate();
+        var todayHour = today.getHours();
+        var todayMinute = today.getMinutes();
+        var todaySecond = today.getSeconds();
+        /* 建站时间 */
+        var t1 = Date.UTC(2022, 10, 15, 12, 10, 10);
+        var t2 = Date.UTC(todayYear, todayMonth, todayDate, todayHour, todayMinute, todaySecond);
+        var diff = t2 - t1;
+        var diffYears = Math.floor(diff / years);
+        var diffDays = Math.floor((diff / days) - diffYears * 365);
+        var diffHours = Math.floor((diff - (diffYears * 365 + diffDays) * days) / hours);
+        var diffMinutes = Math.floor((diff - (diffYears * 365 + diffDays) * days - diffHours * hours) / minutes);
+        var diffSeconds = Math.floor((diff - (diffYears * 365 + diffDays) * days - diffHours * hours - diffMinutes * minutes) / seconds);
+        document.getElementById("sitetime").innerHTML = " 已安全运行 " + diffYears + " 年 " + diffDays + " 天 " + diffHours + " 小时 " + diffMinutes + " 分 " + diffSeconds + " 秒 ";
+    }
 
+    siteTime();
+</script>
+<script src="//cdn.jsdelivr.net/npm/prismjs/components/prism-bash.min.js"></script>
+<script src="//cdn.jsdelivr.net/npm/prismjs/components/prism-java.min.js"></script>
+<script src="//cdn.jsdelivr.net/npm/prismjs/components/prism-python.min.js"></script>
+<script src="//cdn.jsdelivr.net/npm/prismjs/components/prism-cpp.min.js"></script>
+<script src="//cdn.jsdelivr.net/npm/prismjs/components/prism-c.min.js"></script>
+<script src="//cdn.jsdelivr.net/npm/prismjs/components/prism-javascript.min.js"></script>
+<script src="//cdn.jsdelivr.net/npm/prismjs/components/prism-css.min.js"></script>
+<script src="//cdn.jsdelivr.net/npm/prismjs/components/prism-powershell.min.js"></script>
+<script src="//cdn.jsdelivr.net/npm/prismjs/components/prism-sql.min.js"></script>
+<script src="//cdn.jsdelivr.net/npm/prismjs/components/prism-yaml.min.js"></script>
+<script src="//cdn.jsdelivr.net/npm/prismjs/components/prism-properties.min.js"></script>
+<script src="//cdn.jsdelivr.net/npm/prismjs/components/matlab.min.js"></script>

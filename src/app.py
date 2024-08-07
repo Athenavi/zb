@@ -62,11 +62,17 @@ except UnicodeDecodeError:
     config.read('config.ini', encoding='gbk')
 
 
+def web_beian():
+    _is_beian = config.get('general', 'beian', fallback='').strip("'")
+    return _is_beian
+
+
 @app.context_processor
 def inject_variables():
     return dict(
         userStatus=get_user_status(),
         username=get_username(),
+        beian=web_beian(),
     )
 
 
@@ -478,7 +484,7 @@ def home():
         rendered_content = template.render(
             title=title, articles_time_list=articles_time_list, url_for=url_for, theme=theme,
             notice=notice, has_next_page=has_next_page, has_previous_page=has_previous_page,
-            current_page=page, tags=tags, tag=tag
+            current_page=page, tags=tags, tag=tag, beian=web_beian()
         )
         # 缓存渲染后的页面内容，并设置服务端缓存过期时间
         cache.set(cache_key, rendered_content, timeout=60)
@@ -512,37 +518,6 @@ def get_file_time(articles):
 
     # print(modify_times)
     return modify_times
-
-
-@cache.cached(timeout=600)
-@app.route('/blog/discord/README.md', methods=['GET', 'POST'])
-def discord_r():
-    _is_discord_Open = config.get('general', 'discord', fallback='ON').strip("'")
-
-    if _is_discord_Open.upper() == 'ON':
-        return """
-            社区讨论条约
-
-        尊重他人意见：在社区讨论中，大家都有权利发表自己的观点，但请避免恶意攻击或侮辱他人。请尊重他人的意见和观点，保持开放、友善的讨论环境。
-
-        文明交流：在讨论过程中，请尽量使用文明、礼貌的语言，避免使用粗鲁或攻击性言辞。保持冷静，理性讨论，不要轻易引发争议。
-
-        尊重知识产权：在引用他人观点或资料时，请注明出处，并尊重他人的知识产权。禁止抄袭和侵犯他人版权。
-
-        禁止谩骂和人身攻击：严禁在讨论中使用谩骂、人身攻击等不当言论，保持理性、平和的态度，避免情绪化的讨论。
-
-        尊重社区规则：遵守社区规定，不发表违反法律法规和社区规定的言论，保持社区秩序和正常运转。
-
-        尊重他人隐私：在讨论中，不要公开或泄露他人的个人信息，尊重他人的隐私权。
-
-        以上是社区讨论的基本条约，希望大家共同遵守，保持社区和谐与发展。
-
-        <button id="show_comments" onclick="showComments()">开启评论区</button>
-        
-        * 参与讨论表示同意上述观点
-        """
-    else:
-        return '<span style="color: red">评论区已被站长关闭</span>'
 
 
 @cache.memoize(30)
@@ -582,7 +557,6 @@ def blog_detail(article):
         author = get_blog_author(article_name)
         update_date = get_file_date(article_name)
         theme = session.get('theme', 'day-theme')  # 获取当前主题
-
         response = make_response(render_template('zyDetail.html', title=title, article_content=1,
                                                  articleName=article_name, theme=theme,
                                                  author=author, blogDate=update_date, domain=domain,
@@ -599,43 +573,6 @@ def blog_detail(article):
 
     except FileNotFoundError:
         return render_template('error.html', status_code='404'), 404
-
-
-"""
-last_comment_time = {}  # 全局变量，用于记录用户最后评论时间
-
-@app.route('/post_comment', methods=['POST'])
-def post_comment():
-    article_name = request.form.get('article_name')
-    username = request.form.get('username')
-    comment = request.form.get('comment')
-
-    # 在处理评论前检查用户评论时间
-    if username in last_comment_time:
-        last_time = last_comment_time[username]
-        current_time = time.time()
-        if current_time - last_time < 10:
-            response = {
-                'result': 'error',
-                'message': '请稍后再发表评论'
-            }
-            return json.dumps(response)
-
-    # 更新用户最后评论时间
-    last_comment_time[username] = time.time()
-
-    # 处理评论逻辑
-    result = zy_post_comment(article_name, username, comment)
-
-    # 构建响应JSON对象
-    response = {
-        'result': result,
-        'username': username,
-        'comment': comment
-    }
-
-    return json.dumps(response)
-"""
 
 
 @cache.cached(timeout=300)
@@ -709,7 +646,7 @@ def generate_rss():
     hidden_articles = [ha + ".md" for ha in hidden_articles]
     files = os.listdir('articles')
     markdown_files = [file for file in files if file.endswith('.md') and not file.startswith('_')]
-    markdown_files = markdown_files[:10]
+    #markdown_files = markdown_files[:10]
 
     # 创建XML文件头及其他信息...
     xml_data = '<?xml version="1.0" encoding="UTF-8"?>\n'

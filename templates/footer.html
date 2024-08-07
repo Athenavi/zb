@@ -1,10 +1,11 @@
 <!-- header.html -->
-{% macro zyfooter(notice) -%}
+{% macro zyfooter(notice,beian) -%}
 
     <footer id="myFooter" class="py-3 bg-dark fixed-bottom">
         <div class="container">
             <p class="m-0 text-center text-white"><a href="https://github.com/Athenavi/zyBLOG/" target="_blank">
-                © CopyRight 2024, zyBLOG All Rights Reserved.</a></p>
+                © CopyRight 2024, zyBLOG All Rights Reserved.</a><a href="https://beian.miit.gov.cn/"
+                                                                    target="_blank">{{ beian }}</a></p>
         </div>
     </footer>
     <div class="top-bar">
