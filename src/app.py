@@ -8,7 +8,7 @@ import random
 import re
 import shutil
 import time
-import urllib
+import urllib.parse
 import xml.etree.ElementTree as ElementTree
 from configparser import ConfigParser
 from datetime import datetime, timedelta
@@ -17,7 +17,7 @@ import requests
 from flask import Flask, render_template, redirect, session, request, url_for, Response, jsonify, send_file, \
     make_response, send_from_directory
 from flask_caching import Cache
-from jinja2 import Environment, select_autoescape, FileSystemLoader
+from jinja2 import select_autoescape
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from src.AboutLogin import zy_login, zy_register, zy_mail_login
@@ -32,21 +32,20 @@ from src.utils import zy_upload_file, get_user_status, get_username, get_client_
     zy_save_edit
 
 global_encoding = 'utf-8'
-template_dir = 'templates'  # 模板文件的目录
-loader = FileSystemLoader(template_dir)
-env = Environment(loader=loader, autoescape=select_autoescape(['html', 'xml']))
-env.add_extension('jinja2.ext.loopcontrols')
 
-app = Flask(__name__, static_folder="../static")
+app = Flask(__name__, template_folder='../templates', static_folder="../static")
 app.config['CACHE_TYPE'] = 'simple'
 cache = Cache(app)
-app.jinja_env = env
 app.secret_key = 'your_secret_key'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=3)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)  # 添加 ProxyFix 中间件
 
 # 移除默认的日志处理程序
 app.logger.handlers = []
+
+# 配置 Jinja2 环境
+app.jinja_env.autoescape = select_autoescape(['html', 'xml'])
+app.jinja_env.add_extension('jinja2.ext.loopcontrols')
 
 # 新增日志处理程序
 log_formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
@@ -244,7 +243,7 @@ def check_exist(cache_file):
 @app.route('/api/<article_name>', methods=['GET', 'POST'])
 def sys_out_file(article_name):
     if article_name.startswith("tempPrev_"):
-        return tempPreview(article_name[:-3])
+        return temp_preview(article_name[:-3])
 
     # 隐藏文章判别
     hidden_articles = read_hidden_articles()
@@ -260,7 +259,7 @@ def sys_out_file(article_name):
         return "An internal error occurred", 500
 
 
-def tempPreview(file_name):
+def temp_preview(file_name):
     parts = file_name.rsplit('_', 1)
     if len(parts) == 2:
         author, file_name = parts
@@ -291,7 +290,6 @@ def get_avatar():
 @app.route('/profile', methods=['GET', 'POST'])
 def space():
     avatar_url = get_avatar() or domain + 'static/favicon.ico'
-    template = env.get_template('zyprofile.html')
     session.setdefault('theme', 'day-theme')
     userStatus = get_user_status()
     username = get_username()
@@ -309,7 +307,7 @@ def space():
     if 'default' in owner_articles:
         owner_articles.remove('default')
 
-    return template.render(url_for=url_for, theme=session['theme'], avatar_url=avatar_url,
+    return render_template(template='zyprofile.html', url_for=url_for, theme=session['theme'], avatar_url=avatar_url,
                            userStatus=userStatus, username=username,
                            Articles=owner_articles)
 
@@ -375,14 +373,14 @@ def get_articles_by_tag(tag_name):
     return tag_articles
 
 
-def get_tags_by_article(articleTitle):
+def get_tags_by_article(article_title):
     db = get_database_connection()
     cursor = db.cursor()
     unique_tags = []
 
     try:
         query = "SELECT Tags FROM articles WHERE Title = %s"
-        cursor.execute(query, (articleTitle,))
+        cursor.execute(query, (article_title,))
 
         result = cursor.fetchone()
         if result:
@@ -451,11 +449,12 @@ def home():
         articles, has_next_page, has_previous_page = get_article_names(page=page)
 
         # 模版配置
-        template = env.get_template('zyIndex.html')
         template_display = session.get('display', 'default')
         template_path = f'templates/theme/{template_display}/index.html'
         if os.path.exists(template_path):
-            template = env.get_template(f'theme/{template_display}/index.html')
+            template = app.jinja_env.get_template(f'theme/{template_display}/index.html')
+        else:
+            template = app.jinja_env.get_template('zyIndex.html')
 
         notice = ''
         try:
@@ -502,7 +501,7 @@ def home():
         return render_template('zyIndex.html')
 
 
-@cache.cached(timeout=600, key_prefix='artile_time')
+@cache.cached(timeout=600, key_prefix='article_time')
 def get_file_time(articles):
     modify_times = []
     for article in articles:
@@ -515,8 +514,6 @@ def get_file_time(articles):
             modify_times.append(formatted_modify_time)
         except FileNotFoundError:
             modify_times.append(None)
-
-    # print(modify_times)
     return modify_times
 
 
@@ -564,10 +561,10 @@ def blog_detail(article):
 
         # 设置服务器端缓存时间
         response.cache_control.max_age = 180
-        response.expires = datetime.utcnow() + timedelta(seconds=300)
+        response.expires = datetime.now() + timedelta(seconds=180)
 
         # 设置浏览器端缓存时间
-        response.headers['Cache-Control'] = 'public, max-age=300'
+        response.headers['Cache-Control'] = f'public, max-age=180'
 
         return response
 
@@ -646,7 +643,7 @@ def generate_rss():
     hidden_articles = [ha + ".md" for ha in hidden_articles]
     files = os.listdir('articles')
     markdown_files = [file for file in files if file.endswith('.md') and not file.startswith('_')]
-    #markdown_files = markdown_files[:10]
+    # markdown_files = markdown_files[:10]
 
     # 创建XML文件头及其他信息...
     xml_data = '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -1381,8 +1378,6 @@ def media_space():
                                        theme=session.get('theme'), has_next_page=has_next_page,
                                        has_previous_page=has_previous_page, current_page=page, userid=username,
                                        domain=domain)
-
-
         elif request.method == 'POST':
             img_name = request.json.get('img_name')
             if not img_name:
@@ -1404,7 +1399,7 @@ def get_media_list(username, category, page=1, per_page=10):
     elif category == 'video':
         file_suffix = ('.mp4', '.avi', '.mkv', '.webm', '.flv')
     elif category == 'xmind':
-        file_suffix = ('.xmind')
+        file_suffix = '.xmind'
     file_dir = os.path.join('media', username)
     if not os.path.exists(file_dir):
         os.makedirs(file_dir)
@@ -1762,7 +1757,7 @@ def sys_out_prev_page():
     type = request.args.get('type')
     user = request.args.get('user')
     file_name = request.args.get('file_name')
-    prev_file_path = os.path.join(base_dir, 'media', str(user), file_name)  # 确保author是字符串
+    prev_file_path = os.path.join(base_dir, 'media', str(user), file_name)
     if not os.path.exists(prev_file_path):
         return render_template('error.html', message=f'{file_name}不存在', status_code=404)
     else:
