@@ -307,7 +307,7 @@ def space():
     if 'default' in owner_articles:
         owner_articles.remove('default')
 
-    return render_template(template='zyprofile.html', url_for=url_for, theme=session['theme'], avatar_url=avatar_url,
+    return render_template('zyprofile.html', url_for=url_for, theme=session['theme'], avatar_url=avatar_url,
                            userStatus=userStatus, username=username,
                            Articles=owner_articles)
 
