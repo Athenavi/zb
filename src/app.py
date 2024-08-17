@@ -12,6 +12,7 @@ import urllib.parse
 import xml.etree.ElementTree as ElementTree
 from configparser import ConfigParser
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import requests
 from flask import Flask, render_template, redirect, session, request, url_for, Response, jsonify, send_file, \
@@ -139,7 +140,7 @@ def toggle_theme():
 @app.route('/search', methods=['GET', 'POST'])
 def search():
     if 'logged_in' not in session:
-        return render_template('zylogin.html', error='登陆后可以使用此功能')
+        return render_template('Login.html', error='登陆后可以使用此功能')
     matched_content = []
 
     if request.method == 'POST':
@@ -252,11 +253,8 @@ def sys_out_file(article_name):
         # 隐藏的文章
         return zy_pw_blog(article_name[:-3])
 
-    try:
-        articles_dir = os.path.join(base_dir, 'articles')
-        return send_from_directory(articles_dir, article_name)
-    except Exception:
-        return "An internal error occurred", 500
+    articles_dir = os.path.join(base_dir, 'articles')
+    return send_from_directory(articles_dir, article_name)
 
 
 def temp_preview(file_name):
@@ -307,7 +305,7 @@ def space():
     if 'default' in owner_articles:
         owner_articles.remove('default')
 
-    return render_template('zyprofile.html', url_for=url_for, theme=session['theme'], avatar_url=avatar_url,
+    return render_template('Profile.html', url_for=url_for, theme=session['theme'], avatar_url=avatar_url,
                            userStatus=userStatus, username=username,
                            Articles=owner_articles)
 
@@ -1251,17 +1249,14 @@ def zy_pw_blog(article_name):
 
 
 def zy_pw_check(article, code):
-    try:
-        invitecodes = get_invitecode_data()  # 获取invitecode表数据
+    invitecodes = get_invitecode_data()  # 获取invitecode表数据
 
-        for result in invitecodes:
-            if result['uuid'] == article and result['code'] == code:
-                app.logger.info('完成了一次数据表更新')
-                return 'success'
+    for result in invitecodes:
+        if result['uuid'] == article and result['code'] == code:
+            app.logger.info('完成了一次数据表更新')
+            return 'success'
 
-        return 'failed'
-    except:
-        return 'failed'
+    return 'failed'
 
 
 @cache.cached(timeout=600, key_prefix='invitecode')
@@ -1359,14 +1354,14 @@ def media_space():
             if not type or type == 'img':
                 imgs, has_next_page, has_previous_page = get_all_img(username, page=page)
 
-                return render_template('zymedia.html', imgs=imgs, title='Media', url_for=url_for,
+                return render_template('Media.html', imgs=imgs, title='Media', url_for=url_for,
                                        theme=session.get('theme'), has_next_page=has_next_page,
                                        has_previous_page=has_previous_page, current_page=page, userid=username,
                                        domain=domain)
             if type == 'video':
                 videos, has_next_page, has_previous_page = get_all_video(username, page=page)
 
-                return render_template('zymedia.html', videos=videos, title='Media', url_for=url_for,
+                return render_template('Media.html', videos=videos, title='Media', url_for=url_for,
                                        theme=session.get('theme'), has_next_page=has_next_page,
                                        has_previous_page=has_previous_page, current_page=page, userid=username,
                                        domain=domain)
@@ -1374,7 +1369,7 @@ def media_space():
             if type == 'xmind':
                 xminds, has_next_page, has_previous_page = get_all_xmind(username, page=page)
 
-                return render_template('zymedia.html', xminds=xminds, title='Media', url_for=url_for,
+                return render_template('Media.html', xminds=xminds, title='Media', url_for=url_for,
                                        theme=session.get('theme'), has_next_page=has_next_page,
                                        has_previous_page=has_previous_page, current_page=page, userid=username,
                                        domain=domain)
@@ -1437,10 +1432,10 @@ def get_all_xmind(username, page=1, per_page=10):
 @app.route('/zyImg/<username>/<img_name>')
 def get_image_path(username, img_name):
     try:
-        img_dir = os.path.join(base_dir, 'media', username, img_name)  # 修改为实际的图片目录相对路径
+        img_dir = Path(base_dir) / 'media' / username / img_name
 
         # 从缓存中获取图像数据
-        img_data = cache.get(img_dir)
+        img_data = cache.get(str(img_dir))
 
         # 如果缓存中没有图像数据，则从文件中读取并进行缓存
         if img_data is None:
@@ -1448,7 +1443,8 @@ def get_image_path(username, img_name):
                 img_data = f.read()
             cache.set(img_dir, img_data)
 
-        return send_file(img_dir, mimetype='image/png')
+        # 使用 BytesIO 包装图像数据
+        return send_file(io.BytesIO(img_data), mimetype='image/png')
     except Exception as e:
         print(f"Error in getting image path: {e}")
         return None
@@ -1485,13 +1481,19 @@ def upload_user_path():
 @app.route('/zyVideo/<username>/<video_name>')
 def start_video(username, video_name):
     try:
-        video_dir = os.path.join(base_dir, 'media', username)
-        video_path = os.path.join(video_dir, video_name)
+        # 使用 pathlib.Path 处理路径
+        video_dir = Path(base_dir) / 'media' / username
+        video_path = video_dir / video_name
 
+        # 检查文件是否存在
+        if not video_path.exists():
+            return f"Video {video_name} not found for user {username}.", 404
+
+        # 使用 send_file 发送视频文件
         return send_file(video_path, mimetype='video/mp4', as_attachment=False, conditional=True)
     except Exception as e:
         print(f"Error in getting video path: {e}")
-        return None
+        return "Internal Server Error", 500
 
 
 @app.route('/jump', methods=['GET', 'POST'])
@@ -1562,7 +1564,7 @@ def callback(provider):
         # face_img = get_user_info(provider, social_uid)
         return zy_mail_login(user_email, ip)
 
-    return render_template('zylogin.html', error=msg)
+    return render_template('Login.html', error=msg)
 
 
 @cache.cached(timeout=300, key_prefix='display_detail')
@@ -1743,7 +1745,7 @@ def sys_out_article_img(article_name, image_name):
 
 @app.route('/blog/f/<author>/<file_name>', methods=['GET'])
 def sys_out_user_file(author, file_name):
-    xmind_file_path = os.path.join(base_dir, 'media', str(author), file_name)  # 确保author是字符串
+    xmind_file_path = Path(base_dir) / 'media' / str(author) / file_name  # 使用 pathlib.Path 处理路径
     # 返回 用户 文件
     try:
         return send_file(xmind_file_path, as_attachment=True)
@@ -1754,7 +1756,6 @@ def sys_out_user_file(author, file_name):
 
 @app.route('/preview', methods=['GET'])
 def sys_out_prev_page():
-    type = request.args.get('type')
     user = request.args.get('user')
     file_name = request.args.get('file_name')
     prev_file_path = os.path.join(base_dir, 'media', str(user), file_name)
