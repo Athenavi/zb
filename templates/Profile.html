@@ -29,11 +29,9 @@
             <div class="block-content block-content-full px-lg-4 py-md-4 py-lg-4">
                 {% if userStatus %}
                     <!-- 展示已登录的内容 -->
-                    <a><img src="{{ avatar_url }}" style="height: 42px; border-radius: 50%;" alt=""
-                            ondblclick="avatarInfo()">{{ username }}</a>
-                    <a href="/media">媒体文件</a>
-                    <a href="/logout">点击这里直接注销</a>　　
-                    <a href="/change-password">修改我的密码</a>
+                    <img src="{{ avatar_url }}" style="height: 42px; border-radius: 50%;">
+                    <a href="/media">📂 媒体</a>
+                    <a href="/setting/profiles">⚙️ 设置</a>
                 {% else %}
                     <!-- 展示未登录的内容 -->
                     <a href="/login">需要登录</a>
@@ -83,11 +81,6 @@
 
 </html>
 <script>
-
-    function avatarInfo() {
-        alert('如何修改我的头像？ \n上传名字为avatar.png到媒体文件中')
-    }
-
     // 获取URL参数的函数
     function getParameterByName(name) {
         name = name.replace(/[\[\]]/g, "\\$&");

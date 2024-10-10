@@ -20,9 +20,8 @@
 
 <div class="container mx-auto px-4">
     <div class="flex flex-col md:flex-row">
-        <span>{{ notice|safe }}</span>
         <!-- Main Content -->
-        <main class="w-full md:w-2/3" id="articleDIV">
+        <main class="w-full md:w-3/4" id="articleDIV">
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {% for article, time in articles_time_list %}
                     <div class="card mb-4 shadow-sm flex">
@@ -74,36 +73,54 @@
             </div>
 
             <div class="p-6 bg-gray-50 rounded-lg">
-                <p class="text-gray-600 mb-4">Ctrl + F 搜索内容</p>
-                <img src="/static/image/gzh.png" alt="Wx——qrcode" class="w-full h-auto mb-4">
-                <div>
-                    <a href="/travel"
-                       class="bg-green-500 text-white px-4 py-2 block w-full rounded-lg hover:bg-green-600 mb-2">
-                        随机一篇文章
-                    </a>
-                    <a href="/blog/privacy"
-                       class="bg-yellow-500 text-white px-4 py-2 block w-full rounded-lg hover:bg-yellow-600 mb-2">
-                        隐私协议
-                    </a>
-                    <a href="/blog/legal-agreement"
-                       class="bg-red-500 text-white px-4 py-2 block w-full rounded-lg hover:bg-red-600 mb-2">
-                        法律声明
-                    </a>
-                    <a href="/sitemap"
-                       class="bg-purple-500 text-white px-4 py-2 block w-full rounded-lg hover:bg-purple-600 mb-2">
-                        站点地图
-                    </a>
-                    <a href="/feed" class="bg-pink-500 text-white px-4 py-2 block w-full rounded-lg hover:bg-pink-600">
-                        RSS订阅
-                    </a>
-                </div>
+                <p id="hitokoto">:D 获取中...
+                </p>——<small id="creator"> 李白</small>
+                <script>(function hitokoto() {
+                    fetch('https://v1.hitokoto.cn')
+                        .then(response => response.json())
+                        .then(data => {
+                            var hitokoto = data.hitokoto;
+                            var creator = data.creator;
+
+                            var domHitokoto = document.querySelector('#hitokoto');
+                            var domCreator = document.querySelectorAll('#creator');
+
+                            Array.isArray(domHitokoto) ? domHitokoto[0].innerText = hitokoto : domHitokoto.innerText = hitokoto;
+                            if (domCreator.length > 0) {
+                                domCreator[0].innerText = creator;
+                            }
+                        })
+                        .catch(error => console.log(error));
+                })();</script>
+            </div>
+            <p class="text-gray-600 mb-4">Ctrl + F 搜索内容</p>
+            <img src="/static/image/gzh.png" alt="Wx——qrcode" class="w-full h-auto mb-4">
+            <div>
+                <a href="/travel"
+                   class="bg-green-500 text-white px-4 py-2 block w-full rounded-lg hover:bg-green-600 mb-2">
+                    随机一篇文章
+                </a>
+                <a href="/blog/privacy"
+                   class="bg-yellow-500 text-white px-4 py-2 block w-full rounded-lg hover:bg-yellow-600 mb-2">
+                    隐私协议
+                </a>
+                <a href="/blog/legal-agreement"
+                   class="bg-red-500 text-white px-4 py-2 block w-full rounded-lg hover:bg-red-600 mb-2">
+                    法律声明
+                </a>
+                <a href="/sitemap"
+                   class="bg-purple-500 text-white px-4 py-2 block w-full rounded-lg hover:bg-purple-600 mb-2">
+                    站点地图
+                </a>
+                <a href="/feed" class="bg-pink-500 text-white px-4 py-2 block w-full rounded-lg hover:bg-pink-600">
+                    RSS订阅
+                </a>
             </div>
         </aside>
     </div>
 </div>
-
 <!-- Footer -->
 {% from 'footer.html' import zyfooter %}
-{{ zyfooter() }}
+{{ zyfooter(notice,beian) }}
 </body>
 </html>

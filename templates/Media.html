@@ -46,7 +46,7 @@
                 <script>
                     // Initialize Dropzone
                     Dropzone.options.myDropzone = {
-                        acceptedFiles: '.jpg, .png, .webp, .jfif, .pjpeg, .jpeg, .pjp, .mp4',
+                        acceptedFiles: '.jpg, .png, .webp, .jfif, .pjpeg, .jpeg, .pjp, .mp4, .xmind',
                         maxFilesize: 60,
                         maxFiles: 1,
                         dictFileTooBig: 'File is too big ({{filesize}}MB). Max filesize: {{maxFilesize}}MB.',
@@ -123,9 +123,10 @@
 
             {% for xmind in xminds %}
                 <div class="col-md-6">
-                    <a class="card-link" onclick="startXmind('{{ xmind }}')">
+                    <a class="card-link"
+                       onclick="prewXmind('{{ domain }}preview?user={{ userid }}&file_name={{ xmind }}')">
                         <div class="card mb-4">
-                            <div class="card-body" style="display: flex;background:transparent;">
+                            <div class="card-body" style="display: flex; background: transparent;">
 
                                 <h3 class="card-title">&nbsp;&nbsp;&nbsp;&nbsp;{{ xmind }}</h3>
                                 <button class="btn btn-primary" onclick="copyXmindURL('{{ xmind }}')">复制外链</button>
@@ -238,6 +239,33 @@
         font-size: 16px;
         margin-top: 10px;
     }
+
+
+    #xmind-popup {
+        display: none;
+        position: fixed;
+        z-index: 9999;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0, 0, 0, 0.8);
+    }
+
+    .xmind-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+    }
+
+
+    .xmind-wrapper button {
+        font-size: 16px;
+        margin-top: 10px;
+    }
 </style>
 <div id="video-popup">
     <div class="video-wrapper">
@@ -254,33 +282,17 @@
     </div>
 </div>
 
+<div id="xmind-popup">
+    <div class="xmind-wrapper">
+        <button class="btn btn-primary" onclick="closeXmind()">关闭预览</button>
+    </div>
+</div>
+
 {% from 'footer.html' import zyfooter %}
 {{ zyfooter() }}
 </body>
 
 </html>
-
-<style>
-    .card-link:hover .card {
-        box-shadow: 0 0 10px #877725;
-    }
-</style>
-<style>
-    .card-body {
-        display: flex;
-        align-items: center;
-    }
-
-    .card-body img {
-        flex: 1;
-        max-width: 50%;
-        max-height: 125%;
-    }
-
-    .card-body h3 {
-        flex: 1;
-    }
-</style>
 <script>
     function showImage(img) {
         // 发起POST请求获取图像数据
@@ -321,6 +333,7 @@
         videoPopup.style.display = 'none';
     }
 
+
     function copyImgURL(img) {
         const URL = "{{ domain }}" + "zyImg/{{ userid }}/" + img;
         navigator.clipboard.writeText(URL).then(function () {
@@ -360,10 +373,6 @@
         videoPopup.style.display = "block";
     }
 
-    function startXmind(xmind) {
-        alert("此功能未能实现")
-    }
-
 
     document.addEventListener('DOMContentLoaded', function () {
         const h3Elements = document.querySelectorAll('.card-title');
@@ -377,17 +386,26 @@
         });
     });
 </script>
+<script src="../static/js/docsify.min.js"></script>
+<script src='../static/js/docsify-xmind.js'></script>
+<script src="../static/js/prewXmind.js"></script>
 <style>
-    .card {
-        background-color: transparent;
-        border: None;
+
+    .card-body img {
+        flex: 1;
+        max-width: 50%;
+        max-height: 125%;
+    }
+
+    .card-body h3 {
+        flex: 1;
+    }
+
+    .card-link:hover .card {
+        box-shadow: 0 0 10px #877725;
     }
 
     .card-body {
-        background-color: rgba(255, 255, 255, 0.8);
-        /* Set the desired transparency value in the last parameter (0.8 in this example) */
-        /* Adjust other styles as needed */
-
         display: flex;
         align-items: center;
     }
@@ -401,8 +419,6 @@
     .card-body h3 {
         flex: 1;
     }
-
-    .card:hover {
-        box-shadow: 0 0 10px #877725;
-    }
 </style>
+
+
