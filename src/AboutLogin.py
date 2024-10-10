@@ -15,7 +15,7 @@ def zy_login():
         password = bleach.clean(request.form['password'])
 
         if input_value == 'guest@7trees.cn':
-            return render_template('zylogin.html', error="宾客账户仅能使用用户名登录")
+            return render_template('Login.html', error="宾客账户仅能使用用户名登录")
 
         db = get_database_connection()
         cursor = db.cursor()
@@ -33,7 +33,7 @@ def zy_login():
 
                 return redirect(url_for('home'))
             else:
-                return render_template('zylogin.html', error="Invalid username or password")
+                return render_template('Login.html', error="Invalid username or password")
 
         except Exception as e:
             logging.error(f"Error logging in: {e}")
@@ -43,7 +43,7 @@ def zy_login():
             cursor.close()
             db.close()
 
-    return render_template('zylogin.html', title="登录")
+    return render_template('Login.html', title="登录")
 
 
 def zy_register(ip):

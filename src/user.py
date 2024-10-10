@@ -148,19 +148,19 @@ def zy_delete_file(filename):
     finally:
         try:
             cursor.close()
+            db.close()
         except NameError:
             pass
-        db.close()
 
 
-def get_owner_articles(Author):
+def get_owner_articles(author):
     db = get_database_connection()
     articles = []
 
     try:
         with db.cursor() as cursor:
             query = "SELECT Title FROM articles WHERE Author = %s"
-            cursor.execute(query, (Author,))
+            cursor.execute(query, (author,))
             results = cursor.fetchall()
 
             for result in results:

@@ -8,16 +8,17 @@ import random
 import re
 import shutil
 import time
-import urllib
+import urllib.parse
 import xml.etree.ElementTree as ElementTree
 from configparser import ConfigParser
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import requests
 from flask import Flask, render_template, redirect, session, request, url_for, Response, jsonify, send_file, \
     make_response, send_from_directory
 from flask_caching import Cache
-from jinja2 import Environment, select_autoescape, FileSystemLoader
+from jinja2 import select_autoescape
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from src.AboutLogin import zy_login, zy_register, zy_mail_login
@@ -32,21 +33,20 @@ from src.utils import zy_upload_file, get_user_status, get_username, get_client_
     zy_save_edit
 
 global_encoding = 'utf-8'
-template_dir = 'templates'  # 模板文件的目录
-loader = FileSystemLoader(template_dir)
-env = Environment(loader=loader, autoescape=select_autoescape(['html', 'xml']))
-env.add_extension('jinja2.ext.loopcontrols')
 
-app = Flask(__name__, static_folder="../static")
+app = Flask(__name__, template_folder='../templates', static_folder="../static")
 app.config['CACHE_TYPE'] = 'simple'
 cache = Cache(app)
-app.jinja_env = env
 app.secret_key = 'your_secret_key'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=3)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)  # 添加 ProxyFix 中间件
 
 # 移除默认的日志处理程序
 app.logger.handlers = []
+
+# 配置 Jinja2 环境
+app.jinja_env.autoescape = select_autoescape(['html', 'xml'])
+app.jinja_env.add_extension('jinja2.ext.loopcontrols')
 
 # 新增日志处理程序
 log_formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
@@ -62,11 +62,17 @@ except UnicodeDecodeError:
     config.read('config.ini', encoding='gbk')
 
 
+def web_beian():
+    _is_beian = config.get('general', 'beian', fallback='').strip("'")
+    return _is_beian
+
+
 @app.context_processor
 def inject_variables():
     return dict(
         userStatus=get_user_status(),
         username=get_username(),
+        beian=web_beian(),
     )
 
 
@@ -100,10 +106,12 @@ try:
     domain = config.get('general', 'domain').strip("'")
     title = config.get('general', 'title').strip("'")
     display = config.get('general', 'theme').strip("'")
+    Version = config.get('general', 'version').strip("'")
 except (configparser.NoSectionError, configparser.NoOptionError):
     domain = '127.0.0.1'
     title = '您的配置文件出现问题！！！'
     display = 'default'
+    Version = '1.0.0'
 
 theme_display = configparser.ConfigParser()
 CopyRight = 'Powered by zyBLOG'
@@ -134,7 +142,7 @@ def toggle_theme():
 @app.route('/search', methods=['GET', 'POST'])
 def search():
     if 'logged_in' not in session:
-        return render_template('zylogin.html', error='登陆后可以使用此功能')
+        return render_template('Login.html', error='登陆后可以使用此功能')
     matched_content = []
 
     if request.method == 'POST':
@@ -234,20 +242,36 @@ def check_exist(cache_file):
                 return jsonify(cache_data)
 
 
-@app.route('/blog/<any>/api/<article_name>', methods=['GET', 'POST'])
 @app.route('/blog/api/<article_name>', methods=['GET', 'POST'])
 @app.route('/api/<article_name>', methods=['GET', 'POST'])
 def sys_out_file(article_name):
+    if article_name.startswith("tempPrev_"):
+        return temp_preview(article_name[:-3])
+
     # 隐藏文章判别
     hidden_articles = read_hidden_articles()
+
     if article_name[:-3] in hidden_articles:
         # 隐藏的文章
         return zy_pw_blog(article_name[:-3])
-    try:
-        articles_dir = os.path.join(base_dir, 'articles')
-        return send_from_directory(articles_dir, article_name)
-    except Exception:
-        return "An internal error occurred", 500
+
+    articles_dir = os.path.join(base_dir, 'articles')
+    return send_from_directory(articles_dir, article_name)
+
+
+def temp_preview(file_name):
+    parts = file_name.rsplit('_', 1)
+    if len(parts) == 2:
+        author, file_name = parts
+        print(author, file_name)
+    author = get_username()
+    prev = f"""
+```xmind preview
+../blog/f/{author}/{file_name}
+```
+
+"""
+    return prev
 
 
 def get_avatar():
@@ -266,7 +290,6 @@ def get_avatar():
 @app.route('/profile', methods=['GET', 'POST'])
 def space():
     avatar_url = get_avatar() or domain + 'static/favicon.ico'
-    template = env.get_template('zyprofile.html')
     session.setdefault('theme', 'day-theme')
     userStatus = get_user_status()
     username = get_username()
@@ -284,9 +307,20 @@ def space():
     if 'default' in owner_articles:
         owner_articles.remove('default')
 
-    return template.render(url_for=url_for, theme=session['theme'], avatar_url=avatar_url,
+    return render_template('Profile.html', url_for=url_for, theme=session['theme'], avatar_url=avatar_url,
                            userStatus=userStatus, username=username,
                            Articles=owner_articles)
+
+
+@app.route('/setting/profiles', methods=['GET', 'POST'])
+def setting_profiles():
+    avatar_url = get_avatar() or domain + 'static/favicon.ico'
+    session.setdefault('theme', 'day-theme')
+    userStatus = get_user_status()
+    username = get_username()
+
+    return render_template('setting.html', url_for=url_for, theme=session['theme'], avatar_url=avatar_url,
+                           userStatus=userStatus, username=username)
 
 
 @app.route('/settingRegion', methods=['POST'])
@@ -350,14 +384,14 @@ def get_articles_by_tag(tag_name):
     return tag_articles
 
 
-def get_tags_by_article(articleTitle):
+def get_tags_by_article(article_title):
     db = get_database_connection()
     cursor = db.cursor()
     unique_tags = []
 
     try:
         query = "SELECT Tags FROM articles WHERE Title = %s"
-        cursor.execute(query, (articleTitle,))
+        cursor.execute(query, (article_title,))
 
         result = cursor.fetchone()
         if result:
@@ -426,11 +460,12 @@ def home():
         articles, has_next_page, has_previous_page = get_article_names(page=page)
 
         # 模版配置
-        template = env.get_template('zyIndex.html')
         template_display = session.get('display', 'default')
         template_path = f'templates/theme/{template_display}/index.html'
         if os.path.exists(template_path):
-            template = env.get_template(f'theme/{template_display}/index.html')
+            template = app.jinja_env.get_template(f'theme/{template_display}/index.html')
+        else:
+            template = app.jinja_env.get_template('zyIndex.html')
 
         notice = ''
         try:
@@ -459,7 +494,7 @@ def home():
         rendered_content = template.render(
             title=title, articles_time_list=articles_time_list, url_for=url_for, theme=theme,
             notice=notice, has_next_page=has_next_page, has_previous_page=has_previous_page,
-            current_page=page, tags=tags, tag=tag
+            current_page=page, tags=tags, tag=tag, beian=web_beian()
         )
         # 缓存渲染后的页面内容，并设置服务端缓存过期时间
         cache.set(cache_key, rendered_content, timeout=60)
@@ -477,7 +512,7 @@ def home():
         return render_template('zyIndex.html')
 
 
-@cache.cached(timeout=600, key_prefix='artile_time')
+@cache.cached(timeout=600, key_prefix='article_time')
 def get_file_time(articles):
     modify_times = []
     for article in articles:
@@ -490,40 +525,7 @@ def get_file_time(articles):
             modify_times.append(formatted_modify_time)
         except FileNotFoundError:
             modify_times.append(None)
-
-    # print(modify_times)
     return modify_times
-
-
-@cache.cached(timeout=600)
-@app.route('/blog/discord/README.md', methods=['GET', 'POST'])
-def discord_r():
-    _is_discord_Open = config.get('general', 'discord', fallback='ON').strip("'")
-
-    if _is_discord_Open.upper() == 'ON':
-        return """
-            社区讨论条约
-
-        尊重他人意见：在社区讨论中，大家都有权利发表自己的观点，但请避免恶意攻击或侮辱他人。请尊重他人的意见和观点，保持开放、友善的讨论环境。
-
-        文明交流：在讨论过程中，请尽量使用文明、礼貌的语言，避免使用粗鲁或攻击性言辞。保持冷静，理性讨论，不要轻易引发争议。
-
-        尊重知识产权：在引用他人观点或资料时，请注明出处，并尊重他人的知识产权。禁止抄袭和侵犯他人版权。
-
-        禁止谩骂和人身攻击：严禁在讨论中使用谩骂、人身攻击等不当言论，保持理性、平和的态度，避免情绪化的讨论。
-
-        尊重社区规则：遵守社区规定，不发表违反法律法规和社区规定的言论，保持社区秩序和正常运转。
-
-        尊重他人隐私：在讨论中，不要公开或泄露他人的个人信息，尊重他人的隐私权。
-
-        以上是社区讨论的基本条约，希望大家共同遵守，保持社区和谐与发展。
-
-        <button id="show_comments" onclick="showComments()">开启评论区</button>
-        
-        * 参与讨论表示同意上述观点
-        """
-    else:
-        return '<span style="color: red">评论区已被站长关闭</span>'
 
 
 @cache.memoize(30)
@@ -563,7 +565,6 @@ def blog_detail(article):
         author = get_blog_author(article_name)
         update_date = get_file_date(article_name)
         theme = session.get('theme', 'day-theme')  # 获取当前主题
-
         response = make_response(render_template('zyDetail.html', title=title, article_content=1,
                                                  articleName=article_name, theme=theme,
                                                  author=author, blogDate=update_date, domain=domain,
@@ -571,52 +572,15 @@ def blog_detail(article):
 
         # 设置服务器端缓存时间
         response.cache_control.max_age = 180
-        response.expires = datetime.utcnow() + timedelta(seconds=300)
+        response.expires = datetime.now() + timedelta(seconds=180)
 
         # 设置浏览器端缓存时间
-        response.headers['Cache-Control'] = 'public, max-age=300'
+        response.headers['Cache-Control'] = f'public, max-age=180'
 
         return response
 
     except FileNotFoundError:
         return render_template('error.html', status_code='404'), 404
-
-
-"""
-last_comment_time = {}  # 全局变量，用于记录用户最后评论时间
-
-@app.route('/post_comment', methods=['POST'])
-def post_comment():
-    article_name = request.form.get('article_name')
-    username = request.form.get('username')
-    comment = request.form.get('comment')
-
-    # 在处理评论前检查用户评论时间
-    if username in last_comment_time:
-        last_time = last_comment_time[username]
-        current_time = time.time()
-        if current_time - last_time < 10:
-            response = {
-                'result': 'error',
-                'message': '请稍后再发表评论'
-            }
-            return json.dumps(response)
-
-    # 更新用户最后评论时间
-    last_comment_time[username] = time.time()
-
-    # 处理评论逻辑
-    result = zy_post_comment(article_name, username, comment)
-
-    # 构建响应JSON对象
-    response = {
-        'result': result,
-        'username': username,
-        'comment': comment
-    }
-
-    return json.dumps(response)
-"""
 
 
 @cache.cached(timeout=300)
@@ -690,7 +654,7 @@ def generate_rss():
     hidden_articles = [ha + ".md" for ha in hidden_articles]
     files = os.listdir('articles')
     markdown_files = [file for file in files if file.endswith('.md') and not file.startswith('_')]
-    markdown_files = markdown_files[:10]
+    # markdown_files = markdown_files[:10]
 
     # 创建XML文件头及其他信息...
     xml_data = '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -1298,17 +1262,14 @@ def zy_pw_blog(article_name):
 
 
 def zy_pw_check(article, code):
-    try:
-        invitecodes = get_invitecode_data()  # 获取invitecode表数据
+    invitecodes = get_invitecode_data()  # 获取invitecode表数据
 
-        for result in invitecodes:
-            if result['uuid'] == article and result['code'] == code:
-                app.logger.info('完成了一次数据表更新')
-                return 'success'
+    for result in invitecodes:
+        if result['uuid'] == article and result['code'] == code:
+            app.logger.info('完成了一次数据表更新')
+            return 'success'
 
-        return 'failed'
-    except:
-        return 'failed'
+    return 'failed'
 
 
 @cache.cached(timeout=600, key_prefix='invitecode')
@@ -1406,14 +1367,14 @@ def media_space():
             if not type or type == 'img':
                 imgs, has_next_page, has_previous_page = get_all_img(username, page=page)
 
-                return render_template('zymedia.html', imgs=imgs, title='Media', url_for=url_for,
+                return render_template('Media.html', imgs=imgs, title='Media', url_for=url_for,
                                        theme=session.get('theme'), has_next_page=has_next_page,
                                        has_previous_page=has_previous_page, current_page=page, userid=username,
                                        domain=domain)
             if type == 'video':
                 videos, has_next_page, has_previous_page = get_all_video(username, page=page)
 
-                return render_template('zymedia.html', videos=videos, title='Media', url_for=url_for,
+                return render_template('Media.html', videos=videos, title='Media', url_for=url_for,
                                        theme=session.get('theme'), has_next_page=has_next_page,
                                        has_previous_page=has_previous_page, current_page=page, userid=username,
                                        domain=domain)
@@ -1421,12 +1382,10 @@ def media_space():
             if type == 'xmind':
                 xminds, has_next_page, has_previous_page = get_all_xmind(username, page=page)
 
-                return render_template('zymedia.html', xminds=xminds, title='Media', url_for=url_for,
+                return render_template('Media.html', xminds=xminds, title='Media', url_for=url_for,
                                        theme=session.get('theme'), has_next_page=has_next_page,
                                        has_previous_page=has_previous_page, current_page=page, userid=username,
                                        domain=domain)
-
-
         elif request.method == 'POST':
             img_name = request.json.get('img_name')
             if not img_name:
@@ -1448,7 +1407,7 @@ def get_media_list(username, category, page=1, per_page=10):
     elif category == 'video':
         file_suffix = ('.mp4', '.avi', '.mkv', '.webm', '.flv')
     elif category == 'xmind':
-        file_suffix = ('.xmind')
+        file_suffix = '.xmind'
     file_dir = os.path.join('media', username)
     if not os.path.exists(file_dir):
         os.makedirs(file_dir)
@@ -1486,10 +1445,10 @@ def get_all_xmind(username, page=1, per_page=10):
 @app.route('/zyImg/<username>/<img_name>')
 def get_image_path(username, img_name):
     try:
-        img_dir = os.path.join(base_dir, 'media', username, img_name)  # 修改为实际的图片目录相对路径
+        img_dir = Path(base_dir) / 'media' / username / img_name
 
         # 从缓存中获取图像数据
-        img_data = cache.get(img_dir)
+        img_data = cache.get(str(img_dir))
 
         # 如果缓存中没有图像数据，则从文件中读取并进行缓存
         if img_data is None:
@@ -1497,7 +1456,8 @@ def get_image_path(username, img_name):
                 img_data = f.read()
             cache.set(img_dir, img_data)
 
-        return send_file(img_dir, mimetype='image/png')
+        # 使用 BytesIO 包装图像数据
+        return send_file(io.BytesIO(img_data), mimetype='image/png')
     except Exception as e:
         print(f"Error in getting image path: {e}")
         return None
@@ -1516,7 +1476,7 @@ def upload_user_path():
             try:
                 for f in request.files.getlist('file'):
                     if f.filename.lower().endswith(
-                            ('.jpg', '.png', '.webp', '.jfif', '.pjpeg', '.jpeg', '.pjp', '.mp4')):
+                            ('.jpg', '.png', '.webp', '.jfif', '.pjpeg', '.jpeg', '.pjp', '.mp4', '.xmind')):
                         if f.content_length > 60 * 1024 * 1024:
                             return 'File size exceeds the limit of 60MB'
                         else:
@@ -1534,13 +1494,19 @@ def upload_user_path():
 @app.route('/zyVideo/<username>/<video_name>')
 def start_video(username, video_name):
     try:
-        video_dir = os.path.join(base_dir, 'media', username)
-        video_path = os.path.join(video_dir, video_name)
+        # 使用 pathlib.Path 处理路径
+        video_dir = Path(base_dir) / 'media' / username
+        video_path = video_dir / video_name
 
+        # 检查文件是否存在
+        if not video_path.exists():
+            return f"Video {video_name} not found for user {username}.", 404
+
+        # 使用 send_file 发送视频文件
         return send_file(video_path, mimetype='video/mp4', as_attachment=False, conditional=True)
     except Exception as e:
         print(f"Error in getting video path: {e}")
-        return None
+        return "Internal Server Error", 500
 
 
 @app.route('/jump', methods=['GET', 'POST'])
@@ -1611,7 +1577,7 @@ def callback(provider):
         # face_img = get_user_info(provider, social_uid)
         return zy_mail_login(user_email, ip)
 
-    return render_template('zylogin.html', error=msg)
+    return render_template('Login.html', error=msg)
 
 
 @cache.cached(timeout=300, key_prefix='display_detail')
@@ -1673,22 +1639,18 @@ def favicon():
     return send_file('../static/favicon.ico', mimetype='image/png')
 
 
-"""
-@app.route('/<page>', methods=['GET', 'POST'])
+@app.route('/@<page>', methods=['GET', 'POST'])
 def diy_space(page):
-    if ContractedAuthor(page) is True:
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        template_path = os.path.join(base_dir, 'media', page, 'index.html')
-        print(template_path)
-        if os.path.exists(template_path):
-            with open(template_path, 'r', encoding=global_encoding) as file:
-                html_content = file.read()
-                resp = make_response(html_content)
-                username = 'qks' + format(random.randint(1000, 9999))  # 可以设置一个默认值或者抛出异常，具体根据需求进行处理
-                resp.set_cookie('key', 'zyBLOG' + username, 7200)
-            return resp
+    template_path = os.path.join(base_dir, 'media', page, 'index.html')
+    print(template_path)
+    if os.path.exists(template_path):
+        with open(template_path, 'r', encoding=global_encoding) as file:
+            html_content = file.read()
+            resp = make_response(html_content)
+            visitID = Version + format(random.randint(10000, 99999))  # 可以设置一个默认值或者抛出异常，具体根据需求进行处理
+            resp.set_cookie('visitID', 'zyBLOG' + visitID, 7200)
+        return resp
     return render_template('error.html')
-"""
 
 
 @cache.cached(timeout=300, key_prefix='short_link')
@@ -1792,13 +1754,35 @@ def sys_out_article_img(article_name, image_name):
 
 @app.route('/blog/f/<author>/<file_name>', methods=['GET'])
 def sys_out_user_file(author, file_name):
-    xmind_file_path = os.path.join(base_dir, 'media', str(author), file_name)  # 确保author是字符串
+    xmind_file_path = Path(base_dir) / 'media' / str(author) / file_name  # 使用 pathlib.Path 处理路径
     # 返回 用户 文件
     try:
         return send_file(xmind_file_path, as_attachment=True)
     except Exception as e:
         logging.error("An error occurred: %s", str(e))
         return "An error occurred while trying to access the file."
+
+
+@app.route('/preview', methods=['GET'])
+def sys_out_prev_page():
+    user = request.args.get('user')
+    file_name = request.args.get('file_name')
+    prev_file_path = os.path.join(base_dir, 'media', str(user), file_name)
+    if not os.path.exists(prev_file_path):
+        return render_template('error.html', message=f'{file_name}不存在', status_code=404)
+    else:
+        return render_template('zyDetail.html', title=title, article_content=1,
+                               articleName=f"tempPrev_{file_name}", domain=domain,
+                               url_for=url_for, article_Surl='-')
+
+
+@app.route('/api/wx', methods=['GET'])
+def wx_api():
+    page = request.args.get('page')
+    if page:
+        return "helloworld"
+    else:
+        return "404 Not found"
 
 
 @app.errorhandler(404)

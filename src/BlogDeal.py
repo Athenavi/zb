@@ -214,8 +214,7 @@ def get_file_date(file_path):
 
 def zy_send_message(message):
     config = ConfigParser()
-    config.read('config_example.ini', encoding='utf-8')
-    access_token = config.get('messageBot', 'access_token').strip("'")
+    config.read('config.ini', encoding='utf-8')
     return 1
 
 

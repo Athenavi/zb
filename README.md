@@ -44,8 +44,20 @@
 
 ![](https://7trees.cn/zyImg/test/ac2764bba0b08d79e8f4bb1ba0d57a59.png)
 
+
 ## 如何运行
 
+建议使用 **Linux宝塔面板**
+
+1. 宝塔 **V9.0.0** 稳定版安装脚本
+```sh
+url=https://download.bt.cn/install/install_lts.sh;if [ -f /usr/bin/curl ];then curl -sSO $url;else wget -O install_lts.sh $url;fi;bash install_lts.sh ed8484bec
+```
+2. 克隆或下载 zyBLOG 代码库到本地。创建一个数据库，导入本项目里的 *sql* 文件（注意sql版本），复制 *config_example.ini* 文件到 *config.ini* ，配置 *config.ini*
+3. BT面板部署成功后(BT主程序页面 可以在 右侧 *网站* 选项卡配置Python项目,建议使用 Python V3.12.3 项目依赖 requirements.txt)
+4. 通用python项目部署参考步骤 [https://www.bt.cn/bbs/thread-125161-1-1.html](https://www.bt.cn/bbs/thread-125161-1-1.html)
+
+不使用宝塔?
 1. 确保你的系统已经安装了 Python 和 pip。
 2. 克隆或下载 zyBLOG 代码库到本地。创建一个数据库，导入本项目里的 *sql* 文件（注意sql版本），复制 *config_example.ini* 文件到 *config.ini* ，配置 *config.ini*
 3. 在终端中进入项目根目录，并执行以下命令的顺序执行以启动 zyBLOG 博客程序：
@@ -55,7 +67,7 @@ $ pip install -r requirements.txt
 $ python wsgi.py
 ```
 
-5. 在浏览器中访问 `http://localhost:5000`，即可进入 zyBLOG。
+5. 在浏览器中访问 `http://localhost:9421`，即可进入 zyBLOG。
 6. 默认管理员账号 'test' 默认密码 '123456'
 
 ## 无法运行？

@@ -33,16 +33,17 @@ def get_database_connection():
     )
     return zy_db
 
+
 def test_database_connection():
     try:
-        db = get_database_connection()
-        db.close()
+        test_db = get_database_connection()
+        test_db.close()
         print("Database connection is successful.")
     except mysql.connector.Error as err:
         print(f"Failed to connect to the database: {err}")
 
 
-def CheckDatabase():
+def check_db():
     global cursor, db
     try:
         db = get_database_connection()

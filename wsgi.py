@@ -17,9 +17,9 @@ def main():
 
     else:
         from src.app import app
-        from src.database import test_database_connection, CheckDatabase
+        from src.database import test_database_connection, check_db
         test_database_connection()
-        CheckDatabase()
+        check_db()
         print("从浏览器打开: http://127.0.0.1:9421")
         serve(app, host='0.0.0.0', port=9421)
 
