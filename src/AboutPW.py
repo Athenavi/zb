@@ -43,10 +43,6 @@ def zy_change_password(ip):
                 cursor.execute(update_query, (hashed_password.decode('utf-8'), username))
                 db.commit()
 
-                update_ip_query = "UPDATE ip SET used = %s WHERE username = %s"
-                cursor.execute(update_ip_query, (ip, username))
-                db.commit()
-
                 cursor.close()
                 db.close()
 

@@ -51,9 +51,6 @@ def zy_register(ip):
         username = bleach.clean(request.form['username'])  # 使用 bleach 进行 XSS 防范
         password = bleach.clean(request.form['password'])
         invite_code = bleach.clean(request.form['invite_code'])
-        if invite_code == '0000':
-            return render_template('zyregister.html', title="注册新用户",
-                                   msg='无效的邀请码!')
 
         db = get_database_connection()
         cursor = db.cursor()
@@ -68,34 +65,16 @@ def zy_register(ip):
                 return render_template('zyregister.html', title="注册新用户",
                                        msg='该用户名已被注册，请选择其他用户名!')
 
-            query_invite_code = "SELECT * FROM inviteCode WHERE code = %s AND is_used = FALSE"
-            cursor.execute(query_invite_code, (invite_code,))
-            result = cursor.fetchone()
-
-            if result:
-                # 邀请码有效，允许用户注册
                 # 执行用户注册的逻辑
-                hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+            hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+            insert_query = "INSERT INTO users (username, password,register_ip) VALUES (%s, %s,%s)"
+            cursor.execute(insert_query, (username, hashed_password, ip))
+            db.commit()
+            session.pop('logged_in', None)
+            session.pop('username', None)
+            session.pop('password_confirmed', None)
+            return render_template('success.html')
 
-                insert_query = "INSERT INTO users (username, password) VALUES (%s, %s)"
-                cursor.execute(insert_query, (username, hashed_password))
-                db.commit()
-
-                # 将邀请码标记为已使用
-                update_query = "UPDATE inviteCode SET is_used = TRUE WHERE uuid = %s"
-                cursor.execute(update_query, (result[0],))
-                db.commit()
-                # 记录IP
-                register_ip_query = "INSERT INTO ip (`used`, `ip`, `username`) VALUES (%s, %s, %s);"
-                cursor.execute(register_ip_query, (ip, ip, username))
-                db.commit()
-                session.pop('logged_in', None)
-                session.pop('username', None)
-                session.pop('password_confirmed', None)
-                return render_template('success.html')
-            else:
-                return render_template('zyregister.html', title="注册新用户",
-                                       msg='邀请码无效或已被使用，请输入有效的邀请码!')
         except Exception as e:
             logging.error(f"Error registering user: {e}")
             return render_template('zyregister.html', title="注册新用户", msg='注册失败!')
@@ -155,16 +134,13 @@ def zy_mail_login(user_email, ip):
         else:
             # 执行用户注册的逻辑
             hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-            insert_query = "INSERT INTO users (username, password, email) VALUES (%s, %s, %s)"
-            cursor.execute(insert_query, (username, hashed_password, user_email))
+            insert_query = "INSERT INTO users (username, password, email,register_ip) VALUES (%s, %s, %s,%s)"
+            cursor.execute(insert_query, (username, hashed_password, user_email, ip))
             db.commit()
             message = '已经为您自动注册账号\n' + '账号' + username + '默认密码：123456 请尽快修改'
             resp = make_response(render_template('success.html', message=message))
             session['logged_in'] = True
             session['username'] = username
-            register_ip_query = "INSERT INTO ip (`used`, `ip`, `username`) VALUES (%s, %s, %s);"
-            cursor.execute(register_ip_query, (ip, ip, username))
-            db.commit()
             # 设置 cookie
             resp.set_cookie('login_statu', '1', 30)
             return resp

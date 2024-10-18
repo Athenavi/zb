@@ -77,7 +77,6 @@ def inject_variables():
 
 
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-LoginRegister_lock = os.path.join(base_dir, 'LR.lock')
 
 
 @app.route('/login', methods=['POST', 'GET'])
@@ -730,10 +729,10 @@ def change_display():
             db = get_database_connection()
             cursor = db.cursor()
             try:
-                query = "SELECT ifAdmin FROM users WHERE username = %s"
+                query = "SELECT `role` FROM users WHERE username = %s"
                 cursor.execute(query, (username,))
                 ifAdmin = cursor.fetchone()[0]
-                if ifAdmin:
+                if ifAdmin == 'Admin':
                     theme_path = f'templates/theme/{theme_id}'
 
                     if os.path.exists(theme_path):
@@ -875,10 +874,10 @@ def upload_file1():
         db = get_database_connection()
         cursor = db.cursor()
         try:
-            query = "SELECT ifAdmin FROM users WHERE username = %s"
+            query = "SELECT `role` FROM users WHERE username = %s"
             cursor.execute(query, (username,))
             ifAdmin = cursor.fetchone()[0]
-            if ifAdmin:
+            if ifAdmin == 'Admin':
                 return zy_upload_file()
         finally:
             cursor.close()
@@ -1261,100 +1260,6 @@ def zy_pw_blog(article_name):
     return hidehtml2
 
 
-def zy_pw_check(article, code):
-    invitecodes = get_invitecode_data()  # 获取invitecode表数据
-
-    for result in invitecodes:
-        if result['uuid'] == article and result['code'] == code:
-            app.logger.info('完成了一次数据表更新')
-            return 'success'
-
-    return 'failed'
-
-
-@cache.cached(timeout=600, key_prefix='invitecode')
-def get_invitecode_data():
-    db = get_database_connection()
-
-    cursor = db.cursor()
-    # 执行 MySQL 查询获取你想要缓存的表数据
-    query = "SELECT * FROM invitecode"
-    cursor.execute(query)
-
-    # 构建数据字典列表
-    data = []
-    columns = [desc[0] for desc in cursor.description]
-    for row in cursor.fetchall():
-        data.append(dict(zip(columns, row)))
-    current_time = datetime.now()
-    app.logger.info('当前数据表更新时间：{}'.format(current_time))
-    cursor.close()
-    db.close()
-
-    return data
-
-
-@app.route('/change-article-pw/<filename>', methods=['POST'])
-def change_article_pw(filename):
-    userStatus = get_user_status()
-    username = get_username()
-    auth = False  # 设置默认值
-
-    if userStatus and username is not None:
-        article = filename
-        # Auth 认证
-        auth = auth_articles(article, username)
-
-    if auth:
-        article_pwd = request.get_json()['NewPass']
-        article = request.get_json()["Article"]
-        if article_pwd == '': article_pwd = '0000'
-        return zy_change_article_pw(article, article_pwd)
-
-    else:
-        return error(message='您没有权限', status_code=503)
-
-
-def zy_change_article_pw(filename, new_pw='1234'):
-    # Connect to the database
-    db = get_database_connection()
-
-    try:
-        with db.cursor() as cursor:
-            # Check if the uuid exists in the table
-            query = "SELECT * FROM invitecode WHERE uuid = %s"
-            cursor.execute(query, (filename,))
-            result = cursor.fetchone()
-
-            if result is not None:
-                # Update the code value
-                query = "UPDATE invitecode SET code = %s WHERE uuid = %s"
-                cursor.execute(query, (new_pw, filename))
-            else:
-                # Insert a new row
-                # Check if the length of newCode is not greater than 4
-                if len(new_pw) > 4:
-                    return "failed"
-
-                query = "INSERT INTO invitecode (uuid, code, is_used) VALUES (%s, %s, 0)"
-                cursor.execute(query, (filename, new_pw))
-
-            # Commit the changes to the database
-            db.commit()
-
-            # Return success message
-            return "success"
-
-    except Exception:
-        # Return failure message if any error occurs
-        return "failed"
-
-    finally:
-        # Close the connection and cursor
-        cursor.close()
-        db.close()
-
-
 @app.route('/media', methods=['GET', 'POST'])
 def media_space():
     type = request.args.get('type', default='img')
@@ -1670,14 +1575,6 @@ def redirect_to_long_url_route(short_url):
     if result:
         # 如果找到对应的长网址，则进行重定向
         long_url = result[0]
-
-        # 记录响应次数和第一次响应时间到opentimes表
-        insert_query = "INSERT INTO opentimes (short_url, response_count, first_response_time) VALUES (%s, %s, %s) " \
-                       "ON DUPLICATE KEY UPDATE response_count = response_count + 1"
-        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        cursor.execute(insert_query, (short_url, 1, current_time))
-        db.commit()
-
         # 获取请求者的 IP 地址
         ip_address = get_client_ip(request, session)
         app.logger.info('当前访问的用户:IP:{},UA:{}'.format(ip_address, user_agent))

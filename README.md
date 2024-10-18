@@ -131,32 +131,6 @@ $ source myenv/bin/activate
 
 如果你了解docker，可以尝试使用Dockerfile来部署运行
 
-## 评论（240319）
-
-   新版本的评论：
-   由 ```utteranc``` 提供技术支持
-
-   不使用当前提供的评论issue地址？
-   你需要修改```templates/detail.html```文件
-   找到如下代码,修改其中的```repo```为你的github项目地址
-
-   ```
-<script src="https://utteranc.es/client.js"
-                 repo="Athenavi/comments"
-                 issue-term="url"
-                 {% if theme=="night-theme" %}
-                 theme="github-dark"
-                 {% else %}
-                 theme="github-light"
-                 {% endif %}
-                 crossorigin="anonymous"
-                 async>
-         </script>
-   ```
-
-### ！！！注意 在完成之间你可能还需```授权```将 utteranc 应用添加到 github 账户中
-
-更多细节请查阅官方文档: [https://utteranc.es/](https://utteranc.es/)
 
 ## 评论（240319）
 

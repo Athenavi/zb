@@ -57,10 +57,10 @@ def back(method):
             db = get_database_connection()
             cursor = db.cursor()
             try:
-                query = "SELECT ifAdmin FROM users WHERE username = %s"
+                query = "SELECT `role` FROM users WHERE username = %s"
                 cursor.execute(query, (username,))
                 ifAdmin = cursor.fetchone()[0]
-                if ifAdmin:
+                if ifAdmin == 'Admin':
                     return admin_dashboard(method), 200
                 else:
                     return redirect(url_for('space'))

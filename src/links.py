@@ -44,12 +44,6 @@ def redirect_to_long_url(short_url):
 
         if result:
             long_url = result[0]
-
-            insert_query = "INSERT INTO opentimes (short_url, response_count, first_response_time) VALUES (%s, %s, %s)"
-            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            cursor.execute(insert_query, (short_url, 1, current_time))
-            db.commit()
-
             return long_url
         else:
             return render_template('error.html', status_code='404'), 404
@@ -82,12 +76,12 @@ def get_link_info(username):
     cursor = db.cursor()
 
     # 查询用户是否为管理员
-    query_admin = "SELECT ifAdmin FROM users WHERE username = %s"
+    query_admin = "SELECT `role` FROM users WHERE username = %s"
     cursor.execute(query_admin, (username,))
     admin_result = cursor.fetchone()
 
     # 如果用户是管理员，则查询所有链接信息
-    if admin_result and admin_result[0] == 1:
+    if admin_result and admin_result[0] == 'Admin':
         query = "SELECT created_at, short_url, long_url FROM urls"
         cursor.execute(query)
     else:
