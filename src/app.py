@@ -128,16 +128,6 @@ except FileNotFoundError:
     title += '_主题不存在或者已损坏!'
 
 
-@app.route('/toggle_theme', methods=['POST'])  # 处理切换主题的请求
-def toggle_theme():
-    if session['theme'] == 'day-theme':
-        session['theme'] = 'night-theme'  # 如果当前主题为白天，则切换为夜晚（night-theme）
-    else:
-        session['theme'] = 'day-theme'  # 如果当前主题为夜晚，则切换为白天（day-theme）
-
-    return 'success'  # 返回切换成功的消息
-
-
 @app.route('/search', methods=['GET', 'POST'])
 def search():
     if 'logged_in' not in session:
@@ -202,36 +192,6 @@ def search():
     return render_template('search.html', results=matched_content)
 
 
-def analyze_ip_location(ip_address):
-    # 使用IP地址作为缓存的键
-    if ip_address in session:
-        return session[ip_address]
-
-    try:
-        ip_api_url = f'http://whois.pconline.com.cn/ipJson.jsp?ip={ip_address}&json=true'
-        response = requests.get(ip_api_url, timeout=3)  # 设置超时时间为3秒
-        data = response.json()
-
-        city_name = data.get('city', '未知')
-        city_code = data.get('cityCode', '未知')
-
-        # 如果API没有返回城市名称或代码，则赋值为“未知”
-        if not city_name:
-            city_name = '未知'
-        if not city_code:
-            city_code = '未知'
-
-    except (requests.exceptions.Timeout, requests.exceptions.ProxyError):
-        # 处理超时和代理错误，将城市名称和代码设为“未知”
-        city_name = '接口异常'
-        city_code = '接口异常'
-
-    # 将结果缓存，避免重复查询
-    session[ip_address] = (city_name, city_code)
-
-    return city_name, city_code
-
-
 def check_exist(cache_file):
     if os.path.exists(cache_file):
         with open(cache_file, 'r') as f:
@@ -289,7 +249,6 @@ def get_avatar():
 @app.route('/profile', methods=['GET', 'POST'])
 def space():
     avatar_url = get_avatar() or domain + 'static/favicon.ico'
-    session.setdefault('theme', 'day-theme')
     userStatus = get_user_status()
     username = get_username()
     owner_articles = None
@@ -306,7 +265,7 @@ def space():
     if 'default' in owner_articles:
         owner_articles.remove('default')
 
-    return render_template('Profile.html', url_for=url_for, theme=session['theme'], avatar_url=avatar_url,
+    return render_template('Profile.html', url_for=url_for, avatar_url=avatar_url,
                            userStatus=userStatus, username=username,
                            Articles=owner_articles)
 
@@ -314,11 +273,10 @@ def space():
 @app.route('/setting/profiles', methods=['GET', 'POST'])
 def setting_profiles():
     avatar_url = get_avatar() or domain + 'static/favicon.ico'
-    session.setdefault('theme', 'day-theme')
     userStatus = get_user_status()
     username = get_username()
 
-    return render_template('setting.html', url_for=url_for, theme=session['theme'], avatar_url=avatar_url,
+    return render_template('setting.html', url_for=url_for, avatar_url=avatar_url,
                            userStatus=userStatus, username=username)
 
 
@@ -433,7 +391,6 @@ def home():
         return render_template('error.html', status_code='域名配置出错,您的程序将无法正常运行'), 404
     # 获取客户端IP地址
     ip = get_client_ip(request, session)
-    city_name, city_code = analyze_ip_location(ip)
 
     if request.method == 'GET':
         page = request.args.get('page', default=1, type=int)
@@ -442,10 +399,7 @@ def home():
         if page <= 0:
             page = 1
 
-        if 'theme' not in session:
-            session['theme'] = 'day-theme'  # 设置默认主题
-        theme = session.get('theme')
-        cache_key = f'page_content:{page}:{theme}:{tag}'  # 根据页面值、主题以及标签生成缓存键
+        cache_key = f'page_content:{page}:{tag}'  # 根据页面值、主题以及标签生成缓存键
 
         # 尝试从缓存中获取页面内容
         content = cache.get(cache_key)
@@ -482,16 +436,16 @@ def home():
             tag_articles = get_articles_by_tag(tag)
             articles = get_list_intersection(articles, tag_articles)
 
-        timeList = get_file_time(articles)
-        articles_time_list = zip(articles, timeList)
+        infoList = get_article_info(articles)
+        articles_time_list = zip(articles, infoList)
 
         # 获取用户名
         username = session.get('username')
-        app.logger.info(f'当前访问的用户: {username}, IP: {ip}, IP归属地: {city_name}, 城市代码: {city_code}')
+        app.logger.info(f'当前访问的用户: {username}, IP: {ip}')
 
         # 渲染模板并存储渲染后的页面内容到缓存中
         rendered_content = template.render(
-            title=title, articles_time_list=articles_time_list, url_for=url_for, theme=theme,
+            title=title, articles_time_list=articles_time_list, url_for=url_for,
             notice=notice, has_next_page=has_next_page, has_previous_page=has_previous_page,
             current_page=page, tags=tags, tag=tag, beian=web_beian()
         )
@@ -511,20 +465,41 @@ def home():
         return render_template('zyIndex.html')
 
 
-@cache.cached(timeout=600, key_prefix='article_time')
-def get_file_time(articles):
-    modify_times = []
-    for article in articles:
+@cache.cached(timeout=1800, key_prefix='article_info')
+def get_article_info(articles):
+    articles_info = []
+    for a_title in articles:
         try:
-            decoded_name = urllib.parse.unquote(article)  # 对文件名进行解码处理
-            file_path = os.path.join('articles', decoded_name + '.md')
             # 获取文件的修改时间
-            modify_time = os.path.getmtime(file_path)
-            formatted_modify_time = datetime.fromtimestamp(modify_time).strftime("%Y-%m-%d %H:%M:%S")
-            modify_times.append(formatted_modify_time)
+            articleInfo = ''
+            db = get_database_connection()
+
+            try:
+                with db.cursor() as cursor:
+                    query = "SELECT * FROM articles WHERE Title = %s"
+                    cursor.execute(query, (a_title,))
+                    result = cursor.fetchall()
+                    if result:
+                        articleInfo += result[2]
+                        articleInfo += " 点赞: "
+                        articleInfo += result[5]
+                        articleInfo += " 评论: "
+                        articleInfo += result[6]
+                    else:
+                        articleInfo += get_file_date(a_title)
+            except Exception as e:
+                print(f"An error occurred: {e}")
+            finally:
+                try:
+                    cursor.close()
+                except NameError:
+                    pass
+                db.close()
+
+            articles_info.append(articleInfo)
         except FileNotFoundError:
-            modify_times.append(None)
-    return modify_times
+            articles_info.append(None)
+    return articles_info
 
 
 @cache.memoize(30)
@@ -1159,105 +1134,7 @@ def travel():
 def zy_pw_blog(article_name):
     session.setdefault('theme', 'day-theme')
     if request.method == 'GET':
-        # 在此处添加密码验证的逻辑
-        article_pwd_check = zy_pw_check(article_name, request.args.get('password'))
-        if article_pwd_check == 'success':
-            try:
-                theme = session['theme']
-                article_content, readNav = get_article_content(article_name, 300)
-                hidehtml1 = f'''
-                <!DOCTYPE html>
-                <!-- 网站主语言 -->
-                <html lang="zh-cn">
-                <head>
-                <!-- 网站采用的字符编码 -->
-                <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-                <!-- 预留网站标题的位置 -->
-                <title>{article_name}</title>
-                <!-- 引入Tailwind CSS的CDN链接 -->
-                <link href="../static/css/tailwind.min.css" rel="stylesheet">
-                </head>
-
-                <body class='{theme}'>
-                <!-- 引入导航栏 -->
-                <!-- 定义导航栏 -->
-                <nav class="bg-blue-500">
-                <div class="container mx-auto">
-                <!-- 导航栏商标 -->
-                <a class="text-xl text-white font-bold py-4" href="/">奇客舒</a>
-                <!-- 导航入口 -->
-                <div>
-                <!-- 导航入口内容 -->
-                </div>
-                </div>
-                </nav>
-
-                <!-- 预留具体页面的位置 -->
-                <div class="container mx-auto mt-8">
-                <div class="w-2/3 mx-auto">
-                <h3 class="text-blue-500 text-xl">当前通过密码访问</h3>
-                <div class="container mx-auto">{article_content}</div>
-                </div>
-                </div>
-
-                <!-- 引入注脚 -->
-                <div class="mt-32">
-                <br><br><br>
-                </div>
-                <footer class="py-3 bg-gray-900 fixed bottom-0 w-full">
-                <div class="container mx-auto">
-                <p class="text-center text-white">版权所有 &copy; zyBLOG 2024</p>
-                </div>
-                </footer>
-                </body>
-                </html>
-                '''
-
-                return hidehtml1
-
-            except Exception:
-                return "An internal error occurred", 500
-
-    theme = session['theme']
-    hidehtml2 = f'''
-            <!DOCTYPE html>
-<!-- 网站主语言 -->
-<html lang="zh-cn">
-<head>
-    <!-- 网站采用的字符编码 -->
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <!-- 预留网站标题的位置 -->
-    <title>{article_name}</title>
-    <!-- 引入Tailwind CSS的CDN链接 -->
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link href="../static/css/hiddenForm.css" rel="stylesheet">
-    <script src="../static/pw/pw.js"></script>
-</head>
-<body class='{theme}'>
-<!-- 预留具体页面的位置 -->
-<div class="container mx-auto mt-8">
-    <div class="w-2/3 mx-auto">
-        <h3 class="text-blue-500 text-xl"></h3>
-        <div class="container mx-auto">
-            <div id="fullscreen">
-                <form id="passwordForm" onsubmit="return submitForm('{article_name}')">
-                <a class="text-xl text-black font-bold py-4">{article_name}</a>
-                <label for="password">需要访问密码:</label>
-                <input type="password" id="password" name="password" placeholder="输入密码" required>
-                <input type="submit" value="提交">
-                <a href="/">逛逛其他</a>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-</body>
-</html>
-            '''
-
-    return hidehtml2
+        return error('文章已加密', 403)
 
 
 @app.route('/media', methods=['GET', 'POST'])

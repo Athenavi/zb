@@ -203,7 +203,7 @@ def get_file_date(file_path):
         # 获取文件的访问时间
         access_time = os.path.getatime(file_path)
 
-        formatted_modify_time = datetime.datetime.fromtimestamp(modify_time).strftime("%Y-%m-%d %H:%M:%S")
+        formatted_modify_time = datetime.datetime.fromtimestamp(modify_time).strftime("%Y-%m-%d %H:%M")
 
         return formatted_modify_time
 

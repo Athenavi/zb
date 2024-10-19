@@ -38,11 +38,6 @@
                                                                        style="height: 32px"/></a>
             <div class="flex items-center">
                 <a href="/profile">🤳</a>
-                <form id="theme-form" method="post" action="/toggle_theme">
-                    <button type="submit" style="border: none; background-color: transparent;">
-                        💡
-                    </button>
-                </form>
             </div>
         </div>
     </nav>
@@ -53,13 +48,6 @@
         <a href="mailto:support@7trees.cn" target="_blank">📧</a>
         <br>
         <a href="https://github.com/Athenavi/zb/issues" target="_blank">💬</a>
-        <br>
-        <a href="../sitemap" target="_blank">🗺</a>
-        <br>
-        <a href="../feed" target="_blank">📌</a>
-        <br>
-        <a onclick="scrollToTop()">🔝</a>
-
         <script>
             function scrollToTop() {
                 document.body.scrollTop = 0;
@@ -87,5 +75,39 @@
         window.addEventListener('contextmenu', function (e) {
             e.preventDefault();
         }, false);
+    </script>
+    <!-- 夜间模式切换按钮 -->
+    <div class="fixed bottom-4 right-4">
+        <button id="theme-toggle" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 focus:outline-none">
+            🌙
+        </button>
+        <button class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 focus:outline-none transition-transform duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                onclick="scrollToTop()">
+            🔝
+        </button>
+    </div>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const button = document.getElementById('theme-toggle');
+
+            // 从本地存储中读取主题状态
+            const currentTheme = localStorage.getItem('theme');
+            let isDark = currentTheme === 'dark';
+
+            // 设置初始主题
+            document.body.setAttribute('data-theme', isDark ? 'dark' : 'light');
+            button.textContent = isDark ? '☀' : '🌙';
+
+            button.addEventListener('click', () => {
+                isDark = !isDark;
+
+                // 更新主题
+                document.body.setAttribute('data-theme', isDark ? 'dark' : 'light');
+                button.textContent = isDark ? '☀' : '🌙';
+
+                // 将主题状态存储到本地存储
+                localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            });
+        });
     </script>
 {% endmacro %}

@@ -7,16 +7,10 @@
     <meta name="keywords" content="zyBLOG{% for Tag in article_tags %},{{ Tag }}{% endfor %}">
     <meta name="robots" content="index, follow">
     <title>{{ articleName }} | {{ title }}</title>
-    {% if theme=="night-theme" %}
-        <link rel="stylesheet" href="../static/css/dark.css">
-    {% else %}
-        <link rel="stylesheet" href="../static/css/vue.css">
-    {% endif %}
-
     <script src="//cdn.jsdelivr.net/npm/docsify/lib/plugins/emoji.min.js"></script>
     <script src="../static/js/zoom-image.min.js"></script>
-<body class="{{ theme }}">
-<div id="app" class={{ theme }}>🏃‍🏃‍🏃‍💨加载中...</div>
+<body>
+<div id="app">🏃‍🏃‍🏃‍💨加载中...</div>
 <div id='comments_zone' style="display: none;">
     与本文有关的标签{% for Tag in article_tags %}<a href="/?tag={{ Tag }}">{{ Tag }}</a>{% endfor %}
     /<<--点击标签获取更多文章|/本文作者：<a href="/profile?id={{ author }}" target="_blank">{{ author }}</a>
@@ -177,3 +171,29 @@
 <script src="//cdn.jsdelivr.net/npm/prismjs/components/prism-yaml.min.js"></script>
 <script src="//cdn.jsdelivr.net/npm/prismjs/components/prism-properties.min.js"></script>
 <script src="//cdn.jsdelivr.net/npm/prismjs/components/matlab.min.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // 从本地存储中读取主题状态
+        const currentTheme = localStorage.getItem('theme');
+        let isDark;
+
+        // 如果没有存储的主题状态，默认设置为白天模式
+        if (!currentTheme) {
+            isDark = false; // 默认为光明模式
+            localStorage.setItem('theme', 'light');
+        } else {
+            isDark = currentTheme === 'dark'; // 根据本地存储设置主题状态
+        }
+
+        // 根据主题状态加载对应的 CSS
+        function loadCSS() {
+            const linkElement = document.createElement('link');
+            linkElement.rel = 'stylesheet';
+            linkElement.href = isDark ? '../static/css/dark.css' : '../static/css/vue.css';
+            document.head.appendChild(linkElement);
+        }
+
+        // 初始加载 CSS
+        loadCSS();
+    });
+</script>
