@@ -10,7 +10,6 @@ import shutil
 import time
 import urllib.parse
 import xml.etree.ElementTree as ElementTree
-from configparser import ConfigParser
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -28,7 +27,7 @@ from src.BlogDeal import get_article_names, get_article_content, clear_html_form
     zy_show_article, zy_edit_article, get_all_article_names
 from src.database import get_database_connection
 from src.links import create_special_url
-from src.user import zyadmin, zy_delete_file, zy_new_article, error, get_owner_articles
+from src.user import zyadmin, zy_delete_file, zy_new_article, error, get_owner_articles, zy_general_conf
 from src.utils import zy_upload_file, get_user_status, get_username, get_client_ip, read_file, \
     zy_save_edit
 
@@ -55,16 +54,34 @@ file_handler.setFormatter(log_formatter)
 app.logger.addHandler(file_handler)
 app.logger.setLevel(logging.INFO)
 
-config = ConfigParser()
-try:
-    config.read('config.ini', encoding='utf-8')
-except UnicodeDecodeError:
-    config.read('config.ini', encoding='gbk')
-
-
-def web_beian():
-    _is_beian = config.get('general', 'beian', fallback='').strip("'")
-    return _is_beian
+domain, title, beian, version, api_host, app_id, app_key = zy_general_conf()
+print("please check information")
+print("++++++++++==========================++++++++++")
+print(f'\n domain: {domain} \n title: {title} \n beian: {beian} \n Version: {version} \n 三方登录api: {api_host} \n')
+print("++++++++++==========================++++++++++")
+print('''
+                                                                                                                               
+                                                                
+                                                                
+                           ||         ||                        
+                           ||         ||                        
+                           ||         ||                        
+                           ||         ||                        
+         ||||||   ||   ||  |||||      ||      ||||     ||||||   
+         ||||||   ||   |   ||||||     ||     ||||||   |||||||   
+            ||    ||  ||   ||  |||    ||     ||   ||  ||  ||    
+           |||     || ||   ||   ||    ||     ||   ||  ||  ||    
+          |||      || |    ||   ||    ||     ||   ||  |||||     
+          ||       ||||    ||  ||     ||     ||  |||  ||        
+         |||||||    |||    ||||||     ||     ||||||   ||||||    
+         |||||||    ||     |||||      ||       |||    ||   ||   
+                  ||||                                |||||||   
+                  |||                                  |||||    
+                                                                
+                                                                
+                                                                
+''')
+print("++++++++++==========================++++++++++")
 
 
 @app.context_processor
@@ -72,7 +89,7 @@ def inject_variables():
     return dict(
         userStatus=get_user_status(),
         username=get_username(),
-        beian=web_beian(),
+        beian=beian,
     )
 
 
@@ -99,33 +116,6 @@ def register():
 def logout():
     session.clear()
     return redirect(url_for('login'))
-
-
-try:
-    domain = config.get('general', 'domain').strip("'")
-    title = config.get('general', 'title').strip("'")
-    display = config.get('general', 'theme').strip("'")
-    Version = config.get('general', 'version').strip("'")
-except (configparser.NoSectionError, configparser.NoOptionError):
-    domain = '127.0.0.1'
-    title = '您的配置文件出现问题！！！'
-    display = 'default'
-    Version = '1.0.0'
-
-theme_display = configparser.ConfigParser()
-CopyRight = 'Powered by zyBLOG'
-
-try:
-    # 读取 template.ini 文件
-    theme_display.read(f'templates/theme/{display}/template.ini', encoding=global_encoding)
-    # 获取配置文件中的属性值
-    if 'default' in theme_display:
-        title += '|' + theme_display.get('default', 'author').strip("'")
-    else:
-        pass
-except FileNotFoundError:
-    # 处理文件路径不存在的情况
-    title += '_主题不存在或者已损坏!'
 
 
 @app.route('/search', methods=['GET', 'POST'])
@@ -382,7 +372,6 @@ def is_valid_domain_with_slash(url):
 
 
 # 主页
-
 @app.route('/', methods=['GET', 'POST'])
 def home():
     if is_valid_domain_with_slash(domain):
@@ -447,7 +436,7 @@ def home():
         rendered_content = template.render(
             title=title, articles_time_list=articles_time_list, url_for=url_for,
             notice=notice, has_next_page=has_next_page, has_previous_page=has_previous_page,
-            current_page=page, tags=tags, tag=tag, beian=web_beian()
+            current_page=page, tags=tags, tag=tag
         )
         # 缓存渲染后的页面内容，并设置服务端缓存过期时间
         cache.set(cache_key, rendered_content, timeout=60)
@@ -467,6 +456,7 @@ def home():
 
 @cache.cached(timeout=1800, key_prefix='article_info')
 def get_article_info(articles):
+    print(articles)
     articles_info = []
     for a_title in articles:
         try:
@@ -478,13 +468,14 @@ def get_article_info(articles):
                 with db.cursor() as cursor:
                     query = "SELECT * FROM articles WHERE Title = %s"
                     cursor.execute(query, (a_title,))
-                    result = cursor.fetchall()
+                    result = cursor.fetchone()
+                    print(result)
                     if result:
                         articleInfo += result[2]
                         articleInfo += " 点赞: "
-                        articleInfo += result[5]
+                        articleInfo += str(result[5])
                         articleInfo += " 评论: "
-                        articleInfo += result[6]
+                        articleInfo += str(result[6])
                     else:
                         articleInfo += get_file_date(a_title)
             except Exception as e:
@@ -498,7 +489,7 @@ def get_article_info(articles):
 
             articles_info.append(articleInfo)
         except FileNotFoundError:
-            articles_info.append(None)
+            articles_info.append('点赞：0 评论：0')
     return articles_info
 
 
@@ -716,22 +707,12 @@ def change_display():
                         has_template_ini = os.path.exists(os.path.join(theme_path, 'template.ini'))
 
                         if has_index_html and has_screenshot_png and has_template_ini:
-                            currentTheme = config.get('general', 'theme').strip("'")
+                            print("update")
 
-                            if theme_id == currentTheme:
+                            if theme_id == 1:
                                 return 'success'
                             else:
-                                # Modify the value of 'theme' in config_example.ini
-                                config.set('general', 'theme', f"'{theme_id}'")
-                                with open('config_example.ini', 'w') as config_file:
-                                    config.write(config_file)
-
-                                currentTheme = config.get('general', 'theme').strip("'")
-
-                                if theme_id == currentTheme:
-                                    return 'success'
-                                else:
-                                    return 'failed'
+                                return 'failed'
                         else:
                             return 'failed'
                     return 'failed'
@@ -1297,12 +1278,6 @@ def jump():
     return render_template('zyJump.html', url=url, domain=domain)
 
 
-# 彩虹聚合登录
-api_host = config.get('general', 'api_host', fallback='error').strip("'")
-app_id = config.get('general', 'app_id', fallback='error').strip("'")
-app_key = config.get('general', 'app_key', fallback='error').strip("'")
-
-
 @app.route('/login/<provider>')
 def cc_login(provider):
     if is_valid_domain_with_slash(api_host):
@@ -1429,7 +1404,7 @@ def diy_space(page):
         with open(template_path, 'r', encoding=global_encoding) as file:
             html_content = file.read()
             resp = make_response(html_content)
-            visitID = Version + format(random.randint(10000, 99999))  # 可以设置一个默认值或者抛出异常，具体根据需求进行处理
+            visitID = version + format(random.randint(10000, 99999))  # 可以设置一个默认值或者抛出异常，具体根据需求进行处理
             resp.set_cookie('visitID', 'zyBLOG' + visitID, 7200)
         return resp
     return render_template('error.html')
@@ -1557,6 +1532,11 @@ def wx_api():
         return "helloworld"
     else:
         return "404 Not found"
+
+
+@app.route('/test', methods=['GET'])
+def test_page():
+    return render_template('dashboard.html')
 
 
 @app.errorhandler(404)

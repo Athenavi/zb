@@ -1,7 +1,6 @@
 import random
 import urllib
 import markdown
-from configparser import ConfigParser
 from src.database import get_database_connection
 import os
 from urllib.parse import quote_plus
@@ -210,12 +209,6 @@ def get_file_date(file_path):
     except FileNotFoundError:
         # 处理文件不存在的情况
         return None
-
-
-def zy_send_message(message):
-    config = ConfigParser()
-    config.read('config.ini', encoding='utf-8')
-    return 1
 
 
 def auth_articles(title, username):
