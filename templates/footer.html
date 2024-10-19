@@ -8,6 +8,24 @@
                                                                     target="_blank">{{ beian }}</a></p>
         </div>
     </footer>
+    <script>
+        let footerTimeout;
+
+        const footer = document.getElementById('myFooter');
+
+        window.addEventListener('wheel', function () {
+            // 如果已经有隐藏的定时器，清除它
+            clearTimeout(footerTimeout);
+
+            // 添加隐藏类
+            footer.classList.add('hide');
+
+            // 2.5秒后再次显示
+            footerTimeout = setTimeout(() => {
+                footer.classList.remove('hide');
+            }, 2500);
+        });
+    </script>
     <div class="top-bar">
         <script>
             function copyAndAlert() {
