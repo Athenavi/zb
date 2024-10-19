@@ -240,16 +240,4 @@ updateUrl = ''
 screenshot = 'screenshot.png'
 ```
 
-``` ini
-[default]
-# id ：模板ID，全网唯一，建议用 域名+名称 的命名方式
-# title ：模板名称
-# description ：模板简介
-# author ：模板作者
-# authorWebsite ：模板作者的官网
-# version ：版本（不添加默认为1.0.0）
-# versionCode ：版本号（只能是数字，不填写默认为1）
-# screenshot ：此模板的缩略图图片（不填写默认为：screenshot.png）`
-```
-
 `当至少我们拥有这三个文件之后 刷新我们的程序 那么新的模板 就会出现在后台模板中`

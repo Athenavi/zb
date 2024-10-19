@@ -41,7 +41,7 @@ CREATE TABLE `articles` (
   `excerpt` text COMMENT '文章摘要',
   `is_featured` tinyint(1) DEFAULT '0' COMMENT '是否为推荐文章',
   `tags` varchar(255) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 --
 -- 转存表中的数据 `articles`
@@ -59,7 +59,7 @@ INSERT INTO `articles` (`ArticleID`, `Title`, `Author`, `Hidden`, `Views`, `Like
 CREATE TABLE `article_pass` (
   `aid` int NOT NULL,
   `pass` varchar(4) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- --------------------------------------------------------
 
@@ -74,7 +74,7 @@ CREATE TABLE `comments` (
   `content` text NOT NULL COMMENT '评论内容',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '评论时间',
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- --------------------------------------------------------
 
@@ -87,7 +87,7 @@ CREATE TABLE `custom_fields` (
   `user_id` int NOT NULL COMMENT '用户ID',
   `field_name` varchar(100) NOT NULL COMMENT '自定义字段名称',
   `field_value` text NOT NULL COMMENT '自定义字段值'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- --------------------------------------------------------
 
@@ -100,7 +100,7 @@ CREATE TABLE `email_subscriptions` (
   `user_id` int NOT NULL COMMENT '用户ID',
   `subscribed` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否订阅邮件',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '订阅时间'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- --------------------------------------------------------
 
@@ -114,7 +114,7 @@ CREATE TABLE `events` (
   `description` text NOT NULL COMMENT '事件描述',
   `event_date` datetime NOT NULL COMMENT '事件日期',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- --------------------------------------------------------
 
@@ -129,7 +129,7 @@ CREATE TABLE `media` (
   `file_type` enum('image','video','audio','document') NOT NULL COMMENT '文件类型',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- --------------------------------------------------------
 
@@ -145,7 +145,7 @@ CREATE TABLE `notifications` (
   `is_read` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否已阅读',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- --------------------------------------------------------
 
@@ -160,7 +160,7 @@ CREATE TABLE `reports` (
   `content_id` int NOT NULL COMMENT '内容ID',
   `reason` text NOT NULL COMMENT '举报理由',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '举报时间'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- --------------------------------------------------------
 
@@ -173,7 +173,7 @@ CREATE TABLE `subscriptions` (
   `subscriber_id` int NOT NULL COMMENT '订阅者用户ID',
   `subscribe_to_id` int NOT NULL COMMENT '被订阅对象ID',
   `subscribe_type` enum('User','Category') NOT NULL COMMENT '订阅类型: 用户/分类'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- --------------------------------------------------------
 
@@ -206,7 +206,7 @@ CREATE TABLE `users` (
   `bio` text COMMENT '用户个人简介',
   `role` enum('Admin','Editor','Subscriber') DEFAULT 'Subscriber' COMMENT '用户角色: 管理员/编辑/订阅者',
   `register_ip` varchar(45) NOT NULL COMMENT '注册时IP'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 --
 -- 转存表中的数据 `users`

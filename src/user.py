@@ -15,6 +15,20 @@ except UnicodeDecodeError:
 door_key = config.get('admin', 'key').strip("'")
 
 
+def zy_general_conf():
+    config = ConfigParser()
+    config.read('config.ini', encoding='utf-8')
+    domain = config.get('general', 'domain', fallback='error').strip("'")
+    title = config.get('general', 'title', fallback='error').strip("'")
+    beian = config.get('general', 'beian', fallback='error').strip("'")
+    version = config.get('general', 'version', fallback='error').strip("'")
+    api_host = config.get('general', 'api_host', fallback='error').strip("'")
+    app_id = config.get('general', 'app_id', fallback='error').strip("'")
+    app_key = config.get('general', 'app_key', fallback='error').strip("'")
+
+    return domain, title, beian, version, api_host, app_id, app_key
+
+
 def error(message, status_code):
     return render_template('error.html', error=message, status_code=status_code), status_code
 
@@ -61,7 +75,10 @@ def back(method):
                 cursor.execute(query, (username,))
                 ifAdmin = cursor.fetchone()[0]
                 if ifAdmin == 'Admin':
-                    return admin_dashboard(method), 200
+                    query = "SHOW TABLE STATUS WHERE Name IN ('articles', 'users', 'comments','media','events')"
+                    cursor.execute(query)
+                    dash_info = cursor.fetchall()
+                    return admin_dashboard(method, dash_info), 200
                 else:
                     return redirect(url_for('space'))
             except Exception as e:
@@ -76,19 +93,15 @@ def back(method):
         return error("请先登录", 401)
 
 
-def admin_dashboard(method):
+def admin_dashboard(method, dashInfo):
     if method != 'GET':
         return None
     else:
-        if 'theme' not in session:
-            session['theme'] = 'night-theme'
-        # files = show_files('articles/')
-        hiddenList = read_hidden_articles()
+        # print(dashInfo)
         display_list = get_all_themes()
         currentDisPlay = config.get('general', 'theme').strip("'")
-        print(hiddenList)
-        return render_template('admin.html', theme=session['theme'], hiddenList=hiddenList, displayList=display_list,
-                               currentDisplay=currentDisPlay)
+        return render_template('dashboard.html', displayList=display_list,
+                               currentDisplay=currentDisPlay, dashInfo=dashInfo)
 
 
 def get_all_themes():
