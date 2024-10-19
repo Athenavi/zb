@@ -3,41 +3,10 @@
     font-family: "Nunito", sans-serif;
 }
 
-.card .card-body {
-    align-items: center;
-    background-color: transparent;
-    display: flex;
-    flex-direction: column;
-    padding: 1rem;
-}
-
-.card img {
-    padding: 1rem;
-}
-
-
-.card:hover {
-    border-color: #007bff;
-    box-shadow: 0 6px 12px rgba(0, 107, 255, 0.2);
-}
-
 .close-button {
     cursor: pointer;
 }
 
-.day-theme {
-    background-color: #ffffff;
-    background-image: url("../image/day.jpg");
-    background-size: cover;
-    background-repeat: no-repeat;
-    background-attachment: fixed;
-    color: #1e1f22;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: -1;
-}
 
 .hidden {
     opacity: 0;
@@ -46,20 +15,6 @@
 .navbar-dark .navbar-brand {
     color: #fff;
     font-weight: bold;
-}
-
-.night-theme {
-    background-color: #1b1e21;
-    background-image: url("../image/dark.jpg");
-    background-size: cover;
-    background-repeat: no-repeat;
-    background-attachment: fixed;
-    color: #498ef6;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: -1;
 }
 
 .pagination .page-item.disabled .page-link {
@@ -128,4 +83,41 @@
 
 #sideDIV {
     padding: 35px;
+}
+
+/* 自定义夜间主题样式 */
+[data-theme="dark"] {
+    background-color: #1b1e21;
+    background-image: url("../image/dark.jpg");
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    color: #498ef6;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: -1;
+}
+
+[data-theme="dark"] .bg-white {
+    background-color: #2d3748 !important; /* 深色背景卡片 */
+    border-color: #4a5568 !important; /* 深色边框 */
+}
+
+[data-theme="dark"] .text-gray-600 {
+    color: #e2e8f0 !important; /* 更亮的文字色 */
+}
+
+[data-theme="light"] {
+    background-image: url("../image/day.jpg");
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    color: #1e1f22;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: -1;
 }

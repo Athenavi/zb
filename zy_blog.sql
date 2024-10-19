@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- 主机： host.docker.internal:3306
--- 生成日期： 2024-10-18 15:28:05
+-- 生成日期： 2024-10-19 02:52:02
 -- 服务器版本： 8.4.2
 -- PHP 版本： 8.2.8
 
@@ -32,8 +32,6 @@ CREATE TABLE `articles` (
   `Title` varchar(255) NOT NULL COMMENT '文章标题',
   `Author` varchar(100) NOT NULL COMMENT '作者名称',
   `Hidden` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否隐藏 1 隐藏 0 不隐藏',
-  `PublishDate` datetime DEFAULT NULL COMMENT '发布时间',
-  `LastModifiedDate` datetime DEFAULT NULL COMMENT '最后修改时间',
   `Views` smallint DEFAULT '0' COMMENT '文章阅读量',
   `Likes` smallint DEFAULT '0' COMMENT '文章点赞数',
   `Comments` smallint DEFAULT '0' COMMENT '评论数',
@@ -42,8 +40,6 @@ CREATE TABLE `articles` (
   `ArticleType` varchar(50) DEFAULT NULL COMMENT '文章类型',
   `excerpt` text COMMENT '文章摘要',
   `is_featured` tinyint(1) DEFAULT '0' COMMENT '是否为推荐文章',
-  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `tags` varchar(255) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -51,8 +47,8 @@ CREATE TABLE `articles` (
 -- 转存表中的数据 `articles`
 --
 
-INSERT INTO `articles` (`ArticleID`, `Title`, `Author`, `Hidden`, `PublishDate`, `LastModifiedDate`, `Views`, `Likes`, `Comments`, `Status`, `CoverImage`, `ArticleType`, `excerpt`, `is_featured`, `created_at`, `updated_at`, `tags`) VALUES
-(1, 'readme', 'test', 0, '2024-10-31 21:46:07', '2024-10-31 21:46:07', 0, 0, 0, 'Draft', NULL, NULL, NULL, 0, '2024-10-18 13:47:23', '2024-10-18 15:17:26', '');
+INSERT INTO `articles` (`ArticleID`, `Title`, `Author`, `Hidden`, `Views`, `Likes`, `Comments`, `Status`, `CoverImage`, `ArticleType`, `excerpt`, `is_featured`, `tags`) VALUES
+(1, 'README', 'test', 0, 0, 0, 0, 'Draft', NULL, NULL, NULL, 0, '2024');
 
 -- --------------------------------------------------------
 
@@ -228,7 +224,6 @@ INSERT INTO `users` (`id`, `username`, `password`, `email`, `created_at`, `updat
 --
 ALTER TABLE `articles`
   ADD PRIMARY KEY (`ArticleID`),
-  ADD KEY `idx_publish_date` (`PublishDate`),
   ADD KEY `idx_views` (`Views`);
 
 --
@@ -370,7 +365,7 @@ ALTER TABLE `subscriptions`
 -- 使用表AUTO_INCREMENT `urls`
 --
 ALTER TABLE `urls`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=45;
 
 --
 -- 使用表AUTO_INCREMENT `users`
