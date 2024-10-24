@@ -29,7 +29,7 @@ from src.database import get_database_connection
 from src.links import create_special_url
 from src.user import zyadmin, zy_delete_file, zy_new_article, error, get_owner_articles, zy_general_conf
 from src.utils import zy_upload_file, get_user_status, get_username, get_client_ip, read_file, \
-    zy_save_edit
+    zy_save_edit, zy_noti_conf
 
 global_encoding = 'utf-8'
 
@@ -37,6 +37,7 @@ app = Flask(__name__, template_folder='../templates', static_folder="../static")
 app.config['CACHE_TYPE'] = 'simple'
 cache = Cache(app)
 app.secret_key = 'your_secret_key'
+app.config['SESSION_COOKIE_NAME'] = 'zb_session'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=3)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)  # 添加 ProxyFix 中间件
 
@@ -202,7 +203,7 @@ def sys_out_file(article_name):
 
     if article_name[:-3] in hidden_articles:
         # 隐藏的文章
-        return zy_pw_blog(article_name[:-3])
+        return error(message="页面不见了", status_code=404)
 
     articles_dir = os.path.join(base_dir, 'articles')
     return send_from_directory(articles_dir, article_name)
@@ -255,9 +256,11 @@ def space():
     if 'default' in owner_articles:
         owner_articles.remove('default')
 
+    notiHost, notiPort = zy_noti_conf()
+
     return render_template('Profile.html', url_for=url_for, avatar_url=avatar_url,
                            userStatus=userStatus, username=username,
-                           Articles=owner_articles)
+                           Articles=owner_articles, notiHost=notiHost)
 
 
 @app.route('/setting/profiles', methods=['GET', 'POST'])
@@ -518,7 +521,7 @@ def blog_detail(article):
 
         if article_name in hidden_articles:
             # 隐藏的文章
-            return zy_pw_blog(article_name)
+            return error(message="页面不见了", status_code=404)
 
         if article_name not in article_names:
             return render_template('error.html', status_code='404'), 404
@@ -529,9 +532,8 @@ def blog_detail(article):
         # print(article_Surl)
         author = get_blog_author(article_name)
         update_date = get_file_date(article_name)
-        theme = session.get('theme', 'day-theme')  # 获取当前主题
         response = make_response(render_template('zyDetail.html', title=title, article_content=1,
-                                                 articleName=article_name, theme=theme,
+                                                 articleName=article_name,
                                                  author=author, blogDate=update_date, domain=domain,
                                                  url_for=url_for, article_Surl=article_surl, article_tags=article_tags))
 
@@ -874,8 +876,6 @@ def static_from_root():
 def markdown_editor(article):
     if article == 'default':
         return error(404, status_code=404)
-    if 'theme' not in session:
-        session['theme'] = 'day-theme'
     # notice = read_file('notice/1.txt', 50)
     userStatus = get_user_status()
     username = get_username()
@@ -894,7 +894,7 @@ def markdown_editor(article):
 
             # 渲染编辑页面并将转换后的HTML传递到模板中
             return render_template('editor.html', edit_html=edit_html, show_edit=show_edit, articleName=article,
-                                   theme=session['theme'], tags=tags)
+                                   tags=tags)
         elif request.method == 'POST':
             content = request.json['content']
             save_edit_code = zy_save_edit(article, content)
@@ -1110,12 +1110,6 @@ def travel():
     else:
         # 处理无法获取响应内容的情况，例如返回错误页面或错误消息
         return "Failed to fetch sitemap content."
-
-
-def zy_pw_blog(article_name):
-    session.setdefault('theme', 'day-theme')
-    if request.method == 'GET':
-        return error('文章已加密', 403)
 
 
 @app.route('/media', methods=['GET', 'POST'])
@@ -1534,9 +1528,10 @@ def wx_api():
         return "404 Not found"
 
 
-@app.route('/test', methods=['GET'])
-def test_page():
-    return render_template('dashboard.html')
+@app.route('/test')
+def test():
+    session['data'] = 'Some Data from App 1'
+    return 'session shared running'
 
 
 @app.errorhandler(404)

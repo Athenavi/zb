@@ -9,9 +9,8 @@
 > 如果您觉得 `zyblog`对您有所帮助，或者您喜欢我们的项目，请在 GitHub 上给我们一个 ⭐️。您的支持是我们持续改进和增加新功能的动力！感谢您的支持！
 
 - **更新日志**
-  - [更新详情](./update.txt)
-  - [旧版](https://github.com/Athenavi/zyBLOG)
-
+    - [更新详情](./update.txt)
+    - [旧版](https://github.com/Athenavi/zyBLOG)
 
 ## 预览
 
@@ -28,38 +27,41 @@
 
 ## 功能特点
 
-
 - [x] 提供文章分类和标签功能，方便用户组织和浏览文章。
-- [x] 界面适应手机 
+- [x] 界面适应手机
 - [x] ~~SEO优化~~(自完全使用前端渲染之后,SEO功能可谓是完全丧失了)
 - [x] 支持创建、编辑和删除博客文章。
 - [x] 提供评论功能，让用户可以与其他用户进行交流和互动。
 - [x] 用户可以注册和登录，以便管理他们的博客文章。
 - [x] 博客文章可以包含图片、视频和代码片段。
-- [x] 支持搜索功能，使用户可以快速找到感兴趣的文章。 
-
-
+- [x] 支持搜索功能，使用户可以快速找到感兴趣的文章。
 
 ## 示例图片
 
 ![](https://7trees.cn/zyImg/test/ac2764bba0b08d79e8f4bb1ba0d57a59.png)
-
 
 ## 如何运行
 
 建议使用 **Linux宝塔面板**
 
 1. 宝塔 **V9.0.0** 稳定版安装脚本
+
 ```sh
 url=https://download.bt.cn/install/install_lts.sh;if [ -f /usr/bin/curl ];then curl -sSO $url;else wget -O install_lts.sh $url;fi;bash install_lts.sh ed8484bec
 ```
-2. 克隆或下载 zyBLOG 代码库到本地。创建一个数据库，导入本项目里的 *sql* 文件（注意sql版本），复制 *config_example.ini* 文件到 *config.ini* ，配置 *config.ini*
-3. BT面板部署成功后(BT主程序页面 可以在 右侧 *网站* 选项卡配置Python项目,建议使用 Python V3.12.3 项目依赖 requirements.txt)
-4. 通用python项目部署参考步骤 [https://www.bt.cn/bbs/thread-125161-1-1.html](https://www.bt.cn/bbs/thread-125161-1-1.html)
+
+2. 克隆或下载 zyBLOG 代码库到本地。创建一个数据库，导入本项目里的 *sql* 文件（注意sql版本），复制 *config_example.ini* 文件到
+   *config.ini* ，配置 *config.ini*
+3. BT面板部署成功后(BT主程序页面 可以在 右侧 *网站* 选项卡配置Python项目,建议使用 Python V3.12.3 项目依赖
+   requirements.txt)
+4.
+通用python项目部署参考步骤 [https://www.bt.cn/bbs/thread-125161-1-1.html](https://www.bt.cn/bbs/thread-125161-1-1.html)
 
 不使用宝塔?
+
 1. 确保你的系统已经安装了 Python 和 pip。
-2. 克隆或下载 zyBLOG 代码库到本地。创建一个数据库，导入本项目里的 *sql* 文件（注意sql版本），复制 *config_example.ini* 文件到 *config.ini* ，配置 *config.ini*
+2. 克隆或下载 zyBLOG 代码库到本地。创建一个数据库，导入本项目里的 *sql* 文件（注意sql版本），复制 *config_example.ini* 文件到
+   *config.ini* ，配置 *config.ini*
 3. 在终端中进入项目根目录，并执行以下命令的顺序执行以启动 zyBLOG 博客程序：
 
 ```bash
@@ -125,21 +127,22 @@ $ source myenv/bin/activate
 
 现在你可以在虚拟环境下重新安装依赖以及启动程序
 
-
-
 ## 仍然无法运行？
 
 如果你了解docker，可以尝试使用Dockerfile来部署运行
 
-
 ## 评论（240319）
 
-   新版本的评论：
-   由 ```utteranc``` 提供技术支持
+    评论: twikoo    （V1.2.101）
+    https://twikoo.js.org/
+    可自行更改评论环境
 
-   不使用当前提供的评论issue地址？
-   你需要修改```templates/detail.html```文件
-   找到如下代码,修改其中的```repo```为你的github项目地址
+~~弃用：~~新版本的评论~~:仍可自行部署：
+由 ```utteranc``` 提供技术支持~~
+
+不使用当前提供的评论issue地址？
+你需要修改```templates/detail.html```文件
+找到如下代码,修改其中的```repo```为你的github项目地址
 
    ```
 <script src="https://utteranc.es/client.js"
@@ -159,13 +162,10 @@ $ source myenv/bin/activate
 
 更多细节请查阅官方文档: [https://utteranc.es/](https://utteranc.es/)
 
-我们热烈欢迎并感谢所有形式的贡献。如果您有任何想法或建议，欢迎通过提交 [pull requests](https://github.com/soybeanjs/soybean-admin/pulls) 或创建 GitHub [issue](https://github.com/soybeanjs/soybean-admin/issues/new) 来分享。
+我们热烈欢迎并感谢所有形式的贡献。如果您有任何想法或建议，欢迎通过提交 [pull requests](https://github.com/soybeanjs/soybean-admin/pulls)
+或创建 GitHub [issue](https://github.com/soybeanjs/soybean-admin/issues/new) 来分享。
 
-
-
-
-## 
-
+##  
 
 ## 开源贡献者
 
@@ -177,7 +177,6 @@ $ source myenv/bin/activate
 
 暂无开放
 
-
 ## Star 趋势
 
 ![Star History Chart](https://api.star-history.com/svg?repos=Athenavi/zb&type=Date)
@@ -188,7 +187,8 @@ $ source myenv/bin/activate
 
 ## 免责声明
 
-zyBLOG 是一个个人项目，并未经过详尽测试和完善，因此不对其能力和稳定性做出任何保证。使用 zyBLOG 时请注意自己的数据安全和程序稳定性。任何由于使用 zyBLOG 造成的数据丢失、损坏或其他问题，作者概不负责。
+zyBLOG 是一个个人项目，并未经过详尽测试和完善，因此不对其能力和稳定性做出任何保证。使用 zyBLOG 时请注意自己的数据安全和程序稳定性。任何由于使用
+zyBLOG 造成的数据丢失、损坏或其他问题，作者概不负责。
 
 **请谨慎使用 zyBLOG，并在使用之前备份你的数据。**
 
@@ -214,7 +214,6 @@ newtemplate
 ```
 
 其中 `index.html` 、 `screenshot.png` 、`template.ini` 是模板的必须文件，一个模板最少由这三个文件组成。
-
 
 `index.html` : 网站首页的模板
 `screenshot.png` : 后台的模板缩略图
