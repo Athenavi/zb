@@ -33,30 +33,6 @@ def error(message, status_code):
     return render_template('error.html', error=message, status_code=status_code), status_code
 
 
-def read_hidden_articles():
-    db = get_database_connection()
-    hidden_articles = []
-
-    try:
-        with db.cursor() as cursor:
-            query = "SELECT Title FROM articles WHERE Hidden = 1"
-            cursor.execute(query)
-            results = cursor.fetchall()
-
-            for result in results:
-                hidden_articles.append(result[0])
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    finally:
-        try:
-            cursor.close()
-        except NameError:
-            pass
-        db.close()
-
-    return hidden_articles
-
-
 def zyadmin(key, method):
     if key == door_key:
         return back(method)

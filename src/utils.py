@@ -175,3 +175,24 @@ def zy_noti_conf():
     return noti_host, noti_port
 
 
+def get_sys_notice():
+    notice = "当前用户没有更多通知"
+    try:
+        notice = read_file('notice/2.txt', 3000)
+    except Exception as e:
+        print(f'读取通知文件出错: {e}')
+    return notice
+
+
+def zy_mail_conf():
+    mail_config = ConfigParser()
+    try:
+        mail_config.read('config.ini', encoding='utf-8')
+    except UnicodeDecodeError:
+        mail_config.read('config.ini', encoding='gbk')
+    mail_host = mail_config.get('mail', 'host', fallback='error').strip("'")
+    mail_port = mail_config.get('mail', 'port', fallback='error').strip("'")
+    mail_user = mail_config.get('mail', 'user', fallback='error').strip("'")
+    mail_password = mail_config.get('mail', 'password', fallback='error').strip("'")
+
+    return mail_host, mail_port, mail_user, mail_password

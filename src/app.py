@@ -1519,19 +1519,16 @@ def sys_out_prev_page():
                                url_for=url_for, article_Surl='-')
 
 
-@app.route('/api/wx', methods=['GET'])
-def wx_api():
-    page = request.args.get('page')
-    if page:
-        return "helloworld"
-    else:
-        return "404 Not found"
-
-
 @app.route('/test')
 def test():
-    session['data'] = 'Some Data from App 1'
-    return 'session shared running'
+    from src.utils import zy_mail_conf
+    from src.notification import send_email
+    smtp_server, stmp_port, sender_email, password = zy_mail_conf()
+    receiver_email = sender_email
+    subject = '安全通知邮件'  # 邮件主题
+    body = '这是一封测试邮件。'  # 邮件正文
+    send_email(sender_email, password, receiver_email, smtp_server,stmp_port=int(stmp_port), subject=subject, body=body)
+    return 'success'
 
 
 @app.errorhandler(404)
