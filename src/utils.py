@@ -1,6 +1,8 @@
 import os
 import string
 import random
+from configparser import ConfigParser
+
 import requests
 import urllib
 from flask import request, make_response, session
@@ -159,3 +161,17 @@ def zy_save_edit(article_name, content):
         return 'success'
 
     return 'failed'
+
+
+def zy_noti_conf():
+    noti_config = ConfigParser()
+    try:
+        noti_config.read('config.ini', encoding='utf-8')
+    except UnicodeDecodeError:
+        noti_config.read('config.ini', encoding='gbk')
+    noti_host = noti_config.get('notification', 'host', fallback='error').strip("'")
+    noti_port = noti_config.get('notification', 'port', fallback='error').strip("'")
+
+    return noti_host, noti_port
+
+

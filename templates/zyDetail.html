@@ -11,19 +11,16 @@
     <script src="../static/js/zoom-image.min.js"></script>
 <body>
 <div id="app">🏃‍🏃‍🏃‍💨加载中...</div>
-<div id='comments_zone' style="display: none;">
+<div id='comments_zone' style="display: none;background-color: #6679cc;width:380px">
     与本文有关的标签{% for Tag in article_tags %}<a href="/?tag={{ Tag }}">{{ Tag }}</a>{% endfor %}
     /<<--点击标签获取更多文章|/本文作者：<a href="/profile?id={{ author }}" target="_blank">{{ author }}</a>
-    <script src="https://utteranc.es/client.js"
-            repo="Athenavi/comments"
-            issue-term="url"
-            {% if theme=="night-theme" %}
-            theme="github-dark"
-            {% else %}
-            theme="github-light"
-            {% endif %}
-            crossorigin="anonymous"
-            async>
+    <div id="tcomment"></div>
+    <script src="https://cdn.jsdelivr.net/npm/twikoo@1.6.39/dist/twikoo.all.min.js"></script>
+    <script>
+        twikoo.init({
+            envId: 'http://twikoo.7trees.cn/',
+            el: '#tcomment'
+        })
     </script>
     <button id="hide_comments" onclick="hideComments()" style="display: none;">隐藏评论区</button>
 </div>

@@ -32,6 +32,21 @@
                     <img src="{{ avatar_url }}" style="height: 42px; border-radius: 50%;" alt="">
                     <a href="/media">📂 媒体</a>
                     <a href="/setting/profiles">⚙️ 设置</a>
+                    <br>
+                    <hr>
+                    <div id="notifications"></div>
+
+                    <script>
+                        $(document).ready(function () {
+                            // 指定连接的端口和地址
+                            var socket = io('{{ notiHost }}'); // 替换为你的服务器地址和端口
+
+                            // 监听新通知事件
+                            socket.on('new_notification', function (data) {
+                                $('#notifications').append('<p class="text-gray-600 mb-4">' + data.message + '</p>');
+                            });
+                        });
+                    </script>
                 {% else %}
                     <!-- 展示未登录的内容 -->
                     <a href="/login">需要登录</a>
@@ -186,4 +201,27 @@
                 });
         });
     });
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/3.1.3/socket.io.min.js"></script>
+<script>
+    window.onload = function () {
+        setTimeout(function () {
+            fetch('{{ notiHost }}', {
+                method: 'GET', // 或者 'POST' 等方法
+                credentials: 'include' // 发送请求时包含 Cookie
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json(); // 或者根据你的需要处理响应
+                })
+                .then(data => {
+                    console.log(data); // 处理返回的数据
+                })
+                .catch(error => {
+                    console.error('There has been a problem with your fetch operation:', error);
+                });
+        }, 3000); // 等待3000毫秒（3秒）
+    };
 </script>
