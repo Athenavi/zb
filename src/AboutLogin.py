@@ -31,7 +31,8 @@ def zy_login():
                 session['logged_in'] = True
                 session['username'] = result[1]
 
-                return redirect(url_for('home'))
+                callback = session.pop('callback', 'home')  # 从 session 中获取并删除
+                return redirect(url_for(callback))  # 重定向到存储的回调
             else:
                 return render_template('Login.html', error="Invalid username or password")
 

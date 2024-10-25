@@ -40,7 +40,9 @@
             <div class="text-center pb-4">
                 <h1 class="text-4xl font-bold text-blue-500">Login</h1>
             </div>
-            <form id="login-form" method="post" action="/login" onsubmit="return validateForm()">
+            <form id="login-form" method="post"
+                  action="/login?callback={{ request.args.get('callback', 'home') }}"
+                  onsubmit="return validateForm()">
                 {% if error %}
                     <div class="alert-danger mb-4" role="alert">
                         {{ error }}

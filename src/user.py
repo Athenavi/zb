@@ -75,13 +75,13 @@ def admin_dashboard(method, dashInfo):
     else:
         # print(dashInfo)
         display_list = get_all_themes()
-        currentDisPlay = config.get('general', 'theme').strip("'")
+        currentDisPlay = session.get('display', 'default')
         return render_template('dashboard.html', displayList=display_list,
                                currentDisplay=currentDisPlay, dashInfo=dashInfo)
 
 
 def get_all_themes():
-    display_list = []
+    display_list = ['default']
     themes_path = 'templates/theme'
     if os.path.exists(themes_path):
         subfolders = [f.path for f in os.scandir(themes_path) if f.is_dir()]
@@ -91,6 +91,7 @@ def get_all_themes():
             has_template_ini = os.path.exists(os.path.join(subfolder, 'template.ini'))
             if has_index_html and has_screenshot_png and has_template_ini:
                 display_list.append(os.path.basename(subfolder))
+    # print(display_list)
     return display_list
 
 

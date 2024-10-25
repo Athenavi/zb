@@ -55,10 +55,11 @@ file_handler.setFormatter(log_formatter)
 app.logger.addHandler(file_handler)
 app.logger.setLevel(logging.INFO)
 
-domain, title, beian, version, api_host, app_id, app_key = zy_general_conf()
+domain, title, beian, sys_version, api_host, app_id, app_key = zy_general_conf()
 print("please check information")
 print("++++++++++==========================++++++++++")
-print(f'\n domain: {domain} \n title: {title} \n beian: {beian} \n Version: {version} \n 三方登录api: {api_host} \n')
+print(
+    f'\n domain: {domain} \n title: {title} \n beian: {beian} \n Version: {sys_version} \n 三方登录api: {api_host} \n')
 print("++++++++++==========================++++++++++")
 print('''
                                                                                                                                
@@ -100,9 +101,13 @@ base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 @app.route('/login', methods=['POST', 'GET'])
 def login():
     if 'logged_in' in session:
-        return redirect(url_for('home'))
-    else:
-        return zy_login()
+        callback = session.get('callback', 'home')
+        return redirect(url_for(callback))
+
+    callback = request.args.get('callback', 'home')
+    # 存储回调到 session
+    session['callback'] = callback
+    return zy_login()
 
 
 # 注册页面
@@ -238,7 +243,7 @@ def get_avatar():
 
 
 @app.route('/profile', methods=['GET', 'POST'])
-def space():
+def profile():
     avatar_url = get_avatar() or domain + 'static/favicon.ico'
     userStatus = get_user_status()
     username = get_username()
@@ -702,6 +707,10 @@ def change_display():
                 ifAdmin = cursor.fetchone()[0]
                 if ifAdmin == 'Admin':
                     theme_path = f'templates/theme/{theme_id}'
+                    if theme_id == 'default':
+                        print(f"recover theme to {theme_id}")
+                        session['display'] = theme_id
+                        return 'success'
 
                     if os.path.exists(theme_path):
                         has_index_html = os.path.exists(os.path.join(theme_path, 'index.html'))
@@ -709,12 +718,10 @@ def change_display():
                         has_template_ini = os.path.exists(os.path.join(theme_path, 'template.ini'))
 
                         if has_index_html and has_screenshot_png and has_template_ini:
-                            print("update")
+                            print(f"update theme to {theme_path}")
+                            session['display'] = theme_id
+                            return 'success'
 
-                            if theme_id == 1:
-                                return 'success'
-                            else:
-                                return 'failed'
                         else:
                             return 'failed'
                     return 'failed'
@@ -734,7 +741,6 @@ def change_display():
 
 last_newArticle_time = {}  # 全局变量，用于记录用户最后递交时间
 app.config['UPLOAD_FOLDER'] = 'temp/upload'
-authorMapper = configparser.ConfigParser()
 
 
 @app.route('/newArticle', methods=['GET', 'POST'])
@@ -1125,14 +1131,14 @@ def media_space():
                 imgs, has_next_page, has_previous_page = get_all_img(username, page=page)
 
                 return render_template('Media.html', imgs=imgs, title='Media', url_for=url_for,
-                                       theme=session.get('theme'), has_next_page=has_next_page,
+                                       has_next_page=has_next_page,
                                        has_previous_page=has_previous_page, current_page=page, userid=username,
                                        domain=domain)
             if type == 'video':
                 videos, has_next_page, has_previous_page = get_all_video(username, page=page)
 
                 return render_template('Media.html', videos=videos, title='Media', url_for=url_for,
-                                       theme=session.get('theme'), has_next_page=has_next_page,
+                                       has_next_page=has_next_page,
                                        has_previous_page=has_previous_page, current_page=page, userid=username,
                                        domain=domain)
 
@@ -1140,7 +1146,7 @@ def media_space():
                 xminds, has_next_page, has_previous_page = get_all_xmind(username, page=page)
 
                 return render_template('Media.html', xminds=xminds, title='Media', url_for=url_for,
-                                       theme=session.get('theme'), has_next_page=has_next_page,
+                                       has_next_page=has_next_page,
                                        has_previous_page=has_previous_page, current_page=page, userid=username,
                                        domain=domain)
         elif request.method == 'POST':
@@ -1334,6 +1340,19 @@ def callback(provider):
 @cache.cached(timeout=300, key_prefix='display_detail')
 @app.route('/theme/<theme_id>')
 def get_theme_detail(theme_id):
+    if theme_id == 'default':
+        theme_properties = {
+            'id': theme_id,
+            'author': title,
+            'title': "恢复系统默认",
+            'authorWebsite': domain,
+            'version': sys_version,
+            'versionCode': "None",
+            'updateUrl': "None",
+            'screenshot': "None",
+        }
+
+        return jsonify(theme_properties)
     if os.path.exists(f'templates/theme/{theme_id}'):
         theme_detail = configparser.ConfigParser()
         # 读取 template.ini 文件
@@ -1343,8 +1362,8 @@ def get_theme_detail(theme_id):
         author = theme_detail.get('default', 'author').strip("'")
         theme_title = theme_detail.get('default', 'title').strip("'")
         author_website = theme_detail.get('default', 'authorWebsite').strip("'")
-        version = theme_detail.get('default', 'version').strip("'")
-        version_code = theme_detail.get('default', 'versionCode').strip("'")
+        theme_version = theme_detail.get('default', 'version').strip("'")
+        theme_version_code = theme_detail.get('default', 'versionCode').strip("'")
         update_url = theme_detail.get('default', 'updateUrl').strip("'")
         screenshot = theme_detail.get('default', 'screenshot').strip("'")
 
@@ -1353,8 +1372,8 @@ def get_theme_detail(theme_id):
             'author': author,
             'title': theme_title,
             'authorWebsite': author_website,
-            'version': version,
-            'versionCode': version_code,
+            'version': theme_version,
+            'versionCode': theme_version_code,
             'updateUrl': update_url,
             'screenshot': screenshot,
         }
@@ -1364,6 +1383,8 @@ def get_theme_detail(theme_id):
 
 @app.route('/theme/<theme_id>/<img_name>')
 def get_screenshot(theme_id, img_name):
+    if theme_id == 'default':
+        return send_file('../static/favicon.ico', mimetype='image/png')
     try:
         img_dir = os.path.join(base_dir, 'templates', 'theme', theme_id, img_name)
 
@@ -1398,7 +1419,7 @@ def diy_space(page):
         with open(template_path, 'r', encoding=global_encoding) as file:
             html_content = file.read()
             resp = make_response(html_content)
-            visitID = version + format(random.randint(10000, 99999))  # 可以设置一个默认值或者抛出异常，具体根据需求进行处理
+            visitID = sys_version + format(random.randint(10000, 99999))  # 可以设置一个默认值或者抛出异常，具体根据需求进行处理
             resp.set_cookie('visitID', 'zyBLOG' + visitID, 7200)
         return resp
     return render_template('error.html')
@@ -1519,6 +1540,19 @@ def sys_out_prev_page():
                                url_for=url_for, article_Surl='-')
 
 
+@app.route('/api/mail')
+def api_mail():
+    from src.utils import zy_mail_conf
+    from src.notification import send_email
+    smtp_server, stmp_port, sender_email, password = zy_mail_conf()
+    receiver_email = sender_email
+    subject = '安全通知邮件'  # 邮件主题
+    body = '这是一封测试邮件。'  # 邮件正文
+    send_email(sender_email, password, receiver_email, smtp_server, stmp_port=int(stmp_port), subject=subject,
+               body=body)
+    return 'success'
+
+
 @app.route('/test')
 def test():
     from src.utils import zy_mail_conf
@@ -1527,7 +1561,8 @@ def test():
     receiver_email = sender_email
     subject = '安全通知邮件'  # 邮件主题
     body = '这是一封测试邮件。'  # 邮件正文
-    send_email(sender_email, password, receiver_email, smtp_server,stmp_port=int(stmp_port), subject=subject, body=body)
+    send_email(sender_email, password, receiver_email, smtp_server, stmp_port=int(stmp_port), subject=subject,
+               body=body)
     return 'success'
 
 
