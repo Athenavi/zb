@@ -75,7 +75,7 @@
         <h5><a href="/profile">↩️</a></h5><br>
         <h4>设置</h4>
         <a href="#" onclick="showSection('profile')">个人资料</a>
-        <a href="#" onclick="showSection('language')">语言</a>
+        <a href="#" onclick="showSection('newArticle')">上传文章</a>
         <a href="#" onclick="showSection('personalization')">个性化</a>
         <a href="#" onclick="showSection('privacy')">隐私</a>
         <a href="#" onclick="showSection('change-pass')">修改密码</a>
@@ -103,10 +103,11 @@
                 <button type="submit" class="btn btn-primary">保存更改</button>
             </form>
         </div>
-        <div id="language" class="section" style="display: none;">
-            <h2>语言设置</h2>
-            <p>在这里选择您的语言偏好。</p>
-            <!-- 语言设置内容 -->
+        <div id="newArticle" class="section" style="display: none;">
+            <h2>上传文章</h2>
+            <div class="iframe-container">
+                <iframe src="/newArticle" frameborder="0" allowfullscreen></iframe>
+            </div>
         </div>
         <div id="personalization" class="section" style="display: none;">
             <h2>个性化设置</h2>

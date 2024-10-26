@@ -95,21 +95,6 @@ def get_all_themes():
     return display_list
 
 
-def zy_new_article():
-    if session.get('logged_in'):
-        username = session.get('username')
-        if username:
-            try:
-                return render_template('postNewArticle.html', theme=session['theme'])
-            except Exception as e:
-                logging.error(f"Error logging in: {e}")
-                return error("未知错误", 500)
-        else:
-            return error("请先登录", 401)
-    else:
-        return error("请先登录", 401)
-
-
 def show_files(path):
     # 指定目录的路径
     directory = path
