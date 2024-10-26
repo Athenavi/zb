@@ -175,15 +175,6 @@ def zy_noti_conf():
     return noti_host, noti_port
 
 
-def get_sys_notice():
-    notice = "当前用户没有更多通知"
-    try:
-        notice = read_file('notice/2.txt', 3000)
-    except Exception as e:
-        print(f'读取通知文件出错: {e}')
-    return notice
-
-
 def zy_mail_conf():
     mail_config = ConfigParser()
     try:

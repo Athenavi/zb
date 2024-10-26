@@ -9,10 +9,13 @@ import re
 import shutil
 import time
 import urllib.parse
+import urllib.parse
 import xml.etree.ElementTree as ElementTree
 from datetime import datetime, timedelta
+from functools import wraps
 from pathlib import Path
 
+import jwt
 import requests
 from flask import Flask, render_template, redirect, session, request, url_for, Response, jsonify, send_file, \
     make_response, send_from_directory
@@ -28,7 +31,7 @@ from src.BlogDeal import get_article_names, get_article_content, clear_html_form
     zy_show_article, zy_edit_article, get_all_article_names
 from src.database import get_database_connection
 from src.links import create_special_url
-from src.user import zyadmin, zy_delete_file, error, get_owner_articles, zy_general_conf
+from src.user import zyadmin, zy_delete_article, error, get_owner_articles, zy_general_conf
 from src.utils import zy_upload_file, get_user_status, get_username, get_client_ip, read_file, \
     zy_save_edit, zy_noti_conf
 
@@ -56,47 +59,46 @@ file_handler.setFormatter(log_formatter)
 app.logger.addHandler(file_handler)
 app.logger.setLevel(logging.INFO)
 
+base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+JWT_EXPIRATION_DELTA = 10800
+
+
+def generate_jwt(user_id):
+    expiration_time = datetime.utcnow() + timedelta(seconds=JWT_EXPIRATION_DELTA)
+    payload = {
+        'user_id': user_id,
+        'exp': expiration_time
+    }
+
+    return jwt.encode(payload, app.secret_key, algorithm='HS256')
+
+
+def authenticate_jwt(token):
+    try:
+        payload = jwt.decode(token, app.secret_key, algorithms=['HS256'])
+        return payload['user_id']
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
+
+
+# 添加用户状态和用户名
+@app.context_processor
+def inject_variables():
+    return dict(
+        userStatus=get_user_status(),
+        username=get_username(),
+    )
+
+
 domain, title, beian, sys_version, api_host, app_id, app_key = zy_general_conf()
 print("please check information")
 print("++++++++++==========================++++++++++")
 print(
     f'\n domain: {domain} \n title: {title} \n beian: {beian} \n Version: {sys_version} \n 三方登录api: {api_host} \n')
 print("++++++++++==========================++++++++++")
-print('''
-                                                                                                                               
-                                                                
-                                                                
-                           ||         ||                        
-                           ||         ||                        
-                           ||         ||                        
-                           ||         ||                        
-         ||||||   ||   ||  |||||      ||      ||||     ||||||   
-         ||||||   ||   |   ||||||     ||     ||||||   |||||||   
-            ||    ||  ||   ||  |||    ||     ||   ||  ||  ||    
-           |||     || ||   ||   ||    ||     ||   ||  ||  ||    
-          |||      || |    ||   ||    ||     ||   ||  |||||     
-          ||       ||||    ||  ||     ||     ||  |||  ||        
-         |||||||    |||    ||||||     ||     ||||||   ||||||    
-         |||||||    ||     |||||      ||       |||    ||   ||   
-                  ||||                                |||||||   
-                  |||                                  |||||    
-                                                                
-                                                                
-                                                                
-''')
-print("++++++++++==========================++++++++++")
-
-
-@app.context_processor
-def inject_variables():
-    return dict(
-        userStatus=get_user_status(),
-        username=get_username(),
-        beian=beian,
-    )
-
-
-base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 @app.route('/login', methods=['POST', 'GET'])
@@ -106,27 +108,49 @@ def login():
         return redirect(url_for(callback))
 
     callback = request.args.get('callback', 'home')
-    # 存储回调到 session
     session['callback'] = callback
+
+    if request.method == 'POST':
+        user_id = zy_login()  # 假设 zy_login 返回用户ID
+        if user_id:
+            session.pop('callback', None)
+            token = generate_jwt(user_id)
+            response = make_response(redirect(url_for(callback)))
+            response.set_cookie('jwt', token, httponly=True)  # 设置 HttpOnly Cookie
+            return response
+
     return zy_login()
 
 
-# 注册页面
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     ip = get_client_ip(request, session)
     return zy_register(ip)
 
 
-# 登出页面
 @app.route('/logout')
 def logout():
+    response = make_response(redirect(url_for('login')))
+    response.set_cookie('jwt', '', expires=0)  # 清除 Cookie
     session.clear()
-    return redirect(url_for('login'))
+    return response
+
+
+def jwt_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = request.cookies.get('jwt')
+        user_id = authenticate_jwt(token)
+        if user_id is None:
+            return error(message="Unauthorized", status_code=401)
+        return f(user_id, *args, **kwargs)
+
+    return decorated_function
 
 
 @app.route('/search', methods=['GET', 'POST'])
-def search():
+@jwt_required
+def search(user_id):
     if 'logged_in' not in session:
         return render_template('Login.html', error='登陆后可以使用此功能')
     matched_content = []
@@ -270,21 +294,14 @@ def profile():
 
 
 @app.route('/setting/profiles', methods=['GET', 'POST'])
-def setting_profiles():
+@jwt_required
+def setting_profiles(user_id):
     avatar_url = get_avatar() or domain + 'static/favicon.ico'
     userStatus = get_user_status()
     username = get_username()
 
     return render_template('setting.html', url_for=url_for, avatar_url=avatar_url,
                            userStatus=userStatus, username=username)
-
-
-@app.route('/settingRegion', methods=['POST'])
-def setting_region():
-    username = get_username()
-    if username is not None:
-        return 1
-    return 1
 
 
 def get_unique_tags():
@@ -507,11 +524,6 @@ def get_a_list():
     return get_all_article_names()
 
 
-@app.route('/blog', methods=['GET', 'POST'])
-def blog_page():
-    return redirect(url_for('login'))
-
-
 @app.route('/blog/<article>.html', methods=['GET', 'POST'])
 def blog_detail_seo(article):
     return redirect(f'/blog/{article}')
@@ -565,7 +577,6 @@ def generate_sitemap():
 
     cache_file = os.path.join(cache_dir, 'sitemap.xml')
 
-    # Check if cache file exists and is within one hour
     if os.path.exists(cache_file):
         cache_timestamp = os.path.getmtime(cache_file)
         if datetime.now().timestamp() - cache_timestamp <= 3600:
@@ -676,74 +687,70 @@ def generate_rss():
 
 
 @app.route('/confirm-password', methods=['GET', 'POST'])
-def confirm_password():
-    return zy_confirm_password()
+@jwt_required
+def confirm_password(user_id):
+    return zy_confirm_password(user_id)
 
 
 @app.route('/change-password', methods=['GET', 'POST'])
-def change_password():
+@jwt_required
+def change_password(user_id):
     ip = get_client_ip(request, session)
-    return zy_change_password(ip)
+    return zy_change_password(user_id, ip)
 
 
 @app.route('/admin/<key>', methods=['GET', 'POST'])
-def admin(key=''):
+@jwt_required
+def admin(user_id, key):
     method = 'GET'
     if request.method == 'POST':
         method = 'POST'
-    return zyadmin(key, method)
+    return zyadmin(key, method, user_id)
 
 
 @app.route('/admin/changeTheme', methods=['POST'])
-def change_display():
+@jwt_required
+def change_display(user_id):
     theme_id = request.args.get('NT')
-    if session.get('logged_in') and theme_id:
-        username = session.get('username')
-        if username:
-            db = get_database_connection()
-            cursor = db.cursor()
-            try:
-                query = "SELECT `role` FROM users WHERE username = %s"
-                cursor.execute(query, (username,))
-                ifAdmin = cursor.fetchone()[0]
-                if ifAdmin == 'Admin':
-                    theme_path = f'templates/theme/{theme_id}'
-                    if theme_id == 'default':
-                        print(f"recover theme to {theme_id}")
+    if theme_id:
+        db = get_database_connection()
+        cursor = db.cursor()
+        try:
+            if user_id == 1:
+                theme_path = f'templates/theme/{theme_id}'
+                if theme_id == 'default':
+                    print(f"recover theme to {theme_id}")
+                    session['display'] = theme_id
+                    return 'success'
+
+                if os.path.exists(theme_path):
+                    has_index_html = os.path.exists(os.path.join(theme_path, 'index.html'))
+                    has_screenshot_png = os.path.exists(os.path.join(theme_path, 'screenshot.png'))
+                    has_template_ini = os.path.exists(os.path.join(theme_path, 'template.ini'))
+
+                    if has_index_html and has_screenshot_png and has_template_ini:
+                        print(f"update theme to {theme_path}")
                         session['display'] = theme_id
+                        query = "INSERT INTO `events` (`id`, `title`, `description`, `event_date`, `created_at`) VALUES (NULL, 'theme change', %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);"
+                        cursor.execute(query, (theme_id,))
+                        db.commit()
                         return 'success'
 
-                    if os.path.exists(theme_path):
-                        has_index_html = os.path.exists(os.path.join(theme_path, 'index.html'))
-                        has_screenshot_png = os.path.exists(os.path.join(theme_path, 'screenshot.png'))
-                        has_template_ini = os.path.exists(os.path.join(theme_path, 'template.ini'))
-
-                        if has_index_html and has_screenshot_png and has_template_ini:
-                            print(f"update theme to {theme_path}")
-                            session['display'] = theme_id
-                            return 'success'
-
-                        else:
-                            return 'failed'
-                    return 'failed'
-                else:
-                    return error("非管理员用户禁止访问！！！", 403)
-            except Exception as e:
-                logging.error(f"Error logging in: {e}")
-                return error("未知错误", 500)
-            finally:
-                cursor.close()
-                db.close()
-        else:
-            return error("请先登录", 401)
-    else:
-        return error("请先登录", 401)
+                    else:
+                        return 'failed'
+                return 'failed'
+            else:
+                return error("非管理员用户禁止访问！！！", 403)
+        except Exception as e:
+            logging.error(f"Error logging in: {e}")
+            return error("未知错误", 500)
+        finally:
+            cursor.close()
+            db.close()
 
 
 last_newArticle_time = {}  # 全局变量，用于记录用户最后递交时间
 app.config['UPLOAD_FOLDER'] = 'temp/upload'
-
-last_newArticle_time = {}  # 记录用户最后提交时间
 
 
 def can_user_submit(username):
@@ -771,35 +778,25 @@ def handle_file_upload(file):
     return None
 
 
-def check_login_status():
+@app.route('/newArticle', methods=['GET', 'POST'])
+@jwt_required
+def new_article(user_id):
     username = session.get('username')
     if not username:
-        return False, "请先登录", 401
-    return True, username
-
-
-@app.route('/newArticle', methods=['GET', 'POST'])
-def new_article():
-    logged_in, response = check_login_status()
-
-    if not logged_in:
-        return response
-
-    username = response
-
+        error(message='请先登录', status_code=401)
     if request.method == 'GET':
-        if not can_user_submit(username):
+        if not can_user_submit(user_id):
             return error('您完成了一次服务（无论成功与否），此服务短期内将变得不可达，请您10分钟之后再来', 503)
         return render_template('postNewArticle.html')
 
     elif request.method == 'POST':
-        if not can_user_submit(username):
+        if not can_user_submit(user_id):
             return error('距离您上次上传时间过短，请十分钟后重试', 503)
 
-        last_newArticle_time[username] = time.time()
+        last_newArticle_time[user_id] = time.time()
         file = request.files['file']
 
-        logging.info(f"User {username} attempting to upload: {file.filename}")
+        logging.info(f"User {user_id} attempting to upload: {file.filename}")
         error_message = handle_file_upload(file)
         if error_message:
             logging.error(f"File upload error: {error_message[0]}")
@@ -808,7 +805,7 @@ def new_article():
         file_name = os.path.splitext(file.filename)[0]
         if set_article_info(file_name, username):
             message = '上传成功。但请您检查错误以及编辑。'
-            logging.info(f"Article info successfully saved for {file_name} by {username}.")
+            logging.info(f"Article info successfully saved for {file_name} by user:{user_id}.")
         else:
             message = '上传成功，但文章信息未能更新，请重试。'
             logging.error("Failed to update article information in the database.")
@@ -855,42 +852,20 @@ def set_article_info(title, username):
 
 
 @app.route('/Admin_upload', methods=['GET', 'POST'])
-def upload_file1():
-    if 'username' not in session:
-        return redirect(url_for('login'))
-    username = session['username']
-    ip = session['public_ip']
-    app.logger.info('当前访问的用户:{}, IP:{}'.format(username, ip))
-    if username:
-        db = get_database_connection()
-        cursor = db.cursor()
-        try:
-            query = "SELECT `role` FROM users WHERE username = %s"
-            cursor.execute(query, (username,))
-            ifAdmin = cursor.fetchone()[0]
-            if ifAdmin == 'Admin':
-                return zy_upload_file()
-        finally:
-            cursor.close()
-            db.close()
-    return False
+@jwt_required
+def upload_file1(user_id):
+    if user_id == 1:
+        return zy_upload_file()
 
 
 @app.route('/delete/<filename>', methods=['POST'])
-def delete_file(filename):
-    userStatus = get_user_status()
-    username = get_username()
-    auth = False  # 设置默认值
-
-    if userStatus and username is not None:
-        article = filename
-        # Auth 认证
-        auth = auth_articles(article, username)
-
-    if auth:
-
-        return zy_delete_file(filename)
-
+@jwt_required
+def delete_file(user_id, filename):
+    username = session.get('username')
+    if username:
+        auth = auth_articles(title=filename, username=username)
+        if auth:
+            return zy_delete_article(filename)
     else:
         return error(message='您没有权限', status_code=503)
 
@@ -1146,7 +1121,8 @@ def travel():
 
 
 @app.route('/media', methods=['GET', 'POST'])
-def media_space():
+@jwt_required
+def media_space(user_id):
     type = request.args.get('type', default='img')
     page = request.args.get('page', default=1, type=int)
     userStatus = get_user_status()
@@ -1257,7 +1233,8 @@ app.config['UPLOADED_PATH'] = 'media'
 
 
 @app.route('/upload_file', methods=['POST'])
-def upload_user_path():
+@jwt_required
+def upload_user_path(user_id):
     user_status = get_user_status()  # 获取用户状态
     username = get_username()  # 获取用户名
 
@@ -1273,13 +1250,7 @@ def upload_user_path():
         file_records = []  # 用于存储文件记录的列表
         with get_database_connection() as db:  # 使用上下文管理器获取数据库连接
             with db.cursor() as cursor:  # 使用上下文管理器获取数据库游标
-                # 查询用户ID
-                cursor.execute("SELECT `id` FROM `users` WHERE `username`=%s", (username,))
-                userid = cursor.fetchone()
-                if userid is None:
-                    return jsonify({'message': 'failed, user not found'}), 404
-                userid = userid[0]
-
+                userid = user_id
                 # 处理每个上传的文件
                 for f in request.files.getlist('file'):
                     if not is_allowed_file(f.filename, allowed_types):  # 检查文件类型
@@ -1388,8 +1359,6 @@ def callback(provider):
     user_email = ''
     if provider not in ['qq', 'wx', 'alipay', 'sina', 'baidu', 'huawei', 'xiaomi', 'dingtalk']:
         return jsonify({'message': 'Invalid login provider'})
-
-    # Replace with your app's credentials
 
     authorization_code = request.args.get('code')
 
@@ -1606,7 +1575,8 @@ def sys_out_user_file(author, file_name):
 
 
 @app.route('/preview', methods=['GET'])
-def sys_out_prev_page():
+@jwt_required
+def sys_out_prev_page(user_id):
     user = request.args.get('user')
     file_name = request.args.get('file_name')
     prev_file_path = os.path.join(base_dir, 'media', str(user), file_name)
@@ -1619,7 +1589,8 @@ def sys_out_prev_page():
 
 
 @app.route('/api/mail')
-def api_mail():
+@jwt_required
+def api_mail(user_id):
     from src.utils import zy_mail_conf
     from src.notification import send_email
     smtp_server, stmp_port, sender_email, password = zy_mail_conf()
@@ -1633,15 +1604,8 @@ def api_mail():
 
 @app.route('/test')
 def test():
-    from src.utils import zy_mail_conf
-    from src.notification import send_email
-    smtp_server, stmp_port, sender_email, password = zy_mail_conf()
-    receiver_email = sender_email
-    subject = '安全通知邮件'  # 邮件主题
-    body = '这是一封测试邮件。'  # 邮件正文
-    send_email(sender_email, password, receiver_email, smtp_server, stmp_port=int(stmp_port), subject=subject,
-               body=body)
-    return 'success'
+    alert = "hello world"
+    return alert
 
 
 @app.errorhandler(404)

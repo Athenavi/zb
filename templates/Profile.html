@@ -17,6 +17,10 @@
         body {
             background: url(../static/image/day.jpg) no-repeat center/cover;
         }
+
+        .notice_read {
+            background-color: #4CAF50;
+        }
     </style>
 </head>
 
@@ -34,7 +38,7 @@
                     <a href="/setting/profiles">⚙️ 设置</a>
                     <br>
                     <hr>
-                    <div id="notifications"></div>
+                    <div id="notifications" id="notice"></div>
 
                     <script>
                         $(document).ready(function () {
@@ -224,4 +228,37 @@
                 });
         }, 3000); // 等待3000毫秒（3秒）
     };
+</script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const parentContainer = document.getElementById('notice');
+
+        // 在父元素上添加事件监听器
+        parentContainer.addEventListener('click', function (event) {
+            // 检查事件目标是否是 class 为 notice_read 的按钮
+            if (event.target && event.target.classList.contains('notice_read')) {
+                const confirmation = confirm('是否删除此通知？');
+                if (confirmation) {
+                    const nid = event.target.id; // 获取按钮的 id
+
+                    fetch('{{ notiHost }}/read?nid=' + nid, {
+                        method: 'GET', // 或者 'POST' 等方法
+                        credentials: 'include' // 发送请求时包含 Cookie
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.is_notice_read) {
+                                event.target.parentElement.removeChild(event.target); // 移除按钮
+                            } else {
+                                alert('删除失败，请稍后再试。');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('发生错误:', error);
+                            alert('请求发生错误，请重试。');
+                        });
+                }
+            }
+        });
+    });
 </script>

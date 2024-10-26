@@ -30,9 +30,7 @@ def zy_login():
                 app.permanent_session_lifetime = timedelta(minutes=120)
                 session['logged_in'] = True
                 session['username'] = result[1]
-
-                callback = session.pop('callback', 'home')  # 从 session 中获取并删除
-                return redirect(url_for(callback))  # 重定向到存储的回调
+                return result[0]
             else:
                 return render_template('Login.html', error="Invalid username or password")
 

@@ -33,38 +33,31 @@ def error(message, status_code):
     return render_template('error.html', error=message, status_code=status_code), status_code
 
 
-def zyadmin(key, method):
+def zyadmin(key, method, user_id):
     if key == door_key:
-        return back(method)
+        return back(method, user_id)
     else:
         return redirect(url_for('space'))
 
 
-def back(method):
+def back(method, user_id):
     if session.get('logged_in'):
-        username = session.get('username')
-        if username:
-            db = get_database_connection()
-            cursor = db.cursor()
-            try:
-                query = "SELECT `role` FROM users WHERE username = %s"
-                cursor.execute(query, (username,))
-                ifAdmin = cursor.fetchone()[0]
-                if ifAdmin == 'Admin':
-                    query = "SHOW TABLE STATUS WHERE Name IN ('articles', 'users', 'comments','media','events')"
-                    cursor.execute(query)
-                    dash_info = cursor.fetchall()
-                    return admin_dashboard(method, dash_info), 200
-                else:
-                    return redirect(url_for('space'))
-            except Exception as e:
-                logging.error(f"Error logging in: {e}")
-                return error("未知错误", 500)
-            finally:
-                cursor.close()
-                db.close()
-        else:
-            return error("请先登录", 401)
+        db = get_database_connection()
+        cursor = db.cursor()
+        try:
+            if user_id == 1:
+                query = "SHOW TABLE STATUS WHERE Name IN ('articles', 'users', 'comments','media','events')"
+                cursor.execute(query)
+                dash_info = cursor.fetchall()
+                return admin_dashboard(method, dash_info), 200
+            else:
+                return redirect(url_for('space'))
+        except Exception as e:
+            logging.error(f"Error logging in: {e}")
+            return error("未知错误", 500)
+        finally:
+            cursor.close()
+            db.close()
     else:
         return error("请先登录", 401)
 
@@ -102,7 +95,7 @@ def show_files(path):
     return files
 
 
-def zy_delete_file(filename):
+def zy_delete_article(filename):
     # 指定目录的路径
     directory = 'articles/'
 
@@ -112,7 +105,7 @@ def zy_delete_file(filename):
     try:
         db = get_database_connection()
         with db.cursor() as cursor:
-            query = "DELETE FROM articles WHERE Title = %s;"
+            query = "UPDATE `articles` SET `Status` = 'Deleted' WHERE `articles`.`Title` = %s;"
             cursor.execute(query, (filename,))
             db.commit()
             # 删除文件
@@ -134,7 +127,7 @@ def get_owner_articles(author):
 
     try:
         with db.cursor() as cursor:
-            query = "SELECT Title FROM articles WHERE Author = %s"
+            query = "SELECT Title FROM articles WHERE `Author` = %s and `Status` = 'Published';"
             cursor.execute(query, (author,))
             results = cursor.fetchall()
 

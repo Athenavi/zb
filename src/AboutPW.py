@@ -3,11 +3,7 @@ from flask import session, flash, redirect, url_for, render_template, request
 from src.database import get_database_connection
 
 
-def zy_change_password(ip):
-    if 'logged_in' not in session:
-        flash('修改密码需要先登录')
-        return redirect(url_for('login'))
-
+def zy_change_password(user_id, ip):
     if 'password_confirmed' not in session or not session['password_confirmed']:
         return redirect(url_for('confirm_password'))
 
@@ -18,51 +14,38 @@ def zy_change_password(ip):
 
         # 验证用户名是否与会话中的用户名一致
         if session.get('username') != username:
-            flash('请确认用户名')
-            return redirect(url_for('change_password'))
+            return render_template('zyPW.html', error="请核对你的用户名", form='change')
 
         # 查询当前密码
         db = get_database_connection()
         cursor = db.cursor()
-        query = "SELECT password FROM users WHERE username = %s"
-        cursor.execute(query, (username,))
+        query = "SELECT password FROM users WHERE `id` = %s"
+        cursor.execute(query, (user_id,))
         result = cursor.fetchone()
 
         if result:
-            current_password = result[0]
-
-            # 验证新密码是否与当前密码一致
-            if current_password == new_password:
-                flash('新旧密码请勿一致')
-                return redirect(url_for('change_password'))
+            hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
 
             if new_password == confirm_password and len(new_password) >= 6:
                 # 更新密码
-                hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
-                update_query = "UPDATE users SET password = %s WHERE username = %s"
-                cursor.execute(update_query, (hashed_password.decode('utf-8'), username))
+                update_query = "UPDATE users SET password = %s WHERE `id` = %s"
+                cursor.execute(update_query, (hashed_password.decode('utf-8'), user_id))
+                db.commit()
+
+                notice_query = "INSERT INTO `notifications` (`id`, `user_id`, `type`, `message`, `is_read`, `created_at`, `updated_at`) VALUES (NULL, %s, 'safe', '修改了密码', '0', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);"
+                cursor.execute(notice_query, (user_id,))
                 db.commit()
 
                 cursor.close()
                 db.close()
 
                 flash('密码修改成功！')
-                session.pop('logged_in', None)
-                session.pop('username', None)
-                session.pop('password_confirmed', None)
+                session.clear()
                 return render_template('success.html')
-            else:
-                flash('确认密码和新密码不匹配，或者新密码长度小于6位')
-        else:
-            flash('信息不正确')
     return render_template('zyPW.html', form='change')
 
 
-def zy_confirm_password():
-    if 'logged_in' not in session:
-        flash('修改密码需要先登录')
-        return redirect(url_for('login'))
-
+def zy_confirm_password(user_id):
     if 'password_confirmed' in session and session['password_confirmed']:
         return redirect(url_for('change_password'))
 
@@ -73,8 +56,8 @@ def zy_confirm_password():
         db = get_database_connection()
         cursor = db.cursor()
 
-        query = "SELECT password FROM users WHERE username = %s"
-        cursor.execute(query, (session['username'],))
+        query = "SELECT password FROM users WHERE `id` = %s"
+        cursor.execute(query, (user_id,))
         result = cursor.fetchone()
 
         if result and bcrypt.checkpw(password.encode('utf-8'), result[0].encode('utf-8')):
