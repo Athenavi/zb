@@ -13,11 +13,7 @@
     <!-- 引入自定义样式文件 -->
     <link rel="stylesheet" href="../static/css/main.css">
 </head>
-<body class="{{ theme }}">
-{% from 'header.html' import zytopbar %}
-<!-- 调用topbar -->
-{{ zytopbar() }}
-
+<body>
 <!-- 预留具体页面的位置 -->
 <div class="container mx-auto">
     <div class="flex justify-center">
@@ -37,8 +33,5 @@
         </form>
     </div>
 </div>
-{% from 'footer.html' import zyfooter %}
-<!-- 调用footer -->
-{{ zyfooter() }}
 </body>
 </html>

@@ -62,16 +62,6 @@
         document.addEventListener("DOMContentLoaded", function () {
             document.getElementById("loading").style.display = "none";
         });
-
-        document.getElementById("theme-form").addEventListener("submit", function (event) {
-            event.preventDefault();
-            fetch("/toggle_theme", {method: "POST"})
-                .then(function (response) {
-                    if (response.ok) {
-                        location.reload();
-                    }
-                });
-        });
         window.addEventListener('contextmenu', function (e) {
             e.preventDefault();
         }, false);

@@ -1,14 +1,68 @@
 import os
-import string
 import random
-from configparser import ConfigParser
-
-import requests
+import string
 import urllib
-from flask import request, make_response, session
-from src.user import error
-from werkzeug.utils import secure_filename
 import zipfile
+from configparser import ConfigParser
+from datetime import datetime, timedelta
+
+import jwt
+import requests
+from flask import request, make_response
+from werkzeug.utils import secure_filename
+
+from src.user import error
+
+secret_key = 'your_secret_key'
+
+JWT_EXPIRATION_DELTA = 10800  # JWT过期时间设置为3小时
+REFRESH_TOKEN_EXPIRATION_DELTA = 604800  # 刷新令牌过期时间设置为7天
+
+
+def generate_jwt(user_id, user_name):
+    expiration_time = datetime.utcnow() + timedelta(seconds=JWT_EXPIRATION_DELTA)
+    payload = {
+        'user_id': user_id,
+        'username': user_name,
+        'exp': expiration_time
+    }
+
+    return jwt.encode(payload, secret_key, algorithm='HS256')
+
+
+def generate_refresh_token(user_id, user_name):
+    # 生成刷新令牌
+    expiration_time = datetime.utcnow() + timedelta(seconds=REFRESH_TOKEN_EXPIRATION_DELTA)
+    payload = {
+        'user_id': user_id,
+        'username': user_name,
+        'exp': expiration_time
+    }
+    return jwt.encode(payload, secret_key, algorithm='HS256')
+
+
+def authenticate_token(token):
+    """
+    通用的令牌认证函数。
+    验证JWT或刷新令牌，并返回用户ID。
+    """
+    try:
+        payload = jwt.decode(token, secret_key, algorithms=['HS256'])
+        return payload['user_id']
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
+
+
+def authenticate_jwt(token):
+    # 认证JWT令牌
+    return authenticate_token(token)
+
+
+def authenticate_refresh_token(token):
+    # 认证刷新令牌
+    return authenticate_token(token)
 
 
 def generate_short_url():
@@ -117,20 +171,6 @@ def get_client_ip(request, session):
 
 # 登录页面
 
-def get_user_status():
-    if 'logged_in' in session and session['logged_in']:
-        return True
-    else:
-        return False
-
-
-def get_username():
-    if 'username' in session:
-        return session['username']
-    else:
-        return None
-
-
 def read_file(file_path, num_chars):
     decoded_path = urllib.parse.unquote(file_path)  # 对文件路径进行解码处理
     encoding = 'utf-8'
@@ -173,15 +213,6 @@ def zy_noti_conf():
     noti_port = noti_config.get('notification', 'port', fallback='error').strip("'")
 
     return noti_host, noti_port
-
-
-def get_sys_notice():
-    notice = "当前用户没有更多通知"
-    try:
-        notice = read_file('notice/2.txt', 3000)
-    except Exception as e:
-        print(f'读取通知文件出错: {e}')
-    return notice
 
 
 def zy_mail_conf():

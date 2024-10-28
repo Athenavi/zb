@@ -11,14 +11,17 @@ import time
 import urllib.parse
 import xml.etree.ElementTree as ElementTree
 from datetime import datetime, timedelta
+from functools import wraps
 from pathlib import Path
 
+import jwt
 import requests
 from flask import Flask, render_template, redirect, session, request, url_for, Response, jsonify, send_file, \
     make_response, send_from_directory
 from flask_caching import Cache
 from jinja2 import select_autoescape
 from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.utils import secure_filename
 
 from src.AboutLogin import zy_login, zy_register, zy_mail_login
 from src.AboutPW import zy_change_password, zy_confirm_password
@@ -27,16 +30,17 @@ from src.BlogDeal import get_article_names, get_article_content, clear_html_form
     zy_show_article, zy_edit_article, get_all_article_names
 from src.database import get_database_connection
 from src.links import create_special_url
-from src.user import zyadmin, zy_delete_file, zy_new_article, error, get_owner_articles, zy_general_conf
-from src.utils import zy_upload_file, get_user_status, get_username, get_client_ip, read_file, \
-    zy_save_edit, zy_noti_conf
+from src.user import zyadmin, zy_delete_article, error, get_owner_articles, zy_general_conf
+from src.utils import zy_upload_file, get_client_ip, read_file, \
+    zy_save_edit, zy_noti_conf, generate_jwt, secret_key, authenticate_jwt, \
+    authenticate_refresh_token
 
 global_encoding = 'utf-8'
 
 app = Flask(__name__, template_folder='../templates', static_folder="../static")
 app.config['CACHE_TYPE'] = 'simple'
 cache = Cache(app)
-app.secret_key = 'your_secret_key'
+app.secret_key = secret_key
 app.config['SESSION_COOKIE_NAME'] = 'zb_session'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=3)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)  # 添加 ProxyFix 中间件
@@ -55,74 +59,104 @@ file_handler.setFormatter(log_formatter)
 app.logger.addHandler(file_handler)
 app.logger.setLevel(logging.INFO)
 
-domain, title, beian, version, api_host, app_id, app_key = zy_general_conf()
+base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+domain, title, beian, sys_version, api_host, app_id, app_key = zy_general_conf()
 print("please check information")
 print("++++++++++==========================++++++++++")
-print(f'\n domain: {domain} \n title: {title} \n beian: {beian} \n Version: {version} \n 三方登录api: {api_host} \n')
-print("++++++++++==========================++++++++++")
-print('''
-                                                                                                                               
-                                                                
-                                                                
-                           ||         ||                        
-                           ||         ||                        
-                           ||         ||                        
-                           ||         ||                        
-         ||||||   ||   ||  |||||      ||      ||||     ||||||   
-         ||||||   ||   |   ||||||     ||     ||||||   |||||||   
-            ||    ||  ||   ||  |||    ||     ||   ||  ||  ||    
-           |||     || ||   ||   ||    ||     ||   ||  ||  ||    
-          |||      || |    ||   ||    ||     ||   ||  |||||     
-          ||       ||||    ||  ||     ||     ||  |||  ||        
-         |||||||    |||    ||||||     ||     ||||||   ||||||    
-         |||||||    ||     |||||      ||       |||    ||   ||   
-                  ||||                                |||||||   
-                  |||                                  |||||    
-                                                                
-                                                                
-                                                                
-''')
+print(
+    f'\n domain: {domain} \n title: {title} \n beian: {beian} \n Version: {sys_version} \n 三方登录api: {api_host} \n')
 print("++++++++++==========================++++++++++")
 
 
 @app.context_processor
 def inject_variables():
     return dict(
-        userStatus=get_user_status(),
-        username=get_username(),
         beian=beian,
+        username=get_username,
+        domain=domain
     )
-
-
-base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 @app.route('/login', methods=['POST', 'GET'])
 def login():
-    if 'logged_in' in session:
-        return redirect(url_for('home'))
-    else:
+    callback = request.args.get('callback', 'home')
+    if request.cookies.get('jwt'):
+        # 如果存在 jwt，解析并获取用户状态
+        user_id = authenticate_jwt(request.cookies.get('jwt'))
+        if user_id:
+            return redirect(url_for(callback))
+    if request.method == 'POST':
         return zy_login()
 
+    return render_template('Login.html', title="登录")
 
-# 注册页面
-@app.route('/register', methods=['GET', 'POST'])
+
+@app.route('/logout')
+def logout():
+    response = make_response(redirect(url_for('login')))
+    response.set_cookie('jwt', '', expires=0)  # 清除 Cookie
+    response.set_cookie('refresh_token', '', expires=0)  # 清除刷新令牌
+    return response
+
+
+@app.route('/register', methods=['POST', 'GET'])
 def register():
     ip = get_client_ip(request, session)
     return zy_register(ip)
 
 
-# 登出页面
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('login'))
+def jwt_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = request.cookies.get('jwt')
+        user_id = authenticate_jwt(token)
+        if user_id is None:
+            return error(message="Unauthorized", status_code=401)
+        return f(user_id, *args, **kwargs)
+
+    return decorated_function
+
+
+@app.before_request
+def check_jwt_expiration():
+    # 检查 JWT 是否即将过期
+    token = request.cookies.get('jwt')
+    if token:
+        payload = jwt.decode(token, app.secret_key, algorithms=['HS256'], options={"verify_exp": False})
+        if 'exp' in payload and datetime.utcfromtimestamp(payload['exp']) < datetime.utcnow() + timedelta(minutes=5):
+            # 如果 JWT 将在 5 分钟内过期，允许校验刷新令牌
+            refresh_token = request.cookies.get('refresh_token')
+            user_id = authenticate_refresh_token(refresh_token)
+            if user_id:
+                new_token = generate_jwt(user_id, payload['username'])
+                response = make_response()
+                response.set_cookie('jwt', new_token, httponly=True)  # 刷新 JWT
+                return response
+
+
+def get_username():
+    token = request.cookies.get('jwt')
+    if token:
+        payload = jwt.decode(token, app.secret_key, algorithms=['HS256'], options={"verify_exp": False})
+        return payload['username']
+
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = request.cookies.get('jwt')
+        user_id = authenticate_jwt(token)
+        if user_id != 1:
+            return error(message="Unauthorized", status_code=403)
+        return f(user_id, *args, **kwargs)
+
+    return decorated_function
 
 
 @app.route('/search', methods=['GET', 'POST'])
-def search():
-    if 'logged_in' not in session:
-        return render_template('Login.html', error='登陆后可以使用此功能')
+@jwt_required
+def search(user_id):
     matched_content = []
 
     if request.method == 'POST':
@@ -238,47 +272,31 @@ def get_avatar():
 
 
 @app.route('/profile', methods=['GET', 'POST'])
-def space():
+@jwt_required
+def profile(user_id):
     avatar_url = get_avatar() or domain + 'static/favicon.ico'
-    userStatus = get_user_status()
+    owner_id = request.args.get('id')
     username = get_username()
-    owner_articles = None
-
-    if userStatus and username is not None:
-        owner_name = request.args.get('id')
-        if owner_name is None or owner_name == '':
-            owner_name = username
-        owner_articles = get_owner_articles(owner_name)
-
-    if owner_articles is None:
-        owner_articles = []  # 设置为空列表
-
-    if 'default' in owner_articles:
-        owner_articles.remove('default')
+    if owner_id is None or owner_id == '':
+        owner_articles = get_owner_articles(owner_id=None, user_name=username) or []
+    else:
+        owner_articles = get_owner_articles(owner_id=owner_id, user_name=None) or []
 
     notiHost, notiPort = zy_noti_conf()
 
+    # 确保 render_template 返回正确对象
     return render_template('Profile.html', url_for=url_for, avatar_url=avatar_url,
-                           userStatus=userStatus, username=username,
+                           userStatus=bool(user_id), username=username,
                            Articles=owner_articles, notiHost=notiHost)
 
 
 @app.route('/setting/profiles', methods=['GET', 'POST'])
-def setting_profiles():
+@jwt_required
+def setting_profiles(user_id):
     avatar_url = get_avatar() or domain + 'static/favicon.ico'
-    userStatus = get_user_status()
     username = get_username()
-
     return render_template('setting.html', url_for=url_for, avatar_url=avatar_url,
-                           userStatus=userStatus, username=username)
-
-
-@app.route('/settingRegion', methods=['POST'])
-def setting_region():
-    username = get_username()
-    if username is not None:
-        return 1
-    return 1
+                           userStatus=bool(user_id), username=username)
 
 
 def get_unique_tags():
@@ -352,7 +370,7 @@ def get_tags_by_article(article_title):
 
     except Exception as e:
         logging.error(f"Error logging in: {e}")
-        return error("未知错误", 500)
+        return error("未知错误", 500), 500
     finally:
         cursor.close()
         db.close()
@@ -431,9 +449,7 @@ def home():
         infoList = get_article_info(articles)
         articles_time_list = zip(articles, infoList)
 
-        # 获取用户名
-        username = session.get('username')
-        app.logger.info(f'当前访问的用户: {username}, IP: {ip}')
+        app.logger.info(f'当前访问的用户, IP: {ip}')
 
         # 渲染模板并存储渲染后的页面内容到缓存中
         rendered_content = template.render(
@@ -442,15 +458,12 @@ def home():
             current_page=page, tags=tags, tag=tag
         )
         # 缓存渲染后的页面内容，并设置服务端缓存过期时间
-        cache.set(cache_key, rendered_content, timeout=60)
+        cache.set(cache_key, rendered_content, timeout=72)
         resp = make_response(rendered_content)
 
-        if username is None:
-            username = 'qks' + format(random.randint(10000, 99999))
-            app.logger.warning('未找到用户名，生成随机用户名: %s', username)
-            session['username'] = username
-
-        resp.set_cookie('key', 'zyBLOG' + username, 7200)
+        visiter = 'qks' + format(random.randint(10000, 99999))
+        app.logger.warning('新访客，生成随机用户名: %s', visiter)
+        resp.set_cookie('key', 'zyBLOG_' + sys_version + visiter, 7200)
         return resp
 
     else:
@@ -499,11 +512,6 @@ def get_article_info(articles):
 @cache.memoize(30)
 def get_a_list():
     return get_all_article_names()
-
-
-@app.route('/blog', methods=['GET', 'POST'])
-def blog_page():
-    return redirect(url_for('login'))
 
 
 @app.route('/blog/<article>.html', methods=['GET', 'POST'])
@@ -559,7 +567,6 @@ def generate_sitemap():
 
     cache_file = os.path.join(cache_dir, 'sitemap.xml')
 
-    # Check if cache file exists and is within one hour
     if os.path.exists(cache_file):
         cache_timestamp = os.path.getmtime(cache_file)
         if datetime.now().timestamp() - cache_timestamp <= 3600:
@@ -670,18 +677,21 @@ def generate_rss():
 
 
 @app.route('/confirm-password', methods=['GET', 'POST'])
-def confirm_password():
-    return zy_confirm_password()
+@jwt_required
+def confirm_password(user_id):
+    return zy_confirm_password(user_id)
 
 
 @app.route('/change-password', methods=['GET', 'POST'])
-def change_password():
+@jwt_required
+def change_password(user_id):
     ip = get_client_ip(request, session)
-    return zy_change_password(ip)
+    return zy_change_password(user_id, ip)
 
 
 @app.route('/admin/<key>', methods=['GET', 'POST'])
-def admin(key=''):
+@admin_required
+def admin(user_id, key):
     method = 'GET'
     if request.method == 'POST':
         method = 'POST'
@@ -689,175 +699,160 @@ def admin(key=''):
 
 
 @app.route('/admin/changeTheme', methods=['POST'])
-def change_display():
+@admin_required
+def change_display(user_id):
     theme_id = request.args.get('NT')
-    if session.get('logged_in') and theme_id:
-        username = session.get('username')
-        if username:
-            db = get_database_connection()
-            cursor = db.cursor()
-            try:
-                query = "SELECT `role` FROM users WHERE username = %s"
-                cursor.execute(query, (username,))
-                ifAdmin = cursor.fetchone()[0]
-                if ifAdmin == 'Admin':
-                    theme_path = f'templates/theme/{theme_id}'
+    if theme_id:
+        db = get_database_connection()
+        cursor = db.cursor()
+        try:
+            theme_path = f'templates/theme/{theme_id}'
+            if theme_id == 'default':
+                print(f"recover theme to {theme_id}")
+                session['display'] = theme_id
+                return 'success'
 
-                    if os.path.exists(theme_path):
-                        has_index_html = os.path.exists(os.path.join(theme_path, 'index.html'))
-                        has_screenshot_png = os.path.exists(os.path.join(theme_path, 'screenshot.png'))
-                        has_template_ini = os.path.exists(os.path.join(theme_path, 'template.ini'))
+            if os.path.exists(theme_path):
+                has_index_html = os.path.exists(os.path.join(theme_path, 'index.html'))
+                has_screenshot_png = os.path.exists(os.path.join(theme_path, 'screenshot.png'))
+                has_template_ini = os.path.exists(os.path.join(theme_path, 'template.ini'))
 
-                        if has_index_html and has_screenshot_png and has_template_ini:
-                            print("update")
+                if has_index_html and has_screenshot_png and has_template_ini:
+                    print(f"update theme to {theme_path}")
+                    session['display'] = theme_id
+                    query = "INSERT INTO `events` (`id`, `title`, `description`, `event_date`, `created_at`) VALUES (NULL, 'theme change', %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);"
+                    cursor.execute(query, (theme_id,))
+                    db.commit()
+                    return 'success'
 
-                            if theme_id == 1:
-                                return 'success'
-                            else:
-                                return 'failed'
-                        else:
-                            return 'failed'
-                    return 'failed'
                 else:
-                    return error("非管理员用户禁止访问！！！", 403)
-            except Exception as e:
-                logging.error(f"Error logging in: {e}")
-                return error("未知错误", 500)
-            finally:
-                cursor.close()
-                db.close()
-        else:
-            return error("请先登录", 401)
-    else:
-        return error("请先登录", 401)
+                    return 'failed'
+            else:
+                return error("非管理员用户禁止访问！！！", 403)
+        except Exception as e:
+            logging.error(f"Error logging in: {e}")
+            return error("未知错误", 500), 500
+        finally:
+            cursor.close()
+            db.close()
 
 
 last_newArticle_time = {}  # 全局变量，用于记录用户最后递交时间
 app.config['UPLOAD_FOLDER'] = 'temp/upload'
-authorMapper = configparser.ConfigParser()
+
+
+def can_user_submit(username):
+    current_time = time.time()
+    last_time = last_newArticle_time.get(username)
+    return last_time is None or current_time - last_time >= 600
+
+
+def handle_file_upload(file):
+    # 验证文件格式和大小
+    if not file.filename.endswith('.md') or file.content_length > 10 * 1024 * 1024:
+        return 'Invalid file format or file too large.', 400
+
+    upload_folder = app.config['UPLOAD_FOLDER']
+    os.makedirs(upload_folder, exist_ok=True)
+    file_path = os.path.join(upload_folder, file.filename)
+
+    # 避免文件名冲突
+    if os.path.isfile(os.path.join('articles', file.filename)):
+        return 'Upload failed, the file already exists.', 400
+
+    # 保存文件
+    file.save(file_path)
+    shutil.copy(file_path, 'articles')
+    return None
 
 
 @app.route('/newArticle', methods=['GET', 'POST'])
-def new_article():
+@jwt_required
+def new_article(user_id):
+    username = get_username()
+    if not username:
+        error(message='请先登录', status_code=401)
     if request.method == 'GET':
-        username = session.get('username')
-        if username in last_newArticle_time:
-            last_time = last_newArticle_time[username]
-            current_time = time.time()
-            if current_time - last_time < 600:
-                return error('您完成了一次服务（无论成功与否），此服务短期内将变得不可达，请你10分钟之后再来', 503)
-        return zy_new_article()
+        if not can_user_submit(user_id):
+            return error('您完成了一次服务（无论成功与否），此服务短期内将变得不可达，请您10分钟之后再来', 503)
+        return render_template('postNewArticle.html')
 
     elif request.method == 'POST':
-        username = session.get('username')
-        if username in last_newArticle_time:
-            last_time = last_newArticle_time[username]
-            current_time = time.time()
-            if current_time - last_time < 600:
-                return error('距离你上次上传时间过短，请十分钟后重试', 503)
+        if not can_user_submit(user_id):
+            return error('距离您上次上传时间过短，请十分钟后重试', 503)
 
-        # 更新用户最后递交时间
-        last_newArticle_time[username] = time.time()
+        last_newArticle_time[user_id] = time.time()
         file = request.files['file']
-        if not file.filename.endswith('.md'):
-            return error('Invalid file format. Only Markdown files are allowed.', 400)
 
-        if file.content_length > 10 * 1024 * 1024:
-            return error('Invalid file', 400)
+        logging.info(f"User {user_id} attempting to upload: {file.filename}")
+        error_message = handle_file_upload(file)
+        if error_message:
+            logging.error(f"File upload error: {error_message[0]}")
+            return error(*error_message)
+
+        file_name = os.path.splitext(file.filename)[0]
+        if set_article_info(file_name, username):
+            message = '上传成功。但请您检查错误以及编辑。'
+            logging.info(f"Article info successfully saved for {file_name} by user:{user_id}.")
         else:
-            if file:
-                # 保存上传的文件到指定路径
-                upload_folder = os.path.join('temp/upload')
-                os.makedirs(upload_folder, exist_ok=True)
-                file_path = os.path.join(upload_folder, file.filename)
-                file.save(file_path)
+            message = '上传成功，但文章信息未能更新，请重试。'
+            logging.error("Failed to update article information in the database.")
 
-                # 检查文件是否存在于articles文件夹下
-                if os.path.isfile(os.path.join('articles', file.filename)):
-                    # 如果文件已经存在，提示上传失败
-                    message = '上传失败，文件已存在。'
-                else:
-                    # 如果文件不存在，将文件复制到articles文件夹下，并提示上传成功
-                    shutil.copy(os.path.join(app.config['UPLOAD_FOLDER'], file.filename), 'articles')
-                    file_name = os.path.splitext(file.filename)[0]  # 获取文件名（不包含后缀）
-
-                    author_value = session.get('username')
-                    # 更新 [author]
-                    set_article_author(file_name, author_value)
-
-                    message = '上传成功。但请你检查错误以及编辑'
-
-                return render_template('postNewArticle.html', message=message)
-
-            else:
-                return redirect('/newArticle')
+        return render_template('postNewArticle.html', message=message)
 
 
-def set_article_author(title, username):
+def set_article_info(title, username):
     db = get_database_connection()
-
     try:
         with db.cursor() as cursor:
-            query = "SELECT * FROM articles WHERE Title = %s"
-            cursor.execute(query, (title,))
-            result = cursor.fetchone()
+            # 获取当前年份
+            current_year = datetime.now().year  # 直接使用 datetime 类
 
-            if result:
-                # Update the author
-                update_query = "UPDATE articles SET Author = %s WHERE Title = %s"
-                cursor.execute(update_query, (username, title))
-            else:
-                # Create a new record
-                insert_query = "INSERT INTO articles (Title, Author) VALUES (%s, %s)"
-                cursor.execute(insert_query, (title, username))
+            # 插入或更新文章信息，tags 写入当前年份
+            query = """
+            INSERT INTO articles (Title, Author, tags) 
+            VALUES (%s, %s, %s) 
+            ON DUPLICATE KEY UPDATE Author = %s, tags = %s;
+            """
+
+            logging.debug(
+                f"Executing SQL: {query} with parameters: {(title, username, current_year, username, current_year)}")
+            cursor.execute(query, (title, username, current_year, username, current_year))
+
+            # 记录事件信息
+            event_log = "INSERT INTO events (title, description, event_date, created_at) VALUES (%s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);"
+            event_title = 'article update'
+            event_description = f'{username} updated {title}'
+            cursor.execute(event_log, (event_title, event_description))
+
+            # 提交事务
             db.commit()
+            return True  # 表示操作成功
+
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logging.error(f"An error occurred during database operation: {e}")
+        # 事务回滚
+        db.rollback()
+        return False  # 表示操作失败
+
     finally:
-        try:
-            cursor.close()
-        except NameError:
-            pass
         db.close()
 
 
 @app.route('/Admin_upload', methods=['GET', 'POST'])
-def upload_file1():
-    if 'username' not in session:
-        return redirect(url_for('login'))
-    username = session['username']
-    ip = session['public_ip']
-    app.logger.info('当前访问的用户:{}, IP:{}'.format(username, ip))
-    if username:
-        db = get_database_connection()
-        cursor = db.cursor()
-        try:
-            query = "SELECT `role` FROM users WHERE username = %s"
-            cursor.execute(query, (username,))
-            ifAdmin = cursor.fetchone()[0]
-            if ifAdmin == 'Admin':
-                return zy_upload_file()
-        finally:
-            cursor.close()
-            db.close()
-    return False
+@admin_required
+def upload_file1(user_id):
+    return zy_upload_file()
 
 
 @app.route('/delete/<filename>', methods=['POST'])
-def delete_file(filename):
-    userStatus = get_user_status()
+@jwt_required
+def delete_file(user_id, filename):
     username = get_username()
-    auth = False  # 设置默认值
-
-    if userStatus and username is not None:
-        article = filename
-        # Auth 认证
-        auth = auth_articles(article, username)
-
-    if auth:
-
-        return zy_delete_file(filename)
-
+    if username:
+        auth = auth_articles(title=filename, username=username)
+        if auth:
+            return zy_delete_article(filename)
     else:
         return error(message='您没有权限', status_code=503)
 
@@ -876,12 +871,10 @@ def static_from_root():
 def markdown_editor(article):
     if article == 'default':
         return error(404, status_code=404)
-    # notice = read_file('notice/1.txt', 50)
-    userStatus = get_user_status()
     username = get_username()
     auth = False  # 设置默认值
 
-    if userStatus and username is not None:
+    if username is not None:
         # Auth 认证
         auth = auth_articles(article, username)
 
@@ -968,10 +961,9 @@ def edit_save():
     if article is None:
         return jsonify({'message': '404'}), 404
 
-    userStatus = get_user_status()
     username = get_username()
 
-    if userStatus is None or username is None:
+    if username is None:
         return jsonify({'message': '您没有权限'}), 503
 
     # Auth 认证
@@ -993,10 +985,9 @@ def hidden_article():
     if article is None:
         return jsonify({'message': '404'}), 404
 
-    userStatus = get_user_status()
     username = get_username()
 
-    if userStatus is None or username is None:
+    if username is None:
         return jsonify({'deal': 'noAuth'})
 
     auth = auth_articles(article, username)
@@ -1116,10 +1107,8 @@ def travel():
 def media_space():
     type = request.args.get('type', default='img')
     page = request.args.get('page', default=1, type=int)
-    userStatus = get_user_status()
-    username = get_username()
-
-    if userStatus and username is not None:
+    username = request.args.get('username', default=get_username())
+    if username is not None:
         if request.method == 'GET':
             if not type or type == 'img':
                 imgs, has_next_page, has_previous_page = get_all_img(username, page=page)
@@ -1224,28 +1213,74 @@ app.config['UPLOADED_PATH'] = 'media'
 
 
 @app.route('/upload_file', methods=['POST'])
-def upload_user_path():
-    userStatus = get_user_status()
+@jwt_required
+def upload_user_path(user_id):
     username = get_username()
 
-    if userStatus and username is not None:
-        if request.method == 'POST':
-            try:
+    if not username:
+        return jsonify({'message': 'failed, user not authenticated'}), 403
+
+    try:
+        # 定义允许上传的文件类型
+        allowed_types = {'.jpg', '.png', '.webp', '.jfif', '.pjpeg', '.jpeg', '.pjp', '.mp4', '.xmind'}
+        user_dir = os.path.join(app.config['UPLOADED_PATH'], username)  # 用户文件存储目录
+        os.makedirs(user_dir, exist_ok=True)  # 如果目录不存在则创建
+
+        file_records = []  # 用于存储文件记录的列表
+        with get_database_connection() as db:  # 使用上下文管理器获取数据库连接
+            with db.cursor() as cursor:  # 使用上下文管理器获取数据库游标
+                userid = user_id
+                # 处理每个上传的文件
                 for f in request.files.getlist('file'):
-                    if f.filename.lower().endswith(
-                            ('.jpg', '.png', '.webp', '.jfif', '.pjpeg', '.jpeg', '.pjp', '.mp4', '.xmind')):
-                        if f.content_length > 60 * 1024 * 1024:
-                            return 'File size exceeds the limit of 60MB'
-                        else:
-                            f.save(os.path.join(app.config['UPLOADED_PATH'], f'{username}', f.filename))
+                    if not is_allowed_file(f.filename, allowed_types):  # 检查文件类型
+                        continue
 
-                return 'success'
+                    if f.content_length > 60 * 1024 * 1024:  # 检查文件大小
+                        return jsonify({'message': 'File size exceeds the limit of 60MB'}), 413
 
-            except Exception as e:
-                print(f"Error in getting image path: {e}")
-                return 'failed'
-    else:
-        return 'failed'
+                    newfile_name = secure_filename(f.filename)  # 确保文件名是安全的
+                    newfile_path = os.path.join(user_dir, newfile_name)  # 生成新文件路径
+                    f.save(newfile_path)  # 保存文件
+
+                    # 确定文件类型
+                    file_type = ('image' if f.filename.lower().endswith(
+                        ('.jpg', '.jpeg', '.png', '.webp', '.jfif', '.pjpeg', '.pjp'))
+                                 else 'video' if f.filename.lower().endswith('.mp4')
+                    else 'document')
+
+                    # 查询是否存在相同的文件路径
+                    cursor.execute("SELECT `id` FROM `media` WHERE `file_path`=%s", (newfile_path,))
+                    existing_record = cursor.fetchone()
+
+                    if existing_record:
+                        # 更新已存在文件的 updated_at
+                        cursor.execute(
+                            "UPDATE `media` SET `updated_at`=%s WHERE `id`=%s",
+                            (datetime.now(), existing_record[0])
+                        )
+                    else:
+                        # 文件路径不存在，添加新的记录
+                        file_records.append((userid, newfile_path, file_type, datetime.now(), datetime.now()))  # 添加文件记录
+                        app.logger.info(f'User: {username}, Uploaded file: {newfile_name}')  # 记录上传日志
+
+                # 如果有文件记录，则插入数据库
+                if file_records:
+                    insert_query = ("INSERT INTO `media` (`user_id`, `file_path`, `file_type`, `created_at`, "
+                                    "`updated_at`) VALUES (%s, %s, %s, %s, %s)")
+                    cursor.executemany(insert_query, file_records)  # 批量插入文件记录
+
+            db.commit()  # 提交数据库事务
+
+        return jsonify({'message': 'success'}), 200  # 返回成功响应
+
+    except Exception as e:
+        app.logger.error(f"Error in file upload: {e}")  # 记录错误日志
+        return jsonify({'message': 'failed', 'error': str(e)}), 500
+
+
+def is_allowed_file(filename, allowed_types):
+    # 检查文件是否是允许的类型
+    return any(filename.lower().endswith(ext) for ext in allowed_types)
 
 
 @app.route('/zyVideo/<username>/<video_name>')
@@ -1283,8 +1318,8 @@ def cc_login(provider):
 
     redirect_uri = domain + "callback/" + provider
 
-    api_safeCheck = [api_host, app_id, app_key]
-    if 'error' in api_safeCheck:
+    api_safe_check = [api_host, app_id, app_key]
+    if 'error' in api_safe_check:
         return render_template('error.html', error='请检查你的第三方登录配置文件')
     login_url = f'{api_host}connect.php?act=login&appid={app_id}&appkey={app_key}&type={provider}&redirect_uri={redirect_uri}'
     response = requests.get(login_url)
@@ -1304,8 +1339,6 @@ def callback(provider):
     user_email = ''
     if provider not in ['qq', 'wx', 'alipay', 'sina', 'baidu', 'huawei', 'xiaomi', 'dingtalk']:
         return jsonify({'message': 'Invalid login provider'})
-
-    # Replace with your app's credentials
 
     authorization_code = request.args.get('code')
 
@@ -1334,6 +1367,19 @@ def callback(provider):
 @cache.cached(timeout=300, key_prefix='display_detail')
 @app.route('/theme/<theme_id>')
 def get_theme_detail(theme_id):
+    if theme_id == 'default':
+        theme_properties = {
+            'id': theme_id,
+            'author': title,
+            'title': "恢复系统默认",
+            'authorWebsite': domain,
+            'version': sys_version,
+            'versionCode': "None",
+            'updateUrl': "None",
+            'screenshot': "None",
+        }
+
+        return jsonify(theme_properties)
     if os.path.exists(f'templates/theme/{theme_id}'):
         theme_detail = configparser.ConfigParser()
         # 读取 template.ini 文件
@@ -1343,8 +1389,8 @@ def get_theme_detail(theme_id):
         author = theme_detail.get('default', 'author').strip("'")
         theme_title = theme_detail.get('default', 'title').strip("'")
         author_website = theme_detail.get('default', 'authorWebsite').strip("'")
-        version = theme_detail.get('default', 'version').strip("'")
-        version_code = theme_detail.get('default', 'versionCode').strip("'")
+        theme_version = theme_detail.get('default', 'version').strip("'")
+        theme_version_code = theme_detail.get('default', 'versionCode').strip("'")
         update_url = theme_detail.get('default', 'updateUrl').strip("'")
         screenshot = theme_detail.get('default', 'screenshot').strip("'")
 
@@ -1353,8 +1399,8 @@ def get_theme_detail(theme_id):
             'author': author,
             'title': theme_title,
             'authorWebsite': author_website,
-            'version': version,
-            'versionCode': version_code,
+            'version': theme_version,
+            'versionCode': theme_version_code,
             'updateUrl': update_url,
             'screenshot': screenshot,
         }
@@ -1364,6 +1410,8 @@ def get_theme_detail(theme_id):
 
 @app.route('/theme/<theme_id>/<img_name>')
 def get_screenshot(theme_id, img_name):
+    if theme_id == 'default':
+        return send_file('../static/favicon.ico', mimetype='image/png')
     try:
         img_dir = os.path.join(base_dir, 'templates', 'theme', theme_id, img_name)
 
@@ -1398,8 +1446,8 @@ def diy_space(page):
         with open(template_path, 'r', encoding=global_encoding) as file:
             html_content = file.read()
             resp = make_response(html_content)
-            visitID = version + format(random.randint(10000, 99999))  # 可以设置一个默认值或者抛出异常，具体根据需求进行处理
-            resp.set_cookie('visitID', 'zyBLOG' + visitID, 7200)
+            visit_id = sys_version + format(random.randint(10000, 99999))  # 可以设置一个默认值或者抛出异常，具体根据需求进行处理
+            resp.set_cookie('visitID', 'zyBLOG' + visit_id, 7200)
         return resp
     return render_template('error.html')
 
@@ -1475,7 +1523,7 @@ def id_find_article(article_id):
     except Exception as e:
         logging.error(f"An error occurred: {str(e)}")
         db.rollback()
-        return error(message='服务器内部错误', status_code=500)
+        return error(message='服务器内部错误', status_code=500), 500
     finally:
         ip_address = get_client_ip(request, session)
         app.logger.info(f'IP:{ip_address}, UA:{user_agent}')
@@ -1507,7 +1555,8 @@ def sys_out_user_file(author, file_name):
 
 
 @app.route('/preview', methods=['GET'])
-def sys_out_prev_page():
+@jwt_required
+def sys_out_prev_page(user_id):
     user = request.args.get('user')
     file_name = request.args.get('file_name')
     prev_file_path = os.path.join(base_dir, 'media', str(user), file_name)
@@ -1519,16 +1568,24 @@ def sys_out_prev_page():
                                url_for=url_for, article_Surl='-')
 
 
-@app.route('/test')
-def test():
+@app.route('/api/mail')
+@jwt_required
+def api_mail(user_id):
     from src.utils import zy_mail_conf
     from src.notification import send_email
     smtp_server, stmp_port, sender_email, password = zy_mail_conf()
     receiver_email = sender_email
     subject = '安全通知邮件'  # 邮件主题
     body = '这是一封测试邮件。'  # 邮件正文
-    send_email(sender_email, password, receiver_email, smtp_server,stmp_port=int(stmp_port), subject=subject, body=body)
+    send_email(sender_email, password, receiver_email, smtp_server, stmp_port=int(stmp_port), subject=subject,
+               body=body)
     return 'success'
+
+
+@app.route('/test')
+def test():
+    alert = "hello world"
+    return alert
 
 
 @app.errorhandler(404)
@@ -1540,7 +1597,7 @@ def page_not_found(error_message):
 @app.errorhandler(500)
 def internal_server_error(error_message):
     app.logger.error(error_message)
-    return "Internal server error", 500
+    return error(message=error_message, status_code=500), 500
 
 
 @app.route('/<path:undefined_path>')
@@ -1552,4 +1609,4 @@ def undefined_route(undefined_path):
 @app.errorhandler(Exception)
 def handle_unexpected_error(error_message):
     app.logger.error(error_message)
-    return "An unexpected error occurred", 500
+    return error(message=error_message, status_code=500), 500

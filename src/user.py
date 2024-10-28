@@ -37,34 +37,24 @@ def zyadmin(key, method):
     if key == door_key:
         return back(method)
     else:
-        return redirect(url_for('space'))
+        return redirect(url_for('profile'))
 
 
 def back(method):
     if session.get('logged_in'):
-        username = session.get('username')
-        if username:
-            db = get_database_connection()
-            cursor = db.cursor()
-            try:
-                query = "SELECT `role` FROM users WHERE username = %s"
-                cursor.execute(query, (username,))
-                ifAdmin = cursor.fetchone()[0]
-                if ifAdmin == 'Admin':
-                    query = "SHOW TABLE STATUS WHERE Name IN ('articles', 'users', 'comments','media','events')"
-                    cursor.execute(query)
-                    dash_info = cursor.fetchall()
-                    return admin_dashboard(method, dash_info), 200
-                else:
-                    return redirect(url_for('space'))
-            except Exception as e:
-                logging.error(f"Error logging in: {e}")
-                return error("未知错误", 500)
-            finally:
-                cursor.close()
-                db.close()
-        else:
-            return error("请先登录", 401)
+        db = get_database_connection()
+        cursor = db.cursor()
+        try:
+            query = "SHOW TABLE STATUS WHERE Name IN ('articles', 'users', 'comments','media','events')"
+            cursor.execute(query)
+            dash_info = cursor.fetchall()
+            return admin_dashboard(method, dash_info), 200
+        except Exception as e:
+            logging.error(f"Error logging in: {e}")
+            return error("未知错误", 500)
+        finally:
+            cursor.close()
+            db.close()
     else:
         return error("请先登录", 401)
 
@@ -75,13 +65,13 @@ def admin_dashboard(method, dashInfo):
     else:
         # print(dashInfo)
         display_list = get_all_themes()
-        currentDisPlay = config.get('general', 'theme').strip("'")
+        currentDisPlay = session.get('display', 'default')
         return render_template('dashboard.html', displayList=display_list,
                                currentDisplay=currentDisPlay, dashInfo=dashInfo)
 
 
 def get_all_themes():
-    display_list = []
+    display_list = ['default']
     themes_path = 'templates/theme'
     if os.path.exists(themes_path):
         subfolders = [f.path for f in os.scandir(themes_path) if f.is_dir()]
@@ -91,22 +81,8 @@ def get_all_themes():
             has_template_ini = os.path.exists(os.path.join(subfolder, 'template.ini'))
             if has_index_html and has_screenshot_png and has_template_ini:
                 display_list.append(os.path.basename(subfolder))
+    # print(display_list)
     return display_list
-
-
-def zy_new_article():
-    if session.get('logged_in'):
-        username = session.get('username')
-        if username:
-            try:
-                return render_template('postNewArticle.html', theme=session['theme'])
-            except Exception as e:
-                logging.error(f"Error logging in: {e}")
-                return error("未知错误", 500)
-        else:
-            return error("请先登录", 401)
-    else:
-        return error("请先登录", 401)
 
 
 def show_files(path):
@@ -116,51 +92,52 @@ def show_files(path):
     return files
 
 
-def zy_delete_file(filename):
+def zy_delete_article(filename):
     # 指定目录的路径
     directory = 'articles/'
-
-    filename = filename + '.md'
-    # 构建文件的完整路径
-    file_path = os.path.join(directory, filename)
+    db = None
+    cursor = None
     try:
         db = get_database_connection()
         with db.cursor() as cursor:
-            query = "DELETE FROM articles WHERE Title = %s;"
-            cursor.execute(query, (filename,))
+            query = "UPDATE `articles` SET `Status` = 'Deleted' WHERE `articles`.`Title` = %s;"
+            cursor.execute(query, (filename,))  # 确保 filename 与数据库中存储的格式一致
             db.commit()
+            filename = filename + '.md'
+            # 构建文件的完整路径
+            file_path = os.path.join(directory, filename)
             # 删除文件
             os.remove(file_path)
             return 'success'
     except Exception as e:
         return 'failed: ' + str(e)
     finally:
-        try:
+        if cursor:
             cursor.close()
+        if db:
             db.close()
-        except NameError:
-            pass
 
 
-def get_owner_articles(author):
+def get_owner_articles(owner_id=None, user_name=None):
     db = get_database_connection()
     articles = []
 
     try:
         with db.cursor() as cursor:
-            query = "SELECT Title FROM articles WHERE Author = %s"
-            cursor.execute(query, (author,))
-            results = cursor.fetchall()
+            if user_name:
+                query = "SELECT Title FROM articles WHERE `Author` = %s and `Status` != 'Deleted';"
+                cursor.execute(query, (user_name,))
+                articles.extend(result[0] for result in cursor.fetchall())
 
-            for result in results:
-                articles.append(result[0])
+            if owner_id:
+                query = """
+                SELECT a.Title FROM articles AS a JOIN users AS u ON a.Author = u.username WHERE u.id = %s;
+                """
+                cursor.execute(query, (owner_id,))
+                articles.extend(result[0] for result in cursor.fetchall())
     except Exception as e:
         print(f"An error occurred: {e}")
     finally:
-        try:
-            cursor.close()
-        except NameError:
-            pass
         db.close()
 
     return articles
