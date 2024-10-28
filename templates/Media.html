@@ -298,6 +298,7 @@
         // 发起POST请求获取图像数据
         fetch('/media', {
             method: 'POST',
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json'
             },
@@ -363,7 +364,8 @@
 
 
     function startVideo(video) {
-        var username = "{{ username }}";  // Replace with the actual username
+        var username = "{{ userid}}";
+        //console.log(userid)
         var videoSrc = "/zyVideo/" + username + "/" + video;
 
         var videoElement = document.getElementById("video-image");

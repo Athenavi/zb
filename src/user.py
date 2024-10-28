@@ -95,27 +95,27 @@ def show_files(path):
 def zy_delete_article(filename):
     # 指定目录的路径
     directory = 'articles/'
-
-    filename = filename + '.md'
-    # 构建文件的完整路径
-    file_path = os.path.join(directory, filename)
+    db = None
+    cursor = None
     try:
         db = get_database_connection()
         with db.cursor() as cursor:
             query = "UPDATE `articles` SET `Status` = 'Deleted' WHERE `articles`.`Title` = %s;"
-            cursor.execute(query, (filename,))
+            cursor.execute(query, (filename,))  # 确保 filename 与数据库中存储的格式一致
             db.commit()
+            filename = filename + '.md'
+            # 构建文件的完整路径
+            file_path = os.path.join(directory, filename)
             # 删除文件
             os.remove(file_path)
             return 'success'
     except Exception as e:
         return 'failed: ' + str(e)
     finally:
-        try:
+        if cursor:
             cursor.close()
+        if db:
             db.close()
-        except NameError:
-            pass
 
 
 def get_owner_articles(owner_id=None, user_name=None):
@@ -125,7 +125,7 @@ def get_owner_articles(owner_id=None, user_name=None):
     try:
         with db.cursor() as cursor:
             if user_name:
-                query = "SELECT Title FROM articles WHERE `Author` = %s and `Status` = 'Published';"
+                query = "SELECT Title FROM articles WHERE `Author` = %s and `Status` != 'Deleted';"
                 cursor.execute(query, (user_name,))
                 articles.extend(result[0] for result in cursor.fetchall())
 

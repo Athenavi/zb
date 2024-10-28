@@ -69,13 +69,23 @@ print(
 print("++++++++++==========================++++++++++")
 
 
+@app.context_processor
+def inject_variables():
+    return dict(
+        beian=beian,
+        username=get_username,
+        domain=domain
+    )
+
+
 @app.route('/login', methods=['POST', 'GET'])
 def login():
+    callback = request.args.get('callback', 'home')
     if request.cookies.get('jwt'):
         # 如果存在 jwt，解析并获取用户状态
         user_id = authenticate_jwt(request.cookies.get('jwt'))
         if user_id:
-            return redirect(url_for('home'))
+            return redirect(url_for(callback))
     if request.method == 'POST':
         return zy_login()
 
@@ -262,11 +272,11 @@ def get_avatar():
 
 
 @app.route('/profile', methods=['GET', 'POST'])
-def profile():
+@jwt_required
+def profile(user_id):
     avatar_url = get_avatar() or domain + 'static/favicon.ico'
     owner_id = request.args.get('id')
     username = get_username()
-
     if owner_id is None or owner_id == '':
         owner_articles = get_owner_articles(owner_id=None, user_name=username) or []
     else:
@@ -276,7 +286,7 @@ def profile():
 
     # 确保 render_template 返回正确对象
     return render_template('Profile.html', url_for=url_for, avatar_url=avatar_url,
-                           userStatus=1, username=username,
+                           userStatus=bool(user_id), username=username,
                            Articles=owner_articles, notiHost=notiHost)
 
 
@@ -285,9 +295,8 @@ def profile():
 def setting_profiles(user_id):
     avatar_url = get_avatar() or domain + 'static/favicon.ico'
     username = get_username()
-
     return render_template('setting.html', url_for=url_for, avatar_url=avatar_url,
-                           userStatus=True, username=username)
+                           userStatus=bool(user_id), username=username)
 
 
 def get_unique_tags():
@@ -440,9 +449,7 @@ def home():
         infoList = get_article_info(articles)
         articles_time_list = zip(articles, infoList)
 
-        # 获取用户名
-        username = session.get('username')
-        app.logger.info(f'当前访问的用户: {username}, IP: {ip}')
+        app.logger.info(f'当前访问的用户, IP: {ip}')
 
         # 渲染模板并存储渲染后的页面内容到缓存中
         rendered_content = template.render(
@@ -451,15 +458,12 @@ def home():
             current_page=page, tags=tags, tag=tag
         )
         # 缓存渲染后的页面内容，并设置服务端缓存过期时间
-        cache.set(cache_key, rendered_content, timeout=60)
+        cache.set(cache_key, rendered_content, timeout=72)
         resp = make_response(rendered_content)
 
-        if username is None:
-            username = 'qks' + format(random.randint(10000, 99999))
-            app.logger.warning('未找到用户名，生成随机用户名: %s', username)
-            session['username'] = username
-
-        resp.set_cookie('key', 'zyBLOG' + username, 7200)
+        visiter = 'qks' + format(random.randint(10000, 99999))
+        app.logger.warning('新访客，生成随机用户名: %s', visiter)
+        resp.set_cookie('key', 'zyBLOG_' + sys_version + visiter, 7200)
         return resp
 
     else:
@@ -765,7 +769,7 @@ def handle_file_upload(file):
 @app.route('/newArticle', methods=['GET', 'POST'])
 @jwt_required
 def new_article(user_id):
-    username = session.get('username')
+    username = get_username()
     if not username:
         error(message='请先登录', status_code=401)
     if request.method == 'GET':
@@ -844,7 +848,7 @@ def upload_file1(user_id):
 @app.route('/delete/<filename>', methods=['POST'])
 @jwt_required
 def delete_file(user_id, filename):
-    username = session.get('username')
+    username = get_username()
     if username:
         auth = auth_articles(title=filename, username=username)
         if auth:
@@ -1100,44 +1104,46 @@ def travel():
 
 
 @app.route('/media', methods=['GET', 'POST'])
-@jwt_required
-def media_space(user_id):
+def media_space():
     type = request.args.get('type', default='img')
     page = request.args.get('page', default=1, type=int)
-    username = get_username()
-    if request.method == 'GET':
-        if not type or type == 'img':
-            imgs, has_next_page, has_previous_page = get_all_img(username, page=page)
+    username = request.args.get('username', default=get_username())
+    if username is not None:
+        if request.method == 'GET':
+            if not type or type == 'img':
+                imgs, has_next_page, has_previous_page = get_all_img(username, page=page)
 
-            return render_template('Media.html', imgs=imgs, title='Media', url_for=url_for,
-                                   has_next_page=has_next_page,
-                                   has_previous_page=has_previous_page, current_page=page, userid=username,
-                                   domain=domain)
-        if type == 'video':
-            videos, has_next_page, has_previous_page = get_all_video(username, page=page)
+                return render_template('Media.html', imgs=imgs, title='Media', url_for=url_for,
+                                       theme=session.get('theme'), has_next_page=has_next_page,
+                                       has_previous_page=has_previous_page, current_page=page, userid=username,
+                                       domain=domain)
+            if type == 'video':
+                videos, has_next_page, has_previous_page = get_all_video(username, page=page)
 
-            return render_template('Media.html', videos=videos, title='Media', url_for=url_for,
-                                   has_next_page=has_next_page,
-                                   has_previous_page=has_previous_page, current_page=page, userid=username,
-                                   domain=domain)
+                return render_template('Media.html', videos=videos, title='Media', url_for=url_for,
+                                       theme=session.get('theme'), has_next_page=has_next_page,
+                                       has_previous_page=has_previous_page, current_page=page, userid=username,
+                                       domain=domain)
 
-        if type == 'xmind':
-            xminds, has_next_page, has_previous_page = get_all_xmind(username, page=page)
+            if type == 'xmind':
+                xminds, has_next_page, has_previous_page = get_all_xmind(username, page=page)
 
-            return render_template('Media.html', xminds=xminds, title='Media', url_for=url_for,
-                                   has_next_page=has_next_page,
-                                   has_previous_page=has_previous_page, current_page=page, userid=username,
-                                   domain=domain)
-    elif request.method == 'POST':
-        img_name = request.json.get('img_name')
-        if not img_name:
-            return error(message='缺少图像名称', status_code=400)
+                return render_template('Media.html', xminds=xminds, title='Media', url_for=url_for,
+                                       theme=session.get('theme'), has_next_page=has_next_page,
+                                       has_previous_page=has_previous_page, current_page=page, userid=username,
+                                       domain=domain)
+        elif request.method == 'POST':
+            img_name = request.json.get('img_name')
+            if not img_name:
+                return error(message='缺少图像名称', status_code=400)
 
-        image = get_image_path(username, img_name)
-        if not image:
-            return error(message='未找到图像', status_code=404)
+            image = get_image_path(username, img_name)
+            if not image:
+                return error(message='未找到图像', status_code=404)
 
-        return image
+            return image
+
+    return error(message='您没有权限', status_code=503)
 
 
 def get_media_list(username, category, page=1, per_page=10):
