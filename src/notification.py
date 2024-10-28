@@ -1,13 +1,15 @@
 from datetime import timedelta
+
 import flask_socketio
-from flask import Flask, request, jsonify, session
+from flask import Flask, request, jsonify
 from flask_caching import Cache
+
 from src.database import get_database_connection
-from src.utils import zy_noti_conf, get_user_status, get_username
+from src.utils import zy_noti_conf, authenticate_jwt, secret_key
 
 noti = Flask(__name__, template_folder='../templates')
 socketio = flask_socketio.SocketIO(noti, cors_allowed_origins='*')
-noti.secret_key = 'your_secret_key'
+noti.secret_key = secret_key
 noti.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=3)
 noti.config['SESSION_COOKIE_NAME'] = 'zb_session'
 
@@ -21,28 +23,36 @@ def run_socketio():
     socketio.run(noti, port=notiPort)
 
 
+def get_user_id():
+    token = request.cookies.get('jwt')
+    print(token)
+    if token:
+        user_info = authenticate_jwt(token)
+        return user_info
+    else:
+        return None
+
+
 @noti.route('/')
 def send_notification():
-    username = get_username()
-    print(f"发送通知的用户名: {username}")
+    user_id = get_user_id()
+    print(f"发送通知的用户: {user_id}")
 
-    if not username:
-        return emit_notification("用户名未找到")
+    if not user_id:
+        return emit_notification("没有更多消息")
 
     # 从缓存中获取通知消息
-    cached_message = cache.get(username)
+    cached_message = cache.get(user_id)
     if cached_message is not None:
         print(f'从缓存获取通知: {cached_message}')
         return emit_notification(cached_message)
 
-    # 查询用户状态并获取通知
-    if get_user_status():
-        notification_message = get_sys_notice(username)
-        cache.set(username, notification_message, timeout=300)  # 设置缓存有效期为5分钟
-    else:
-        notification_message = "当前用户状态不佳，无法获取通知"
+    # 如果缓存中没有，尝试从数据库中获取通知
+    notice_message = get_sys_notice(user_id)
+    if notice_message:
+        return emit_notification(notice_message)
 
-    return emit_notification(notification_message)
+    return emit_notification("没有更多消息")
 
 
 def emit_notification(notification_message):
@@ -50,19 +60,13 @@ def emit_notification(notification_message):
     return notification_message
 
 
-def get_sys_notice(username):
+def get_sys_notice(user_id):
     notice = "当前用户没有更多通知"
     try:
         with get_database_connection() as db:
             with db.cursor() as cursor:
                 # 查询用户ID及其未读通知
-                cursor.execute("""
-                    SELECT n.id,n.user_id,n.type,n.message,n.is_read,n.created_at,n.updated_at
-                    FROM users AS u 
-                    JOIN notifications AS n ON u.id = n.user_id 
-                    WHERE u.username = %s AND n.is_read = 0
-                """, (username,))
-
+                cursor.execute("""SELECT * FROM notifications WHERE user_id = %s;""", (user_id,))
                 existing_records = cursor.fetchall()
                 print(f'获取的通知记录: {existing_records}')
 
@@ -78,10 +82,10 @@ def get_sys_notice(username):
 
 @noti.route('/read')
 def read_notification():
-    username = get_username()
+    user_id = get_user_id()
     nid = request.args.get('nid')
 
-    if not username or not nid:
+    if not user_id or not nid:
         return jsonify({"is_notice_read": False})
 
     is_notice_read = False
@@ -89,18 +93,15 @@ def read_notification():
         with get_database_connection() as db:
             with db.cursor() as cursor:
                 # 直接更新所读通知
-                cursor.execute("""
-                    UPDATE notifications 
-                    SET is_read = 1 
-                    WHERE id = %s AND user_id = (SELECT id FROM users WHERE username = %s)
-                """, (nid, username))
+                cursor.execute("""UPDATE notifications SET is_read = 1 WHERE id = %s AND user_id = %s;""",
+                               (nid, user_id))
 
                 db.commit()
                 if cursor.rowcount > 0:
                     is_notice_read = True
                     # 更新缓存
-                    updated_notice = get_sys_notice(username)
-                    cache.set(username, updated_notice, timeout=300)
+                    updated_notice = get_sys_notice(user_id)
+                    cache.set(user_id, updated_notice, timeout=300)
 
     except Exception as e:
         print(f"获取通知时发生错误: {e}")

@@ -33,25 +33,22 @@ def error(message, status_code):
     return render_template('error.html', error=message, status_code=status_code), status_code
 
 
-def zyadmin(key, method, user_id):
+def zyadmin(key, method):
     if key == door_key:
-        return back(method, user_id)
+        return back(method)
     else:
-        return redirect(url_for('space'))
+        return redirect(url_for('profile'))
 
 
-def back(method, user_id):
+def back(method):
     if session.get('logged_in'):
         db = get_database_connection()
         cursor = db.cursor()
         try:
-            if user_id == 1:
-                query = "SHOW TABLE STATUS WHERE Name IN ('articles', 'users', 'comments','media','events')"
-                cursor.execute(query)
-                dash_info = cursor.fetchall()
-                return admin_dashboard(method, dash_info), 200
-            else:
-                return redirect(url_for('space'))
+            query = "SHOW TABLE STATUS WHERE Name IN ('articles', 'users', 'comments','media','events')"
+            cursor.execute(query)
+            dash_info = cursor.fetchall()
+            return admin_dashboard(method, dash_info), 200
         except Exception as e:
             logging.error(f"Error logging in: {e}")
             return error("未知错误", 500)
@@ -121,25 +118,26 @@ def zy_delete_article(filename):
             pass
 
 
-def get_owner_articles(author):
+def get_owner_articles(owner_id=None, user_name=None):
     db = get_database_connection()
     articles = []
 
     try:
         with db.cursor() as cursor:
-            query = "SELECT Title FROM articles WHERE `Author` = %s and `Status` = 'Published';"
-            cursor.execute(query, (author,))
-            results = cursor.fetchall()
+            if user_name:
+                query = "SELECT Title FROM articles WHERE `Author` = %s and `Status` = 'Published';"
+                cursor.execute(query, (user_name,))
+                articles.extend(result[0] for result in cursor.fetchall())
 
-            for result in results:
-                articles.append(result[0])
+            if owner_id:
+                query = """
+                SELECT a.Title FROM articles AS a JOIN users AS u ON a.Author = u.username WHERE u.id = %s;
+                """
+                cursor.execute(query, (owner_id,))
+                articles.extend(result[0] for result in cursor.fetchall())
     except Exception as e:
         print(f"An error occurred: {e}")
     finally:
-        try:
-            cursor.close()
-        except NameError:
-            pass
         db.close()
 
     return articles

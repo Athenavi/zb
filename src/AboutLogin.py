@@ -3,46 +3,48 @@ import random
 from datetime import timedelta
 
 import bcrypt
-import bleach  # 导入 bleach 库用于 XSS 防范
+import bleach
 from flask import request, session, redirect, url_for, render_template, app, make_response
 
 from src.database import get_database_connection
+from src.utils import generate_jwt, generate_refresh_token
 
 
 def zy_login():
-    if request.method == 'POST':
-        input_value = bleach.clean(request.form['username'])  # 用户输入的用户名或邮箱
-        password = bleach.clean(request.form['password'])
+    input_value = bleach.clean(request.form['username'])  # 用户输入的用户名或邮箱
+    password = bleach.clean(request.form['password'])
 
-        if input_value == 'guest@7trees.cn':
-            return render_template('Login.html', error="宾客账户仅能使用用户名登录")
+    if input_value == 'guest@7trees.cn':
+        return render_template('Login.html', error="宾客账户仅能使用用户名登录")
 
-        db = get_database_connection()
-        cursor = db.cursor()
+    db = get_database_connection()
+    cursor = db.cursor()
 
-        try:
-            query = "SELECT * FROM users WHERE (username = %s OR email = %s) AND username <> 'guest@7trees.cn'"
-            cursor.execute(query, (input_value, input_value))
-            result = cursor.fetchone()
+    try:
+        query = "SELECT * FROM users WHERE (username = %s OR email = %s) AND username <> 'guest@7trees.cn'"
+        cursor.execute(query, (input_value, input_value))
+        result = cursor.fetchone()
 
-            if result is not None and bcrypt.checkpw(password.encode('utf-8'), result[2].encode('utf-8')):
-                session.permanent = True
-                app.permanent_session_lifetime = timedelta(minutes=120)
-                session['logged_in'] = True
-                session['username'] = result[1]
-                return result[0]
-            else:
-                return render_template('Login.html', error="Invalid username or password")
+        if result is not None and bcrypt.checkpw(password.encode('utf-8'), result[2].encode('utf-8')):
+            # 登录成功，生成 JWT 和刷新令牌
+            user_id = result[0]  # 假设 result[0] 是用户ID
+            user_name = result[1]
+            token = generate_jwt(user_id, user_name)  # 生成 JWT
+            refresh_token = generate_refresh_token(user_id, user_name)  # 生成刷新令牌
+            response = make_response(redirect(url_for('home')))
+            response.set_cookie('jwt', token, httponly=True)
+            response.set_cookie('refresh_token', refresh_token, httponly=True)
+            return response
+        else:
+            return render_template('Login.html', error="Invalid username or password")
 
-        except Exception as e:
-            logging.error(f"Error logging in: {e}")
-            return "登录失败"
+    except Exception as e:
+        logging.error(f"Error logging in: {e}")
+        return "登录失败"
 
-        finally:
-            cursor.close()
-            db.close()
-
-    return render_template('Login.html', title="登录")
+    finally:
+        cursor.close()
+        db.close()
 
 
 def zy_register(ip):
@@ -64,19 +66,19 @@ def zy_register(ip):
                 return render_template('zyregister.html', title="注册新用户",
                                        msg='该用户名已被注册，请选择其他用户名!')
 
-                # 执行用户注册的逻辑
+            # 执行用户注册的逻辑
             hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-            insert_query = "INSERT INTO users (username, password,register_ip) VALUES (%s, %s,%s)"
+            insert_query = "INSERT INTO users (username, password, register_ip) VALUES (%s, %s, %s)"
             cursor.execute(insert_query, (username, hashed_password, ip))
             db.commit()
-            session.pop('logged_in', None)
-            session.pop('username', None)
-            session.pop('password_confirmed', None)
+
+            # 注册成功后，可以生成 JWT 令牌（可选）
             return render_template('success.html')
 
         except Exception as e:
             logging.error(f"Error registering user: {e}")
             return render_template('zyregister.html', title="注册新用户", msg='注册失败!')
+
         finally:
             cursor.close()
             db.close()

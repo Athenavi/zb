@@ -9,7 +9,6 @@ import re
 import shutil
 import time
 import urllib.parse
-import urllib.parse
 import xml.etree.ElementTree as ElementTree
 from datetime import datetime, timedelta
 from functools import wraps
@@ -32,15 +31,16 @@ from src.BlogDeal import get_article_names, get_article_content, clear_html_form
 from src.database import get_database_connection
 from src.links import create_special_url
 from src.user import zyadmin, zy_delete_article, error, get_owner_articles, zy_general_conf
-from src.utils import zy_upload_file, get_user_status, get_username, get_client_ip, read_file, \
-    zy_save_edit, zy_noti_conf
+from src.utils import zy_upload_file, get_client_ip, read_file, \
+    zy_save_edit, zy_noti_conf, generate_jwt, secret_key, authenticate_jwt, \
+    authenticate_refresh_token
 
 global_encoding = 'utf-8'
 
 app = Flask(__name__, template_folder='../templates', static_folder="../static")
 app.config['CACHE_TYPE'] = 'simple'
 cache = Cache(app)
-app.secret_key = 'your_secret_key'
+app.secret_key = secret_key
 app.config['SESSION_COOKIE_NAME'] = 'zb_session'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=3)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)  # 添加 ProxyFix 中间件
@@ -61,38 +61,6 @@ app.logger.setLevel(logging.INFO)
 
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-JWT_EXPIRATION_DELTA = 10800
-
-
-def generate_jwt(user_id):
-    expiration_time = datetime.utcnow() + timedelta(seconds=JWT_EXPIRATION_DELTA)
-    payload = {
-        'user_id': user_id,
-        'exp': expiration_time
-    }
-
-    return jwt.encode(payload, app.secret_key, algorithm='HS256')
-
-
-def authenticate_jwt(token):
-    try:
-        payload = jwt.decode(token, app.secret_key, algorithms=['HS256'])
-        return payload['user_id']
-    except jwt.ExpiredSignatureError:
-        return None
-    except jwt.InvalidTokenError:
-        return None
-
-
-# 添加用户状态和用户名
-@app.context_processor
-def inject_variables():
-    return dict(
-        userStatus=get_user_status(),
-        username=get_username(),
-    )
-
-
 domain, title, beian, sys_version, api_host, app_id, app_key = zy_general_conf()
 print("please check information")
 print("++++++++++==========================++++++++++")
@@ -103,37 +71,29 @@ print("++++++++++==========================++++++++++")
 
 @app.route('/login', methods=['POST', 'GET'])
 def login():
-    if 'logged_in' in session:
-        callback = session.get('callback', 'home')
-        return redirect(url_for(callback))
-
-    callback = request.args.get('callback', 'home')
-    session['callback'] = callback
-
-    if request.method == 'POST':
-        user_id = zy_login()  # 假设 zy_login 返回用户ID
+    if request.cookies.get('jwt'):
+        # 如果存在 jwt，解析并获取用户状态
+        user_id = authenticate_jwt(request.cookies.get('jwt'))
         if user_id:
-            session.pop('callback', None)
-            token = generate_jwt(user_id)
-            response = make_response(redirect(url_for(callback)))
-            response.set_cookie('jwt', token, httponly=True)  # 设置 HttpOnly Cookie
-            return response
+            return redirect(url_for('home'))
+    if request.method == 'POST':
+        return zy_login()
 
-    return zy_login()
-
-
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    ip = get_client_ip(request, session)
-    return zy_register(ip)
+    return render_template('Login.html', title="登录")
 
 
 @app.route('/logout')
 def logout():
     response = make_response(redirect(url_for('login')))
     response.set_cookie('jwt', '', expires=0)  # 清除 Cookie
-    session.clear()
+    response.set_cookie('refresh_token', '', expires=0)  # 清除刷新令牌
     return response
+
+
+@app.route('/register', methods=['POST', 'GET'])
+def register():
+    ip = get_client_ip(request, session)
+    return zy_register(ip)
 
 
 def jwt_required(f):
@@ -148,11 +108,45 @@ def jwt_required(f):
     return decorated_function
 
 
+@app.before_request
+def check_jwt_expiration():
+    # 检查 JWT 是否即将过期
+    token = request.cookies.get('jwt')
+    if token:
+        payload = jwt.decode(token, app.secret_key, algorithms=['HS256'], options={"verify_exp": False})
+        if 'exp' in payload and datetime.utcfromtimestamp(payload['exp']) < datetime.utcnow() + timedelta(minutes=5):
+            # 如果 JWT 将在 5 分钟内过期，允许校验刷新令牌
+            refresh_token = request.cookies.get('refresh_token')
+            user_id = authenticate_refresh_token(refresh_token)
+            if user_id:
+                new_token = generate_jwt(user_id, payload['username'])
+                response = make_response()
+                response.set_cookie('jwt', new_token, httponly=True)  # 刷新 JWT
+                return response
+
+
+def get_username():
+    token = request.cookies.get('jwt')
+    if token:
+        payload = jwt.decode(token, app.secret_key, algorithms=['HS256'], options={"verify_exp": False})
+        return payload['username']
+
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = request.cookies.get('jwt')
+        user_id = authenticate_jwt(token)
+        if user_id != 1:
+            return error(message="Unauthorized", status_code=403)
+        return f(user_id, *args, **kwargs)
+
+    return decorated_function
+
+
 @app.route('/search', methods=['GET', 'POST'])
 @jwt_required
 def search(user_id):
-    if 'logged_in' not in session:
-        return render_template('Login.html', error='登陆后可以使用此功能')
     matched_content = []
 
     if request.method == 'POST':
@@ -270,26 +264,19 @@ def get_avatar():
 @app.route('/profile', methods=['GET', 'POST'])
 def profile():
     avatar_url = get_avatar() or domain + 'static/favicon.ico'
-    userStatus = get_user_status()
+    owner_id = request.args.get('id')
     username = get_username()
-    owner_articles = None
 
-    if userStatus and username is not None:
-        owner_name = request.args.get('id')
-        if owner_name is None or owner_name == '':
-            owner_name = username
-        owner_articles = get_owner_articles(owner_name)
-
-    if owner_articles is None:
-        owner_articles = []  # 设置为空列表
-
-    if 'default' in owner_articles:
-        owner_articles.remove('default')
+    if owner_id is None or owner_id == '':
+        owner_articles = get_owner_articles(owner_id=None, user_name=username) or []
+    else:
+        owner_articles = get_owner_articles(owner_id=owner_id, user_name=None) or []
 
     notiHost, notiPort = zy_noti_conf()
 
+    # 确保 render_template 返回正确对象
     return render_template('Profile.html', url_for=url_for, avatar_url=avatar_url,
-                           userStatus=userStatus, username=username,
+                           userStatus=1, username=username,
                            Articles=owner_articles, notiHost=notiHost)
 
 
@@ -297,11 +284,10 @@ def profile():
 @jwt_required
 def setting_profiles(user_id):
     avatar_url = get_avatar() or domain + 'static/favicon.ico'
-    userStatus = get_user_status()
     username = get_username()
 
     return render_template('setting.html', url_for=url_for, avatar_url=avatar_url,
-                           userStatus=userStatus, username=username)
+                           userStatus=True, username=username)
 
 
 def get_unique_tags():
@@ -375,7 +361,7 @@ def get_tags_by_article(article_title):
 
     except Exception as e:
         logging.error(f"Error logging in: {e}")
-        return error("未知错误", 500)
+        return error("未知错误", 500), 500
     finally:
         cursor.close()
         db.close()
@@ -700,50 +686,48 @@ def change_password(user_id):
 
 
 @app.route('/admin/<key>', methods=['GET', 'POST'])
-@jwt_required
+@admin_required
 def admin(user_id, key):
     method = 'GET'
     if request.method == 'POST':
         method = 'POST'
-    return zyadmin(key, method, user_id)
+    return zyadmin(key, method)
 
 
 @app.route('/admin/changeTheme', methods=['POST'])
-@jwt_required
+@admin_required
 def change_display(user_id):
     theme_id = request.args.get('NT')
     if theme_id:
         db = get_database_connection()
         cursor = db.cursor()
         try:
-            if user_id == 1:
-                theme_path = f'templates/theme/{theme_id}'
-                if theme_id == 'default':
-                    print(f"recover theme to {theme_id}")
+            theme_path = f'templates/theme/{theme_id}'
+            if theme_id == 'default':
+                print(f"recover theme to {theme_id}")
+                session['display'] = theme_id
+                return 'success'
+
+            if os.path.exists(theme_path):
+                has_index_html = os.path.exists(os.path.join(theme_path, 'index.html'))
+                has_screenshot_png = os.path.exists(os.path.join(theme_path, 'screenshot.png'))
+                has_template_ini = os.path.exists(os.path.join(theme_path, 'template.ini'))
+
+                if has_index_html and has_screenshot_png and has_template_ini:
+                    print(f"update theme to {theme_path}")
                     session['display'] = theme_id
+                    query = "INSERT INTO `events` (`id`, `title`, `description`, `event_date`, `created_at`) VALUES (NULL, 'theme change', %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);"
+                    cursor.execute(query, (theme_id,))
+                    db.commit()
                     return 'success'
 
-                if os.path.exists(theme_path):
-                    has_index_html = os.path.exists(os.path.join(theme_path, 'index.html'))
-                    has_screenshot_png = os.path.exists(os.path.join(theme_path, 'screenshot.png'))
-                    has_template_ini = os.path.exists(os.path.join(theme_path, 'template.ini'))
-
-                    if has_index_html and has_screenshot_png and has_template_ini:
-                        print(f"update theme to {theme_path}")
-                        session['display'] = theme_id
-                        query = "INSERT INTO `events` (`id`, `title`, `description`, `event_date`, `created_at`) VALUES (NULL, 'theme change', %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);"
-                        cursor.execute(query, (theme_id,))
-                        db.commit()
-                        return 'success'
-
-                    else:
-                        return 'failed'
-                return 'failed'
+                else:
+                    return 'failed'
             else:
                 return error("非管理员用户禁止访问！！！", 403)
         except Exception as e:
             logging.error(f"Error logging in: {e}")
-            return error("未知错误", 500)
+            return error("未知错误", 500), 500
         finally:
             cursor.close()
             db.close()
@@ -852,10 +836,9 @@ def set_article_info(title, username):
 
 
 @app.route('/Admin_upload', methods=['GET', 'POST'])
-@jwt_required
+@admin_required
 def upload_file1(user_id):
-    if user_id == 1:
-        return zy_upload_file()
+    return zy_upload_file()
 
 
 @app.route('/delete/<filename>', methods=['POST'])
@@ -884,12 +867,10 @@ def static_from_root():
 def markdown_editor(article):
     if article == 'default':
         return error(404, status_code=404)
-    # notice = read_file('notice/1.txt', 50)
-    userStatus = get_user_status()
     username = get_username()
     auth = False  # 设置默认值
 
-    if userStatus and username is not None:
+    if username is not None:
         # Auth 认证
         auth = auth_articles(article, username)
 
@@ -976,10 +957,9 @@ def edit_save():
     if article is None:
         return jsonify({'message': '404'}), 404
 
-    userStatus = get_user_status()
     username = get_username()
 
-    if userStatus is None or username is None:
+    if username is None:
         return jsonify({'message': '您没有权限'}), 503
 
     # Auth 认证
@@ -1001,10 +981,9 @@ def hidden_article():
     if article is None:
         return jsonify({'message': '404'}), 404
 
-    userStatus = get_user_status()
     username = get_username()
 
-    if userStatus is None or username is None:
+    if username is None:
         return jsonify({'deal': 'noAuth'})
 
     auth = auth_articles(article, username)
@@ -1125,45 +1104,40 @@ def travel():
 def media_space(user_id):
     type = request.args.get('type', default='img')
     page = request.args.get('page', default=1, type=int)
-    userStatus = get_user_status()
     username = get_username()
+    if request.method == 'GET':
+        if not type or type == 'img':
+            imgs, has_next_page, has_previous_page = get_all_img(username, page=page)
 
-    if userStatus and username is not None:
-        if request.method == 'GET':
-            if not type or type == 'img':
-                imgs, has_next_page, has_previous_page = get_all_img(username, page=page)
+            return render_template('Media.html', imgs=imgs, title='Media', url_for=url_for,
+                                   has_next_page=has_next_page,
+                                   has_previous_page=has_previous_page, current_page=page, userid=username,
+                                   domain=domain)
+        if type == 'video':
+            videos, has_next_page, has_previous_page = get_all_video(username, page=page)
 
-                return render_template('Media.html', imgs=imgs, title='Media', url_for=url_for,
-                                       has_next_page=has_next_page,
-                                       has_previous_page=has_previous_page, current_page=page, userid=username,
-                                       domain=domain)
-            if type == 'video':
-                videos, has_next_page, has_previous_page = get_all_video(username, page=page)
+            return render_template('Media.html', videos=videos, title='Media', url_for=url_for,
+                                   has_next_page=has_next_page,
+                                   has_previous_page=has_previous_page, current_page=page, userid=username,
+                                   domain=domain)
 
-                return render_template('Media.html', videos=videos, title='Media', url_for=url_for,
-                                       has_next_page=has_next_page,
-                                       has_previous_page=has_previous_page, current_page=page, userid=username,
-                                       domain=domain)
+        if type == 'xmind':
+            xminds, has_next_page, has_previous_page = get_all_xmind(username, page=page)
 
-            if type == 'xmind':
-                xminds, has_next_page, has_previous_page = get_all_xmind(username, page=page)
+            return render_template('Media.html', xminds=xminds, title='Media', url_for=url_for,
+                                   has_next_page=has_next_page,
+                                   has_previous_page=has_previous_page, current_page=page, userid=username,
+                                   domain=domain)
+    elif request.method == 'POST':
+        img_name = request.json.get('img_name')
+        if not img_name:
+            return error(message='缺少图像名称', status_code=400)
 
-                return render_template('Media.html', xminds=xminds, title='Media', url_for=url_for,
-                                       has_next_page=has_next_page,
-                                       has_previous_page=has_previous_page, current_page=page, userid=username,
-                                       domain=domain)
-        elif request.method == 'POST':
-            img_name = request.json.get('img_name')
-            if not img_name:
-                return error(message='缺少图像名称', status_code=400)
+        image = get_image_path(username, img_name)
+        if not image:
+            return error(message='未找到图像', status_code=404)
 
-            image = get_image_path(username, img_name)
-            if not image:
-                return error(message='未找到图像', status_code=404)
-
-            return image
-
-    return error(message='您没有权限', status_code=503)
+        return image
 
 
 def get_media_list(username, category, page=1, per_page=10):
@@ -1235,10 +1209,9 @@ app.config['UPLOADED_PATH'] = 'media'
 @app.route('/upload_file', methods=['POST'])
 @jwt_required
 def upload_user_path(user_id):
-    user_status = get_user_status()  # 获取用户状态
-    username = get_username()  # 获取用户名
+    username = get_username()
 
-    if not user_status or not username:
+    if not username:
         return jsonify({'message': 'failed, user not authenticated'}), 403
 
     try:
@@ -1286,7 +1259,8 @@ def upload_user_path(user_id):
 
                 # 如果有文件记录，则插入数据库
                 if file_records:
-                    insert_query = "INSERT INTO `media` (`user_id`, `file_path`, `file_type`, `created_at`, `updated_at`) VALUES (%s, %s, %s, %s, %s)"
+                    insert_query = ("INSERT INTO `media` (`user_id`, `file_path`, `file_type`, `created_at`, "
+                                    "`updated_at`) VALUES (%s, %s, %s, %s, %s)")
                     cursor.executemany(insert_query, file_records)  # 批量插入文件记录
 
             db.commit()  # 提交数据库事务
@@ -1338,8 +1312,8 @@ def cc_login(provider):
 
     redirect_uri = domain + "callback/" + provider
 
-    api_safeCheck = [api_host, app_id, app_key]
-    if 'error' in api_safeCheck:
+    api_safe_check = [api_host, app_id, app_key]
+    if 'error' in api_safe_check:
         return render_template('error.html', error='请检查你的第三方登录配置文件')
     login_url = f'{api_host}connect.php?act=login&appid={app_id}&appkey={app_key}&type={provider}&redirect_uri={redirect_uri}'
     response = requests.get(login_url)
@@ -1466,8 +1440,8 @@ def diy_space(page):
         with open(template_path, 'r', encoding=global_encoding) as file:
             html_content = file.read()
             resp = make_response(html_content)
-            visitID = sys_version + format(random.randint(10000, 99999))  # 可以设置一个默认值或者抛出异常，具体根据需求进行处理
-            resp.set_cookie('visitID', 'zyBLOG' + visitID, 7200)
+            visit_id = sys_version + format(random.randint(10000, 99999))  # 可以设置一个默认值或者抛出异常，具体根据需求进行处理
+            resp.set_cookie('visitID', 'zyBLOG' + visit_id, 7200)
         return resp
     return render_template('error.html')
 
@@ -1543,7 +1517,7 @@ def id_find_article(article_id):
     except Exception as e:
         logging.error(f"An error occurred: {str(e)}")
         db.rollback()
-        return error(message='服务器内部错误', status_code=500)
+        return error(message='服务器内部错误', status_code=500), 500
     finally:
         ip_address = get_client_ip(request, session)
         app.logger.info(f'IP:{ip_address}, UA:{user_agent}')
@@ -1617,7 +1591,7 @@ def page_not_found(error_message):
 @app.errorhandler(500)
 def internal_server_error(error_message):
     app.logger.error(error_message)
-    return "Internal server error", 500
+    return error(message=error_message, status_code=500), 500
 
 
 @app.route('/<path:undefined_path>')
@@ -1629,4 +1603,4 @@ def undefined_route(undefined_path):
 @app.errorhandler(Exception)
 def handle_unexpected_error(error_message):
     app.logger.error(error_message)
-    return "An unexpected error occurred", 500
+    return error(message=error_message, status_code=500), 500
