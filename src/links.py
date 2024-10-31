@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from flask import render_template
 
 from src.database import get_database_connection

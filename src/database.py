@@ -1,6 +1,8 @@
-import mysql.connector
 import configparser
 import os
+
+import mysql.connector
+
 
 def get_database_connection():
     db_host = os.environ.get('db_host', '').strip("'")

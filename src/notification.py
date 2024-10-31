@@ -20,7 +20,7 @@ cache.init_app(noti)
 def run_socketio():
     notiHost, notiPort = zy_noti_conf()
     print(f"推送服务：{notiHost},端口：{notiPort}")
-    socketio.run(noti, port=notiPort)
+    socketio.run(noti, port=notiPort, allow_unsafe_werkzeug=True)
 
 
 def get_user_id():

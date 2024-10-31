@@ -1,12 +1,14 @@
-import random
-import urllib
-import markdown
-from src.database import get_database_connection
-import os
-from urllib.parse import quote_plus
-from src.user import error
 import datetime
+import os
+import random
 import re
+import urllib
+from urllib.parse import quote_plus
+
+import markdown
+
+from src.database import get_database_connection
+from src.user import error
 
 
 def get_article_names(page=1, per_page=10):
