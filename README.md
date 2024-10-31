@@ -128,7 +128,7 @@ $ source myenv/bin/activate
 现在你可以在虚拟环境下重新安装依赖以及启动程序
 ## python版本遇到问题？
 
-    [更新详情](./articles/Linux上python多版本问题.md)
+- [更多问题](./articles/Linux上python多版本问题.md)
      
 ## 仍然无法运行？
 
