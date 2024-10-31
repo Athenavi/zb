@@ -1,5 +1,5 @@
 <div align="center">
-	<img src="https://7trees.cn/static/favicon.ico" width="160" />
+	<img src="https://7trees.cn/static/favicon.ico" width="160"  alt=""/>
 	<h1>zyblog</h1>
 </div>
 
@@ -50,11 +50,11 @@
 url=https://download.bt.cn/install/install_lts.sh;if [ -f /usr/bin/curl ];then curl -sSO $url;else wget -O install_lts.sh $url;fi;bash install_lts.sh ed8484bec
 ```
 
-2. 克隆或下载 zyBLOG 代码库到本地。创建一个数据库，导入本项目里的 *sql* 文件（注意sql版本），复制 *config_example.ini* 文件到
+1. 克隆或下载 zyBLOG 代码库到本地。创建一个数据库，导入本项目里的 *sql* 文件（注意sql版本），复制 *config_example.ini* 文件到
    *config.ini* ，配置 *config.ini*
-3. BT面板部署成功后(BT主程序页面 可以在 右侧 *网站* 选项卡配置Python项目,建议使用 Python V3.12.3 项目依赖
+2. BT面板部署成功后(BT主程序页面 可以在 右侧 *网站* 选项卡配置Python项目,建议使用 Python V3.12.3 项目依赖
    requirements.txt)
-4.
+3. 
 通用python项目部署参考步骤 [https://www.bt.cn/bbs/thread-125161-1-1.html](https://www.bt.cn/bbs/thread-125161-1-1.html)
 
 不使用宝塔?
@@ -69,8 +69,8 @@ $ pip install -r requirements.txt
 $ python wsgi.py
 ```
 
-5. 在浏览器中访问 `http://localhost:9421`，即可进入 zyBLOG。
-6. 默认管理员账号 'test' 默认密码 '123456'
+1. 在浏览器中访问 `http://localhost:9421`，即可进入 zyBLOG。
+2. 默认管理员账号 'test' 默认密码 '123456'
 
 ## 无法运行？
 
@@ -86,7 +86,7 @@ $ python wsgi.py
    sudo apt upgrade
    ```
 
-2. 添加deadsnakes PPA（Personal Package Archive）：
+2. 添加 deadsnakes PPA（Personal Package Archive）：
 
    ```
    sudo add-apt-repository ppa:deadsnakes/ppa
@@ -126,56 +126,30 @@ $ source myenv/bin/activate
 ```
 
 现在你可以在虚拟环境下重新安装依赖以及启动程序
+## python版本遇到问题？
 
+    [更新详情](./articles/Linux上python多版本问题.md)
+     
 ## 仍然无法运行？
 
 如果你了解docker，可以尝试使用Dockerfile来部署运行
 
-## 评论（240319）
+## 评论（241031）
 
     评论: twikoo    （V1.2.101）
     https://twikoo.js.org/
     可自行更改评论环境
 
-~~弃用：~~新版本的评论~~:仍可自行部署：
-由 ```utteranc``` 提供技术支持~~
-
-不使用当前提供的评论issue地址？
-你需要修改```templates/detail.html```文件
-找到如下代码,修改其中的```repo```为你的github项目地址
-
-   ```
-<script src="https://utteranc.es/client.js"
-                 repo="Athenavi/comments"
-                 issue-term="url"
-                 {% if theme=="night-theme" %}
-                 theme="github-dark"
-                 {% else %}
-                 theme="github-light"
-                 {% endif %}
-                 crossorigin="anonymous"
-                 async>
-         </script>
-   ```
-
-### ！！！注意 在完成之间你可能还需```授权```将 utteranc 应用添加到 github 账户中
-
-更多细节请查阅官方文档: [https://utteranc.es/](https://utteranc.es/)
-
-我们热烈欢迎并感谢所有形式的贡献。如果您有任何想法或建议，欢迎通过提交 [pull requests](https://github.com/soybeanjs/soybean-admin/pulls)
-或创建 GitHub [issue](https://github.com/soybeanjs/soybean-admin/issues/new) 来分享。
-
-##  
-
 ## 开源贡献者
 
 感谢以下各位的贡献
 
-<img src="https://contrib.rocks/image?repo=Athenavi/zb" />
+<img src="https://contrib.rocks/image?repo=Athenavi/zb"  alt=""/>
 
 ## 交流
 
-暂无开放
+我们热烈欢迎并感谢所有形式的贡献。如果您有任何想法或建议，欢迎通过提交 [pull requests](https://github.com/soybeanjs/soybean-admin/pulls)
+或创建 GitHub [issue](https://github.com/soybeanjs/soybean-admin/issues/new) 来分享。
 
 ## Star 趋势
 
@@ -232,7 +206,7 @@ id = 'cn.7trees.2024'
 title = '2024Theme'
 description = '2024Theme_for_zyBLOG'
 author = '7trees'
-authorWebsite = 'http://7trees.cn'
+authorWebsite = 'https://7trees.cn'
 version = '1.0'
 versionCode = '1'
 updateUrl = ''
