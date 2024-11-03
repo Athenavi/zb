@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="">
+<head>
+    <meta charset="UTF-8">
+    <title>zyblog CLI</title>
+    <style>
+        body {
+            background-color: black;
+            color: white;
+            font-family: Consolas, monospace;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        #terminal {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #output-container {
+            flex-grow: 1;
+            overflow: auto;
+            padding: 10px;
+            box-sizing: border-box;
+            font-size: 16px;
+            white-space: nowrap;
+        }
+
+        #output {
+            /* Output content goes here */
+        }
+
+        #input-container {
+            display: flex;
+            align-items: center;
+            padding: 5px;
+        }
+
+        #prompt {
+            font-size: 16px;
+            margin-right: 5px;
+        }
+
+        #input {
+            background-color: transparent;
+            color: white;
+            border: none;
+            outline: none;
+            font-size: 16px;
+            flex-grow: 1;
+            white-space: nowrap;
+        }
+
+        #progress-container {
+            border-radius: 5px; /* 圆角边框 */
+            overflow: hidden; /* 防止超出范围 */
+        }
+
+        #progress-bar {
+            height: 100%;
+            transition: width 0.1s ease; /* 默认过渡效果 */
+        }
+
+        #progress-text {
+            color: black; /* 文字颜色 */
+        }
+    </style>
+</head>
+<body>
+<div id="terminal">
+    <div id="output-container">
+        <div id="output">
+        <pre> ________       ___    ___  ________   ___        ________   ________
+|\_____  \     |\  \  /  /||\   __  \ |\  \      |\   __  \ |\   ____\
+ \|___/  /|    \ \  \/  / /\ \  \|\ /_\ \  \     \ \  \|\  \\ \  \___|
+     /  / /     \ \    / /  \ \   __  \\ \  \     \ \  \\\  \\ \  \  ___
+    /  /_/__     \/  /  /    \ \  \|\  \\ \  \____ \ \  \\\  \\ \  \|\  \
+   |\________\ __/  / /       \ \_______\\ \_______\\ \_______\\ \_______\
+    \|_______||\___/ /         \|_______| \|_______| \|_______| \|_______|
+              \|___|/
+
+                                                                          <br>zyblog CLI [Version 1.49]<br>(C) zyblog Project. All rights reserved.<br>Enter 'help' to get the commands.</pre>
+        </div>
+    </div>
+    <div id="input-container">
+        <span id="prompt" contenteditable="false">C:\zyblog ></span>
+        <span id="input" contenteditable="true" autofocus=""></span>
+    </div>
+</div>
+<div id="progress-container"
+     style="display: none; position: relative; width: 100%; background-color: lightgray; border: 1px solid #000; margin: 20px 0;">
+    <div id="progress-bar" style="width: 0%; background-color: green; height: 20px;"></div>
+    <span id="progress-text"
+          style="position: absolute; width: 100%; text-align: center; top: -25px; font-weight: bold;">0%</span>
+</div>
+<script>
+    const terminal = document.getElementById("terminal");
+    const input = document.getElementById("input");
+    const output = document.getElementById("output");
+    const prompt = document.getElementById("prompt");
+
+    let isTravellingMode = false;
+    let selectedDestination = "{{ url }}";
+    const history = []; // Array to store command history
+    let historyIndex = -1; // Index to keep track of the current position in history
+
+    input.addEventListener("keydown", function (event) {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            const command = input.textContent.trim();
+
+            if (isTravellingMode) {
+                handleTravellingInput(command);
+            } else {
+                if (command !== "") {
+                    history.push(command); // Store the command in history
+                    historyIndex = history.length; // Reset history index
+
+                    handleRegularInput(command);
+                } else {
+                    // If no command is entered, display the prompt only
+                    appendToTerminal(prompt.textContent);
+                    input.textContent = "";
+                    input.focus();
+                }
+            }
+        } else if (event.key === "ArrowUp") {
+            // Handle the "Arrow Up" key to navigate command history
+            if (historyIndex > 0) {
+                historyIndex--;
+                input.textContent = history[historyIndex];
+            }
+        } else if (event.key === "ArrowDown") {
+            // Handle the "Arrow Down" key to navigate command history
+            if (historyIndex < history.length - 1) {
+                historyIndex++;
+                input.textContent = history[historyIndex];
+            } else if (historyIndex === history.length - 1) {
+                // Clear the input if we're at the latest history entry
+                input.textContent = "";
+            }
+        }
+    });
+
+    function handleRegularInput(command) {
+        if (command.toLowerCase() === "clear") {
+            output.innerHTML = "";
+            output.scrollTop = 0;
+        } else if (command.toLowerCase() === "travellings" || command.toLowerCase() === "t") {
+            isTravellingMode = true;
+            fetchNewDestination();
+        } else if (command.toLowerCase() === "date") {
+            const currentDate = new Date().toLocaleString("zh-CN", {timeZone: "Asia/Shanghai"});
+            appendToTerminal("C:\\zyblog > " + command);
+            appendToTerminal(currentDate);
+        } else if (command.toLowerCase() === "help") {
+            appendToTerminal("C:\\zyblog > " + command);
+            appendToTerminal("Commands：<br>t               开始穿梭！<br>cmd             输出版权信息<br>help            输出帮助菜单<br>echo            输出文字<br>date            输出当前时间<br>clear           清空历史记录<br>settings           前往开往偏好设置<br>travellings     开始穿梭吧！");
+        } else if (command.toLowerCase() === "cmd") {
+            // Print the title
+            appendToTerminal("zyblog CLI [Version 1.49]<br>(C) Travellings-link Project. All rights reserved.");
+        } else if (command.toLowerCase().startsWith("echo ")) {
+            const text = command.slice(5);
+            appendToTerminal("C:\\zyblog > " + command);
+            appendToTerminal(text);
+        } else if (command.toLowerCase() === "settings") {
+            appendToTerminal("C:\\Travelling > " + command);
+            appendToTerminal("正在前往开往设置...")
+            location.href = "/setting/profiles";
+        } else {
+            appendToTerminal("C:\\zyblog > " + command);
+            appendToTerminal("Command not found: " + command);
+        }
+
+        input.textContent = "";
+        input.focus();
+    }
+
+    function handleTravellingInput(choice) {
+        choice = choice.toLowerCase();
+
+        if (choice === "y") {
+            if (selectedDestination) {
+                window.open(selectedDestination, "_blank");
+                appendToTerminal("请做出你的选择 > Y");
+                appendToTerminal("即将发车...");
+            }
+            isTravellingMode = false;
+
+            // Reset the prompt
+            prompt.textContent = "C:\\zyblog >";
+            input.textContent = "";
+            input.focus();
+        } else if (choice === "n") {
+            fetchNewDestination();
+        } else if (choice === "e") {
+            isTravellingMode = false;
+
+            // Reset the prompt
+            prompt.textContent = "C:\\zyblog >";
+            input.textContent = "";
+            input.focus();
+            appendToTerminal("请做出你的选择 > E");
+            appendToTerminal("已取消本次穿梭");
+        } else {
+            appendToTerminal("C:\\zyblog > " + choice);
+            appendToTerminal("无效的选择");
+
+            // Change the prompt
+            prompt.textContent = "请做出你的选择 >";
+            input.textContent = "";
+            input.focus();
+        }
+    }
+
+    function fetchNewDestination() {
+        // 清空之前的目的地信息
+        output.innerHTML = "";
+
+        // 显示进度条
+        const progressContainer = document.getElementById("progress-container");
+        progressContainer.style.display = "block"; // 显示进度条容器
+        const progressBar = document.getElementById("progress-bar");
+        const progressText = document.getElementById("progress-text");
+
+        // 输出初始信息
+        appendToTerminal("Go to Travel！");
+
+        // 模拟进度条加载
+        let startTime = null;
+        const duration = 2666; // 总的加载时间，2.6秒
+        const step = (timestamp) => {
+            if (!startTime) startTime = timestamp;
+            const elapsed = timestamp - startTime;
+
+            // 使用二次贝塞尔曲线公式来计算进度
+            const t = Math.min(elapsed / duration, 1); // t 从 0 到 1
+            const eased = t * t; // 二次贝塞尔曲线
+
+            // 更新进度条和百分比文本
+            const progress = Math.floor(eased * 100); // 计算百分比
+            progressBar.style.width = `${progress}%`; // 更新进度条宽度
+            progressText.textContent = `${progress}%`; // 更新百分比文本
+
+            // 当进度到达 100% 时
+            if (progress < 100) {
+                requestAnimationFrame(step); // 请求下一帧
+            } else {
+                appendToTerminal("即将发车..."); // 输出发车信息
+                window.open(selectedDestination, "_blank"); // 打开新地址
+
+                // 重置输入并聚焦
+                input.textContent = "";
+                input.focus();
+
+                // 隐藏进度条
+                progressContainer.style.display = "none";
+            }
+        };
+
+        requestAnimationFrame(step); // 开始动画
+    }
+
+    function appendToTerminal(text) {
+        const pre = document.createElement("pre");
+        pre.innerHTML = text;
+        output.appendChild(pre);
+        output.scrollTop = output.scrollHeight;
+    }
+
+    window.addEventListener('load', function () {
+        setTimeout(() => {
+            fetchNewDestination()
+        }, 666);
+    });
+</script>
+</body>
+</html>

@@ -173,33 +173,27 @@ def search(user_id):
         else:
             files = os.listdir('articles')
             markdown_files = [file for file in files if file.endswith('.md')]
-
-            # 创建XML根元素
             root = ElementTree.Element('root')
 
             for file in markdown_files:
                 article_name = file[:-3]  # 移除文件扩展名 (.md)
-                encoded_article_name = urllib.parse.quote(article_name)  # 对文件名进行编码处理
+                encoded_article_name = urllib.parse.quote(article_name)
                 article_url = domain + 'blog/' + encoded_article_name
                 date = get_file_date(encoded_article_name)
-                describe = get_article_content(article_name, 50)  # 建议的值50以内
+                describe = get_article_content(article_name, 50)
                 describe = clear_html_format(describe)
 
                 if keyword.lower() in article_name.lower() or keyword.lower() in describe.lower():
-                    # 创建item元素并包含内容
                     item = ElementTree.SubElement(root, 'item')
                     ElementTree.SubElement(item, 'title').text = article_name
                     ElementTree.SubElement(item, 'link').text = article_url
                     ElementTree.SubElement(item, 'pubDate').text = date
                     ElementTree.SubElement(item, 'description').text = describe
 
-            # 创建XML树
+            # 创建XML树并写入缓存
             tree = ElementTree.ElementTree(root)
+            match_data = ElementTree.tostring(tree.getroot(), encoding="unicode", method='xml')
 
-            # 将XML数据转换为字符串
-            match_data = ElementTree.tostring(tree.getroot(), encoding=global_encoding, method='xml').decode()
-
-            # 写入缓存
             with open(cache_path, 'w') as cache_file:
                 cache_file.write(match_data)
 
@@ -1105,7 +1099,7 @@ def travel():
         if urls:
             random.shuffle(urls)  # 随机打乱URL列表的顺序
             random_url = urls[0]  # 选择打乱后的第一个URL
-            return render_template('zyJump.html', url=random_url, domian=domain)
+            return render_template('Jump.html', url=random_url, domian=domain)
         # 如果没有找到任何<loc>标签，则返回适当的错误信息或默认页面
         return "No URLs found in the response."
     else:
@@ -1314,7 +1308,7 @@ def start_video(username, video_name):
 @app.route('/jump', methods=['GET', 'POST'])
 def jump():
     url = request.args.get('url', default=domain)
-    return render_template('zyJump.html', url=url, domain=domain)
+    return render_template('Jump.html', url=url, domain=domain)
 
 
 @app.route('/login/<provider>')

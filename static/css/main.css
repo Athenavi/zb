@@ -105,7 +105,7 @@
     background-size: cover;
     background-repeat: no-repeat;
     background-attachment: fixed;
-    color: #498ef6;
+    color: #877725;
     top: 0;
     left: 0;
     right: 0;
@@ -114,12 +114,12 @@
 }
 
 [data-theme="dark"] .bg-white {
-    background-color: #2d3748 !important;
-    border-color: #4a5568 !important;
+    background-color: #877725 !important;
+    border-color: #877725 !important;
 }
 
 [data-theme="dark"] .text-gray-600 {
-    color: #97b4dc !important;
+    color: #877725 !important;
 }
 
 [data-theme="light"] {
