@@ -1,11 +1,31 @@
 <!-- header.html -->
-{% macro zyfooter(notice,beian) -%}
+{% macro zyfooter(notice) -%}
 
-    <footer id="myFooter" class="py-3 bg-dark fixed-bottom">
-        <div class="container">
-            <p class="m-0 text-center text-white"><a href="https://github.com/Athenavi/zyBLOG/" target="_blank">
-                © CopyRight 2024, zyBLOG All Rights Reserved.</a><a href="https://beian.miit.gov.cn/"
-                                                                    target="_blank">{{ beian }}</a></p>
+    <footer id="myFooter" class="bg-black text-gray-200 py-6">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="flex flex-col md:flex-row items-center">
+                    <p class="m-0 text-center md:text-left text-sm">
+                        <a href="https://github.com/Athenavi/zyBLOG/" target="_blank" class="hover:underline">
+                            © 2024 zyBLOG All Rights Reserved.
+                        </a>
+                    </p>
+                </div>
+                <div class="mt-4 md:mt-0 flex flex-col md:flex-row">
+                    <p class="m-0 text-center md:text-left text-sm">
+                        <a href="https://beian.miit.gov.cn/" target="_blank" class="hover:underline">{{ beian }}</a>
+                    </p>
+                </div>
+            </div>
+            <div class="mt-4">
+                <div class="flex justify-center space-x-4">
+                    <a href="/blog/legal-agreement" class="text-gray-400 hover:text-white">隐私政策</a>
+                    <a href="/blog/README" class="text-gray-400 hover:text-white">使用条款</a>
+                    <a href="https://github.com/Athenavi/zb/issues" target="_blank"
+                       class="text-gray-400 hover:text-white">支持</a>
+                    <a href="mailto:support@7trees.cn" target="_blank" class="text-gray-400 hover:text-white">联系</a>
+                </div>
+            </div>
         </div>
     </footer>
     <script>
@@ -20,10 +40,10 @@
             // 添加隐藏类
             footer.classList.add('hide');
 
-            // 2.5秒后再次显示
+            // 1.7秒后再次显示
             footerTimeout = setTimeout(() => {
                 footer.classList.remove('hide');
-            }, 2500);
+            }, 1700);
         });
     </script>
     <div class="top-bar">

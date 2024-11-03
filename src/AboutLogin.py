@@ -63,7 +63,7 @@ def zy_register(ip):
             existing_user = cursor.fetchone()
 
             if existing_user:
-                return render_template('zyregister.html', title="注册新用户",
+                return render_template('Register.html', title="注册新用户",
                                        msg='该用户名已被注册，请选择其他用户名!')
 
             # 执行用户注册的逻辑
@@ -77,13 +77,13 @@ def zy_register(ip):
 
         except Exception as e:
             logging.error(f"Error registering user: {e}")
-            return render_template('zyregister.html', title="注册新用户", msg='注册失败!')
+            return render_template('Register.html', title="注册新用户", msg='注册失败!')
 
         finally:
             cursor.close()
             db.close()
 
-    return render_template('zyregister.html', title="注册新用户")
+    return render_template('Register.html', title="注册新用户")
 
 
 def get_email(username):

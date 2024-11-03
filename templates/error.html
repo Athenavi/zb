@@ -1,47 +1,60 @@
 <!DOCTYPE html>
-<!-- 网站主语言 -->
 <html lang="zh-cn">
 <head>
-    <!-- 网站采用的字符编码 -->
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <!-- 预留网站标题的位置 -->
-    <title>{% block title %}{% endblock %}</title>
-    <!-- 引入Tailwind CSS的CDN链接 -->
+    <title>{% block title %}错误{% endblock %}</title>
     <link href="../static/css/tailwind.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #1a1a1a; /* 深色背景 */
+            color: #00ffcc; /* 明亮的文字颜色 */
+            font-family: 'Courier New', Courier, monospace; /* 终端字体 */
+            background-image: linear-gradient(135deg, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.6)), url('../static/images/cyberpunk-bg.jpg'); /* 赛博朋克背景 */
+            background-size: cover;
+            background-attachment: fixed;
+        }
+        h1, h3 {
+            text-shadow: 0 0 10px #00ffcc, 0 0 20px #ff3d00; /* 多重文字阴影效果 */
+            letter-spacing: 1px; /* 字符间距 */
+        }
+        a {
+            color: #ff6f00; /* 超链接颜色 */
+            text-decoration: none;
+            transition: color 0.3s ease; /* 动效 */
+        }
+        a:hover {
+            color: #ffe600; /* 悬停超链接高亮 */
+            text-shadow: 0 0 10px #ffe600; /* 悬停效果 */
+        }
+        .container {
+            margin-top: 50px;
+            text-align: center;
+            backdrop-filter: blur(5px); /* 背景模糊 */
+            border: 1px solid rgba(255, 255, 255, 0.1); /* 边框效果 */
+            border-radius: 10px; /* 圆角边框 */
+            padding: 20px;
+        }
+        nav {
+            backdrop-filter: blur(10px);
+        }
+    </style>
 </head>
 
 <body>
-<!-- 引入导航栏 -->
-<!-- 定义导航栏 -->
-<nav class="bg-blue-500">
+<nav class="bg-black">
     <div class="container mx-auto">
-        <!-- 导航栏商标 -->
-        <a class="text-xl text-white font-bold py-4" href="/">奇客舒</a>
-        <!-- 导航入口 -->
-        <div>
-            <!-- 导航入口内容 -->
-        </div>
+        <a class="text-xl text-green-500 font-bold py-4" href="/">Home</a>
     </div>
 </nav>
 
-<!-- 预留具体页面的位置 -->
-<div class="container mx-auto mt-8">
-    <div class="w-2/3 mx-auto">
-        <h1 class="text-red-500 text-lg">未能完成您的请求！错误代码: {{ status_code }}</h1>
-        <h3 class="text-blue-500 text-xl">{{ error }}</h3>
-        <a class="text-blue-500 hover:text-blue-700 text-lg" href="/login">登陆页面</a>
-    </div>
+<div class="container">
+    <h1>未能完成您的请求！错误代码: {{ status_code }}</h1>
+    <h3>错误信息：{{ error }}</h3>
+    <a href="/login">登陆页面</a>
 </div>
 
-<!-- 引入注脚 -->
-<div class="mt-32">
-    <br><br><br>
-</div>
-<footer class="py-3 bg-gray-900 fixed bottom-0 w-full">
-    <div class="container mx-auto">
-        <p class="text-center text-white">版权所有 &copy; zyBLOG 2024</p>
-    </div>
-</footer>
+{% from 'footer.html' import zyfooter %}
+{{ zyfooter(notice) }}
 </body>
 </html>

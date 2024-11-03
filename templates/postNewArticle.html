@@ -1,37 +1,37 @@
 <!DOCTYPE html>
-<!-- 网站主语言 -->
 <html lang="zh-cn">
 
 <head>
-    <!-- 网站采用的字符编码 -->
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <!-- 预留网站标题的位置 -->
     <title>前台投稿</title>
-    <!-- 引入Tailwind CSS的样式文件 -->
     <link href="../static/css/tailwind.min.css" rel="stylesheet">
-    <!-- 引入自定义样式文件 -->
     <link rel="stylesheet" href="../static/css/main.css">
 </head>
-<body>
-<!-- 预留具体页面的位置 -->
-<div class="container mx-auto">
-    <div class="flex justify-center">
-        <span>当前页面提供 “.md” 文章的上传</span><br><br>
-        <span style="color:red">*文件大小<“10MB”;<br>*请勿上传违法违规的文件<br>*确认好上传的文件信息再点击上传</span>
-        {% if message %}
-            <p>{{ message }}</p>
-        {% endif %}
-        <div id="result"></div>
-        <form method="POST" action="/newArticle" enctype="multipart/form-data" class="my-6">
-            <div>
-                <label for="file" class="block">选择要上传的文件:</label>
-                <input type="file" id="file" name="file" accept=".md" class="mt-2">
-            </div>
-            <input type="submit" value="上传"
-                   class="mt-4 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
-        </form>
+
+<body class="bg-gray-100">
+    <div class="container mx-auto p-6">
+        <div class="bg-white shadow-lg rounded-lg p-6">
+            <h1 class="text-2xl font-bold text-center mb-4">文件上传</h1>
+            <p class="text-center text-gray-600 mb-4">当前页面提供 “.md” 文章的上传</p>
+            <span class="text-red-600 block text-center mb-4">
+                *文件大小<10MB<br>*请勿上传违法违规的文件<br>*确认好上传的文件信息再点击上传
+            </span>
+            {% if message %}
+                <p class="text-green-500 text-center mb-4">{{ message }}</p>
+            {% endif %}
+            <div id="result"></div>
+            <form method="POST" action="/newArticle" enctype="multipart/form-data" class="my-6">
+                <div class="mb-4">
+                    <label for="file" class="block text-gray-700">选择要上传的文件:</label>
+                    <input type="file" id="file" name="file" accept=".md" class="mt-2 border border-gray-300 rounded-lg p-2 w-full">
+                </div>
+                <input type="submit"
+                       value="上传"
+                       class="mt-4 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded shadow-lg transition duration-300 ease-in-out transform hover:scale-105">
+            </form>
+        </div>
     </div>
-</div>
 </body>
+
 </html>
