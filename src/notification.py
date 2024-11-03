@@ -3,12 +3,11 @@ from datetime import timedelta
 import flask_socketio
 from flask import Flask, request, jsonify
 from flask_caching import Cache
-
 from src.database import get_database_connection
 from src.utils import zy_noti_conf, authenticate_jwt, secret_key
 
 noti = Flask(__name__, template_folder='../templates')
-socketio = flask_socketio.SocketIO(noti, cors_allowed_origins='*')
+socketio = flask_socketio.SocketIO(noti, cors_allowed_origins='*', async_mode='threading')
 noti.secret_key = secret_key
 noti.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=3)
 noti.config['SESSION_COOKIE_NAME'] = 'zb_session'

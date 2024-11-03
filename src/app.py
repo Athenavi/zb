@@ -399,6 +399,7 @@ def home():
         pass
     else:
         return render_template('error.html', status_code='域名配置出错,您的程序将无法正常运行'), 404
+
     # 获取客户端IP地址
     ip = get_client_ip(request, session)
 
@@ -416,8 +417,11 @@ def home():
         if content:
             # 设置浏览器缓存
             resp = make_response(content)
-            resp.headers['Cache-Control'] = 'public, max-age=240'  # 缓存为4分钟
+            resp.headers['Cache-Control'] = 'public, max-age=600'  # 缓存为10分钟
+            app.logger.info(f'缓存命中，页面: {page}, 标签: {tag}')
             return resp
+        else:
+            app.logger.info(f'缓存未命中，准备生成新内容，页面: {page}, 标签: {tag}')
 
         # 重新获取页面内容
         articles, has_next_page, has_previous_page = get_article_names(page=page)
@@ -457,13 +461,19 @@ def home():
             notice=notice, has_next_page=has_next_page, has_previous_page=has_previous_page,
             current_page=page, tags=tags, tag=tag
         )
+
         # 缓存渲染后的页面内容，并设置服务端缓存过期时间
-        cache.set(cache_key, rendered_content, timeout=72)
+        cache.set(cache_key, rendered_content, timeout=600)  # 服务端缓存10分钟
         resp = make_response(rendered_content)
 
-        visiter = 'qks' + format(random.randint(10000, 99999))
-        app.logger.warning('新访客，生成随机用户名: %s', visiter)
-        resp.set_cookie('key', 'zyBLOG_' + sys_version + visiter, 7200)
+        if 'key' in request.cookies:
+            visiter = request.cookies.get('key')  # 使用现有的访客名称
+            app.logger.info('访客已存在，使用现有用户名: %s', visiter)
+        else:
+            visiter = 'qks' + format(random.randint(10000, 99999))
+            app.logger.warning('新访客，生成随机用户名: %s', visiter)
+            resp.set_cookie('key', 'zyBLOG_' + sys_version + visiter, 7200)  # 设置 cookie
+
         return resp
 
     else:

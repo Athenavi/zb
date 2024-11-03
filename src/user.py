@@ -35,13 +35,6 @@ def error(message, status_code):
 
 def zyadmin(key, method):
     if key == door_key:
-        return back(method)
-    else:
-        return redirect(url_for('profile'))
-
-
-def back(method):
-    if session.get('logged_in'):
         db = get_database_connection()
         cursor = db.cursor()
         try:
@@ -55,8 +48,6 @@ def back(method):
         finally:
             cursor.close()
             db.close()
-    else:
-        return error("请先登录", 401)
 
 
 def admin_dashboard(method, dashInfo):

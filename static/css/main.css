@@ -1,5 +1,5 @@
 .body {
-    background-color: #f8f9fa;
+    background-color: gray;
     font-family: "Nunito", sans-serif;
 }
 
@@ -7,6 +7,9 @@
     cursor: pointer;
 }
 
+.card:hover {
+    box-shadow: 0 0 10px #877725;
+}
 
 .hidden {
     opacity: 0;
@@ -18,7 +21,7 @@
 }
 
 #myFooter {
-    transition: opacity 0.5s ease, visibility 0.5s ease; /* 添加过渡效果 */
+    transition: opacity 0.5s ease, visibility 0.5s ease;
     opacity: 1;
     visibility: visible;
 }
@@ -37,9 +40,9 @@
     border-color: #007bff;
 }
 
-.pagination .page-link, .pagination .page-link:focus, .pagination .page-link:hover {
-    background-color: #fff;
-    border: 1px solid #dee2e6;
+.pagination .page-link,
+.pagination .page-link:focus,
+.pagination .page-link:hover {
     color: #007bff;
 }
 
@@ -96,7 +99,6 @@
     padding: 35px;
 }
 
-/* 自定义夜间主题样式 */
 [data-theme="dark"] {
     background-color: #1b1e21;
     background-image: url("../image/dark.jpg");
@@ -112,12 +114,12 @@
 }
 
 [data-theme="dark"] .bg-white {
-    background-color: #2d3748 !important; /* 深色背景卡片 */
-    border-color: #4a5568 !important; /* 深色边框 */
+    background-color: #2d3748 !important;
+    border-color: #4a5568 !important;
 }
 
 [data-theme="dark"] .text-gray-600 {
-    color: #e2e8f0 !important; /* 更亮的文字色 */
+    color: #97b4dc !important;
 }
 
 [data-theme="light"] {
