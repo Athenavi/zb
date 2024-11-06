@@ -81,14 +81,14 @@ def inject_variables():
 
 @app.route('/login', methods=['POST', 'GET'])
 def login():
-    callback = request.args.get('callback', 'home')
+    callback_route = request.args.get('callback', 'home')
     if request.cookies.get('jwt'):
         # 如果存在 jwt，解析并获取用户状态
         user_id = authenticate_jwt(request.cookies.get('jwt'))
         if user_id:
-            return redirect(url_for(callback))
+            return redirect(url_for(callback_route))
     if request.method == 'POST':
-        return zy_login()
+        return zy_login(callback_route)
 
     return render_template('Login.html', title="登录")
 
@@ -162,6 +162,7 @@ def search(user_id):
 
     if request.method == 'POST':
         keyword = request.form.get('keyword')  # 获取搜索关键字
+        app.logger.info(f'{user_id} search keyword: {keyword}')
         cache_dir = os.path.join('temp', 'search')
         os.makedirs(cache_dir, exist_ok=True)
         cache_path = os.path.join(cache_dir, keyword + '.xml')
@@ -277,12 +278,12 @@ def profile(user_id):
     else:
         owner_articles = get_owner_articles(owner_id=owner_id, user_name=None) or []
 
-    notiHost, notiPort = zy_noti_conf()
+    noti_host, noti_port = zy_noti_conf()
 
     # 确保 render_template 返回正确对象
     return render_template('Profile.html', url_for=url_for, avatar_url=avatar_url,
                            userStatus=bool(user_id), username=username,
-                           Articles=owner_articles, notiHost=notiHost)
+                           Articles=owner_articles, notiHost=noti_host, notiPort=noti_port)
 
 
 @app.route('/setting/profiles', methods=['GET', 'POST'])
@@ -393,7 +394,7 @@ def home():
     if is_valid_domain_with_slash(domain):
         pass
     else:
-        return error(message="域名配置出错,您的程序将无法正常运行",status_code=503)
+        return error(message="域名配置出错,您的程序将无法正常运行", status_code=503)
 
     # 获取客户端IP地址
     ip = get_client_ip(request, session)
@@ -445,8 +446,8 @@ def home():
             tag_articles = get_articles_by_tag(tag)
             articles = get_list_intersection(articles, tag_articles)
 
-        infoList = get_article_info(articles)
-        articles_time_list = zip(articles, infoList)
+        info_list = get_article_info(articles)
+        articles_time_list = zip(articles, info_list)
 
         app.logger.info(f'当前访问的用户, IP: {ip}')
 
@@ -490,7 +491,7 @@ def get_article_info(articles):
                     query = "SELECT * FROM articles WHERE Title = %s"
                     cursor.execute(query, (a_title,))
                     result = cursor.fetchone()
-                    print(result)
+                    #print(result)
                     if result:
                         articleInfo += result[2]
                         articleInfo += " 点赞: "
@@ -700,6 +701,7 @@ def admin(user_id, key):
     method = 'GET'
     if request.method == 'POST':
         method = 'POST'
+    app.logger.info(f'{user_id} : open dashboard with key :{key}')
     return zyadmin(key, method)
 
 
@@ -725,12 +727,15 @@ def change_display(user_id):
                 if has_index_html and has_screenshot_png and has_template_ini:
                     print(f"update theme to {theme_path}")
                     session['display'] = theme_id
-                    query = "INSERT INTO `events` (`id`, `title`, `description`, `event_date`, `created_at`) VALUES (NULL, 'theme change', %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);"
+                    query = ("INSERT INTO `events` (`id`, `title`, `description`, `event_date`, `created_at`) VALUES ("
+                             "NULL, 'theme change', %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);")
                     cursor.execute(query, (theme_id,))
                     db.commit()
+                    app.logger.info(f'{user_id} : change theme to {theme_id}')
                     return 'success'
 
                 else:
+                    app.logger.info(f'{user_id} : change theme to {theme_id} : error')
                     return 'failed'
             else:
                 return error("非管理员用户禁止访问！！！", 403)
@@ -806,7 +811,7 @@ def new_article(user_id):
         return render_template('postNewArticle.html', message=message)
 
 
-def set_article_info(title, username):
+def set_article_info(a_title, username):
     db = get_database_connection()
     try:
         with db.cursor() as cursor:
@@ -822,10 +827,11 @@ def set_article_info(title, username):
 
             logging.debug(
                 f"Executing SQL: {query} with parameters: {(title, username, current_year, username, current_year)}")
-            cursor.execute(query, (title, username, current_year, username, current_year))
+            cursor.execute(query, (a_title, username, current_year, username, current_year))
 
             # 记录事件信息
-            event_log = "INSERT INTO events (title, description, event_date, created_at) VALUES (%s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);"
+            event_log = ("INSERT INTO events (title, description, event_date, created_at) VALUES (%s, %s, "
+                         "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);")
             event_title = 'article update'
             event_description = f'{username} updated {title}'
             cursor.execute(event_log, (event_title, event_description))
@@ -847,6 +853,7 @@ def set_article_info(title, username):
 @app.route('/Admin_upload', methods=['GET', 'POST'])
 @admin_required
 def upload_file1(user_id):
+    app.logger.info(f'{user_id} : Try Upload file')
     return zy_upload_file()
 
 
@@ -857,8 +864,10 @@ def delete_file(user_id, filename):
     if username:
         auth = auth_articles(title=filename, username=username)
         if auth:
+            app.logger.info(f'{user_id} Delete: {filename}')
             return zy_delete_article(filename)
     else:
+        app.logger.info(f'{user_id} Delete: {filename} :error')
         return error(message='您没有权限', status_code=503)
 
 
@@ -927,7 +936,7 @@ def markdown_editor(article):
         return error(message='您没有权限', status_code=503)
 
 
-def write_tags_to_database(tags_list, title):
+def write_tags_to_database(tags_list, a_title):
     tags_str = ';'.join(tags_list)
 
     db = get_database_connection()
@@ -936,18 +945,18 @@ def write_tags_to_database(tags_list, title):
     try:
         # 检查文章是否存在
         query = "SELECT * FROM articles WHERE Title = %s"
-        cursor.execute(query, (title,))
+        cursor.execute(query, (a_title,))
         result = cursor.fetchone()
 
         if result:
             # 如果文章存在，则更新标签
             update_query = "UPDATE articles SET Tags = %s WHERE Title = %s"
-            cursor.execute(update_query, (tags_str, title))
+            cursor.execute(update_query, (tags_str, a_title))
             db.commit()
         else:
             # 如果文章不存在，则创建新文章记录
             insert_query = "INSERT INTO articles (Title, Tags) VALUES (%s, %s)"
-            cursor.execute(insert_query, (title, tags_str))
+            cursor.execute(insert_query, (a_title, tags_str))
             db.commit()
 
     except Exception as e:
@@ -1110,19 +1119,19 @@ def travel():
 
 @app.route('/media', methods=['GET', 'POST'])
 def media_space():
-    type = request.args.get('type', default='img')
+    media_type = request.args.get('type', default='img')
     page = request.args.get('page', default=1, type=int)
     username = request.args.get('username', default=get_username())
     if username is not None:
         if request.method == 'GET':
-            if not type or type == 'img':
+            if not media_type or media_type == 'img':
                 imgs, has_next_page, has_previous_page = get_all_img(username, page=page)
 
                 return render_template('Media.html', imgs=imgs, title='Media', url_for=url_for,
                                        theme=session.get('theme'), has_next_page=has_next_page,
                                        has_previous_page=has_previous_page, current_page=page, userid=username,
                                        domain=domain)
-            if type == 'video':
+            if media_type == 'video':
                 videos, has_next_page, has_previous_page = get_all_video(username, page=page)
 
                 return render_template('Media.html', videos=videos, title='Media', url_for=url_for,
@@ -1130,7 +1139,7 @@ def media_space():
                                        has_previous_page=has_previous_page, current_page=page, userid=username,
                                        domain=domain)
 
-            if type == 'xmind':
+            if media_type == 'xmind':
                 xminds, has_next_page, has_previous_page = get_all_xmind(username, page=page)
 
                 return render_template('Media.html', xminds=xminds, title='Media', url_for=url_for,
@@ -1317,7 +1326,7 @@ def cc_login(provider):
     if is_valid_domain_with_slash(api_host):
         pass
     else:
-        return error(message="彩虹聚合登录API接口配置错误,您的程序无法使用第三方登录",status_code='503'),503
+        return error(message="彩虹聚合登录API接口配置错误,您的程序无法使用第三方登录", status_code='503'), 503
     if provider not in ['qq', 'wx', 'alipay', 'sina', 'baidu', 'huawei', 'xiaomi', 'dingtalk']:
         return jsonify({'message': 'Invalid login provider'})
 
@@ -1454,7 +1463,7 @@ def diy_space(page):
             visit_id = sys_version + format(random.randint(10000, 99999))  # 可以设置一个默认值或者抛出异常，具体根据需求进行处理
             resp.set_cookie('visitID', 'zyBLOG' + visit_id, 7200)
         return resp
-    return error(message="Not Found",status_code=404)
+    return error(message="Not Found", status_code=404)
 
 
 @cache.cached(timeout=300, key_prefix='short_link')
@@ -1568,6 +1577,7 @@ def sys_out_prev_page(user_id):
     if not os.path.exists(prev_file_path):
         return error(message='{file_name}不存在', status_code=404)
     else:
+        app.logger.info(f'{user_id} preview: {file_name}')
         return render_template('zyDetail.html', article_content=1,
                                articleName=f"tempPrev_{file_name}", domain=domain,
                                url_for=url_for, article_Surl='-')
@@ -1584,27 +1594,28 @@ def api_mail(user_id):
     body = '这是一封测试邮件。'  # 邮件正文
     send_email(sender_email, password, receiver_email, smtp_server, stmp_port=int(stmp_port), subject=subject,
                body=body)
+    app.logger.info(f'{user_id} sendMail')
     return 'success'
 
 
 @app.route('/donate')
 def donate():
-    forUID = request.args.get('for-uid')
-    if not forUID:
+    for_uid = request.args.get('for-uid')
+    if not for_uid:
         return "此用户不存在"
     else:
         channel_url = 'http://test.com'
-        return f'你要捐赠的是{forUID},他的捐款通道为{channel_url}'
+        return f'你要捐赠的是{for_uid},他的捐款通道为{channel_url}'
 
 
 @app.route('/links')
-def friendsLink():
-    friendsLinks = {
+def friendslink():
+    friends_links = {
         '七棵树': domain,
         'github': "https://github.com/Athenavi",
         '博客园': "https://cnblogs.com/Athenavi/",
     }
-    return friendsLinks
+    return friends_links
 
 
 @app.route('/api/ip')
@@ -1638,7 +1649,7 @@ def internal_server_error(error_message):
 @app.route('/<path:undefined_path>')
 def undefined_route(undefined_path):
     app.logger.error(undefined_path)
-    return error(message="Not Found",status_code='404')
+    return error(message="Not Found", status_code='404')
 
 
 @app.errorhandler(Exception)

@@ -16,8 +16,8 @@ door_key = config.get('admin', 'key').strip("'")
 
 
 def zy_general_conf():
-    config = ConfigParser()
-    config.read('config.ini', encoding='utf-8')
+    sys_config = ConfigParser()
+    sys_config.read('config.ini', encoding='utf-8')
     domain = config.get('general', 'domain', fallback='error').strip("'")
     title = config.get('general', 'title', fallback='error').strip("'")
     beian = config.get('general', 'beian', fallback='error').strip("'")
@@ -50,7 +50,7 @@ def zyadmin(key, method):
             db.close()
 
 
-def admin_dashboard(method, dashInfo):
+def admin_dashboard(method, dash_info):
     if method != 'GET':
         return None
     else:
@@ -58,7 +58,7 @@ def admin_dashboard(method, dashInfo):
         display_list = get_all_themes()
         currentDisPlay = session.get('display', 'default')
         return render_template('dashboard.html', displayList=display_list,
-                               currentDisplay=currentDisPlay, dashInfo=dashInfo)
+                               currentDisplay=currentDisPlay, dashInfo=dash_info)
 
 
 def get_all_themes():

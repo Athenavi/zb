@@ -4,13 +4,13 @@ from datetime import timedelta, datetime
 
 import bcrypt
 import bleach
-from flask import request, session, redirect, url_for, render_template, app, make_response
+from flask import request, session, redirect, url_for, render_template, make_response
 
 from src.database import get_database_connection
 from src.utils import generate_jwt, generate_refresh_token
 
 
-def zy_login():
+def zy_login(callback_route):
     input_value = bleach.clean(request.form['username'])  # 用户输入的用户名或邮箱
     password = bleach.clean(request.form['password'])
 
@@ -32,7 +32,7 @@ def zy_login():
             token = generate_jwt(user_id, user_name)  # 生成 JWT
             refresh_token = generate_refresh_token(user_id, user_name)  # 生成刷新令牌
 
-            response = make_response(redirect(url_for('home')))
+            response = make_response(redirect(url_for(callback_route)))
 
             # 设置 Cookie 的过期时间为 7 天
             expires = datetime.now() + timedelta(days=7)
@@ -58,6 +58,7 @@ def zy_register(ip):
         username = bleach.clean(request.form['username'])  # 使用 bleach 进行 XSS 防范
         password = bleach.clean(request.form['password'])
         invite_code = bleach.clean(request.form['invite_code'])
+        print(f'user inviteCode: {invite_code}')
 
         db = get_database_connection()
         cursor = db.cursor()

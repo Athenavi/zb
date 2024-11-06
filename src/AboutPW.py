@@ -33,8 +33,8 @@ def zy_change_password(user_id, ip):
                 cursor.execute(update_query, (hashed_password.decode('utf-8'), user_id))
                 db.commit()
 
-                notice_query = "INSERT INTO `notifications` (`id`, `user_id`, `type`, `message`, `is_read`, `created_at`, `updated_at`) VALUES (NULL, %s, 'safe', '修改了密码', '0', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);"
-                cursor.execute(notice_query, (user_id,))
+                notice_query = "INSERT INTO `notifications` (`id`, `user_id`, `type`, `message`, `is_read`, `created_at`, `updated_at`) VALUES (NULL, %s, 'safe', %s, '0', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);"
+                cursor.execute(notice_query, (user_id,f"{ip} changed password"))
                 db.commit()
 
                 cursor.close()
