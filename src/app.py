@@ -393,7 +393,7 @@ def home():
     if is_valid_domain_with_slash(domain):
         pass
     else:
-        return render_template('error.html', status_code='域名配置出错,您的程序将无法正常运行'), 404
+        return error(message="域名配置出错,您的程序将无法正常运行",status_code=503)
 
     # 获取客户端IP地址
     ip = get_client_ip(request, session)
@@ -537,7 +537,7 @@ def blog_detail(article):
             return error(message="页面不见了", status_code=404)
 
         if article_name not in article_names:
-            return render_template('error.html', status_code='404'), 404
+            return error(message="页面不见了", status_code=404)
 
         article_tags = get_tags_by_article(article_name)
         article_url = domain + 'blog/' + article_name
@@ -560,7 +560,7 @@ def blog_detail(article):
         return response
 
     except FileNotFoundError:
-        return render_template('error.html', status_code='404'), 404
+        return error(message="页面不见了", status_code=404)
 
 
 @cache.cached(timeout=300)
@@ -1100,7 +1100,7 @@ def travel():
         if urls:
             random.shuffle(urls)  # 随机打乱URL列表的顺序
             random_url = urls[0]  # 选择打乱后的第一个URL
-            return render_template('Jump.html', url=random_url, domian=domain)
+            return render_template('inform.html', url=random_url, domian=domain)
         # 如果没有找到任何<loc>标签，则返回适当的错误信息或默认页面
         return "No URLs found in the response."
     else:
@@ -1309,7 +1309,7 @@ def start_video(username, video_name):
 @app.route('/jump', methods=['GET', 'POST'])
 def jump():
     url = request.args.get('url', default=domain)
-    return render_template('Jump.html', url=url, domain=domain)
+    return render_template('inform.html', url=url, domain=domain)
 
 
 @app.route('/login/<provider>')
@@ -1317,7 +1317,7 @@ def cc_login(provider):
     if is_valid_domain_with_slash(api_host):
         pass
     else:
-        return render_template('error.html', status_code='彩虹聚合登录API接口配置错误,您的程序无法使用第三方登录'), 404
+        return error(message="彩虹聚合登录API接口配置错误,您的程序无法使用第三方登录",status_code='503'),503
     if provider not in ['qq', 'wx', 'alipay', 'sina', 'baidu', 'huawei', 'xiaomi', 'dingtalk']:
         return jsonify({'message': 'Invalid login provider'})
 
@@ -1325,7 +1325,7 @@ def cc_login(provider):
 
     api_safe_check = [api_host, app_id, app_key]
     if 'error' in api_safe_check:
-        return render_template('error.html', error='请检查你的第三方登录配置文件')
+        return error(message=api_safe_check, status_code='503'), 503
     login_url = f'{api_host}connect.php?act=login&appid={app_id}&appkey={app_key}&type={provider}&redirect_uri={redirect_uri}'
     response = requests.get(login_url)
     data = response.json()
@@ -1334,7 +1334,7 @@ def cc_login(provider):
     if code == 0:
         cc_url = data.get('url')
     else:
-        return render_template('error.html', error=msg)
+        return error(message=msg, status_code='503')
 
     return redirect(cc_url, 302)
 
@@ -1454,7 +1454,7 @@ def diy_space(page):
             visit_id = sys_version + format(random.randint(10000, 99999))  # 可以设置一个默认值或者抛出异常，具体根据需求进行处理
             resp.set_cookie('visitID', 'zyBLOG' + visit_id, 7200)
         return resp
-    return render_template('error.html')
+    return error(message="Not Found",status_code=404)
 
 
 @cache.cached(timeout=300, key_prefix='short_link')
@@ -1528,7 +1528,7 @@ def id_find_article(article_id):
     except Exception as e:
         logging.error(f"An error occurred: {str(e)}")
         db.rollback()
-        return error(message='服务器内部错误', status_code=500), 500
+        return error(message='服务器内部错误', status_code=500)
     finally:
         ip_address = get_client_ip(request, session)
         app.logger.info(f'IP:{ip_address}, UA:{user_agent}')
@@ -1566,7 +1566,7 @@ def sys_out_prev_page(user_id):
     file_name = request.args.get('file_name')
     prev_file_path = os.path.join(base_dir, 'media', str(user), file_name)
     if not os.path.exists(prev_file_path):
-        return render_template('error.html', message=f'{file_name}不存在', status_code=404)
+        return error(message='{file_name}不存在', status_code=404)
     else:
         return render_template('zyDetail.html', article_content=1,
                                articleName=f"tempPrev_{file_name}", domain=domain,
@@ -1626,22 +1626,22 @@ def ip_api():
 @app.errorhandler(404)
 def page_not_found(error_message):
     app.logger.error(error_message)
-    return "Page not found", 404
+    return error(message=error_message, status_code=404)
 
 
 @app.errorhandler(500)
 def internal_server_error(error_message):
     app.logger.error(error_message)
-    return error(message=error_message, status_code=500), 500
+    return error(message=error_message, status_code=500)
 
 
 @app.route('/<path:undefined_path>')
 def undefined_route(undefined_path):
     app.logger.error(undefined_path)
-    return render_template('error.html', status_code='404'), 404
+    return error(message="Not Found",status_code='404')
 
 
 @app.errorhandler(Exception)
 def handle_unexpected_error(error_message):
     app.logger.error(error_message)
-    return error(message=error_message, status_code=500), 500
+    return error(message=error_message, status_code=500)

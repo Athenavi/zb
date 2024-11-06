@@ -79,7 +79,7 @@ def zy_register(ip):
             db.commit()
 
             # 注册成功后，可以生成 JWT 令牌（可选）
-            return render_template('success.html')
+            return render_template('inform.html', status_code='200', message=f"{username}注册成功！")
 
         except Exception as e:
             logging.error(f"Error registering user: {e}")
@@ -127,16 +127,19 @@ def zy_mail_login(user_email, ip):
         result = cursor.fetchone()
 
         if result is not None:
-            session.permanent = True
-            app.permanent_session_lifetime = timedelta(minutes=120)
-            session['logged_in'] = True
-            session['username'] = result[1]
+            # 登录成功，生成 JWT 和刷新令牌
+            user_id = result[0]  # 假设 result[0] 是用户ID
+            user_name = result[1]
+            token = generate_jwt(user_id, user_name)  # 生成 JWT
+            refresh_token = generate_refresh_token(user_id, user_name)  # 生成刷新令牌
+            response = make_response(
+                render_template('inform.html', status_code='200', message="授权通过!你可以关闭此页面"))
+            # 设置 Cookie 的过期时间为 7 天
+            expires = datetime.now() + timedelta(days=7)
+            response.set_cookie('jwt', token, httponly=True, expires=expires)
+            response.set_cookie('refresh_token', refresh_token, httponly=True, expires=expires)
 
-            resp = make_response(render_template('success.html', message="授权通过!你可以关闭此页面"))
-
-            # 设置 cookie
-            resp.set_cookie('login_statu', '1', 30)
-            return resp
+            return response
 
         else:
             # 执行用户注册的逻辑
@@ -145,7 +148,7 @@ def zy_mail_login(user_email, ip):
             cursor.execute(insert_query, (username, hashed_password, user_email, ip))
             db.commit()
             message = '已经为您自动注册账号\n' + '账号' + username + '默认密码：123456 请尽快修改'
-            resp = make_response(render_template('success.html', message=message))
+            resp = make_response(render_template('inform.html', status_code='200', message=message))
             session['logged_in'] = True
             session['username'] = username
             # 设置 cookie

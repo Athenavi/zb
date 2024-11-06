@@ -30,7 +30,7 @@ def zy_general_conf():
 
 
 def error(message, status_code):
-    return render_template('error.html', error=message, status_code=status_code), status_code
+    return render_template('inform.html', error=message, status_code=status_code), status_code
 
 
 def zyadmin(key, method):

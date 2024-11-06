@@ -42,7 +42,7 @@ def zy_change_password(user_id, ip):
 
                 flash('密码修改成功！')
                 session.clear()
-                return render_template('success.html')
+                return render_template('inform.html', status_code='200', message='密码修改成功！')
     return render_template('zyPW.html', form='change')
 
 

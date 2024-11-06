@@ -13,17 +13,30 @@
         <a href="{{ domain }}">
             <img alt="{{ title }}" src="/static/favicon.ico" class="logo-img"/>
         </a>
-        <div class="tips-title">您即将离开本站博客，跳转到第三方链接</div>
-        <div class="address">{{ url }}</div>
-        <div class="tips-subtitle">请注意您的账号和财产安全</div>
-        <div class="btn-groups">
-            <button onclick="try { window.close(); } catch(e) { alert('请手动关闭此页面'); }" type="button"
-                    class="ant-btn ant-btn-default">取消访问
-            </button>
-            <a href="{{ url }}" rel="nofollow">
-                <button type="button" class="ant-btn ant-btn-primary">继续访问</button>
-            </a>
-        </div>
+        {% if status_code %}
+            <div class="tips-title">{{ status_code }}</div>
+            <div class="tips-subtitle"><h2 id="message">{{ message }}</h2></div>
+            <div class="btn-groups">
+                <button onclick="window.history.back()" type="button"
+                        class="ant-btn ant-btn-default">返回上一级页面
+                </button>
+                <a href="/" rel="nofollow">
+                    <button type="button" class="ant-btn ant-btn-primary">返回主页</button>
+                </a>
+            </div>
+        {% else %}
+            <div class="tips-title">您即将离开本站博客，跳转到第三方链接</div>
+            <div class="address">{{ url }}</div>
+            <div class="tips-subtitle">请注意您的账号和财产安全</div>
+            <div class="btn-groups">
+                <button onclick="try { window.close(); } catch(e) { alert('请手动关闭此页面'); }" type="button"
+                        class="ant-btn ant-btn-default">取消访问
+                </button>
+                <a href="{{ url }}" rel="nofollow">
+                    <button type="button" class="ant-btn ant-btn-primary">继续访问</button>
+                </a>
+            </div>
+        {% endif %}
     </div>
 </div>
 </body>
@@ -121,3 +134,13 @@
         color: #07C160;
     }
 </style>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var h2 = document.getElementById('message');
+        if (h2 && h2.innerHTML.includes('你可以关闭此页面')) {
+            setTimeout(function () {
+                window.close();
+            }, 3000);
+        }
+    });
+</script>
