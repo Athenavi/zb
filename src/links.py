@@ -25,7 +25,7 @@ def create_special_url(long_url, username):
 
         return short_url
     except Exception:
-        return render_template('error.html', status_code='404'), 404
+        return "Not Found"
     finally:
         cursor.close()
         db.close()
@@ -44,9 +44,9 @@ def redirect_to_long_url(short_url):
             long_url = result[0]
             return long_url
         else:
-            return render_template('error.html', status_code='404'), 404
+            return "Not Found"
     except Exception:
-        return render_template('error.html', status_code='404'), 404
+        return "Not Found"
     finally:
         cursor.close()
         db.close()
@@ -63,7 +63,7 @@ def delete_link(short_url):
 
         return True
     except Exception:
-        return render_template('error.html', status_code='404'), 404
+        return "Not Found"
     finally:
         cursor.close()
         db.close()

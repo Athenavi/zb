@@ -101,7 +101,7 @@ def get_article_content(article, limit):
         lines_limit = min(limit, len(lines))
         line_counter = 0
         html_content = ''
-        readNav = []
+        read_nav = []
         in_code_block = False
         in_math_block = False
         code_block_content = ''
@@ -141,7 +141,7 @@ def get_article_content(article, limit):
                     header_level = len(line.split()[0]) + 2
                     header_title = line.strip('#').strip()
                     anchor = header_title.lower().replace(" ", "-")
-                    readNav.append(
+                    read_nav.append(
                         f'<a href="#{anchor}">{header_title}</a><br>'
                     )
                     line = f'<h{header_level} id="{anchor}">{header_title}</h{header_level}>'
@@ -150,7 +150,7 @@ def get_article_content(article, limit):
 
             line_counter += 1
 
-        return html_content, '\n'.join(readNav)
+        return html_content, '\n'.join(read_nav)
 
     except FileNotFoundError:
         # Return a 404 error page if the file does not exist
@@ -198,11 +198,11 @@ def get_file_date(file_path):
         decoded_name = urllib.parse.unquote(file_path)  # 对文件名进行解码处理
         file_path = os.path.join('articles', decoded_name + '.md')
         # 获取文件的创建时间
-        create_time = os.path.getctime(file_path)
+        #create_time = os.path.getctime(file_path)
         # 获取文件的修改时间
         modify_time = os.path.getmtime(file_path)
         # 获取文件的访问时间
-        access_time = os.path.getatime(file_path)
+        #access_time = os.path.getatime(file_path)
 
         formatted_modify_time = datetime.datetime.fromtimestamp(modify_time).strftime("%Y-%m-%d %H:%M")
 

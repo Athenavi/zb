@@ -102,14 +102,14 @@ def zy_upload_file():
         if not allowed_file(file.filename) or file.content_length > 10 * 1024 * 1024:
             return error('Invalid file', 400)
 
-        type = request.form.get('type')
+        file_type = request.form.get('type')
 
         # 根据类型选择保存目录
-        if type == 'articles':
+        if file_type == 'articles':
             save_directory = 'articles/'
-        elif type == 'notice':
+        elif file_type == 'notice':
             save_directory = 'notice/'
-        elif type == 'theme':
+        elif file_type == 'theme':
             save_directory = 'templates/theme/'
         else:
             return error('Invalid type', 400)
