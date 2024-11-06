@@ -1609,7 +1609,17 @@ def friendsLink():
 
 @app.route('/api/ip')
 def ip_api():
+    key = request.cookies.get('key')
+
+    if key:
+        cached_ip = cache.get(key)
+        if cached_ip:
+            query_params = request.args.to_dict()
+            print(f"{key} cache ip : {cached_ip} with {query_params}")
+            return jsonify({'ip': cached_ip})
+
     ip = get_client_ip(request, session)
+    cache.set(key, ip, timeout=600)
     return jsonify({'ip': ip})
 
 

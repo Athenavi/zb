@@ -1,19 +1,26 @@
 const fetchIpInfo = () => {
-    fetch('/api/ip')
+    // 获取当前 URL
+    const currentUrl = window.location.href;
+    const url = new URL(currentUrl);
+    const params = new URLSearchParams(url.search);
+    const apiUrl = '/api/ip?' + params.toString();
+    fetch(apiUrl, {
+        method: 'GET', // 或者 'POST' 等方法
+        credentials: 'include' // 发送请求时包含 Cookie
+    })
         .then(response => {
-            // Ensure response is OK and parse JSON
             if (response.ok) {
-                return response.json(); // Change from response.data to response.json()
+                return response.json();
             }
             return Promise.reject('Network response was not ok');
         })
         .then(data => {
-            showWelcome(data.ip); // Adjust to access ip from the object
-            hideLoadingSpinner();  // Hide loading spinner after data is received
+            showWelcome(data.ip);
+            hideLoadingSpinner();
         })
         .catch(() => {
             showErrorMessage();
-            hideLoadingSpinner();  // Hide loading spinner on error
+            hideLoadingSpinner();
         });
 };
 

@@ -12,17 +12,17 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css"
           integrity="sha384-xOolHFLEh07PJGoPkLv1IbcEPTNtaed2xpHsD9ESMhqIYd0nLMwNLD69Npy4HI+N" crossorigin="anonymous">
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="../static/css/main.css">
+    <link rel="stylesheet" href="/static/css/main.css">
     <style>
         body {
-            background: url(../static/image/day.jpg) no-repeat center/cover;
+            background: url(/static/image/day.jpg) no-repeat center/cover;
             color: #fff;
         }
 
-        .card {
-            border: none;
-            border-radius: 10px;
-            overflow: hidden;
+        .card-title, .card-body h6 {
+            white-space: nowrap; /* 不换行 */
+            overflow: hidden; /* 隐藏超出部分 */
+            text-overflow: ellipsis; /* 使用省略号 */
         }
 
         .card-body {
@@ -30,7 +30,7 @@
             justify-content: space-between;
             align-items: center;
             padding: 15px;
-            background: rgba(0, 0, 0, 0.5);
+            background: transparent;
             transition: background 0.3s ease;
         }
 
@@ -74,11 +74,6 @@
 
         .xmind-wrapper button {
             font-size: 16px;
-            margin-top: 10px;
-        }
-
-        /* 增加关闭按钮的风格 */
-        .btn {
             margin-top: 10px;
         }
 
@@ -185,7 +180,7 @@
                             <div class="card">
                                 <div class="card-body">
                                     <h3 class="card-title">{{ img }}</h3>
-                                    <button class="btn btn-primary" onclick="copyImgURL('{{ img }}')">复制外链</button>
+                                    <button class="btn btn-primary" onclick="copyImgURL('{{ img }}')"></button>
                                 </div>
                             </div>
                         </a>
@@ -198,7 +193,7 @@
                             <div class="card">
                                 <div class="card-body">
                                     <h3 class="card-title">{{ video }}</h3>
-                                    <button class="btn btn-primary" onclick="copyVideoURL('{{ video }}')">复制外链
+                                    <button class="btn btn-primary" onclick="copyVideoURL('{{ video }}')">
                                     </button>
                                 </div>
                             </div>
@@ -213,8 +208,6 @@
                             <div class="card">
                                 <div class="card-body">
                                     <h3 class="card-title">{{ xmind }}</h3>
-                                    <button class="btn btn-primary" onclick="copyXmindURL('{{ xmind }}')">复制外链
-                                    </button>
                                 </div>
                             </div>
                         </a>

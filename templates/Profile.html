@@ -9,10 +9,11 @@
     <meta name="robots" content="index, follow">
     <title>{{ title }} | zyBLOG</title>
     <!-- Tailwind CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="/static/css/tailwind.min.css" rel="stylesheet">
+    <link href="/static/css/main.css" rel="stylesheet">
     <style>
-        body {
-            background: url(../static/image/day.jpg) no-repeat center/cover;
+        #myFooter {
+            background: transparent;
         }
     </style>
 </head>
@@ -20,14 +21,14 @@
 <body class="bg-cover bg-center">
 {% from 'header.html' import zytopbar %}
 {{ zytopbar() }}
-<div class="container mx-auto mt-8">
+<div class="container mx-auto mt-8 px-4">
     <div class="flex justify-center">
         <div class="w-full md:w-8/12 bg-white rounded-lg shadow-lg p-6">
             {% if userStatus %}
                 <div class="flex items-center mb-4">
                     <img src="{{ avatar_url }}" class="h-10 w-10 rounded-full" alt="">
-                    <a href="/media" class="ml-4 text-blue-500 hover:underline">📂 媒体</a>
-                    <a href="/setting/profiles" class="ml-4 text-blue-500 hover:underline">⚙️ 设置</a>
+                    <a href="/media" class="ml-4 text-blue-700">📂 媒体</a>
+                    <a href="/setting/profiles" class="ml-4 text-blue-700">⚙️ 设置</a>
                 </div>
                 <div id="notifications" class="mb-6"></div>
 
@@ -40,7 +41,7 @@
                     });
                 </script>
             {% else %}
-                <a href="/login?callback=profile" class="text-blue-500 hover:underline">需要登录</a>
+                <a href="/login?callback=profile" class="text-blue-700">需要登录</a>
             {% endif %}
             <hr class="my-4">
             {% if Articles %}
@@ -50,12 +51,11 @@
                 {% for article in Articles %}
                     <div class="bg-gray-100 p-4 rounded-lg flex justify-between items-center">
                         <a href="{{ url_for('blog_detail', article=article) }}"
-                           class="text-xl font-semibold text-blue-700 hover:underline">{{ article }}</a>
-                        <div>
-                            <a href="/edit/{{ article }}" class="text-green-500 hover:underline">编辑</a>
-                            <a href="#" data-article={{ article }} class="hidden121 ml-4
-                               text-blue-500">隐藏/取消隐藏</a>
-                            <a href="#" data-article={{ article }} class="delete121 ml-4 text-red-500">删除</a>
+                           class="text-xl font-semibold text-blue-700">{{ article }}</a>
+                        <div class="flex items-center space-x-4">
+                            <a href="/edit/{{ article }}" class="text-green-500">编辑</a>
+                            <a href="#" data-article={{ article }} class="hidden121">隐藏/取消隐藏</a>
+                            <a href="#" data-article={{ article }} class="delete121">删除</a>
                         </div>
                     </div>
                 {% endfor %}
@@ -63,10 +63,11 @@
         </div>
     </div>
 </div>
-
-<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.slim.min.js"></script>
+{% from 'footer.html' import zyfooter %}
+{{ zyfooter(notice) }}
 </body>
 </html>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.slim.min.js"></script>
 <script>
     // 获取URL参数的函数
     function getParameterByName(name) {
@@ -79,109 +80,69 @@
         return decodeURIComponent(results[2].replace(/\+/g, " "));
     }
 
-    // 在页面加载时获取URL参数id的值并显示
     window.onload = function () {
         var id = getParameterByName('id');
         var span = document.getElementById('idSpan');
         span.innerHTML = id;
     }
-    // 设置隐藏/取消隐藏文章的请求参数
+
     const hiddenLinks = document.querySelectorAll('a.hidden121');
 
-    // 为每个隐藏链接添加点击事件处理程序
     hiddenLinks.forEach(link => {
         link.addEventListener('click', event => {
-            event.preventDefault(); // 阻止默认链接行为
-
-            // 获取链接上的 data-article 属性作为文章名
+            event.preventDefault();
             const article = link.getAttribute('data-article');
-
-            // 构建请求体
             const requestBody = JSON.stringify({article});
 
-            var confirmation = confirm('您正在尝试对文章进行一个操作，是否继续？');
-            if (!confirmation) {
-                // 用户点击了取消，终止本次请求
-                return;
-            }
-
-            // 发起 POST 请求
-            fetch('/hidden/article', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: requestBody
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.deal === 'hide') {
-                        // 处理隐藏文章的响应
-                        console.log('文章已隐藏');
-                        alert('文章已隐藏');
-                    } else if (data.deal === 'unhide') {
-                        // 处理取消隐藏文章的响应
-                        console.log('文章已取消隐藏');
-                        alert('已经取消隐藏');
-                    } else if (data.deal === 'noAuth') {
-                        console.log('noAuth');
-                        alert('无权限操作');
-                    } else {
-                        // 处理其他响应
-                        console.log(data.message);
-                    }
+            if (confirm('您正在尝试对文章进行一个操作，是否继续？')) {
+                fetch('/hidden/article', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: requestBody
                 })
-                .catch(error => {
-                    alert('请求出错');
-                    console.error('请求出错:', error);
-                });
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.deal === 'hide') {
+                            alert('文章已隐藏');
+                        } else if (data.deal === 'unhide') {
+                            alert('已经取消隐藏');
+                        } else if (data.deal === 'noAuth') {
+                            alert('无权限操作');
+                        } else {
+                            console.log(data.message);
+                        }
+                    })
+                    .catch(error => {
+                        alert('请求出错');
+                        console.error('请求出错:', error);
+                    });
+            }
         });
     });
 
-
-    //
     const deleteLinks = document.querySelectorAll('a.delete121');
 
-    // 为每个隐藏链接添加点击事件处理程序
     deleteLinks.forEach(link => {
         link.addEventListener('click', event => {
-            event.preventDefault(); // 阻止默认链接行为
-
-            // 获取链接上的 data-article 属性作为文章名
+            event.preventDefault();
             const article = link.getAttribute('data-article');
 
-            var confirmation = confirm('您正在尝试永久删除该文章！！！是否继续？');
-            if (!confirmation) {
-                // 用户点击了取消，终止本次请求
-                return;
+            if (confirm('您正在尝试永久删除该文章！！！是否继续？')) {
+                if (confirm('再次确认呢？是否继续？')) {
+                    fetch(`/delete/${article}`, {method: 'POST'})
+                        .then(response => {
+                            if (response.ok) {
+                                alert('文章删除成功！');
+                                location.reload();
+                            } else {
+                                alert('文章删除失败！');
+                            }
+                        })
+                        .catch(error => {
+                            alert('请求出错：' + error);
+                        });
+                }
             }
-
-            var confirmation0 = confirm('再次确认呢？是否继续？');
-            if (!confirmation0) {
-                // 用户点击了取消，终止本次请求
-                return;
-            }
-
-
-            // 发起 POST 请求
-            fetch(`/delete/${article}`, {
-                method: 'POST'
-            })
-                .then(response => {
-                    if (response.ok) {
-                        // 成功删除文章
-                        alert('文章删除成功！');
-                        // 刷新页面或做其他处理
-                        location.reload();
-                    } else {
-                        // 删除文章失败
-                        alert('文章删除失败！');
-                    }
-                })
-                .catch(error => {
-                    // 请求出错
-                    alert('请求出错：' + error);
-                });
         });
     });
 </script>
@@ -190,44 +151,41 @@
     window.onload = function () {
         setTimeout(function () {
             fetch('{{ notiHost }}', {
-                method: 'GET', // 或者 'POST' 等方法
-                credentials: 'include' // 发送请求时包含 Cookie
+                method: 'GET',
+                credentials: 'include'
             })
                 .then(response => {
                     if (!response.ok) {
                         throw new Error('Network response was not ok');
                     }
-                    return response.json(); // 或者根据你的需要处理响应
+                    return response.json();
                 })
                 .then(data => {
-                    console.log(data); // 处理返回的数据
+                    console.log(data);
                 })
                 .catch(error => {
                     console.error('There has been a problem with your fetch operation:', error);
                 });
-        }, 3000); // 等待3000毫秒（3秒）
+        }, 3000);
     };
 </script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        const parentContainer = document.getElementById('notice');
+        const parentContainer = document.getElementById('notice'); // 这里假设有个notice容器
 
-        // 在父元素上添加事件监听器
         parentContainer.addEventListener('click', function (event) {
-            // 检查事件目标是否是 class 为 notice_read 的按钮
             if (event.target && event.target.classList.contains('notice_read')) {
-                const confirmation = confirm('是否删除此通知？');
-                if (confirmation) {
-                    const nid = event.target.id; // 获取按钮的 id
+                if (confirm('是否删除此通知？')) {
+                    const nid = event.target.id;
 
                     fetch('{{ notiHost }}/read?nid=' + nid, {
-                        method: 'GET', // 或者 'POST' 等方法
-                        credentials: 'include' // 发送请求时包含 Cookie
+                        method: 'GET',
+                        credentials: 'include'
                     })
                         .then(response => response.json())
                         .then(data => {
                             if (data.is_notice_read) {
-                                event.target.parentElement.removeChild(event.target); // 移除按钮
+                                event.target.parentElement.removeChild(event.target);
                             } else {
                                 alert('删除失败，请稍后再试。');
                             }
