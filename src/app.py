@@ -27,7 +27,7 @@ from src.AboutLogin import zy_login, zy_register, zy_mail_login
 from src.AboutPW import zy_change_password, zy_confirm_password
 from src.BlogDeal import get_article_names, get_article_content, clear_html_format, \
     get_file_date, get_blog_author, read_hidden_articles, auth_articles, \
-    zy_show_article, zy_edit_article, get_all_article_names
+    zy_show_article, zy_edit_article, get_all_article_names, get_subscriber_ids
 from src.database import get_database_connection
 from src.links import create_special_url
 from src.user import zyadmin, zy_delete_article, error, get_owner_articles, zy_general_conf
@@ -491,7 +491,7 @@ def get_article_info(articles):
                     query = "SELECT * FROM articles WHERE Title = %s"
                     cursor.execute(query, (a_title,))
                     result = cursor.fetchone()
-                    #print(result)
+                    # print(result)
                     if result:
                         articleInfo += result[2]
                         articleInfo += " 点赞: "
@@ -1632,6 +1632,54 @@ def ip_api():
     ip = get_client_ip(request, session)
     cache.set(key, ip, timeout=600)
     return jsonify({'ip': ip})
+
+
+@app.route('/following')
+@jwt_required
+def following(user_id):
+    ip = get_client_ip(request, session)
+
+    if request.method == 'GET':
+
+        cache_key = f'subscriber_ids_uid:{user_id}'
+
+        # 尝试从缓存中获取页面内容
+        content = cache.get(cache_key)
+        if content:
+            # 设置浏览器缓存
+            resp = make_response(content)
+            resp.headers['Cache-Control'] = 'public, max-age=600'  # 缓存为10分钟
+            app.logger.info(f'缓存命中，following 页面: {user_id}')
+            return resp
+        else:
+            app.logger.info(f'缓存未命中，准备生成新内容，页面: {user_id}')
+
+        # 重新获取页面内容
+        subscriber_ids_list = get_subscriber_ids(uid=user_id)
+
+        # 模版配置
+        template_display = session.get('display', 'default')
+        template_path = f'templates/theme/{template_display}/index.html'
+        if os.path.exists(template_path):
+            template = app.jinja_env.get_template(f'theme/{template_display}/index.html')
+        else:
+            template = app.jinja_env.get_template('zyIndex.html')
+
+        app.logger.info(f'subscriber_ids 访问的用户 {user_id}, IP: {ip}')
+
+        # 渲染模板并存储渲染后的页面内容到缓存中
+        rendered_content = template.render(
+            subscriber_ids_list=subscriber_ids_list, url_for=url_for,
+            notice='', tags=[], page_mark='订阅'
+        )
+
+        # 缓存渲染后的页面内容，并设置服务端缓存过期时间
+        cache.set(cache_key, rendered_content, timeout=600)  # 服务端缓存10分钟
+        resp = make_response(rendered_content)
+        return resp
+
+    else:
+        return render_template('zyIndex.html')
 
 
 @app.errorhandler(404)

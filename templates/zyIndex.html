@@ -20,7 +20,7 @@
     <div class="flex flex-col md:flex-row">
         <main class="w-full md:w-3/4" id="articleDIV">
             <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-bold mb-2">最新文章</h2>
+                <h2 class="text-xl font-bold mb-2">{{ page_mark }}最新文章</h2>
                 <button id="toggleLayout"
                         class="bg-transparent-500 text-white px-4 py-2 rounded  transition duration-200">
                     🎚️
@@ -28,6 +28,17 @@
             </div>
 
             <div id="articleCards" class="grid grid-cols-1 gap-6">
+                {% for sub_id,sub_name in subscriber_ids_list %}
+                    <div class="card bg-lightblue-500 shadow-lg rounded-lg overflow-hidden border border-gray-200">
+                        <a href="profile?id={{ sub_id }}"
+                           class="flex hover:bg-gray-100 transition duration-200">
+                            <div class="flex-1 p-4">
+                                <h5 class="text-xl font-bold mb-2">{{ sub_name }}</h5>
+                            </div>
+                        </a>
+                    </div>
+                {% endfor %}
+
                 {% for article, info in articles_time_list %}
                     <div class="card bg-lightblue-500 shadow-lg rounded-lg overflow-hidden border border-gray-200">
                         <a href="{{ url_for('blog_detail', article=article) }}"
@@ -96,10 +107,10 @@
             </div>
             <p class="text-gray-600 mb-4">Ctrl + F 搜索内容</p>
             <div class="announcement_content">
-                        <div class="loading-spinner"></div>
-                        <div id="welcome-info" style="display: none;">
-                            <script src="/static/js/side.js" defer></script>
-                        </div>
+                <div class="loading-spinner"></div>
+                <div id="welcome-info" style="display: none;">
+                    <script src="/static/js/side.js" defer></script>
+                </div>
             </div>
             <img src="/static/image/gzh.png" alt="Wx——qrcode" class="w-full h-auto mb-4 rounded-lg shadow">
             <div class="textwidget custom-html-widget">

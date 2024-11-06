@@ -9,14 +9,8 @@ def zy_change_password(user_id, ip):
         return redirect(url_for('confirm_password'))
 
     if request.method == 'POST':
-        username = request.form.get('username')
         new_password = request.form.get('new_password')
         confirm_password = request.form.get('confirm_password')
-
-        # 验证用户名是否与会话中的用户名一致
-        if session.get('username') != username:
-            return render_template('zyPW.html', error="请核对你的用户名", form='change')
-
         # 查询当前密码
         db = get_database_connection()
         cursor = db.cursor()
