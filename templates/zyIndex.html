@@ -6,7 +6,7 @@
     <meta name="description" content="zyBLOG|基于flask的博客程序">
     <meta name="keywords" content="zyBLOG, flask, 七棵树, 奇客舒, 博客">
     <meta name="robots" content="index, follow">
-    <title>{{ title }} | zyBLOG</title>
+    <title>{{ title }}</title>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="stylesheet" href="/static/css/main.css">
 </head>
@@ -95,7 +95,23 @@
                 })();</script>
             </div>
             <p class="text-gray-600 mb-4">Ctrl + F 搜索内容</p>
+            <div class="announcement_content">
+                        <div class="loading-spinner"></div>
+                        <div id="welcome-info" style="display: none;">
+                            <script src="/static/js/side.js" defer></script>
+                        </div>
+            </div>
             <img src="/static/image/gzh.png" alt="Wx——qrcode" class="w-full h-auto mb-4 rounded-lg shadow">
+            <div class="textwidget custom-html-widget">
+                <div class="qqg-card-widget" id="qqg-card-wechat">
+                    <div id="qqg-flip-wrapper">
+                        <div id="qqg-flip-content">
+                            <div class="qqg-face"></div>
+                            <div class="qqg-back qqg-face"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </aside>
     </div>
 </div>

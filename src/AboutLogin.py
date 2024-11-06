@@ -1,6 +1,6 @@
 import logging
 import random
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 import bcrypt
 import bleach
@@ -31,9 +31,15 @@ def zy_login():
             user_name = result[1]
             token = generate_jwt(user_id, user_name)  # 生成 JWT
             refresh_token = generate_refresh_token(user_id, user_name)  # 生成刷新令牌
+
             response = make_response(redirect(url_for('home')))
-            response.set_cookie('jwt', token, httponly=True)
-            response.set_cookie('refresh_token', refresh_token, httponly=True)
+
+            # 设置 Cookie 的过期时间为 7 天
+            expires = datetime.now() + timedelta(days=7)
+
+            response.set_cookie('jwt', token, httponly=True, expires=expires)
+            response.set_cookie('refresh_token', refresh_token, httponly=True, expires=expires)
+
             return response
         else:
             return render_template('Login.html', error="Invalid username or password")

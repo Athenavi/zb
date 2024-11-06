@@ -73,6 +73,7 @@ print("++++++++++==========================++++++++++")
 def inject_variables():
     return dict(
         beian=beian,
+        title=title,
         username=get_username,
         domain=domain
     )
@@ -451,7 +452,7 @@ def home():
 
         # 渲染模板并存储渲染后的页面内容到缓存中
         rendered_content = template.render(
-            title=title, articles_time_list=articles_time_list, url_for=url_for,
+            articles_time_list=articles_time_list, url_for=url_for,
             notice=notice, has_next_page=has_next_page, has_previous_page=has_previous_page,
             current_page=page, tags=tags, tag=tag
         )
@@ -544,7 +545,7 @@ def blog_detail(article):
         # print(article_Surl)
         author = get_blog_author(article_name)
         update_date = get_file_date(article_name)
-        response = make_response(render_template('zyDetail.html', title=title, article_content=1,
+        response = make_response(render_template('zyDetail.html', article_content=1,
                                                  articleName=article_name,
                                                  author=author, blogDate=update_date, domain=domain,
                                                  url_for=url_for, article_Surl=article_surl, article_tags=article_tags))
@@ -1567,7 +1568,7 @@ def sys_out_prev_page(user_id):
     if not os.path.exists(prev_file_path):
         return render_template('error.html', message=f'{file_name}不存在', status_code=404)
     else:
-        return render_template('zyDetail.html', title=title, article_content=1,
+        return render_template('zyDetail.html', article_content=1,
                                articleName=f"tempPrev_{file_name}", domain=domain,
                                url_for=url_for, article_Surl='-')
 
@@ -1586,10 +1587,40 @@ def api_mail(user_id):
     return 'success'
 
 
-@app.route('/test')
-def test():
-    alert = "hello world"
-    return alert
+@app.route('/donate')
+def donate():
+    forUID = request.args.get('for-uid')
+    if not forUID:
+        return "此用户不存在"
+    else:
+        channel_url = 'http://test.com'
+        return f'你要捐赠的是{forUID},他的捐款通道为{channel_url}'
+
+
+@app.route('/links')
+def friendsLink():
+    friendsLinks = {
+        '七棵树': domain,
+        'github': "https://github.com/Athenavi",
+        '博客园': "https://cnblogs.com/Athenavi/",
+    }
+    return friendsLinks
+
+
+@app.route('/api/ip')
+def ip_api():
+    key = request.cookies.get('key')
+
+    if key:
+        cached_ip = cache.get(key)
+        if cached_ip:
+            query_params = request.args.to_dict()
+            print(f"{key} cache ip : {cached_ip} with {query_params}")
+            return jsonify({'ip': cached_ip})
+
+    ip = get_client_ip(request, session)
+    cache.set(key, ip, timeout=600)
+    return jsonify({'ip': ip})
 
 
 @app.errorhandler(404)
