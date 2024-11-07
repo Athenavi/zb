@@ -113,7 +113,8 @@ def jwt_required(f):
         token = request.cookies.get('jwt')
         user_id = authenticate_jwt(token)
         if user_id is None:
-            return error(message="Unauthorized", status_code=401)
+            callback_route = request.endpoint  # 获取请求的端点名称
+            return redirect(url_for('login', callback=callback_route))
         return f(user_id, *args, **kwargs)
 
     return decorated_function
@@ -396,9 +397,6 @@ def home():
     else:
         return error(message="域名配置出错,您的程序将无法正常运行", status_code=503)
 
-    # 获取客户端IP地址
-    ip = get_client_ip(request, session)
-
     if request.method == 'GET':
         page = request.args.get('page', default=1, type=int)
         tag = request.args.get('tag', default='None')
@@ -448,9 +446,6 @@ def home():
 
         info_list = get_article_info(articles)
         articles_time_list = zip(articles, info_list)
-
-        app.logger.info(f'当前访问的用户, IP: {ip}')
-
         # 渲染模板并存储渲染后的页面内容到缓存中
         rendered_content = template.render(
             articles_time_list=articles_time_list, url_for=url_for,
@@ -1118,46 +1113,44 @@ def travel():
 
 
 @app.route('/media', methods=['GET', 'POST'])
-def media_space():
+@jwt_required
+def media(user_id):
     media_type = request.args.get('type', default='img')
     page = request.args.get('page', default=1, type=int)
-    username = request.args.get('username', default=get_username())
-    if username is not None:
-        if request.method == 'GET':
-            if not media_type or media_type == 'img':
-                imgs, has_next_page, has_previous_page = get_all_img(username, page=page)
+    username = get_username()
+    if request.method == 'GET':
+        if not media_type or media_type == 'img':
+            imgs, has_next_page, has_previous_page = get_all_img(username, page=page)
 
-                return render_template('Media.html', imgs=imgs, title='Media', url_for=url_for,
-                                       theme=session.get('theme'), has_next_page=has_next_page,
-                                       has_previous_page=has_previous_page, current_page=page, userid=username,
-                                       domain=domain)
-            if media_type == 'video':
-                videos, has_next_page, has_previous_page = get_all_video(username, page=page)
+            return render_template('Media.html', imgs=imgs, title='Media', url_for=url_for,
+                                   theme=session.get('theme'), has_next_page=has_next_page,
+                                   has_previous_page=has_previous_page, current_page=page, userid=username,
+                                   domain=domain)
+        if media_type == 'video':
+            videos, has_next_page, has_previous_page = get_all_video(username, page=page)
 
-                return render_template('Media.html', videos=videos, title='Media', url_for=url_for,
-                                       theme=session.get('theme'), has_next_page=has_next_page,
-                                       has_previous_page=has_previous_page, current_page=page, userid=username,
-                                       domain=domain)
+            return render_template('Media.html', videos=videos, title='Media', url_for=url_for,
+                                   theme=session.get('theme'), has_next_page=has_next_page,
+                                   has_previous_page=has_previous_page, current_page=page, userid=username,
+                                   domain=domain)
 
-            if media_type == 'xmind':
-                xminds, has_next_page, has_previous_page = get_all_xmind(username, page=page)
+        if media_type == 'xmind':
+            xminds, has_next_page, has_previous_page = get_all_xmind(username, page=page)
 
-                return render_template('Media.html', xminds=xminds, title='Media', url_for=url_for,
-                                       theme=session.get('theme'), has_next_page=has_next_page,
-                                       has_previous_page=has_previous_page, current_page=page, userid=username,
-                                       domain=domain)
-        elif request.method == 'POST':
-            img_name = request.json.get('img_name')
-            if not img_name:
-                return error(message='缺少图像名称', status_code=400)
+            return render_template('Media.html', xminds=xminds, title='Media', url_for=url_for,
+                                   theme=session.get('theme'), has_next_page=has_next_page,
+                                   has_previous_page=has_previous_page, current_page=page, userid=username,
+                                   domain=domain)
+    elif request.method == 'POST':
+        img_name = request.json.get('img_name')
+        if not img_name:
+            return error(message='缺少图像名称', status_code=400)
 
-            image = get_image_path(username, img_name)
-            if not image:
-                return error(message='未找到图像', status_code=404)
+        image = get_image_path(username, img_name)
+        if not image:
+            return error(message='未找到图像', status_code=404)
 
-            return image
-
-    return error(message='您没有权限', status_code=503)
+        return image
 
 
 def get_media_list(username, category, page=1, per_page=10):
@@ -1364,15 +1357,8 @@ def callback(provider):
     msg = data.get('msg')
     if code == 0:
         social_uid = data.get('social_uid')
-        ip = data.get('ip')
-        session['public_ip'] = ip
-        if provider == 'qq':
-            user_email = social_uid + "@qq.com"
-        if provider == 'wx':
-            user_email = social_uid + "@wx.com"
-        elif provider != 'qq' and 'wx':
-            user_email = social_uid + "@qks.com"
-        # face_img = get_user_info(provider, social_uid)
+        ip = get_client_ip(request, session)
+        user_email = social_uid + f"@{provider}.com"
         return zy_mail_login(user_email, ip)
 
     return render_template('Login.html', error=msg)
@@ -1685,22 +1671,22 @@ def following(user_id):
 @app.errorhandler(404)
 def page_not_found(error_message):
     app.logger.error(error_message)
-    return error(message=error_message, status_code=404)
+    return error(error_message, status_code=404)
 
 
 @app.errorhandler(500)
 def internal_server_error(error_message):
     app.logger.error(error_message)
-    return error(message=error_message, status_code=500)
+    return error(error_message, status_code=500)
 
 
 @app.route('/<path:undefined_path>')
 def undefined_route(undefined_path):
     app.logger.error(undefined_path)
-    return error(message="Not Found", status_code='404')
+    return error("Not Found", status_code=404)
 
 
 @app.errorhandler(Exception)
 def handle_unexpected_error(error_message):
     app.logger.error(error_message)
-    return error(message=error_message, status_code=500)
+    return error(error_message, status_code=500)

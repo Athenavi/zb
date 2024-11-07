@@ -138,17 +138,17 @@
 
         // 从localStorage中获取布局状态
         const savedLayout = localStorage.getItem('articleLayout') || 'grid-cols-1';
-        articleCards.classList.remove('grid-cols-1', 'grid-cols-3');
+        articleCards.classList.remove('grid-cols-1', 'grid-cols-2');
         articleCards.classList.add(savedLayout);
 
         // 切换布局并保存到localStorage
         toggleLayoutButton.addEventListener('click', function () {
             if (articleCards.classList.contains('grid-cols-1')) {
                 articleCards.classList.remove('grid-cols-1');
-                articleCards.classList.add('grid-cols-3');
-                localStorage.setItem('articleLayout', 'grid-cols-3'); // 保存状态
+                articleCards.classList.add('grid-cols-2');
+                localStorage.setItem('articleLayout', 'grid-cols-2'); // 保存状态
             } else {
-                articleCards.classList.remove('grid-cols-3');
+                articleCards.classList.remove('grid-cols-2');
                 articleCards.classList.add('grid-cols-1');
                 localStorage.setItem('articleLayout', 'grid-cols-1'); // 保存状态
             }

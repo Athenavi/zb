@@ -149,12 +149,7 @@ def zy_mail_login(user_email, ip):
             cursor.execute(insert_query, (username, hashed_password, user_email, ip))
             db.commit()
             message = '已经为您自动注册账号\n' + '账号' + username + '默认密码：123456 请尽快修改'
-            resp = make_response(render_template('inform.html', status_code='200', message=message))
-            session['logged_in'] = True
-            session['username'] = username
-            # 设置 cookie
-            resp.set_cookie('login_statu', '1', 30)
-            return resp
+            return render_template('inform.html', status_code='200', message=message)
 
     except Exception as e:
         logging.error(f"Error registering user: {e}")
