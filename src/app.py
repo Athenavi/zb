@@ -27,7 +27,7 @@ from src.AboutLogin import zy_login, zy_register, zy_mail_login
 from src.AboutPW import zy_change_password, zy_confirm_password
 from src.BlogDeal import get_article_names, get_article_content, clear_html_format, \
     get_file_date, get_blog_author, read_hidden_articles, auth_articles, \
-    zy_show_article, zy_edit_article, get_all_article_names
+    zy_show_article, zy_edit_article, get_all_article_names, get_subscriber_ids
 from src.database import get_database_connection
 from src.links import create_special_url
 from src.user import zyadmin, zy_delete_article, error, get_owner_articles, zy_general_conf
@@ -113,7 +113,8 @@ def jwt_required(f):
         token = request.cookies.get('jwt')
         user_id = authenticate_jwt(token)
         if user_id is None:
-            return error(message="Unauthorized", status_code=401)
+            callback_route = request.endpoint  # 获取请求的端点名称
+            return redirect(url_for('login', callback=callback_route))
         return f(user_id, *args, **kwargs)
 
     return decorated_function
@@ -396,9 +397,6 @@ def home():
     else:
         return error(message="域名配置出错,您的程序将无法正常运行", status_code=503)
 
-    # 获取客户端IP地址
-    ip = get_client_ip(request, session)
-
     if request.method == 'GET':
         page = request.args.get('page', default=1, type=int)
         tag = request.args.get('tag', default='None')
@@ -448,9 +446,6 @@ def home():
 
         info_list = get_article_info(articles)
         articles_time_list = zip(articles, info_list)
-
-        app.logger.info(f'当前访问的用户, IP: {ip}')
-
         # 渲染模板并存储渲染后的页面内容到缓存中
         rendered_content = template.render(
             articles_time_list=articles_time_list, url_for=url_for,
@@ -491,7 +486,7 @@ def get_article_info(articles):
                     query = "SELECT * FROM articles WHERE Title = %s"
                     cursor.execute(query, (a_title,))
                     result = cursor.fetchone()
-                    #print(result)
+                    # print(result)
                     if result:
                         articleInfo += result[2]
                         articleInfo += " 点赞: "
@@ -1118,46 +1113,44 @@ def travel():
 
 
 @app.route('/media', methods=['GET', 'POST'])
-def media_space():
+@jwt_required
+def media(user_id):
     media_type = request.args.get('type', default='img')
     page = request.args.get('page', default=1, type=int)
-    username = request.args.get('username', default=get_username())
-    if username is not None:
-        if request.method == 'GET':
-            if not media_type or media_type == 'img':
-                imgs, has_next_page, has_previous_page = get_all_img(username, page=page)
+    username = get_username()
+    if request.method == 'GET':
+        if not media_type or media_type == 'img':
+            imgs, has_next_page, has_previous_page = get_all_img(username, page=page)
 
-                return render_template('Media.html', imgs=imgs, title='Media', url_for=url_for,
-                                       theme=session.get('theme'), has_next_page=has_next_page,
-                                       has_previous_page=has_previous_page, current_page=page, userid=username,
-                                       domain=domain)
-            if media_type == 'video':
-                videos, has_next_page, has_previous_page = get_all_video(username, page=page)
+            return render_template('Media.html', imgs=imgs, title='Media', url_for=url_for,
+                                   theme=session.get('theme'), has_next_page=has_next_page,
+                                   has_previous_page=has_previous_page, current_page=page, userid=username,
+                                   domain=domain)
+        if media_type == 'video':
+            videos, has_next_page, has_previous_page = get_all_video(username, page=page)
 
-                return render_template('Media.html', videos=videos, title='Media', url_for=url_for,
-                                       theme=session.get('theme'), has_next_page=has_next_page,
-                                       has_previous_page=has_previous_page, current_page=page, userid=username,
-                                       domain=domain)
+            return render_template('Media.html', videos=videos, title='Media', url_for=url_for,
+                                   theme=session.get('theme'), has_next_page=has_next_page,
+                                   has_previous_page=has_previous_page, current_page=page, userid=username,
+                                   domain=domain)
 
-            if media_type == 'xmind':
-                xminds, has_next_page, has_previous_page = get_all_xmind(username, page=page)
+        if media_type == 'xmind':
+            xminds, has_next_page, has_previous_page = get_all_xmind(username, page=page)
 
-                return render_template('Media.html', xminds=xminds, title='Media', url_for=url_for,
-                                       theme=session.get('theme'), has_next_page=has_next_page,
-                                       has_previous_page=has_previous_page, current_page=page, userid=username,
-                                       domain=domain)
-        elif request.method == 'POST':
-            img_name = request.json.get('img_name')
-            if not img_name:
-                return error(message='缺少图像名称', status_code=400)
+            return render_template('Media.html', xminds=xminds, title='Media', url_for=url_for,
+                                   theme=session.get('theme'), has_next_page=has_next_page,
+                                   has_previous_page=has_previous_page, current_page=page, userid=username,
+                                   domain=domain)
+    elif request.method == 'POST':
+        img_name = request.json.get('img_name')
+        if not img_name:
+            return error(message='缺少图像名称', status_code=400)
 
-            image = get_image_path(username, img_name)
-            if not image:
-                return error(message='未找到图像', status_code=404)
+        image = get_image_path(username, img_name)
+        if not image:
+            return error(message='未找到图像', status_code=404)
 
-            return image
-
-    return error(message='您没有权限', status_code=503)
+        return image
 
 
 def get_media_list(username, category, page=1, per_page=10):
@@ -1364,15 +1357,8 @@ def callback(provider):
     msg = data.get('msg')
     if code == 0:
         social_uid = data.get('social_uid')
-        ip = data.get('ip')
-        session['public_ip'] = ip
-        if provider == 'qq':
-            user_email = social_uid + "@qq.com"
-        if provider == 'wx':
-            user_email = social_uid + "@wx.com"
-        elif provider != 'qq' and 'wx':
-            user_email = social_uid + "@qks.com"
-        # face_img = get_user_info(provider, social_uid)
+        ip = get_client_ip(request, session)
+        user_email = social_uid + f"@{provider}.com"
         return zy_mail_login(user_email, ip)
 
     return render_template('Login.html', error=msg)
@@ -1634,25 +1620,73 @@ def ip_api():
     return jsonify({'ip': ip})
 
 
+@app.route('/following')
+@jwt_required
+def following(user_id):
+    ip = get_client_ip(request, session)
+
+    if request.method == 'GET':
+
+        cache_key = f'subscriber_ids_uid:{user_id}'
+
+        # 尝试从缓存中获取页面内容
+        content = cache.get(cache_key)
+        if content:
+            # 设置浏览器缓存
+            resp = make_response(content)
+            resp.headers['Cache-Control'] = 'public, max-age=600'  # 缓存为10分钟
+            app.logger.info(f'缓存命中，following 页面: {user_id}')
+            return resp
+        else:
+            app.logger.info(f'缓存未命中，准备生成新内容，页面: {user_id}')
+
+        # 重新获取页面内容
+        subscriber_ids_list = get_subscriber_ids(uid=user_id)
+
+        # 模版配置
+        template_display = session.get('display', 'default')
+        template_path = f'templates/theme/{template_display}/index.html'
+        if os.path.exists(template_path):
+            template = app.jinja_env.get_template(f'theme/{template_display}/index.html')
+        else:
+            template = app.jinja_env.get_template('zyIndex.html')
+
+        app.logger.info(f'subscriber_ids 访问的用户 {user_id}, IP: {ip}')
+
+        # 渲染模板并存储渲染后的页面内容到缓存中
+        rendered_content = template.render(
+            subscriber_ids_list=subscriber_ids_list, url_for=url_for,
+            notice='', tags=[], page_mark='订阅'
+        )
+
+        # 缓存渲染后的页面内容，并设置服务端缓存过期时间
+        cache.set(cache_key, rendered_content, timeout=600)  # 服务端缓存10分钟
+        resp = make_response(rendered_content)
+        return resp
+
+    else:
+        return render_template('zyIndex.html')
+
+
 @app.errorhandler(404)
 def page_not_found(error_message):
     app.logger.error(error_message)
-    return error(message=error_message, status_code=404)
+    return error(error_message, status_code=404)
 
 
 @app.errorhandler(500)
 def internal_server_error(error_message):
     app.logger.error(error_message)
-    return error(message=error_message, status_code=500)
+    return error(error_message, status_code=500)
 
 
 @app.route('/<path:undefined_path>')
 def undefined_route(undefined_path):
     app.logger.error(undefined_path)
-    return error(message="Not Found", status_code='404')
+    return error("Not Found", status_code=404)
 
 
 @app.errorhandler(Exception)
 def handle_unexpected_error(error_message):
     app.logger.error(error_message)
-    return error(message=error_message, status_code=500)
+    return error(error_message, status_code=500)

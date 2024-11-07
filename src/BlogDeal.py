@@ -266,3 +266,37 @@ def zy_edit_article(article):
     except FileNotFoundError:
         # 文件不存在时返回 404 错误页面
         return error('No file', 404)
+
+
+
+def get_subscriber_ids(uid):
+    db = get_database_connection()
+    cursor = db.cursor()
+
+    try:
+        # 查询用户的订阅信息和对应的用户名，合并两个查询
+        query = """
+        SELECT u.id, u.username 
+        FROM subscriptions s
+        JOIN users u ON s.subscribe_to_id = u.id 
+        WHERE s.subscriber_id = %s AND s.subscribe_type = 'User';
+        """
+        cursor.execute(query, (uid,))
+        subscribers = cursor.fetchall()
+
+        # 如果没有找到订阅者，返回空列表
+        if not subscribers:
+            return []
+
+        # 创建（ID, 用户名）元组列表
+        subscriber_ids_list = [(sub[0], sub[1]) for sub in subscribers]
+        print(subscriber_ids_list)
+        return subscriber_ids_list
+
+    except Exception as e:
+        logging.error(f"Error logging in: {e}")
+        return "未知错误", False, False
+
+    finally:
+        cursor.close()
+        db.close()

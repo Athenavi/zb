@@ -69,23 +69,6 @@
 </html>
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.slim.min.js"></script>
 <script>
-    // 获取URL参数的函数
-    function getParameterByName(name) {
-        name = name.replace(/[\[\]]/g, "\\$&");
-        var url = window.location.href;
-        var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)");
-        var results = regex.exec(url);
-        if (!results) return '我';
-        if (!results[2]) return '';
-        return decodeURIComponent(results[2].replace(/\+/g, " "));
-    }
-
-    window.onload = function () {
-        var id = getParameterByName('id');
-        var span = document.getElementById('idSpan');
-        span.innerHTML = id;
-    }
-
     const hiddenLinks = document.querySelectorAll('a.hidden121');
 
     hiddenLinks.forEach(link => {

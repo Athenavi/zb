@@ -122,7 +122,7 @@ def get_owner_articles(owner_id=None, user_name=None):
 
             if owner_id:
                 query = """
-                SELECT a.Title FROM articles AS a JOIN users AS u ON a.Author = u.username WHERE u.id = %s;
+                SELECT a.Title FROM articles AS a JOIN users AS u ON a.Author = u.username WHERE u.id = %s and a.`Status` != 'Deleted';
                 """
                 cursor.execute(query, (owner_id,))
                 articles.extend(result[0] for result in cursor.fetchall())
