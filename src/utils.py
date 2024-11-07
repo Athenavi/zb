@@ -1,5 +1,8 @@
+import json
 import os
 import random
+import re
+import shutil
 import string
 import urllib
 import zipfile
@@ -8,7 +11,7 @@ from datetime import datetime, timedelta
 
 import jwt
 import requests
-from flask import request, make_response
+from flask import request, make_response, jsonify
 from werkzeug.utils import secure_filename
 
 from src.user import error
@@ -227,3 +230,91 @@ def zy_mail_conf():
     mail_password = mail_config.get('mail', 'password', fallback='error').strip("'")
 
     return mail_host, mail_port, mail_user, mail_password
+
+
+def handle_file_upload(file, upload_folder):
+    # 验证文件格式和大小
+    if not file.filename.endswith('.md') or file.content_length > 10 * 1024 * 1024:
+        return 'Invalid file format or file too large.', 400
+
+    os.makedirs(upload_folder, exist_ok=True)
+    file_path = os.path.join(upload_folder, file.filename)
+
+    # 避免文件名冲突
+    if os.path.isfile(os.path.join('articles', file.filename)):
+        return 'Upload failed, the file already exists.', 400
+
+    # 保存文件
+    file.save(file_path)
+    shutil.copy(file_path, 'articles')
+    return None
+
+
+def is_allowed_file(filename, allowed_types):
+    # 检查文件是否是允许的类型
+    return any(filename.lower().endswith(ext) for ext in allowed_types)
+
+
+def check_exist(cache_file):
+    if os.path.exists(cache_file):
+        with open(cache_file, 'r') as f:
+            cache_data = json.load(f)
+            cache_timestamp = datetime.fromtimestamp(os.path.getmtime(cache_file))
+            if datetime.now() - cache_timestamp <= timedelta(hours=1):
+                return jsonify(cache_data)
+
+
+def is_valid_domain_with_slash(url):
+    pattern = r"^(https?://)?([a-zA-Z0-9-]+\.)*[a-zA-Z]{2,}(\/)$"
+
+    if re.match(pattern, url):
+        return True
+    else:
+        return False
+
+
+def get_list_intersection(list1, list2):
+    intersection = list(set(list1) & set(list2))
+    return intersection
+
+
+def get_media_list(username, category, page=1, per_page=10):
+    file_suffix = ()
+    if category == 'img':
+        file_suffix = ('.png', '.jpg', '.webp')
+    elif category == 'video':
+        file_suffix = ('.mp4', '.avi', '.mkv', '.webm', '.flv')
+    elif category == 'xmind':
+        file_suffix = '.xmind'
+    file_dir = os.path.join('media', username)
+    if not os.path.exists(file_dir):
+        os.makedirs(file_dir)
+
+    files = [file for file in os.listdir(file_dir) if file.endswith(tuple(file_suffix))]
+    files = sorted(files, key=lambda x: os.path.getctime(os.path.join(file_dir, x)), reverse=True)
+    total_img_count = len(files)
+    total_pages = (total_img_count + per_page - 1) // per_page
+
+    start_index = (page - 1) * per_page
+    end_index = start_index + per_page
+    files = files[start_index:end_index]
+
+    has_next_page = page < total_pages
+    has_previous_page = page > 1
+
+    return files, has_next_page, has_previous_page
+
+
+def get_all_img(username, page=1, per_page=10):
+    imgs, has_next_page, has_previous_page = get_media_list(username, category='img')
+    return imgs, has_next_page, has_previous_page
+
+
+def get_all_video(username, page=1, per_page=10):
+    videos, has_next_page, has_previous_page = get_media_list(username, category='video')
+    return videos, has_next_page, has_previous_page
+
+
+def get_all_xmind(username, page=1, per_page=10):
+    videos, has_next_page, has_previous_page = get_media_list(username, category='xmind')
+    return videos, has_next_page, has_previous_page

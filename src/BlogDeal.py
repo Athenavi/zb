@@ -198,11 +198,11 @@ def get_file_date(file_path):
         decoded_name = urllib.parse.unquote(file_path)  # 对文件名进行解码处理
         file_path = os.path.join('articles', decoded_name + '.md')
         # 获取文件的创建时间
-        #create_time = os.path.getctime(file_path)
+        # create_time = os.path.getctime(file_path)
         # 获取文件的修改时间
         modify_time = os.path.getmtime(file_path)
         # 获取文件的访问时间
-        #access_time = os.path.getatime(file_path)
+        # access_time = os.path.getatime(file_path)
 
         formatted_modify_time = datetime.datetime.fromtimestamp(modify_time).strftime("%Y-%m-%d %H:%M")
 
@@ -268,7 +268,6 @@ def zy_edit_article(article):
         return error('No file', 404)
 
 
-
 def get_subscriber_ids(uid):
     db = get_database_connection()
     cursor = db.cursor()
@@ -294,9 +293,229 @@ def get_subscriber_ids(uid):
         return subscriber_ids_list
 
     except Exception as e:
-        logging.error(f"Error logging in: {e}")
-        return "未知错误", False, False
+        return f"未知错误{e}", False, False
 
     finally:
         cursor.close()
+        db.close()
+
+
+def get_unique_tags():
+    db = get_database_connection()
+    cursor = db.cursor()
+    unique_tags = []
+
+    try:
+        query = "SELECT Tags FROM articles"
+        cursor.execute(query)
+
+        results = cursor.fetchall()
+        for result in results:
+            tags_str = result[0]
+            if tags_str:
+                tags_list = tags_str.split(';')
+                unique_tags.extend(tags for tags in tags_list if tags)
+
+        unique_tags = list(set(unique_tags))
+
+    except Exception as e:
+        return f"未知错误{e}"
+
+    finally:
+        cursor.close()
+        db.close()
+
+    return unique_tags
+
+
+def get_articles_by_tag(tag_name):
+    db = get_database_connection()
+    cursor = db.cursor()
+    tag_articles = []
+
+    try:
+        query = "SELECT Title FROM articles WHERE Tags LIKE %s"
+        cursor.execute(query, ('%' + tag_name + '%',))
+
+        results = cursor.fetchall()
+        for result in results:
+            tag_articles.append(result[0])
+
+    except Exception as e:
+        return f"未知错误{e}"
+
+    finally:
+        cursor.close()
+        db.close()
+
+    return tag_articles
+
+
+def get_tags_by_article(article_title):
+    db = get_database_connection()
+    cursor = db.cursor()
+    unique_tags = []
+
+    try:
+        query = "SELECT Tags FROM articles WHERE Title = %s"
+        cursor.execute(query, (article_title,))
+
+        result = cursor.fetchone()
+        if result:
+            tags_str = result[0]
+            if tags_str:
+                tags_list = tags_str.split(';')
+                unique_tags = list(set(tags_list))
+
+    except Exception as e:
+        return error(f"未知错误{e}", 500), 500
+    finally:
+        cursor.close()
+        db.close()
+
+    return unique_tags
+
+
+def set_article_info(a_title, username):
+    db = get_database_connection()
+    try:
+        with db.cursor() as cursor:
+            # 获取当前年份
+            current_year = datetime.now().year  # 直接使用 datetime 类
+
+            # 插入或更新文章信息，tags 写入当前年份
+            query = """
+            INSERT INTO articles (Title, Author, tags) 
+            VALUES (%s, %s, %s) 
+            ON DUPLICATE KEY UPDATE Author = %s, tags = %s;
+            """
+
+            print(
+                f"Executing SQL: {query} with parameters: {(a_title, username, current_year, username, current_year)}")
+            cursor.execute(query, (a_title, username, current_year, username, current_year))
+
+            # 记录事件信息
+            event_log = ("INSERT INTO events (title, description, event_date, created_at) VALUES (%s, %s, "
+                         "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);")
+            event_title = 'article update'
+            event_description = f'{username} updated {a_title}'
+            cursor.execute(event_log, (event_title, event_description))
+
+            # 提交事务
+            db.commit()
+            return True  # 表示操作成功
+
+    except Exception as e:
+        print(f"An error occurred during database operation: {e}")
+        # 事务回滚
+        db.rollback()
+        return False  # 表示操作失败
+
+    finally:
+        db.close()
+
+
+def write_tags_to_database(tags_list, a_title):
+    tags_str = ';'.join(tags_list)
+
+    db = get_database_connection()
+    cursor = db.cursor()
+
+    try:
+        # 检查文章是否存在
+        query = "SELECT * FROM articles WHERE Title = %s"
+        cursor.execute(query, (a_title,))
+        result = cursor.fetchone()
+
+        if result:
+            # 如果文章存在，则更新标签
+            update_query = "UPDATE articles SET Tags = %s WHERE Title = %s"
+            cursor.execute(update_query, (tags_str, a_title))
+            db.commit()
+        else:
+            # 如果文章不存在，则创建新文章记录
+            insert_query = "INSERT INTO articles (Title, Tags) VALUES (%s, %s)"
+            cursor.execute(insert_query, (a_title, tags_str))
+            db.commit()
+
+    except Exception as e:
+        pass
+
+    finally:
+        cursor.close()
+        db.close()
+
+
+def hide_article(article):
+    db = get_database_connection()
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT * FROM articles WHERE Title = %s"
+            cursor.execute(query, (article,))
+            result = cursor.fetchone()
+
+            if result is None:
+                query = "INSERT INTO articles (Title, Author, Hidden) VALUES (%s, 'test', 1)"
+                cursor.execute(query, (article,))
+            elif result[3] == 0:
+                query = "UPDATE articles SET Hidden = 1 WHERE Title = %s"
+                cursor.execute(query, (article,))
+
+            db.commit()
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        try:
+            cursor.close()
+        except NameError:
+            pass
+        db.close()
+
+
+def unhidden_article(article):
+    db = get_database_connection()
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT * FROM articles WHERE Title = %s"
+            cursor.execute(query, (article,))
+            result = cursor.fetchone()
+
+            if result is not None and result[3] == 1:
+                query = "UPDATE articles SET Hidden = 0 WHERE Title = %s"
+                cursor.execute(query, (article,))
+            elif result is None:
+                query = "INSERT INTO articles (Title, Author, Hidden) VALUES (%s, 'test', 0)"
+                cursor.execute(query, (article,))
+
+            db.commit()
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        try:
+            cursor.close()
+        except NameError:
+            pass
+        db.close()
+
+
+def is_hidden(article):
+    db = get_database_connection()
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT Hidden FROM articles WHERE Title = %s"
+            cursor.execute(query, (article,))
+            result = cursor.fetchone()
+
+            if result is not None and result[0] == 1:
+                return True
+            else:
+                return False
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return False
+    finally:
+        try:
+            cursor.close()
+        except NameError:
+            pass
         db.close()

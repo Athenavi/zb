@@ -1,12 +1,10 @@
 import configparser
 import datetime
 import io
-import json
 import logging
 import os
 import random
 import re
-import shutil
 import time
 import urllib.parse
 import xml.etree.ElementTree as ElementTree
@@ -27,13 +25,15 @@ from src.AboutLogin import zy_login, zy_register, zy_mail_login
 from src.AboutPW import zy_change_password, zy_confirm_password
 from src.BlogDeal import get_article_names, get_article_content, clear_html_format, \
     get_file_date, get_blog_author, read_hidden_articles, auth_articles, \
-    zy_show_article, zy_edit_article, get_all_article_names, get_subscriber_ids
+    zy_show_article, zy_edit_article, get_all_article_names, get_subscriber_ids, get_unique_tags, get_articles_by_tag, \
+    get_tags_by_article, set_article_info, write_tags_to_database, is_hidden, unhidden_article, hide_article
 from src.database import get_database_connection
 from src.links import create_special_url
 from src.user import zyadmin, zy_delete_article, error, get_owner_articles, zy_general_conf
 from src.utils import zy_upload_file, get_client_ip, read_file, \
     zy_save_edit, zy_noti_conf, generate_jwt, secret_key, authenticate_jwt, \
-    authenticate_refresh_token
+    authenticate_refresh_token, handle_file_upload, is_allowed_file, is_valid_domain_with_slash, get_list_intersection, \
+    get_all_img, get_all_video, get_all_xmind
 
 global_encoding = 'utf-8'
 
@@ -43,6 +43,9 @@ cache = Cache(app)
 app.secret_key = secret_key
 app.config['SESSION_COOKIE_NAME'] = 'zb_session'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=3)
+app.config['USER_BASE_PATH'] = 'media'
+app.config['TEMP_FOLDER'] = 'temp/upload'
+app.config['ALLOWED_EXTENSIONS'] = {'.jpg', '.png', '.webp', '.jfif', '.pjpeg', '.jpeg', '.pjp', '.mp4', '.xmind'}
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)  # 添加 ProxyFix 中间件
 
 # 移除默认的日志处理程序
@@ -214,15 +217,6 @@ def search(user_id):
     return render_template('search.html', results=matched_content)
 
 
-def check_exist(cache_file):
-    if os.path.exists(cache_file):
-        with open(cache_file, 'r') as f:
-            cache_data = json.load(f)
-            cache_timestamp = datetime.fromtimestamp(os.path.getmtime(cache_file))
-            if datetime.now() - cache_timestamp <= timedelta(hours=1):
-                return jsonify(cache_data)
-
-
 @app.route('/blog/api/<article_name>', methods=['GET', 'POST'])
 @app.route('/api/<article_name>', methods=['GET', 'POST'])
 def sys_out_file(article_name):
@@ -255,25 +249,21 @@ def temp_preview(file_name):
     return prev
 
 
-def get_avatar():
-    username = get_username()
-    if username:
-        avatar = os.path.join(base_dir, 'media', username, 'avatar.png')
-        if os.path.exists(avatar):
-            avatar_url = domain + 'zyImg/' + username + '/avatar.png'
-        else:
-            avatar_url = None
+def get_avatar(username):
+    avatar = os.path.join(base_dir, 'media', username, 'avatar.png')
+    if os.path.exists(avatar):
+        avatar_url = domain + 'zyImg/' + username + '/avatar.png'
     else:
-        avatar_url = domain + 'static/favicon.ico'
+        avatar_url = None
     return avatar_url
 
 
 @app.route('/profile', methods=['GET', 'POST'])
 @jwt_required
 def profile(user_id):
-    avatar_url = get_avatar() or domain + 'static/favicon.ico'
-    owner_id = request.args.get('id')
     username = get_username()
+    avatar_url = get_avatar(username) or domain + 'static/favicon.ico'
+    owner_id = request.args.get('id')
     if owner_id is None or owner_id == '':
         owner_articles = get_owner_articles(owner_id=None, user_name=username) or []
     else:
@@ -290,103 +280,10 @@ def profile(user_id):
 @app.route('/setting/profiles', methods=['GET', 'POST'])
 @jwt_required
 def setting_profiles(user_id):
-    avatar_url = get_avatar() or domain + 'static/favicon.ico'
     username = get_username()
+    avatar_url = get_avatar(username) or domain + 'static/favicon.ico'
     return render_template('setting.html', url_for=url_for, avatar_url=avatar_url,
                            userStatus=bool(user_id), username=username)
-
-
-def get_unique_tags():
-    db = get_database_connection()
-    cursor = db.cursor()
-    unique_tags = []
-
-    try:
-        query = "SELECT Tags FROM articles"
-        cursor.execute(query)
-
-        results = cursor.fetchall()
-        for result in results:
-            tags_str = result[0]
-            if tags_str:
-                tags_list = tags_str.split(';')
-                unique_tags.extend(tags for tags in tags_list if tags)
-
-        unique_tags = list(set(unique_tags))
-
-    except Exception as e:
-        logging.error(f"Error logging in: {e}")
-        return "未知错误"
-
-    finally:
-        cursor.close()
-        db.close()
-
-    return unique_tags
-
-
-def get_articles_by_tag(tag_name):
-    db = get_database_connection()
-    cursor = db.cursor()
-    tag_articles = []
-
-    try:
-        query = "SELECT Title FROM articles WHERE Tags LIKE %s"
-        cursor.execute(query, ('%' + tag_name + '%',))
-
-        results = cursor.fetchall()
-        for result in results:
-            tag_articles.append(result[0])
-
-    except Exception as e:
-        logging.error(f"Error logging in: {e}")
-        return "未知错误"
-
-    finally:
-        cursor.close()
-        db.close()
-
-    return tag_articles
-
-
-def get_tags_by_article(article_title):
-    db = get_database_connection()
-    cursor = db.cursor()
-    unique_tags = []
-
-    try:
-        query = "SELECT Tags FROM articles WHERE Title = %s"
-        cursor.execute(query, (article_title,))
-
-        result = cursor.fetchone()
-        if result:
-            tags_str = result[0]
-            if tags_str:
-                tags_list = tags_str.split(';')
-                unique_tags = list(set(tags_list))
-
-    except Exception as e:
-        logging.error(f"Error logging in: {e}")
-        return error("未知错误", 500), 500
-    finally:
-        cursor.close()
-        db.close()
-
-    return unique_tags
-
-
-def get_list_intersection(list1, list2):
-    intersection = list(set(list1) & set(list2))
-    return intersection
-
-
-def is_valid_domain_with_slash(url):
-    pattern = r"^(https?://)?([a-zA-Z0-9-]+\.)*[a-zA-Z]{2,}(\/)$"
-
-    if re.match(pattern, url):
-        return True
-    else:
-        return False
 
 
 # 主页
@@ -400,11 +297,12 @@ def home():
     if request.method == 'GET':
         page = request.args.get('page', default=1, type=int)
         tag = request.args.get('tag', default='None')
+        display = get_current_theme()
 
         if page <= 0:
             page = 1
 
-        cache_key = f'page_content:{page}:{tag}'  # 根据页面值、主题以及标签生成缓存键
+        cache_key = f'page_content:{display}:{page}:{tag}'  # 根据页面值、主题以及标签生成缓存键
 
         # 尝试从缓存中获取页面内容
         content = cache.get(cache_key)
@@ -421,7 +319,7 @@ def home():
         articles, has_next_page, has_previous_page = get_article_names(page=page)
 
         # 模版配置
-        template_display = session.get('display', 'default')
+        template_display = get_current_theme()
         template_path = f'templates/theme/{template_display}/index.html'
         if os.path.exists(template_path):
             template = app.jinja_env.get_template(f'theme/{template_display}/index.html')
@@ -711,7 +609,7 @@ def change_display(user_id):
             theme_path = f'templates/theme/{theme_id}'
             if theme_id == 'default':
                 print(f"recover theme to {theme_id}")
-                session['display'] = theme_id
+                cache.set('display_theme', theme_id)  # 设置缓存
                 return 'success'
 
             if os.path.exists(theme_path):
@@ -721,7 +619,7 @@ def change_display(user_id):
 
                 if has_index_html and has_screenshot_png and has_template_ini:
                     print(f"update theme to {theme_path}")
-                    session['display'] = theme_id
+                    cache.set('display_theme', theme_id)  # 设置缓存
                     query = ("INSERT INTO `events` (`id`, `title`, `description`, `event_date`, `created_at`) VALUES ("
                              "NULL, 'theme change', %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);")
                     cursor.execute(query, (theme_id,))
@@ -743,32 +641,11 @@ def change_display(user_id):
 
 
 last_newArticle_time = {}  # 全局变量，用于记录用户最后递交时间
-app.config['UPLOAD_FOLDER'] = 'temp/upload'
 
 
-def can_user_submit(username):
-    current_time = time.time()
+def can_user_submit(username, current_time):
     last_time = last_newArticle_time.get(username)
     return last_time is None or current_time - last_time >= 600
-
-
-def handle_file_upload(file):
-    # 验证文件格式和大小
-    if not file.filename.endswith('.md') or file.content_length > 10 * 1024 * 1024:
-        return 'Invalid file format or file too large.', 400
-
-    upload_folder = app.config['UPLOAD_FOLDER']
-    os.makedirs(upload_folder, exist_ok=True)
-    file_path = os.path.join(upload_folder, file.filename)
-
-    # 避免文件名冲突
-    if os.path.isfile(os.path.join('articles', file.filename)):
-        return 'Upload failed, the file already exists.', 400
-
-    # 保存文件
-    file.save(file_path)
-    shutil.copy(file_path, 'articles')
-    return None
 
 
 @app.route('/newArticle', methods=['GET', 'POST'])
@@ -778,19 +655,19 @@ def new_article(user_id):
     if not username:
         error(message='请先登录', status_code=401)
     if request.method == 'GET':
-        if not can_user_submit(user_id):
+        if not can_user_submit(user_id, time.time()):
             return error('您完成了一次服务（无论成功与否），此服务短期内将变得不可达，请您10分钟之后再来', 503)
         return render_template('postNewArticle.html')
 
     elif request.method == 'POST':
-        if not can_user_submit(user_id):
+        if not can_user_submit(user_id, time.time()):
             return error('距离您上次上传时间过短，请十分钟后重试', 503)
 
         last_newArticle_time[user_id] = time.time()
         file = request.files['file']
 
         logging.info(f"User {user_id} attempting to upload: {file.filename}")
-        error_message = handle_file_upload(file)
+        error_message = handle_file_upload(file, app.config['TEMP_FOLDER'])
         if error_message:
             logging.error(f"File upload error: {error_message[0]}")
             return error(*error_message)
@@ -804,45 +681,6 @@ def new_article(user_id):
             logging.error("Failed to update article information in the database.")
 
         return render_template('postNewArticle.html', message=message)
-
-
-def set_article_info(a_title, username):
-    db = get_database_connection()
-    try:
-        with db.cursor() as cursor:
-            # 获取当前年份
-            current_year = datetime.now().year  # 直接使用 datetime 类
-
-            # 插入或更新文章信息，tags 写入当前年份
-            query = """
-            INSERT INTO articles (Title, Author, tags) 
-            VALUES (%s, %s, %s) 
-            ON DUPLICATE KEY UPDATE Author = %s, tags = %s;
-            """
-
-            logging.debug(
-                f"Executing SQL: {query} with parameters: {(title, username, current_year, username, current_year)}")
-            cursor.execute(query, (a_title, username, current_year, username, current_year))
-
-            # 记录事件信息
-            event_log = ("INSERT INTO events (title, description, event_date, created_at) VALUES (%s, %s, "
-                         "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);")
-            event_title = 'article update'
-            event_description = f'{username} updated {title}'
-            cursor.execute(event_log, (event_title, event_description))
-
-            # 提交事务
-            db.commit()
-            return True  # 表示操作成功
-
-    except Exception as e:
-        logging.error(f"An error occurred during database operation: {e}")
-        # 事务回滚
-        db.rollback()
-        return False  # 表示操作失败
-
-    finally:
-        db.close()
 
 
 @app.route('/Admin_upload', methods=['GET', 'POST'])
@@ -931,37 +769,6 @@ def markdown_editor(article):
         return error(message='您没有权限', status_code=503)
 
 
-def write_tags_to_database(tags_list, a_title):
-    tags_str = ';'.join(tags_list)
-
-    db = get_database_connection()
-    cursor = db.cursor()
-
-    try:
-        # 检查文章是否存在
-        query = "SELECT * FROM articles WHERE Title = %s"
-        cursor.execute(query, (a_title,))
-        result = cursor.fetchone()
-
-        if result:
-            # 如果文章存在，则更新标签
-            update_query = "UPDATE articles SET Tags = %s WHERE Title = %s"
-            cursor.execute(update_query, (tags_str, a_title))
-            db.commit()
-        else:
-            # 如果文章不存在，则创建新文章记录
-            insert_query = "INSERT INTO articles (Title, Tags) VALUES (%s, %s)"
-            cursor.execute(insert_query, (a_title, tags_str))
-            db.commit()
-
-    except Exception as e:
-        logging.error(f"Error writing tags to database: {e}")
-
-    finally:
-        cursor.close()
-        db.close()
-
-
 @app.route('/save/edit', methods=['POST'])
 def edit_save():
     content = request.json.get('content', '')
@@ -1014,81 +821,6 @@ def hidden_article():
         return jsonify({'deal': 'hide'})
 
 
-def hide_article(article):
-    db = get_database_connection()
-    try:
-        with db.cursor() as cursor:
-            query = "SELECT * FROM articles WHERE Title = %s"
-            cursor.execute(query, (article,))
-            result = cursor.fetchone()
-
-            if result is None:
-                query = "INSERT INTO articles (Title, Author, Hidden) VALUES (%s, 'test', 1)"
-                cursor.execute(query, (article,))
-            elif result[3] == 0:
-                query = "UPDATE articles SET Hidden = 1 WHERE Title = %s"
-                cursor.execute(query, (article,))
-
-            db.commit()
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    finally:
-        try:
-            cursor.close()
-        except NameError:
-            pass
-        db.close()
-
-
-def unhidden_article(article):
-    db = get_database_connection()
-    try:
-        with db.cursor() as cursor:
-            query = "SELECT * FROM articles WHERE Title = %s"
-            cursor.execute(query, (article,))
-            result = cursor.fetchone()
-
-            if result is not None and result[3] == 1:
-                query = "UPDATE articles SET Hidden = 0 WHERE Title = %s"
-                cursor.execute(query, (article,))
-            elif result is None:
-                query = "INSERT INTO articles (Title, Author, Hidden) VALUES (%s, 'test', 0)"
-                cursor.execute(query, (article,))
-
-            db.commit()
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    finally:
-        try:
-            cursor.close()
-        except NameError:
-            pass
-        db.close()
-
-
-def is_hidden(article):
-    db = get_database_connection()
-    try:
-        with db.cursor() as cursor:
-            query = "SELECT Hidden FROM articles WHERE Title = %s"
-            cursor.execute(query, (article,))
-            result = cursor.fetchone()
-
-            if result is not None and result[0] == 1:
-                return True
-            else:
-                return False
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return False
-    finally:
-        try:
-            cursor.close()
-        except NameError:
-            pass
-        db.close()
-
-
 @app.route('/travel', methods=['GET'])
 def travel():
     response = requests.get(domain + 'sitemap.xml')  # 发起对/sitemap接口的请求
@@ -1123,14 +855,14 @@ def media(user_id):
             imgs, has_next_page, has_previous_page = get_all_img(username, page=page)
 
             return render_template('Media.html', imgs=imgs, title='Media', url_for=url_for,
-                                   theme=session.get('theme'), has_next_page=has_next_page,
+                                   has_next_page=has_next_page,
                                    has_previous_page=has_previous_page, current_page=page, userid=username,
                                    domain=domain)
         if media_type == 'video':
             videos, has_next_page, has_previous_page = get_all_video(username, page=page)
 
             return render_template('Media.html', videos=videos, title='Media', url_for=url_for,
-                                   theme=session.get('theme'), has_next_page=has_next_page,
+                                   has_next_page=has_next_page,
                                    has_previous_page=has_previous_page, current_page=page, userid=username,
                                    domain=domain)
 
@@ -1138,7 +870,7 @@ def media(user_id):
             xminds, has_next_page, has_previous_page = get_all_xmind(username, page=page)
 
             return render_template('Media.html', xminds=xminds, title='Media', url_for=url_for,
-                                   theme=session.get('theme'), has_next_page=has_next_page,
+                                   has_next_page=has_next_page,
                                    has_previous_page=has_previous_page, current_page=page, userid=username,
                                    domain=domain)
     elif request.method == 'POST':
@@ -1151,48 +883,6 @@ def media(user_id):
             return error(message='未找到图像', status_code=404)
 
         return image
-
-
-def get_media_list(username, category, page=1, per_page=10):
-    file_suffix = ()
-    if category == 'img':
-        file_suffix = ('.png', '.jpg', '.webp')
-    elif category == 'video':
-        file_suffix = ('.mp4', '.avi', '.mkv', '.webm', '.flv')
-    elif category == 'xmind':
-        file_suffix = '.xmind'
-    file_dir = os.path.join('media', username)
-    if not os.path.exists(file_dir):
-        os.makedirs(file_dir)
-
-    files = [file for file in os.listdir(file_dir) if file.endswith(tuple(file_suffix))]
-    files = sorted(files, key=lambda x: os.path.getctime(os.path.join(file_dir, x)), reverse=True)
-    total_img_count = len(files)
-    total_pages = (total_img_count + per_page - 1) // per_page
-
-    start_index = (page - 1) * per_page
-    end_index = start_index + per_page
-    files = files[start_index:end_index]
-
-    has_next_page = page < total_pages
-    has_previous_page = page > 1
-
-    return files, has_next_page, has_previous_page
-
-
-def get_all_img(username, page=1, per_page=10):
-    imgs, has_next_page, has_previous_page = get_media_list(username, category='img')
-    return imgs, has_next_page, has_previous_page
-
-
-def get_all_video(username, page=1, per_page=10):
-    videos, has_next_page, has_previous_page = get_media_list(username, category='video')
-    return videos, has_next_page, has_previous_page
-
-
-def get_all_xmind(username, page=1, per_page=10):
-    videos, has_next_page, has_previous_page = get_media_list(username, category='xmind')
-    return videos, has_next_page, has_previous_page
 
 
 @app.route('/zyImg/<username>/<img_name>')
@@ -1216,9 +906,6 @@ def get_image_path(username, img_name):
         return None
 
 
-app.config['UPLOADED_PATH'] = 'media'
-
-
 @app.route('/upload_file', methods=['POST'])
 @jwt_required
 def upload_user_path(user_id):
@@ -1229,8 +916,8 @@ def upload_user_path(user_id):
 
     try:
         # 定义允许上传的文件类型
-        allowed_types = {'.jpg', '.png', '.webp', '.jfif', '.pjpeg', '.jpeg', '.pjp', '.mp4', '.xmind'}
-        user_dir = os.path.join(app.config['UPLOADED_PATH'], username)  # 用户文件存储目录
+        allowed_types = app.config['ALLOWED_EXTENSIONS']
+        user_dir = os.path.join(app.config['USER_BASE_PATH'], username)  # 用户文件存储目录
         os.makedirs(user_dir, exist_ok=True)  # 如果目录不存在则创建
 
         file_records = []  # 用于存储文件记录的列表
@@ -1283,11 +970,6 @@ def upload_user_path(user_id):
     except Exception as e:
         app.logger.error(f"Error in file upload: {e}")  # 记录错误日志
         return jsonify({'message': 'failed', 'error': str(e)}), 500
-
-
-def is_allowed_file(filename, allowed_types):
-    # 检查文件是否是允许的类型
-    return any(filename.lower().endswith(ext) for ext in allowed_types)
 
 
 @app.route('/zyVideo/<username>/<video_name>')
@@ -1644,7 +1326,7 @@ def following(user_id):
         subscriber_ids_list = get_subscriber_ids(uid=user_id)
 
         # 模版配置
-        template_display = session.get('display', 'default')
+        template_display = get_current_theme()
         template_path = f'templates/theme/{template_display}/index.html'
         if os.path.exists(template_path):
             template = app.jinja_env.get_template(f'theme/{template_display}/index.html')
@@ -1666,6 +1348,13 @@ def following(user_id):
 
     else:
         return render_template('zyIndex.html')
+
+
+def get_current_theme():
+    current_theme = cache.get('display_theme')  # 获取缓存
+    if current_theme is None:
+        current_theme = 'default'
+    return current_theme
 
 
 @app.errorhandler(404)
