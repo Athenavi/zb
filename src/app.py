@@ -1002,7 +1002,7 @@ def cc_login(provider):
         pass
     else:
         return error(message="彩虹聚合登录API接口配置错误,您的程序无法使用第三方登录", status_code='503'), 503
-    if provider not in ['qq', 'wx', 'alipay', 'sina', 'baidu', 'huawei', 'xiaomi', 'dingtalk']:
+    if provider not in ['qq', 'wx', 'alipay', 'sina', 'baidu', 'huawei', 'xiaomi', 'dingtalk', 'douyin']:
         return jsonify({'message': 'Invalid login provider'})
 
     redirect_uri = domain + "callback/" + provider

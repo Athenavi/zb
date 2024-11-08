@@ -110,6 +110,11 @@
             cursor: pointer;
         }
 
+        .small-window-button img {
+            margin-left: 15px;
+            height: 28px;
+        }
+
         .small-window-button span {
             margin-left: 8px;
             color: #0073aa;
@@ -121,6 +126,23 @@
             }
         }
     </style>
+    <script>
+        function openSmallWindow(provider) {
+            const checkbox = document.querySelector('input[type="checkbox"]');
+            if (!checkbox.checked) {
+                return alert('您还未同意本站的法律声明以及隐私协议');
+            }
+
+            const smallWindow = window.open(`/login/${provider}`, 'newWindow', `width=${window.innerWidth / 2},height=${window.innerHeight / 2}`);
+
+            const checkWindowClosed = setInterval(() => {
+                if (smallWindow.closed) {
+                    clearInterval(checkWindowClosed);
+                    location.reload();
+                }
+            }, 1000);
+        }
+    </script>
 </head>
 
 <body>
@@ -143,8 +165,12 @@
             <a href="/blog/privacy">隐私协议</a>
         </div>
         <button type="submit">安全登录</button>
-        <div class="small-window-button" onclick="openSmallWindow()">
-            <a class="ml-2" style="font-size:28px">🐧</a><span>一键登录</span>
+        <div class="small-window-button">
+            <div onclick="openSmallWindow('qq')"><img src="/static/image/qq.png" alt="QQ"></div>
+            <div onclick="openSmallWindow('wx')"><img src="/static/image/wx.png" alt="WeChat"></div>
+            <div onclick="openSmallWindow('alipay')"><img src="/static/image/zfb.png" alt="Alipay"></div>
+            <div onclick="openSmallWindow('dingtalk')"><img src="/static/image/dingtalk.png" alt="Dingtalk"></div>
+            <div onclick="openSmallWindow('douyin')"><img src="/static/image/douyin.png" alt="Douyin"></div>
         </div>
         <div class="footer-text">
             <span>还没有账号？</span>
@@ -174,25 +200,6 @@
         }
 
         return true;
-    }
-
-
-    function openSmallWindow() {
-        var checkbox = document.querySelector('input[type="checkbox"]');
-        if (!checkbox.checked) {
-            return alert('您还未同意上述本站的法律声明以及隐私协议');
-        }
-
-        var screenWidth = window.innerWidth / 2;
-        var screenHeight = window.innerHeight / 2;
-        var smallWindow = window.open('/login/qq', 'newWindow', `width=${screenWidth},height=${screenHeight}`);
-
-        const checkWindowClosed = setInterval(() => {
-            if (smallWindow.closed) {
-                clearInterval(checkWindowClosed);
-                location.reload();
-            }
-        }, 1000);
     }
 </script>
 </body>
