@@ -18,6 +18,7 @@ from flask import Flask, render_template, redirect, session, request, url_for, R
     make_response, send_from_directory
 from flask_caching import Cache
 from jinja2 import select_autoescape
+from packaging.version import Version
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
 
@@ -289,9 +290,7 @@ def setting_profiles(user_id):
 # 主页
 @app.route('/', methods=['GET', 'POST'])
 def home():
-    if is_valid_domain_with_slash(domain):
-        pass
-    else:
+    if not is_valid_domain_with_slash(domain):
         return error(message="域名配置出错,您的程序将无法正常运行", status_code=503)
 
     if request.method == 'GET':
@@ -302,21 +301,24 @@ def home():
         if page <= 0:
             page = 1
 
-        cache_key = f'page_content:{display}:{page}:{tag}'  # 根据页面值、主题以及标签生成缓存键
+        cache_key = f'page_content:{display}:{page}:{tag}'
 
         # 尝试从缓存中获取页面内容
         content = cache.get(cache_key)
         if content:
-            # 设置浏览器缓存
             resp = make_response(content)
-            resp.headers['Cache-Control'] = 'public, max-age=600'  # 缓存为10分钟
+            resp.headers['Cache-Control'] = 'public, max-age=600'
             app.logger.info(f'缓存命中，页面: {page}, 标签: {tag}')
             return resp
         else:
             app.logger.info(f'缓存未命中，准备生成新内容，页面: {page}, 标签: {tag}')
 
-        # 重新获取页面内容
+        # 获取文章内容
         articles, has_next_page, has_previous_page = get_article_names(page=page)
+
+        if not articles:
+            app.logger.warning('没有找到任何文章！')
+            return error(message="没有找到任何文章", status_code=404)
 
         # 模版配置
         template_display = get_current_theme()
@@ -340,33 +342,47 @@ def home():
 
         if tag != 'None':
             tag_articles = get_articles_by_tag(tag)
-            articles = get_list_intersection(articles, tag_articles)
+            if tag_articles:
+                articles = get_list_intersection(articles, tag_articles)
+            else:
+                app.logger.warning(f'没有找到标签: {tag} 下的文章！')
 
+        # 检查获取的文章是否为空
         info_list = get_article_info(articles)
         articles_time_list = zip(articles, info_list)
+
+        if not info_list:
+            app.logger.warning('获取文章信息失败，返回错误提示')
+            return error(message="没有找到任何文章", status_code=404)
+
         # 渲染模板并存储渲染后的页面内容到缓存中
         rendered_content = template.render(
-            articles_time_list=articles_time_list, url_for=url_for,
-            notice=notice, has_next_page=has_next_page, has_previous_page=has_previous_page,
-            current_page=page, tags=tags, tag=tag
+            articles_time_list=articles_time_list,
+            url_for=url_for,
+            notice=notice,
+            has_next_page=has_next_page,
+            has_previous_page=has_previous_page,
+            current_page=page,
+            tags=tags,
+            tag=tag
         )
 
-        # 缓存渲染后的页面内容，并设置服务端缓存过期时间
-        cache.set(cache_key, rendered_content, timeout=600)  # 服务端缓存10分钟
+        # 缓存渲染后的页面内容
+        cache.set(cache_key, rendered_content, timeout=360)  # 设置为360秒
         resp = make_response(rendered_content)
 
         if 'key' in request.cookies:
-            visiter = request.cookies.get('key')  # 使用现有的访客名称
+            visiter = request.cookies.get('key')
             app.logger.info('访客已存在，使用现有用户名: %s', visiter)
         else:
             visiter = 'qks' + format(random.randint(10000, 99999))
             app.logger.warning('新访客，生成随机用户名: %s', visiter)
-            resp.set_cookie('key', 'zyBLOG_' + sys_version + visiter, 7200)  # 设置 cookie
+            resp.set_cookie('key', 'zyBLOG_' + sys_version + visiter, 7200)
 
         return resp
 
     else:
-        return render_template('zyIndex.html')
+        return error("此方法无效", 500)
 
 
 @cache.cached(timeout=1800, key_prefix='article_info')
@@ -603,41 +619,78 @@ def admin(user_id, key):
 def change_display(user_id):
     theme_id = request.args.get('NT')
     if theme_id:
+        if theme_id == get_current_theme():
+            return "failed001"
         db = get_database_connection()
         cursor = db.cursor()
         try:
-            theme_path = f'templates/theme/{theme_id}'
             if theme_id == 'default':
                 print(f"recover theme to {theme_id}")
                 cache.set('display_theme', theme_id)  # 设置缓存
                 return 'success'
-
-            if os.path.exists(theme_path):
-                has_index_html = os.path.exists(os.path.join(theme_path, 'index.html'))
-                has_screenshot_png = os.path.exists(os.path.join(theme_path, 'screenshot.png'))
-                has_template_ini = os.path.exists(os.path.join(theme_path, 'template.ini'))
-
-                if has_index_html and has_screenshot_png and has_template_ini:
-                    print(f"update theme to {theme_path}")
-                    cache.set('display_theme', theme_id)  # 设置缓存
-                    query = ("INSERT INTO `events` (`id`, `title`, `description`, `event_date`, `created_at`) VALUES ("
-                             "NULL, 'theme change', %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);")
-                    cursor.execute(query, (theme_id,))
-                    db.commit()
-                    app.logger.info(f'{user_id} : change theme to {theme_id}')
-                    return 'success'
-
-                else:
-                    app.logger.info(f'{user_id} : change theme to {theme_id} : error')
-                    return 'failed'
+            if theme_safe_check(theme_id, channel=2):
+                print(f"update theme to {theme_id}")
+                cache.set('display_theme', theme_id)  # 设置缓存
+                query = ("INSERT INTO `events` (`id`, `title`, `description`, `event_date`, `created_at`) VALUES ("
+                         "NULL, 'theme change', %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);")
+                cursor.execute(query, (theme_id,))
+                db.commit()
+                app.logger.info(f'{user_id} : change theme to {theme_id}')
+                return "success"
             else:
-                return error("非管理员用户禁止访问！！！", 403)
+                return "failed"
         except Exception as e:
             logging.error(f"Error logging in: {e}")
             return error("未知错误", 500), 500
         finally:
             cursor.close()
             db.close()
+    else:
+        return error("非管理员用户禁止访问！！！", 403)
+
+
+def theme_safe_check(theme_id, channel=1):
+    theme_path = f'templates/theme/{theme_id}'
+    if not os.path.exists(theme_path):
+        return False
+    has_index_html = os.path.exists(os.path.join(theme_path, 'index.html'))
+    has_template_ini = os.path.exists(os.path.join(theme_path, 'template.ini'))
+
+    if has_index_html and has_template_ini:
+        theme_detail = configparser.ConfigParser()
+        # 读取 template.ini 文件
+        theme_detail.read(f'templates/theme/{theme_id}/template.ini', encoding=global_encoding)
+        # 获取配置文件中的属性值
+        tid = theme_detail.get('default', 'id').strip("'")
+        author = theme_detail.get('default', 'author').strip("'")
+        theme_title = theme_detail.get('default', 'title').strip("'")
+        author_website = theme_detail.get('default', 'authorWebsite').strip("'")
+        theme_version = theme_detail.get('default', 'version').strip("'")
+        theme_version_code = theme_detail.get('default', 'versionCode').strip("'")
+        update_url = theme_detail.get('default', 'updateUrl').strip("'")
+        screenshot = theme_detail.get('default', 'screenshot').strip("'")
+
+        theme_properties = {
+            'id': tid,
+            'author': author,
+            'title': theme_title,
+            'authorWebsite': author_website,
+            'version': theme_version,
+            'versionCode': theme_version_code,
+            'updateUrl': update_url,
+            'screenshot': screenshot,
+        }
+
+        if channel == 1:
+            return jsonify(theme_properties)
+        else:
+            # print(Version(theme_version) > Version(sys_version))
+            if Version(theme_version) < Version(sys_version):
+                return False
+            else:
+                return True
+    else:
+        return False
 
 
 last_newArticle_time = {}  # 全局变量，用于记录用户最后递交时间
@@ -1060,34 +1113,8 @@ def get_theme_detail(theme_id):
             'updateUrl': "None",
             'screenshot': "None",
         }
-
         return jsonify(theme_properties)
-    if os.path.exists(f'templates/theme/{theme_id}'):
-        theme_detail = configparser.ConfigParser()
-        # 读取 template.ini 文件
-        theme_detail.read(f'templates/theme/{theme_id}/template.ini', encoding=global_encoding)
-        # 获取配置文件中的属性值
-        tid = theme_detail.get('default', 'id').strip("'")
-        author = theme_detail.get('default', 'author').strip("'")
-        theme_title = theme_detail.get('default', 'title').strip("'")
-        author_website = theme_detail.get('default', 'authorWebsite').strip("'")
-        theme_version = theme_detail.get('default', 'version').strip("'")
-        theme_version_code = theme_detail.get('default', 'versionCode').strip("'")
-        update_url = theme_detail.get('default', 'updateUrl').strip("'")
-        screenshot = theme_detail.get('default', 'screenshot').strip("'")
-
-        theme_properties = {
-            'id': tid,
-            'author': author,
-            'title': theme_title,
-            'authorWebsite': author_website,
-            'version': theme_version,
-            'versionCode': theme_version_code,
-            'updateUrl': update_url,
-            'screenshot': screenshot,
-        }
-
-        return jsonify(theme_properties)
+    return theme_safe_check(theme_id, channel=1)
 
 
 @app.route('/theme/<theme_id>/<img_name>')
