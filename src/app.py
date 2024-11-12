@@ -1,5 +1,6 @@
 import configparser
 import datetime
+import hashlib
 import io
 import logging
 import os
@@ -26,13 +27,13 @@ from src.AboutLogin import zy_login, zy_register, zy_mail_login
 from src.AboutPW import zy_change_password, zy_confirm_password
 from src.BlogDeal import get_article_names, get_article_content, clear_html_format, \
     get_file_date, get_blog_author, read_hidden_articles, auth_articles, \
-    zy_show_article, zy_edit_article,get_subscriber_ids, get_unique_tags, get_articles_by_tag, \
-    get_tags_by_article, set_article_info, write_tags_to_database, is_hidden, unhidden_article, hide_article
+    zy_show_article, zy_edit_article, get_subscriber_ids, get_unique_tags, get_articles_by_tag, \
+    get_tags_by_article, set_article_info, write_tags_to_database, set_article_visibility
 from src.database import get_database_connection
 from src.links import create_special_url
 from src.user import zyadmin, zy_delete_article, error, get_owner_articles, zy_general_conf
 from src.utils import zy_upload_file, get_client_ip, read_file, \
-    zy_save_edit, zy_noti_conf, generate_jwt, secret_key, authenticate_jwt, \
+    zy_noti_conf, generate_jwt, secret_key, authenticate_jwt, \
     authenticate_refresh_token, handle_file_upload, is_allowed_file, is_valid_domain_with_slash, \
     get_all_img, get_all_video, get_all_xmind, get_list_intersection
 
@@ -219,6 +220,7 @@ def search(user_id):
     return render_template('search.html', results=matched_content)
 
 
+@cache.memoize(180)
 @app.route('/blog/api/<article_name>', methods=['GET', 'POST'])
 @app.route('/api/<article_name>', methods=['GET', 'POST'])
 def sys_out_file(article_name):
@@ -251,7 +253,7 @@ def temp_preview(file_name):
     return prev
 
 
-@cache.memoize(300)
+@cache.memoize(600)
 def get_avatar(username):
     avatar = os.path.join(base_dir, 'media', username, 'avatar.png')
     if os.path.exists(avatar):
@@ -316,7 +318,7 @@ def home():
             app.logger.info(f'缓存未命中，准备生成新内容，页面: {page}, 标签: {tag}')
 
         # 获取文章内容
-        articles, has_next_page, has_previous_page = get_a_list(chanel=2,page=page)
+        articles, has_next_page, has_previous_page = get_a_list(chanel=2, page=page)
 
         if not articles:
             app.logger.warning('没有找到任何文章！')
@@ -427,13 +429,14 @@ def get_article_info(articles):
 
 
 @cache.memoize(30)
-def get_a_list(chanel=1,page=1):
+def get_a_list(chanel=1, page=1):
     if chanel == 1:
-        articles, has_next_page, has_previous_page = get_article_names(page=1,per_page=99999)
+        articles, has_next_page, has_previous_page = get_article_names(page=1, per_page=99999)
         return articles
     if chanel == 2:
         articles, has_next_page, has_previous_page = get_article_names(page=page, per_page=12)
         return articles, has_next_page, has_previous_page
+
 
 @app.route('/blog/<article>.html', methods=['GET', 'POST'])
 def blog_detail_seo(article):
@@ -441,37 +444,33 @@ def blog_detail_seo(article):
 
 
 @app.route('/blog/<article>', methods=['GET', 'POST'])
+@cache.memoize(180)
 def blog_detail(article):
     try:
-        # 根据文章名称获取相应的内容并处理
-        article_name = article
         article_names = get_a_list(chanel=1)
         hidden_articles = read_hidden_articles()
 
-        if article_name in hidden_articles:
-            # 隐藏的文章
+        if article in hidden_articles or article not in article_names:
             return error(message="页面不见了", status_code=404)
 
-        if article_name not in article_names:
-            return error(message="页面不见了", status_code=404)
-
-        article_tags = get_tags_by_article(article_name)
-        article_url = domain + 'blog/' + article_name
+        article_tags = get_tags_by_article(article)
+        article_url = domain + 'blog/' + article
         article_surl = api_shortlink(article_url)
-        # print(article_Surl)
-        author = get_blog_author(article_name)
-        update_date = get_file_date(article_name)
-        response = make_response(render_template('zyDetail.html', article_content=1,
-                                                 articleName=article_name,
-                                                 author=author, blogDate=update_date, domain=domain,
-                                                 url_for=url_for, article_Surl=article_surl, article_tags=article_tags))
+        author = get_blog_author(article)
+        update_date = get_file_date(article)
 
-        # 设置服务器端缓存时间
+        response = make_response(render_template('zyDetail.html',
+                                                 article_content=1,
+                                                 articleName=article,
+                                                 author=author,
+                                                 blogDate=update_date,
+                                                 domain=domain,
+                                                 url_for=url_for,
+                                                 article_Surl=article_surl,
+                                                 article_tags=article_tags))
+
+        # 只设置缓存的 max_age
         response.cache_control.max_age = 180
-        response.expires = datetime.now() + timedelta(seconds=180)
-
-        # 设置浏览器端缓存时间
-        response.headers['Cache-Control'] = f'public, max-age=180'
 
         return response
 
@@ -624,35 +623,49 @@ def admin(user_id, key):
 @admin_required
 def change_display(user_id):
     theme_id = request.args.get('NT')
-    if theme_id:
-        if theme_id == get_current_theme():
-            return "failed001"
-        db = get_database_connection()
-        cursor = db.cursor()
-        try:
-            if theme_id == 'default':
-                print(f"recover theme to {theme_id}")
-                cache.set('display_theme', theme_id)  # 设置缓存
-                return 'success'
-            if theme_safe_check(theme_id, channel=2):
-                print(f"update theme to {theme_id}")
-                cache.set('display_theme', theme_id)  # 设置缓存
-                query = ("INSERT INTO `events` (`id`, `title`, `description`, `event_date`, `created_at`) VALUES ("
-                         "NULL, 'theme change', %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);")
-                cursor.execute(query, (theme_id,))
-                db.commit()
-                app.logger.info(f'{user_id} : change theme to {theme_id}')
-                return "success"
-            else:
-                return "failed"
-        except Exception as e:
-            logging.error(f"Error logging in: {e}")
-            return error("未知错误", 500), 500
-        finally:
-            cursor.close()
-            db.close()
-    else:
+
+    if not theme_id:
         return error("非管理员用户禁止访问！！！", 403)
+
+    current_theme = get_current_theme()
+
+    if theme_id == current_theme:
+        return "failed001"
+
+    # 使用上下文管理器处理数据库连接
+    try:
+        if theme_id == 'default':
+            print(f"recover theme to {theme_id}")
+            cache.set('display_theme', theme_id)
+            # 缓存最后变更主题的记录
+            cache.set(f"last_change_{user_id}", theme_id, timeout=60)  # 设置超时
+            return 'success'
+
+        if not theme_safe_check(theme_id, channel=2):
+            return "failed"
+
+        # 更新缓存并插入数据库记录
+        cache.set('display_theme', theme_id)
+        log_theme_change(theme_id, user_id)
+
+        # 缓存最后变更主题的记录
+        cache.set(f"last_change_{user_id}", theme_id, timeout=60)  # 设置超时
+
+        app.logger.info(f'{user_id} : change theme to {theme_id}')
+        return "success"
+
+    except Exception as e:
+        logging.error(f"Error during theme change: {e}")
+        return error("未知错误", 500), 500
+
+
+def log_theme_change(theme_id, user_id):
+    db = get_database_connection()
+    with db.cursor() as cursor:
+        query = ("INSERT INTO `events` (`id`, `title`, `description`, `event_date`, `created_at`) VALUES ("
+                 "NULL, 'theme change', %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);")
+        cursor.execute(query, (theme_id,))
+        db.commit()
 
 
 def theme_safe_check(theme_id, channel=1):
@@ -763,7 +776,7 @@ def delete_file(user_id, filename):
         return error(message='您没有权限', status_code=503)
 
 
-@cache.cached(timeout=4800)
+@cache.cached(timeout=14400)
 @app.route('/robots.txt')
 def static_from_root():
     content = "User-agent: *\nDisallow: /admin"
@@ -847,37 +860,89 @@ def edit_save():
     if not auth:
         return jsonify({'message': '404'}), 404
 
-    save_edit_code = zy_save_edit(article, content)
-    if save_edit_code == 'success':
-        return jsonify({'show_edit_code': 'success'})
-    else:
-        return jsonify({'show_edit_code': 'failed'})
+    return zy_save_edit(article, content)
 
+
+def zy_save_edit(article_name, content):
+    if article_name and content:
+        save_directory = 'articles/'
+
+        # 计算内容的哈希值
+        current_content_hash = hashlib.md5(content.encode('utf-8')).hexdigest()
+
+        # 从缓存中获取之前的哈希值
+        previous_content_hash = cache.get(article_name)
+
+        # 检查内容是否与上一次提交相同
+        if current_content_hash == previous_content_hash:
+            return jsonify({'show_edit_code': 'success'})
+
+        # 更新缓存中的哈希值
+        cache.set(article_name, current_content_hash, timeout=600)
+
+        # 将文章名转换为字节字符串
+        article_name_bytes = article_name.encode('utf-8')
+
+        # 将字节字符串和目录拼接为文件路径
+        file_path = os.path.join(save_directory, article_name_bytes.decode('utf-8') + ".md")
+
+        # 检查保存目录是否存在，如果不存在则创建它
+        if not os.path.exists(save_directory):
+            os.makedirs(save_directory)
+
+        # 将文件保存到指定的目录上，覆盖任何已存在的文件
+        with open(file_path, 'w', encoding='utf-8') as file:
+            file.write(content)
+
+        return jsonify({'show_edit_code': 'success'})
+
+    return jsonify({'show_edit_code': 'success'})
+
+
+last_request_time = {}
 
 @app.route('/hidden/article', methods=['POST'])
 def hidden_article():
     article = request.json.get('article')
+
     if article is None:
         return jsonify({'message': '404'}), 404
 
     username = get_username()
-
     if username is None:
         return jsonify({'deal': 'noAuth'})
 
-    auth = auth_articles(article, username)
-
-    if not auth:
+    if not auth_articles(article, username):
         return jsonify({'deal': 'noAuth'})
 
-    if is_hidden(article):
-        # 取消隐藏文章
-        unhidden_article(article)
-        return jsonify({'deal': 'unhide'})
-    else:
-        # 隐藏文章
-        hide_article(article)
+    # 防抖机制：限制时间内对相同文章的请求
+    current_time = time()
+    cooldown_time = 5  # 决定防抖的时间窗口
+    hidden_status_key = f"{article}_hiddenStatus"
+
+    if hidden_status_key in last_request_time:
+        last_time = last_request_time[hidden_status_key]
+        if current_time - last_time < cooldown_time:
+            return jsonify({'deal': 'Please wait before trying again'})
+
+    # 更新最后请求时间
+    last_request_time[hidden_status_key] = current_time
+
+    cached_status = cache.get(hidden_status_key)
+
+    # 检查文章的当前隐藏状态并尝试隐藏
+    current_hidden_status = set_article_visibility(article, hide=True)
+
+    if cached_status:
         return jsonify({'deal': 'hide'})
+
+    if current_hidden_status is None:
+        return jsonify({'deal': 'error'})
+
+    deal = 'hide' if current_hidden_status == 0 else 'unhide'
+    cache.set(hidden_status_key, not current_hidden_status, timeout=14400)
+
+    return jsonify({'deal': deal})
 
 
 @app.route('/travel', methods=['GET'])

@@ -183,29 +183,6 @@ def read_file(file_path, num_chars):
 
 
 # 获取系统默认编码
-def zy_save_edit(article_name, content):
-    if article_name and content:
-        save_directory = 'articles/'
-
-        # 将文章名转换为字节字符串
-        article_name_bytes = article_name.encode('utf-8')
-
-        # 将字节字符串和目录拼接为文件路径
-        file_path = os.path.join(save_directory, article_name_bytes.decode('utf-8') + ".md")
-
-        # 检查保存目录是否存在，如果不存在则创建它
-        if not os.path.exists(save_directory):
-            os.makedirs(save_directory)
-
-        # 将文件保存到指定的目录上，覆盖任何已存在的文件
-        with open(file_path, 'w', encoding='utf-8') as file:
-            file.write(content)
-
-        return 'success'
-
-    return 'failed'
-
-
 def zy_noti_conf():
     noti_config = ConfigParser()
     try:

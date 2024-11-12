@@ -423,73 +423,36 @@ def write_tags_to_database(tags_list, a_title):
         db.close()
 
 
-def hide_article(article):
+def set_article_visibility(article, hide=True):
     db = get_database_connection()
     try:
         with db.cursor() as cursor:
-            query = "SELECT * FROM articles WHERE Title = %s"
-            cursor.execute(query, (article,))
-            result = cursor.fetchone()
-
-            if result is None:
-                query = "INSERT INTO articles (Title, Author, Hidden) VALUES (%s, 'test', 1)"
-                cursor.execute(query, (article,))
-            elif result[3] == 0:
-                query = "UPDATE articles SET Hidden = 1 WHERE Title = %s"
-                cursor.execute(query, (article,))
-
-            db.commit()
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    finally:
-        try:
-            cursor.close()
-        except NameError:
-            pass
-        db.close()
-
-
-def unhidden_article(article):
-    db = get_database_connection()
-    try:
-        with db.cursor() as cursor:
-            query = "SELECT * FROM articles WHERE Title = %s"
-            cursor.execute(query, (article,))
-            result = cursor.fetchone()
-
-            if result is not None and result[3] == 1:
-                query = "UPDATE articles SET Hidden = 0 WHERE Title = %s"
-                cursor.execute(query, (article,))
-            elif result is None:
-                query = "INSERT INTO articles (Title, Author, Hidden) VALUES (%s, 'test', 0)"
-                cursor.execute(query, (article,))
-
-            db.commit()
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    finally:
-        try:
-            cursor.close()
-        except NameError:
-            pass
-        db.close()
-
-
-def is_hidden(article):
-    db = get_database_connection()
-    try:
-        with db.cursor() as cursor:
+            # 查询文章的当前状态
             query = "SELECT Hidden FROM articles WHERE Title = %s"
             cursor.execute(query, (article,))
             result = cursor.fetchone()
 
-            if result is not None and result[0] == 1:
-                return True
+            if result is None:
+                # 如果文章不存在，根据 hide 参数来设置 Hidden 状态
+                hidden_status = 1 if hide else 0
+                query = "INSERT INTO articles (Title, Author, Hidden) VALUES (%s, 'test', %s)"
+                cursor.execute(query, (article, hidden_status))
             else:
-                return False
+                current_hidden_status = result[0]
+                if hide and current_hidden_status == 0:
+                    query = "UPDATE articles SET Hidden = 1 WHERE Title = %s"
+                    cursor.execute(query, (article,))
+                elif not hide and current_hidden_status == 1:
+                    query = "UPDATE articles SET Hidden = 0 WHERE Title = %s"
+                    cursor.execute(query, (article,))
+
+            db.commit()
+
+            # 返回当前 hidden 状态
+            return current_hidden_status if result else None
     except Exception as e:
         print(f"An error occurred: {e}")
-        return False
+        return None
     finally:
         try:
             cursor.close()
