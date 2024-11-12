@@ -134,6 +134,16 @@ def get_article_content(article, limit):
         return error('No file', 404)
 
 
+def zy_show_article(content):
+    try:
+        markdown_text = content
+        article_content = markdown.markdown(markdown_text)
+        return article_content
+    except:
+        # 发生任何异常时返回一个错误页面，可以根据需要自定义错误消息
+        return error('Error in displaying the article', 404)
+
+
 def clear_html_format(text):
     clean_text = re.sub('<.*?>', '', str(text))
     return clean_text
@@ -214,18 +224,8 @@ def auth_articles(title, username):
         db.close()
 
 
-def zy_show_article(content):
-    try:
-        markdown_text = content
-        article_content = markdown.markdown(markdown_text)
-        return article_content
-    except:
-        # 发生任何异常时返回一个错误页面，可以根据需要自定义错误消息
-        return error('Error in displaying the article', 404)
-
-
-def zy_edit_article(article):
-    limit = 215  # 读取的最大行数
+def zy_edit_article(article, maxLine):
+    limit = maxLine
     try:
         with codecs.open(f'articles/{article}.md', 'r', encoding='utf-8-sig', errors='replace') as f:
             lines = []

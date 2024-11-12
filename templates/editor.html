@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <title>编辑文章</title>
     <!-- 引入 Tailwind CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
+    <link rel="stylesheet" href="/static/css/tailwind.min.css">
     <!-- 引入 SimpleMDE CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/simplemde/latest/simplemde.min.css">
 </head>
@@ -25,7 +25,7 @@
                     class="mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
                 保存标签
             </button>
-            <a href="/blog/{{articleName}}" target="_blank">
+            <a href="/blog/{{ articleName }}" target="_blank">
                 <button class="mt-4 bg-green-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
                     文章页
                 </button>
@@ -37,7 +37,8 @@
                 class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
             保存内容
         </button>
-        <textarea id="md-editor" class="shadow border rounded py-2 px-3 text-grey-darker mb-3 w-full" rows="10">{{edit_html}}</textarea>
+        <textarea id="md-editor" class="shadow border rounded py-2 px-3 text-grey-darker mb-3 w-full"
+                  rows="10">{{ edit_html }}</textarea>
     </div>
 </div>
 
@@ -54,7 +55,7 @@
         })
             .then(response => response.json())
             .then(data => {
-                if (data.show_edit === 'success') {
+                if (data.show_edit_code === 'success') {
                     alert('保存成功');
                 } else {
                     alert('保存失败');
@@ -78,6 +79,14 @@
                 }
             })
             .catch(error => console.error('保存失败:', error));
+    });
+
+    // 在页面加载完成后自动聚焦输入框
+    document.addEventListener("DOMContentLoaded", function () {
+        var tagInput = document.getElementById("tagInput");
+        if (tagInput) {
+            tagInput.focus(); // 自动给予焦点
+        }
     });
 </script>
 </body>
