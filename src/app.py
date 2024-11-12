@@ -440,6 +440,10 @@ def get_a_list(chanel=1, page=1):
     if chanel == 2:
         articles, has_next_page, has_previous_page = get_article_names(page=page, per_page=12)
         return articles, has_next_page, has_previous_page
+    if chanel == 3:
+        # rss页面
+        articles, has_next_page, has_previous_page = get_article_names(page=1, per_page=30)
+        return articles
 
 
 @app.route('/blog/<article>.html', methods=['GET', 'POST'])
@@ -482,7 +486,6 @@ def blog_detail(article):
         return error(message="页面不见了", status_code=404)
 
 
-@cache.cached(timeout=300)
 @app.route('/sitemap.xml')
 @app.route('/sitemap')
 def generate_sitemap():
@@ -499,8 +502,7 @@ def generate_sitemap():
             response = Response(cached_xml_data, mimetype='text/xml')
             return response
 
-    files = os.listdir('articles')
-    markdown_files = [file for file in files if file.endswith('.md') and not file.startswith('_')]
+    markdown_files = get_a_list(chanel=1)
 
     # 创建XML文件头
     xml_data = '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -508,9 +510,8 @@ def generate_sitemap():
     xml_data += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
 
     for file in markdown_files:
-        article_name = file[:-3]  # 移除文件扩展名 (.md)
-        article_url = domain + 'blog/' + article_name
-        date = get_file_date(article_name)
+        article_url = domain + 'blog/' + file
+        date = get_file_date(file)
         article_surl = api_shortlink(article_url)
         # 创建url标签并包含链接
         xml_data += '<url>\n'
@@ -531,7 +532,6 @@ def generate_sitemap():
     return response
 
 
-@cache.cached(timeout=300)
 @app.route('/feed')
 @app.route('/rss')
 def generate_rss():
@@ -548,11 +548,7 @@ def generate_rss():
             response = Response(cached_xml_data, mimetype='application/rss+xml')
             return response
 
-    hidden_articles = read_hidden_articles()
-    hidden_articles = [ha + ".md" for ha in hidden_articles]
-    files = os.listdir('articles')
-    markdown_files = [file for file in files if file.endswith('.md') and not file.startswith('_')]
-    # markdown_files = markdown_files[:10]
+    markdown_files = get_a_list(chanel=3, page=1)
 
     # 创建XML文件头及其他信息...
     xml_data = '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -566,21 +562,16 @@ def generate_rss():
     xml_data += '<atom:link href="' + domain + 'rss" rel="self" type="application/rss+xml" />\n'
 
     for file in markdown_files:
-        article_name = file[:-3]  # 移除文件扩展名 (.md)
-        encoded_article_name = urllib.parse.quote(article_name)  # 对文件名进行编码处理
+        encoded_article_name = urllib.parse.quote(file)  # 对文件名进行编码处理
         article_url = domain + 'blog/' + encoded_article_name
         date = get_file_date(encoded_article_name)
-        if file in hidden_articles:
-            describe = "本文章属于加密文章"
-            content = "本文章属于加密文章\n" + f'<a href="{article_url}" target="_blank" rel="noopener">带密码访问</a>'
-        else:
-            content, *_ = get_article_content(article_name, 10)
-            describe = encoded_article_name
+        content, *_ = get_article_content(file, 10)
+        describe = encoded_article_name
 
         article_surl = api_shortlink(article_url)
         # 创建item标签并包含内容
         xml_data += '<item>\n'
-        xml_data += f'\t<title>{article_name}</title>\n'
+        xml_data += f'\t<title>{file}</title>\n'
         xml_data += f'\t<link>{article_surl}</link>\n'
         xml_data += f'\t<guid>{article_url}</guid>\n'
         xml_data += f'\t<pubDate>{date}</pubDate>\n'
