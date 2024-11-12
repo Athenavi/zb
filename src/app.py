@@ -305,10 +305,10 @@ def home():
         if page <= 0:
             page = 1
 
-        cache_key = f'page_content:{display}:{page}:{tag}'
+        home_cache = f'page_content:{display}:{page}:{tag}'
 
         # 尝试从缓存中获取页面内容
-        content = cache.get(cache_key)
+        content = cache.get(home_cache)
         if content:
             resp = make_response(content)
             resp.headers['Cache-Control'] = 'public, max-age=600'
@@ -334,7 +334,7 @@ def home():
 
         notice = ''
         try:
-            notice = read_file('notice/1.txt', 3000)
+            notice = read_file('notice/1.txt', 3000)  # 确保只读取文本内容
         except Exception as e:
             app.logger.error(f'读取通知文件出错: {e}')
 
@@ -371,8 +371,12 @@ def home():
             tag=tag
         )
 
-        # 缓存渲染后的页面内容
-        cache.set(cache_key, rendered_content, timeout=360)  # 设置为360秒
+        # 确保渲染的内容是字符串
+        if isinstance(rendered_content, str):
+            cache.set(home_cache, rendered_content, timeout=360)  # 设置为360秒
+        else:
+            app.logger.error('渲染内容不是字符串，无法缓存。')
+
         resp = make_response(rendered_content)
 
         if 'key' in request.cookies:
@@ -901,6 +905,7 @@ def zy_save_edit(article_name, content):
 
 last_request_time = {}
 
+
 @app.route('/hidden/article', methods=['POST'])
 def hidden_article():
     article = request.json.get('article')
@@ -916,7 +921,7 @@ def hidden_article():
         return jsonify({'deal': 'noAuth'})
 
     # 防抖机制：限制时间内对相同文章的请求
-    current_time = time()
+    current_time = time.time()
     cooldown_time = 5  # 决定防抖的时间窗口
     hidden_status_key = f"{article}_hiddenStatus"
 
@@ -1010,19 +1015,12 @@ def media(user_id):
 
 
 @app.route('/zyImg/<username>/<img_name>')
+@cache.cached(600)
 def get_image_path(username, img_name):
     try:
         img_dir = Path(base_dir) / 'media' / username / img_name
-
-        # 从缓存中获取图像数据
-        img_data = cache.get(str(img_dir))
-
-        # 如果缓存中没有图像数据，则从文件中读取并进行缓存
-        if img_data is None:
-            with open(img_dir, 'rb') as f:
-                img_data = f.read()
-            cache.set(img_dir, img_data)
-
+        with open(img_dir, 'rb') as f:
+            img_data = f.read()
         # 使用 BytesIO 包装图像数据
         return send_file(io.BytesIO(img_data), mimetype='image/png')
     except Exception as e:
@@ -1194,20 +1192,14 @@ def get_theme_detail(theme_id):
 
 
 @app.route('/theme/<theme_id>/<img_name>')
+@cache.cached(600)
 def get_screenshot(theme_id, img_name):
     if theme_id == 'default':
         return send_file('../static/favicon.ico', mimetype='image/png')
     try:
         img_dir = os.path.join(base_dir, 'templates', 'theme', theme_id, img_name)
-
-        # 从缓存中获取图像数据
-        img_data = cache.get(img_dir)
-
-        # 如果缓存中没有图像数据，则从文件中读取并进行缓存
-        if img_data is None:
-            with open(img_dir, 'rb') as f:
-                img_data = f.read()
-            cache.set(img_dir, img_data)
+        with open(img_dir, 'rb') as f:
+            img_data = f.read()
 
         img_io = io.BytesIO(img_data)
         img_io.seek(0)
