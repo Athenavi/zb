@@ -176,14 +176,14 @@
                 document.getElementById("authorWebsite").textContent = "作者网站: " + data.authorWebsite;
                 document.getElementById("themeId").textContent = data.id;
                 document.getElementById("title").textContent = "标题: " + data.title;
-                document.getElementById("version").textContent = "版本: " + data.version;
-                document.getElementById("versionCode").textContent = "版本代码: " + data.versionCode;
+                document.getElementById("version").textContent = "适配版本: " + data.version;
+                document.getElementById("versionCode").textContent = "主题版本代码（标识符）: " + data.versionCode;
                 // 显示弹出窗口
                 document.getElementById("detailModal").style.display = "block";
             });
     }
 
-    // 关闭弹出窗口的函数
+    // 主题版本检查
 
     //修改主题
     document.getElementById("changeDisplay").addEventListener("click", function () {
@@ -195,8 +195,10 @@
             .then(data => {
                 if (data === 'success') {
                     alert('主题应用成功！');
+                } else if (data === 'failed001') {
+                    alert('当前已是该主题;请勿重复提交');
                 } else {
-                    alert('主题应用失败！');
+                    alert('主题应用失败！主题文件丢失或者主题没有适配当前程序版本');
                 }
             })
             .catch(error => {
