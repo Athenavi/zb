@@ -27,7 +27,7 @@ from src.AboutLogin import zy_login, zy_register, zy_mail_login
 from src.AboutPW import zy_change_password, zy_confirm_password
 from src.BlogDeal import get_article_names, get_article_content, clear_html_format, \
     get_file_date, get_blog_author, read_hidden_articles, auth_articles, \
-    zy_show_article, zy_edit_article, get_subscriber_ids, get_unique_tags, get_articles_by_tag, \
+    zy_edit_article, get_subscriber_ids, get_unique_tags, get_articles_by_tag, \
     get_tags_by_article, set_article_info, write_tags_to_database, set_article_visibility
 from src.database import get_database_connection
 from src.links import create_special_url
@@ -47,8 +47,11 @@ app.config['SESSION_COOKIE_NAME'] = 'zb_session'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=3)
 app.config['USER_BASE_PATH'] = 'media'
 app.config['TEMP_FOLDER'] = 'temp/upload'
+# 定义允许上传的文件类型/文件大小
 app.config['ALLOWED_EXTENSIONS'] = {'.jpg', '.png', '.webp', '.jfif', '.pjpeg', '.jpeg', '.pjp', '.mp4', '.xmind'}
 app.config['UPLOAD_LIMIT'] = 60 * 1024 * 1024
+# 定义文件最大可编辑的行数
+app.config['MAX_LINE_LIMIT'] = 360
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)  # 添加 ProxyFix 中间件
 
 # 移除默认的日志处理程序
@@ -794,40 +797,19 @@ def markdown_editor(article):
 
     if auth:
         if request.method == 'GET':
-            edit_html = zy_edit_article(article)
-            show_edit = zy_show_article(article)
+            edit_html = zy_edit_article(article, maxLine=app.config['MAX_LINE_LIMIT'])
 
             tags = get_tags_by_article(article)
 
             # 渲染编辑页面并将转换后的HTML传递到模板中
-            return render_template('editor.html', edit_html=edit_html, show_edit=show_edit, articleName=article,
+            return render_template('editor.html', edit_html=edit_html, articleName=article,
                                    tags=tags)
         elif request.method == 'POST':
             content = request.json['content']
-            save_edit_code = zy_save_edit(article, content)
-            return jsonify({'show_edit_code': save_edit_code})
+            return zy_save_edit(article, content)
         elif request.method == 'PUT':
             tags_input = request.get_json().get('tags')
-            tags_list = []
-            # 将中文逗号转换为英文逗号
-            tags_input = tags_input.replace("，", ",")
-
-            # 用正则表达式截断标签信息中超过五个标签的部分
-            comma_count = tags_input.count(",")
-            if comma_count > 4:
-                tags_input = re.split(",", tags_input, maxsplit=4)[0]
-
-            # 限制每个标签最大字符数为10，并添加到标签列表
-
-            for tag in tags_input.split(","):
-                tag = tag.strip()
-                if len(tag) <= 10:
-                    tags_list.append(tag)
-
-            # 写入更新后的标签到数据库
-            write_tags_to_database(tags_list, article)
-            return jsonify({'show_edit': "success"})
-
+            return zy_save_tags(article, tags_input)
         else:
             # 渲染编辑页面
             return render_template('editor.html')
@@ -836,47 +818,51 @@ def markdown_editor(article):
         return error(message='您没有权限', status_code=503)
 
 
-@app.route('/save/edit', methods=['POST'])
-def edit_save():
-    content = request.json.get('content', '')
-    article = request.json.get('article')
+def zy_save_tags(article, tags_input):
+    # 将中文逗号转换为英文逗号
+    tags_input = tags_input.replace("，", ",")
 
-    if article is None:
-        return jsonify({'message': '404'}), 404
+    # 用正则表达式限制标签数量和每个标签的长度
+    tags_list = [
+        tag.strip() for tag in re.split(",", tags_input, maxsplit=4) if len(tag.strip()) <= 10
+    ]
 
-    username = get_username()
+    # 计算标签的哈希值
+    current_tag_hash = hashlib.md5(tags_input.encode('utf-8')).hexdigest()
+    previous_content_hash = cache.get(f"{article}:tag_hash")
 
-    if username is None:
-        return jsonify({'message': '您没有权限'}), 503
+    # 检查内容是否与上一次提交相同
+    if current_tag_hash == previous_content_hash:
+        return jsonify({'show_edit': 'success'})
 
-    # Auth 认证
-    auth = auth_articles(article, username)
+    # 更新缓存中的标签哈希值
+    cache.set(f"{article}:tag_hash", current_tag_hash, timeout=28800)
 
-    if not auth:
-        return jsonify({'message': '404'}), 404
+    # 写入更新后的标签到数据库
+    write_tags_to_database(tags_list, article)
+    return jsonify({'show_edit': "success"})
 
-    return zy_save_edit(article, content)
 
-
-def zy_save_edit(article_name, content):
-    if article_name and content:
+def zy_save_edit(article, content):
+    if article and content:
         save_directory = 'articles/'
 
         # 计算内容的哈希值
         current_content_hash = hashlib.md5(content.encode('utf-8')).hexdigest()
 
         # 从缓存中获取之前的哈希值
-        previous_content_hash = cache.get(article_name)
+        previous_content_hash = cache.get(f"{article}_lasted_hash")
 
         # 检查内容是否与上一次提交相同
         if current_content_hash == previous_content_hash:
+            # print(current_content_hash)
             return jsonify({'show_edit_code': 'success'})
 
         # 更新缓存中的哈希值
-        cache.set(article_name, current_content_hash, timeout=600)
+        cache.set(f"{article}_lasted_hash", current_content_hash, timeout=28800)
 
         # 将文章名转换为字节字符串
-        article_name_bytes = article_name.encode('utf-8')
+        article_name_bytes = article.encode('utf-8')
 
         # 将字节字符串和目录拼接为文件路径
         file_path = os.path.join(save_directory, article_name_bytes.decode('utf-8') + ".md")
@@ -891,7 +877,7 @@ def zy_save_edit(article_name, content):
 
         return jsonify({'show_edit_code': 'success'})
 
-    return jsonify({'show_edit_code': 'success'})
+    return jsonify({'show_edit_code': 'failed'})
 
 
 last_request_time = {}
@@ -1022,7 +1008,6 @@ def upload_user_path(user_id):
         return jsonify({'message': 'failed, user not authenticated'}), 403
 
     try:
-        # 定义允许上传的文件类型
         allowed_types = app.config['ALLOWED_EXTENSIONS']
         user_dir = os.path.join(app.config['USER_BASE_PATH'], username)  # 用户文件存储目录
         os.makedirs(user_dir, exist_ok=True)  # 如果目录不存在则创建
@@ -1037,7 +1022,7 @@ def upload_user_path(user_id):
                         continue
 
                     if f.content_length > app.config['UPLOAD_LIMIT']:
-                        return jsonify({'message': 'File size exceeds the limit of 60MB'}), 413
+                        return jsonify({'message': f'File size exceeds the limit of {app.config['UPLOAD_LIMIT']}'}), 413
 
                         # 确保文件名安全并确保是字符串类型
                     newfile_name = secure_filename(str(f.filename))
