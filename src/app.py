@@ -922,7 +922,7 @@ def hidden_article():
 
     # 防抖机制：限制时间内对相同文章的请求
     current_time = time.time()
-    cooldown_time = 5  # 决定防抖的时间窗口
+    cooldown_time = 6
     hidden_status_key = f"{article}_hiddenStatus"
 
     if hidden_status_key in last_request_time:
@@ -935,19 +935,14 @@ def hidden_article():
 
     cached_status = cache.get(hidden_status_key)
 
-    # 检查文章的当前隐藏状态并尝试隐藏
-    current_hidden_status = set_article_visibility(article, hide=True)
-
     if cached_status:
+        current_hidden_status = set_article_visibility(article, hide=True)
+        cache.set(hidden_status_key, current_hidden_status)
         return jsonify({'deal': 'hide'})
-
-    if current_hidden_status is None:
-        return jsonify({'deal': 'error'})
-
-    deal = 'hide' if current_hidden_status == 0 else 'unhide'
-    cache.set(hidden_status_key, not current_hidden_status, timeout=14400)
-
-    return jsonify({'deal': deal})
+    else:
+        current_hidden_status = set_article_visibility(article, hide=False)
+        cache.set(hidden_status_key, current_hidden_status)
+        return jsonify({'deal': 'unhide'})
 
 
 @app.route('/travel', methods=['GET'])
@@ -1015,7 +1010,6 @@ def media(user_id):
 
 
 @app.route('/zyImg/<username>/<img_name>')
-@cache.cached(600)
 def get_image_path(username, img_name):
     try:
         img_dir = Path(base_dir) / 'media' / username / img_name
@@ -1192,7 +1186,6 @@ def get_theme_detail(theme_id):
 
 
 @app.route('/theme/<theme_id>/<img_name>')
-@cache.cached(600)
 def get_screenshot(theme_id, img_name):
     if theme_id == 'default':
         return send_file('../static/favicon.ico', mimetype='image/png')

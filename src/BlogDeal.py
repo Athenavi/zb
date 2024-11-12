@@ -11,7 +11,7 @@ from src.database import get_database_connection
 from src.user import error
 
 
-def get_article_names(per_page,page=1):
+def get_article_names(per_page, page=1):
     articles = []
     files = os.listdir('articles')
     markdown_files = [file for file in files if file.endswith('.md')]
@@ -449,7 +449,7 @@ def set_article_visibility(article, hide=True):
             db.commit()
 
             # 返回当前 hidden 状态
-            return current_hidden_status if result else None
+            return current_hidden_status if result else False
     except Exception as e:
         print(f"An error occurred: {e}")
         return None
