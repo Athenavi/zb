@@ -26,15 +26,15 @@ from src.AboutLogin import zy_login, zy_register, zy_mail_login
 from src.AboutPW import zy_change_password, zy_confirm_password
 from src.BlogDeal import get_article_names, get_article_content, clear_html_format, \
     get_file_date, get_blog_author, read_hidden_articles, auth_articles, \
-    zy_show_article, zy_edit_article, get_all_article_names, get_subscriber_ids, get_unique_tags, get_articles_by_tag, \
+    zy_show_article, zy_edit_article,get_subscriber_ids, get_unique_tags, get_articles_by_tag, \
     get_tags_by_article, set_article_info, write_tags_to_database, is_hidden, unhidden_article, hide_article
 from src.database import get_database_connection
 from src.links import create_special_url
 from src.user import zyadmin, zy_delete_article, error, get_owner_articles, zy_general_conf
 from src.utils import zy_upload_file, get_client_ip, read_file, \
     zy_save_edit, zy_noti_conf, generate_jwt, secret_key, authenticate_jwt, \
-    authenticate_refresh_token, handle_file_upload, is_allowed_file, is_valid_domain_with_slash, get_list_intersection, \
-    get_all_img, get_all_video, get_all_xmind
+    authenticate_refresh_token, handle_file_upload, is_allowed_file, is_valid_domain_with_slash, \
+    get_all_img, get_all_video, get_all_xmind, get_list_intersection
 
 global_encoding = 'utf-8'
 
@@ -47,6 +47,7 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=3)
 app.config['USER_BASE_PATH'] = 'media'
 app.config['TEMP_FOLDER'] = 'temp/upload'
 app.config['ALLOWED_EXTENSIONS'] = {'.jpg', '.png', '.webp', '.jfif', '.pjpeg', '.jpeg', '.pjp', '.mp4', '.xmind'}
+app.config['UPLOAD_LIMIT'] = 60 * 1024 * 1024
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)  # 添加 ProxyFix 中间件
 
 # 移除默认的日志处理程序
@@ -250,6 +251,7 @@ def temp_preview(file_name):
     return prev
 
 
+@cache.memoize(300)
 def get_avatar(username):
     avatar = os.path.join(base_dir, 'media', username, 'avatar.png')
     if os.path.exists(avatar):
@@ -314,7 +316,7 @@ def home():
             app.logger.info(f'缓存未命中，准备生成新内容，页面: {page}, 标签: {tag}')
 
         # 获取文章内容
-        articles, has_next_page, has_previous_page = get_article_names(page=page)
+        articles, has_next_page, has_previous_page = get_a_list(chanel=2,page=page)
 
         if not articles:
             app.logger.warning('没有找到任何文章！')
@@ -425,9 +427,13 @@ def get_article_info(articles):
 
 
 @cache.memoize(30)
-def get_a_list():
-    return get_all_article_names()
-
+def get_a_list(chanel=1,page=1):
+    if chanel == 1:
+        articles, has_next_page, has_previous_page = get_article_names(page=1,per_page=99999)
+        return articles
+    if chanel == 2:
+        articles, has_next_page, has_previous_page = get_article_names(page=page, per_page=12)
+        return articles, has_next_page, has_previous_page
 
 @app.route('/blog/<article>.html', methods=['GET', 'POST'])
 def blog_detail_seo(article):
@@ -439,7 +445,7 @@ def blog_detail(article):
     try:
         # 根据文章名称获取相应的内容并处理
         article_name = article
-        article_names = get_a_list()
+        article_names = get_a_list(chanel=1)
         hidden_articles = read_hidden_articles()
 
         if article_name in hidden_articles:
@@ -982,18 +988,24 @@ def upload_user_path(user_id):
                     if not is_allowed_file(f.filename, allowed_types):  # 检查文件类型
                         continue
 
-                    if f.content_length > 60 * 1024 * 1024:  # 检查文件大小
+                    if f.content_length > app.config['UPLOAD_LIMIT']:
                         return jsonify({'message': 'File size exceeds the limit of 60MB'}), 413
 
-                    newfile_name = secure_filename(f.filename)  # 确保文件名是安全的
-                    newfile_path = os.path.join(user_dir, newfile_name)  # 生成新文件路径
+                        # 确保文件名安全并确保是字符串类型
+                    newfile_name = secure_filename(str(f.filename))
+                    user_dir = str(user_dir)
+
+                    # 生成新文件路径并保存文件
+                    newfile_path = os.path.join(user_dir, newfile_name)
                     f.save(newfile_path)  # 保存文件
 
                     # 确定文件类型
-                    file_type = ('image' if f.filename.lower().endswith(
-                        ('.jpg', '.jpeg', '.png', '.webp', '.jfif', '.pjpeg', '.pjp'))
-                                 else 'video' if f.filename.lower().endswith('.mp4')
-                    else 'document')
+                    file_type = (
+                        'image' if f.filename.lower().endswith(
+                            ('.jpg', '.jpeg', '.png', '.webp', '.jfif', '.pjpeg', '.pjp')
+                        ) else 'video' if f.filename.lower().endswith('.mp4')
+                        else 'document'
+                    )
 
                     # 查询是否存在相同的文件路径
                     cursor.execute("SELECT `id` FROM `media` WHERE `file_path`=%s", (newfile_path,))
@@ -1078,7 +1090,6 @@ def cc_login(provider):
 
 @app.route('/callback/<provider>')
 def callback(provider):
-    user_email = ''
     if provider not in ['qq', 'wx', 'alipay', 'sina', 'baidu', 'huawei', 'xiaomi', 'dingtalk']:
         return jsonify({'message': 'Invalid login provider'})
 
