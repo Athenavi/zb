@@ -1291,7 +1291,7 @@ def sys_out_article_img(article_name, image_name):
         author = 'test'
 
     articles_img_dir = os.path.join(base_dir, 'media', str(author))
-    #app.logger.info(f"author: {author}的媒体{image_name}被调用")
+    # app.logger.info(f"author: {author}的媒体{image_name}被调用")
     return send_from_directory(articles_img_dir, image_name)
 
 
@@ -1523,8 +1523,8 @@ def unfollow_user(user_id):
 @app.route('/like', methods=['GET', 'POST'])
 @jwt_required
 def like(user_id):
+    article_name = request.args.get('at')
     if request.method == 'POST':
-        article_name = request.args.get('at')
         if not article_name:
             return jsonify({'like_code': 'failed', 'message': "error"})
         user_liked = cache.get(f'{user_id}_liked')

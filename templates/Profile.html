@@ -190,6 +190,7 @@
         var fid = getParameterByName('id');
         if (!fid) {
             alert('不能关注自己或无效的关注ID！！！');
+            hiddenFollow(1)
             return; // 直接返回
         }
         fetch(`/api/follow?fid=${fid}`, {
@@ -218,6 +219,7 @@
         var fid = getParameterByName('id');
         if (!fid) {
             alert('不能取消关注自己或无效的关注ID！！！');
+            hiddenFollow(2)
             return; // 直接返回
         }
         fetch(`/api/unfollow?fid=${fid}`, {
