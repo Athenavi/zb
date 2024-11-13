@@ -166,12 +166,15 @@ def get_blog_author(title):
             result = cursor.fetchone()
 
             if result:
-                return result['Author']
+                query = "SELECT id FROM users WHERE username = %s"
+                cursor.execute(query, (result[0],))
+                author_uid = cursor.fetchone()
+                return result[0], author_uid[0]
             else:
-                return None
+                return None, None
     except Exception as e:
         print(f"An error occurred: {e}")
-        return None
+        return None, None
     finally:
         try:
             cursor.close()

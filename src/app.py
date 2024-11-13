@@ -272,10 +272,14 @@ def profile(user_id):
     username = get_username()
     avatar_url = get_avatar(username) or domain + 'static/favicon.ico'
     owner_id = request.args.get('id')
-    if owner_id is None or owner_id == '':
-        owner_articles = get_owner_articles(owner_id=None, user_name=username) or []
+    owner_username = request.args.get('tun')
+    if owner_username:
+        owner_articles = get_owner_articles(owner_id=None, user_name=owner_username) or []
     else:
-        owner_articles = get_owner_articles(owner_id=owner_id, user_name=None) or []
+        if owner_id is None or owner_id == '':
+            owner_articles = get_owner_articles(owner_id=None, user_name=username) or []
+        else:
+            owner_articles = get_owner_articles(owner_id=owner_id, user_name=None) or []
 
     noti_host, noti_port = zy_noti_conf()
 
@@ -467,13 +471,14 @@ def blog_detail(article):
         article_tags = get_tags_by_article(article)
         article_url = domain + 'blog/' + article
         article_surl = api_shortlink(article_url)
-        author = get_blog_author(article)
+        author, author_uid = get_blog_author(article)
         update_date = get_file_date(article)
 
         response = make_response(render_template('zyDetail.html',
                                                  article_content=1,
                                                  articleName=article,
                                                  author=author,
+                                                 authorUID=str(author_uid),
                                                  blogDate=update_date,
                                                  domain=domain,
                                                  url_for=url_for,
@@ -797,7 +802,7 @@ def markdown_editor(article):
 
     if auth:
         if request.method == 'GET':
-            edit_html = zy_edit_article(article, maxLine=app.config['MAX_LINE_LIMIT'])
+            edit_html = zy_edit_article(article, max_line=app.config['MAX_LINES'])
 
             tags = get_tags_by_article(article)
 
@@ -1280,12 +1285,13 @@ def id_find_article(article_id):
 @cache.cached(timeout=1200)
 @app.route('/blog/<article_name>/images/<image_name>', methods=['GET'])
 def sys_out_article_img(article_name, image_name):
-    author = get_blog_author(article_name)
+    author, author_uid = get_blog_author(article_name)
 
     if author is None:
         author = 'test'
 
-    articles_img_dir = os.path.join(base_dir, 'media', str(author))  # 确保author是字符串
+    articles_img_dir = os.path.join(base_dir, 'media', str(author))
+    #app.logger.info(f"author: {author}的媒体{image_name}被调用")
     return send_from_directory(articles_img_dir, image_name)
 
 
