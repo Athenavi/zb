@@ -24,8 +24,8 @@ def create_special_url(long_url, username):
             db.commit()
 
         return short_url
-    except Exception:
-        return "Not Found"
+    except Exception as e:
+        return "Not Found {e}".format(e=e)
     finally:
         cursor.close()
         db.close()
@@ -45,8 +45,8 @@ def redirect_to_long_url(short_url):
             return long_url
         else:
             return "Not Found"
-    except Exception:
-        return "Not Found"
+    except Exception as e:
+        return "Not Found {e}".format(e=e)
     finally:
         cursor.close()
         db.close()
@@ -62,8 +62,8 @@ def delete_link(short_url):
         db.commit()
 
         return True
-    except Exception:
-        return "Not Found"
+    except Exception as e:
+        return "Not Found {e}".format(e=e)
     finally:
         cursor.close()
         db.close()

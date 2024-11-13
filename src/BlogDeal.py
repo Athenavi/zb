@@ -139,9 +139,9 @@ def zy_show_article(content):
         markdown_text = content
         article_content = markdown.markdown(markdown_text)
         return article_content
-    except:
+    except Exception as e:
         # 发生任何异常时返回一个错误页面，可以根据需要自定义错误消息
-        return error('Error in displaying the article', 404)
+        return error(f'Error in displaying the article :{e}', 404)
 
 
 def clear_html_format(text):
@@ -224,8 +224,8 @@ def auth_articles(title, username):
         db.close()
 
 
-def zy_edit_article(article, maxLine):
-    limit = maxLine
+def zy_edit_article(article, max_line):
+    limit = max_line
     try:
         with codecs.open(f'articles/{article}.md', 'r', encoding='utf-8-sig', errors='replace') as f:
             lines = []
@@ -416,6 +416,7 @@ def write_tags_to_database(tags_list, a_title):
             db.commit()
 
     except Exception as e:
+        print(f"An error occurred during database operation: {e}")
         pass
 
     finally:
