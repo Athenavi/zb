@@ -1535,8 +1535,12 @@ def like(user_id):
         db = get_database_connection()
         try:
             with db.cursor() as cursor:
-                query = "UPDATE `articles` SET `Likes` = `Likes` + 1 WHERE `articles`.`Title` = %s;"
-                cursor.execute(query, (article_name,))
+                rd_like = random.randint(3, 8)
+                rd_view = random.randint(22, 33)
+                query = "UPDATE `articles` SET `Likes` = `Likes` + %s WHERE `articles`.`Title` = %s;"
+                cursor.execute(query, (rd_like, article_name,))
+                query2 = "UPDATE `articles` SET `Views` = `Views` + %s WHERE `articles`.`Title` = %s;"
+                cursor.execute(query2, (rd_view, article_name,))
                 db.commit()
                 user_liked.append(article_name)
                 cache.set(f'{user_id}_liked', user_liked)
