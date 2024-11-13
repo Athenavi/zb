@@ -30,7 +30,7 @@
             <div id="articleCards" class="grid grid-cols-1 gap-6">
                 {% for sub_id,sub_name in subscriber_ids_list %}
                     <div class="card bg-lightblue-500 shadow-lg rounded-lg overflow-hidden border border-gray-200">
-                        <a href="profile?id={{ sub_id }}"
+                        <a href="/profile?id={{ sub_id }}&sn={{ sub_name }}"
                            class="flex hover:bg-gray-100 transition duration-200">
                             <div class="flex-1 p-4">
                                 <h5 class="text-xl font-bold mb-2">{{ sub_name }}</h5>

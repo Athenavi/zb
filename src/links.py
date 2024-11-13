@@ -1,5 +1,3 @@
-from flask import render_template
-
 from src.database import get_database_connection
 from src.utils import generate_short_url
 

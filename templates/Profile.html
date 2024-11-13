@@ -45,17 +45,19 @@
             {% endif %}
             <hr class="my-4">
             {% if Articles %}
-                <h2 class="text-2xl font-bold mb-4">{{ title }}的文章</h2>
+                <div class="text-2xl font-bold mb-4" id="idH2"></div>
             {% endif %}
             <div class="space-y-4">
                 {% for article in Articles %}
                     <div class="bg-gray-100 p-4 rounded-lg flex justify-between items-center">
                         <a href="{{ url_for('blog_detail', article=article) }}"
                            class="text-xl font-semibold text-blue-700">{{ article }}</a>
-                        <div class="flex items-center space-x-4">
-                            <a href="/edit/{{ article }}" class="text-green-500">编辑</a>
-                            <a href="#" data-article={{ article }} class="hidden121">隐藏/取消隐藏</a>
-                            <a href="#" data-article={{ article }} class="delete121">删除</a>
+                        <div class="menu_div">
+                            <div class="flex items-center space-x-4">
+                                <a href="/edit/{{ article }}" class="text-green-500">编辑</a>
+                                <a href="#" data-article={{ article }} class="hidden121">隐藏/取消隐藏</a>
+                                <a href="#" data-article={{ article }} class="delete121">删除</a>
+                            </div>
                         </div>
                     </div>
                 {% endfor %}
@@ -182,4 +184,103 @@
             }
         });
     });
+</script>
+<script>
+    function followed() {
+        var fid = getParameterByName('id');
+        if (!fid) {
+            alert('不能关注自己或无效的关注ID！！！');
+            return; // 直接返回
+        }
+        fetch(`/api/follow?fid=${fid}`, {
+            method: 'POST',
+            credentials: 'include'
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('网络响应不正确');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.follow_code === 'success') {
+                    alert('成功关注');
+                    hiddenFollow(1);
+                    return 0;
+                } else {
+                    alert('关注失败！！: ' + data.message);
+                }
+            })
+            .catch(error => alert('关注失败！！: ' + error));
+    }
+
+    function unfollowed() {
+        var fid = getParameterByName('id');
+        if (!fid) {
+            alert('不能取消关注自己或无效的关注ID！！！');
+            return; // 直接返回
+        }
+        fetch(`/api/unfollow?fid=${fid}`, {
+            method: 'POST',
+            credentials: 'include'
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('网络响应不正确');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.follow_code === 'success') {
+                    alert('成功取消关注');
+                    hiddenFollow(2);
+                    return 0;
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => alert('取消关注失败！！: ' + error));
+    }
+
+    function hiddenFollow(type) {
+        var followBtn = document.getElementById('follow-btn');
+        var unfollowBtn = document.getElementById('unfollow-btn');
+
+        if (type === 1) {
+            if (followBtn) {
+                followBtn.style.display = 'none';
+            }
+            // 在idH2中插入取消关注按钮
+            if (!unfollowBtn) {
+                var idh2 = document.getElementById('idH2');
+                idh2.innerHTML += '<button onclick="unfollowed()" id="unfollow-btn">取消关注</button>';
+            }
+        }
+        if (type === 2) {
+            if (unfollowBtn) {
+                unfollowBtn.style.display = 'none';
+            }
+        }
+    }
+
+    function getParameterByName(name) {
+        name = name.replace(/[\[\]]/g, "\\$&");
+        var url = window.location.href;
+        var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)");
+        var results = regex.exec(url);
+        if (!results) return null;
+        if (!results[2]) return '';
+        return decodeURIComponent(results[2].replace(/\+/g, " "));
+    }
+
+    window.onload = function () {
+        var idh2 = document.getElementById('idH2');
+        idh2.innerHTML = "Ta的文章";
+        var menuDivs = document.getElementsByClassName('menu_div');
+        for (var i = 0; i < menuDivs.length; i++) {
+            menuDivs[i].style.display = 'none';
+        }
+        // 在idH2中插入按钮
+        idh2.innerHTML += '<button onclick="followed()" id="follow-btn" style="color:red;">关注</button>';
+    }
 </script>

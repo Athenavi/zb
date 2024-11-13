@@ -4,7 +4,7 @@ from datetime import timedelta, datetime
 
 import bcrypt
 import bleach
-from flask import request, session, redirect, url_for, render_template, make_response
+from flask import request, redirect, url_for, render_template, make_response
 
 from src.database import get_database_connection
 from src.utils import generate_jwt, generate_refresh_token

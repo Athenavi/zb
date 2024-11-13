@@ -1366,7 +1366,7 @@ def ip_api():
     return jsonify({'ip': ip})
 
 
-@app.route('/following')
+@app.route('/following', methods=['GET', 'POST'])
 @jwt_required
 def following(user_id):
     ip = get_client_ip(request, session)
@@ -1410,8 +1410,138 @@ def following(user_id):
         resp = make_response(rendered_content)
         return resp
 
+    if request.method == 'POST':
+        return error(message='Not Found', status_code=404)
+
+
+@app.route('/api/follow', methods=['GET', 'POST'])
+@jwt_required
+def follow_user(user_id):
+    follow_id = request.args.get('fid')
+
+    if not user_id or not follow_id:
+        return jsonify({'follow_code': 'failed', 'message': '用户ID或关注ID不能为空'})
+
+    # 首次尝试从缓存中读取用户的关注列表
+    user_followed = cache.get(f'{user_id}_followed')
+
+    # 如果缓存为空，则从数据库中获取所有关注并缓存
+    if user_followed is None:
+        db = get_database_connection()
+        try:
+            with db.cursor() as cursor:
+                cursor.execute("SELECT `subscribe_to_id` FROM `subscriptions` WHERE `subscriber_id` = %s", (user_id,))
+                user_followed = [row[0] for row in cursor.fetchall()]  # 获取所有关注ID
+                cache.set(f'{user_id}_followed', user_followed)  # 更新缓存
+                print('here')
+        except Exception as e:
+            print(f"Exception occurred when loading from DB: {e}")
+            return jsonify({'follow_code': 'failed', 'message': "error"})
+        finally:
+            db.close()
+
+    # 检查是否已经关注过
+    if follow_id in user_followed:
+        return jsonify({'follow_code': 'success', 'message': '已关注'})
+
+    db = get_database_connection()
+    try:
+        with db.cursor() as cursor:
+            # 进行关注操作
+            insert_query = "INSERT INTO `subscriptions` (`subscriber_id`, `subscribe_to_id`, `subscribe_type`) VALUES (%s, %s, 'User')"
+            cursor.execute(insert_query, (user_id, follow_id))
+            db.commit()
+
+            user_followed.append(follow_id)  # 更新列表
+            cache.set(f'{user_id}_followed', user_followed)  # 更新缓存
+            print('here2')
+            return jsonify({'follow_code': 'success'})
+
+    except Exception as e:
+        print(f"Exception occurred: {e}")
+        return jsonify({'follow_code': 'failed', 'message': "error"})
+
+    finally:
+        db.close()
+
+
+@app.route('/api/unfollow', methods=['GET', 'POST'])
+@jwt_required
+def unfollow_user(user_id):
+    unfollow_id = request.args.get('fid')
+
+    if not user_id or not unfollow_id:
+        return jsonify({'unfollow_code': 'failed', 'message': '用户ID或取关ID不能为空'})
+
+    # 首次尝试从缓存中读取用户的关注列表
+    user_followed = cache.get(f'{user_id}_followed')
+
+    # 如果缓存为空，则从数据库中获取所有关注并缓存
+    if user_followed is None:
+        db = get_database_connection()
+        try:
+            with db.cursor() as cursor:
+                cursor.execute("SELECT `subscribe_to_id` FROM `subscriptions` WHERE `subscriber_id` = %s", (user_id,))
+                user_followed = [row[0] for row in cursor.fetchall()]  # 获取所有关注ID
+                cache.set(f'{user_id}_followed', user_followed)  # 更新缓存
+        except Exception as e:
+            print(f"Exception occurred when loading from DB: {e}")
+            return jsonify({'unfollow_code': 'failed', 'message': "error"})
+        finally:
+            db.close()
+
+    # 检查是否已经关注
+    if unfollow_id not in user_followed:
+        return jsonify({'unfollow_code': 'success', 'message': '未关注，无需取关'})
+
+    db = get_database_connection()
+    try:
+        with db.cursor() as cursor:
+            # 进行取关操作
+            delete_query = "DELETE FROM `subscriptions` WHERE `subscriber_id` = %s AND `subscribe_to_id` = %s"
+            cursor.execute(delete_query, (user_id, unfollow_id))
+            db.commit()
+
+            user_followed.remove(unfollow_id)  # 更新列表
+            cache.set(f'{user_id}_followed', user_followed)  # 更新缓存
+            return jsonify({'unfollow_code': 'success', 'message': '成功取关'})
+
+    except Exception as e:
+        print(f"Exception occurred: {e}")
+        return jsonify({'unfollow_code': 'failed', 'message': "error"})
+
+    finally:
+        db.close()
+
+
+@app.route('/like', methods=['GET', 'POST'])
+@jwt_required
+def like(user_id):
+    if request.method == 'POST':
+        article_name = request.args.get('at')
+        if not article_name:
+            return jsonify({'like_code': 'failed', 'message': "error"})
+        user_liked = cache.get(f'{user_id}_liked')
+        if user_liked is None:
+            user_liked = []
+        if article_name in user_liked:
+            return jsonify({'like_code': 'failed', 'message': "你已经点赞过了!!"})
+        db = get_database_connection()
+        try:
+            with db.cursor() as cursor:
+                query = "UPDATE `articles` SET `Likes` = `Likes` + 1 WHERE `articles`.`Title` = %s;"
+                cursor.execute(query, (article_name,))
+                db.commit()
+                user_liked.append(article_name)
+                cache.set(f'{user_id}_liked', user_liked)
+                return jsonify({'like_code': 'success'})
+
+        except Exception as e:
+            return jsonify({'like_code': 'failed', 'message': str(e)})
+        finally:
+            db.close()
     else:
-        return render_template('zyIndex.html')
+        return jsonify({'like_code': 'failed'})
 
 
 def get_current_theme():
