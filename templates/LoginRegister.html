@@ -20,7 +20,13 @@
         .checkbox-container {
             display: flex;
             align-items: center;
-            margin-top: 20px;
+            margin-top: 40px;
+        }
+
+        .checkbox-container a {
+            margin-left: 10px;
+            margin-right: 10px;
+            color: cornflowerblue;
         }
 
         .checkbox-container input {
@@ -41,15 +47,56 @@
             justify-content: center;
             align-items: center;
             cursor: pointer;
+            margin-top: 25px;
         }
 
         .small-window-button img {
-            height: 28px;
+            height: 32px;
         }
 
-        .small-window-button span {
+        .small-window-button a {
             color: #0073aa;
+            border: None;
         }
+
+        /* 整体容器样式 */
+        .qr-login {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 5px;
+            border-radius: 10px; /* 圆角 */
+            background-color: #f9f9f9; /* 背景颜色 */
+        }
+
+        /* 按钮样式 */
+        #qrLoginButton {
+            color: lightslategray; /* 字体颜色 */
+            border: none; /* 去掉边框 */
+            border-radius: 5px; /* 圆角 */
+            font-size: 16px; /* 字体大小 */
+            cursor: pointer; /* 鼠标指针样式 */
+            transition: background-color 0.3s; /* 动画效果 */
+        }
+
+        /* 按钮悬停效果 */
+        #qrLoginButton:hover {
+            background-color: #0073aa; /* 悬停时的背景颜色 */
+            color: #4CAF50;
+        }
+
+        /* 二维码容器样式 */
+        #qrCode {
+            text-align: center; /* 文本居中 */
+            display: none; /* 默认隐藏 */
+        }
+
+        /* 二维码图片样式 */
+        #qrImage {
+            width: 150px; /* 图片宽度 */
+            height: 150px; /* 图片高度 */
+        }
+
     </style>
     <script>
         function openSmallWindow(provider) {
@@ -91,14 +138,13 @@
                 <i class="bx bxs-lock-alt"></i>
             </div>
             <button type="submit" class="btn">安全登录</button>
-            <div class="forgot-link">
-                <div class="checkbox-container">
-                    <input type="checkbox" required>
-                    <label for="">阅读并接受</label>
-                    <a href="/blog/legal-agreement">法律声明</a>和
-                    <a href="/blog/privacy">隐私协议</a>
+            <div class="qr-login">
+                <button type="button" id="qrLoginButton">二维码登录</button>
+                <div id="qrCode" style="display:none;">
+                    <img id="qrImage" src="" alt="二维码"/>
+                    <button id="checkStatus">check</button>
+                    <p>请使用手机扫描二维码登录</p>
                 </div>
-                <a href="#">忘记密码?</a>
             </div>
             <div class="social-icons">
                 <div class="small-window-button">
@@ -119,6 +165,17 @@
                         <div onclick="openSmallWindow('douyin')"><img src="/static/image/douyin.png" alt="Douyin"></div>
                     </a>
                 </div>
+            </div>
+            <div class="forgot-link">
+                <div class="checkbox-container">
+                    <input type="checkbox" required>
+                    <label for="">阅读并接受</label>
+                    <a href="/blog/legal-agreement">法律声明</a>和
+                    <a href="/blog/privacy">隐私协议</a>
+                </div>
+                <br>
+                <a href="/">随便看看</a>
+                <a href="#">忘记密码?</a>
             </div>
         </form>
     </div>
@@ -212,6 +269,96 @@
             return false;
         }
     }
+</script>
+<script>
+    // 二维码登录
+    document.getElementById('qrLoginButton').addEventListener('click', async function () {
+        const qrCodeContainer = document.getElementById('qrCode');
+        const qrImage = document.getElementById('qrImage');
+
+        // 使用 await 等待 getQRCode() 返回结果
+        const qrCodeUrl = await getQRCode();
+
+        // 检查二维码容器的当前显示状态
+        if (qrCodeContainer.style.display === 'none' || qrCodeContainer.style.display === '') {
+            qrImage.src = qrCodeUrl; // 设置二维码图片的源
+            qrCodeContainer.style.display = 'block'; // 显示二维码
+        } else {
+            qrCodeContainer.style.display = 'none'; // 隐藏二维码
+        }
+    });
+
+    let token = '';
+    let token_expire = ''
+    let new_token = ''
+    let refresh_token = ''
+
+    // 获取二维码并显示
+    async function getQRCode() {
+        try {
+            const response = await fetch('/qrlogin');
+            if (!response.ok) throw new Error('网络响应错误');
+            const data = await response.json();
+            qrdata = data.qr_code;
+            token = data.token; // 保存token以便后续使用
+            token_expire = data.expire;
+            console.log('获取的二维码:', qrdata); // 可选：调试输出
+            console.log('获取的token:', token); // 可选：调试输出
+            console.log('token过期时间:', token_expire); // 可选：调试输出
+            return qrdata; // 返回二维码的 URL
+        } catch (error) {
+            console.error('获取二维码失败:', error);
+        }
+    }
+
+    // 检查登录状态
+    document.getElementById('checkStatus').addEventListener('click', async function () {
+        // 确保 token 已经被成功设置
+        if (!token) {
+            alert("请先扫码")
+            return;
+        }
+        let expireTimeMillis = parseFloat(token_expire) * 1000;
+
+        // 获取当前时间戳（毫秒）
+        let currentTimeMillis = Date.now();
+
+        // 判断是否过期
+        if (currentTimeMillis > expireTimeMillis) {
+            alert("当前二维码已失效,请重新扫码")
+            getQRCode()
+            console.log("Token has expired.");
+        } else {
+            console.log("Token is still valid.");
+        }
+
+        try {
+            const response = await fetch(`/checkQRLogin?token=${token}`);
+            if (!response.ok) throw new Error('网络响应错误');
+            const data = await response.json();
+            Loginstatus = data.status;
+            console.log('登陆状态:', Loginstatus);
+            alert("扫码信息" + Loginstatus)
+            if (Loginstatus === 'success') {
+                const qrCodeContainer = document.getElementById('qrCode');
+                // 检查二维码容器的当前显示状态
+                if (qrCodeContainer.style.display === 'block' || qrCodeContainer.style.display === '') {
+                    qrCodeContainer.style.display = 'none'; // 隐藏二维码
+                }
+                new_token = data.token;
+                refresh_token = data.refresh_token;
+                if (new_token !== '') {
+                    document.cookie = `jwt=${new_token}; path=/; max-age=259200`;
+                    document.cookie = `refresh_token=${refresh_token}; path=/; max-age=259200`;
+                    location.reload();
+                }
+
+            }
+        } catch (error) {
+            console.error('检查登录状态失败:', error);
+        }
+
+    });
 </script>
 </body>
 
