@@ -42,9 +42,9 @@ def redirect_to_long_url(short_url):
             long_url = result[0]
             return long_url
         else:
-            return "Not Found"
-    except Exception as e:
-        return "Not Found {e}".format(e=e)
+            return None
+    except Exception:
+        return None
     finally:
         cursor.close()
         db.close()

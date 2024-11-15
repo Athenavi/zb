@@ -61,7 +61,9 @@ def emit_notification(notification_message):
 
 
 def get_sys_notice(user_id):
-    notice = "当前用户没有更多通知"
+    if not user_id:
+        notice = "当前没有更多通知"
+        return notice
     try:
         with get_database_connection() as db:
             with db.cursor() as cursor:
