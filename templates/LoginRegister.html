@@ -20,7 +20,13 @@
         .checkbox-container {
             display: flex;
             align-items: center;
-            margin-top: 20px;
+            margin-top: 40px;
+        }
+
+        .checkbox-container a {
+            margin-left: 10px;
+            margin-right: 10px;
+            color: cornflowerblue;
         }
 
         .checkbox-container input {
@@ -41,14 +47,16 @@
             justify-content: center;
             align-items: center;
             cursor: pointer;
+            margin-top: 25px;
         }
 
         .small-window-button img {
-            height: 28px;
+            height: 32px;
         }
 
-        .small-window-button span {
+        .small-window-button a {
             color: #0073aa;
+            border: None;
         }
     </style>
     <script>
@@ -91,15 +99,6 @@
                 <i class="bx bxs-lock-alt"></i>
             </div>
             <button type="submit" class="btn">安全登录</button>
-            <div class="forgot-link">
-                <div class="checkbox-container">
-                    <input type="checkbox" required>
-                    <label for="">阅读并接受</label>
-                    <a href="/blog/legal-agreement">法律声明</a>和
-                    <a href="/blog/privacy">隐私协议</a>
-                </div>
-                <a href="#">忘记密码?</a>
-            </div>
             <div class="social-icons">
                 <div class="small-window-button">
                     <a href="#">
@@ -119,6 +118,16 @@
                         <div onclick="openSmallWindow('douyin')"><img src="/static/image/douyin.png" alt="Douyin"></div>
                     </a>
                 </div>
+            </div>
+            <div class="forgot-link">
+                <div class="checkbox-container">
+                    <input type="checkbox" required>
+                    <label for="">阅读并接受</label>
+                    <a href="/blog/legal-agreement">法律声明</a>和
+                    <a href="/blog/privacy">隐私协议</a>
+                </div>
+                <br>
+                <a href="#">忘记密码?</a>
             </div>
         </form>
     </div>
