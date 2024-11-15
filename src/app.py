@@ -26,13 +26,14 @@ from werkzeug.utils import secure_filename
 from src.AboutLogin import zy_login, zy_register, zy_mail_login
 from src.AboutPW import zy_change_password, zy_confirm_password
 from src.BlogDeal import get_article_names, get_article_content, clear_html_format, \
-    get_file_date, get_blog_author, read_hidden_articles, auth_articles, \
+    get_blog_author, read_hidden_articles, auth_articles, get_file_date, \
     zy_edit_article, get_subscriber_ids, get_unique_tags, get_articles_by_tag, \
     get_tags_by_article, set_article_info, write_tags_to_database, set_article_visibility
 from src.database import get_database_connection
-from src.links import create_special_url
+from src.links import create_special_url, redirect_to_long_url
+from src.notification import get_sys_notice
 from src.user import zyadmin, zy_delete_article, error, get_owner_articles, zy_general_conf, get_userInfo
-from src.utils import zy_upload_file, get_client_ip, read_file, \
+from src.utils import zy_upload_file, get_client_ip, \
     zy_noti_conf, generate_jwt, secret_key, authenticate_jwt, \
     authenticate_refresh_token, handle_file_upload, is_allowed_file, is_valid_domain_with_slash, \
     get_all_img, get_all_video, get_all_xmind, get_list_intersection
@@ -47,6 +48,8 @@ app.config['SESSION_COOKIE_NAME'] = 'zb_session'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=3)
 app.config['USER_BASE_PATH'] = 'media'
 app.config['TEMP_FOLDER'] = 'temp/upload'
+# 定义随机头像服务器
+app.config['AVATAR_SERVER'] = "https://api.7trees.cn/avatar"
 # 定义允许上传的文件类型/文件大小
 app.config['ALLOWED_EXTENSIONS'] = {'.jpg', '.png', '.webp', '.jfif', '.pjpeg', '.jpeg', '.pjp', '.mp4', '.xmind'}
 app.config['UPLOAD_LIMIT'] = 60 * 1024 * 1024
@@ -263,19 +266,15 @@ def temp_preview(file_name):
 
 @cache.memoize(600)
 def get_avatar(username):
-    avatar = os.path.join(base_dir, 'media', username, 'avatar.png')
-    if os.path.exists(avatar):
-        avatar_url = domain + 'zyImg/' + username + '/avatar.png'
-    else:
-        avatar_url = None
-    return avatar_url
+    avatar = app.config['AVATAR_SERVER']
+    return avatar
 
 
 @app.route('/profile', methods=['GET', 'POST'])
 @jwt_required
 def profile(user_id):
     username = get_username()
-    avatar_url = get_avatar(username) or domain + 'static/favicon.ico'
+    avatar_url = get_avatar(username)
     owner_id = request.args.get('id')
     owner_username = request.args.get('tun')
     if owner_username:
@@ -297,10 +296,20 @@ def profile(user_id):
 @app.route('/setting/profiles', methods=['GET', 'POST'])
 @jwt_required
 def setting_profiles(user_id):
-    username = get_username()
-    avatar_url = get_avatar(username) or domain + 'static/favicon.ico'
-    return render_template('setting.html', url_for=url_for, avatar_url=avatar_url,
-                           userStatus=bool(user_id), username=username)
+    UserInfo = cache.get(f"{user_id}_userInfo") or get_userInfo(user_id=user_id, user_name=None)
+    cache.set(f'{user_id}_userInfo', UserInfo)
+    avatar_url = UserInfo[5] or app.config['AVATAR_SERVER']
+    Bio = UserInfo[5] or "这人很懒，什么也没留下"
+    username = UserInfo[1]
+
+    return render_template(
+        'setting.html',
+        url_for=url_for,
+        avatar_url=avatar_url,
+        userStatus=bool(user_id),
+        username=username,
+        Bio=Bio
+    )
 
 
 # 主页
@@ -346,7 +355,7 @@ def home():
 
         notice = ''
         try:
-            notice = read_file('notice/1.txt', 3000)  # 确保只读取文本内容
+            notice = get_sys_notice(0)
         except Exception as e:
             app.logger.error(f'读取通知文件出错: {e}')
 
@@ -1214,26 +1223,9 @@ def redirect_to_long_url_route(short_url):
     if len(short_url) != 6:
         return 'error'
     user_agent = request.headers.get('User-Agent')
-    db = get_database_connection()
-    cursor = db.cursor()
-
-    # 根据短网址查询数据库获取对应的长网址
-    query = "SELECT long_url FROM urls WHERE short_url = %s"
-    cursor.execute(query, (short_url,))
-    result = cursor.fetchone()
-
-    if result:
-        # 如果找到对应的长网址，则进行重定向
-        long_url = result[0]
-        # 获取请求者的 IP 地址
-        ip_address = get_client_ip(request, session)
-        app.logger.info('当前访问的用户:IP:{},UA:{}'.format(ip_address, user_agent))
-        db.commit()
-
-        # 关闭数据库连接
-        cursor.close()
-        db.close()
-
+    long_url = redirect_to_long_url(short_url)
+    if long_url:
+        app.logger.info(f"{user_agent}->{short_url}")
         return redirect(long_url, code=302)
     else:
         # 如果没有找到对应的长网址，则返回错误页面或其他处理逻辑

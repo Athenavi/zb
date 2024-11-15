@@ -4,7 +4,6 @@ import random
 import re
 import shutil
 import string
-import urllib
 import zipfile
 from configparser import ConfigParser
 from datetime import datetime, timedelta
@@ -172,17 +171,6 @@ def get_client_ip(request, session):
     return public_ip
 
 
-# 登录页面
-
-def read_file(file_path, num_chars):
-    decoded_path = urllib.parse.unquote(file_path)  # 对文件路径进行解码处理
-    encoding = 'utf-8'
-    with open(decoded_path, 'r', encoding=encoding) as file:
-        content = file.read(num_chars)
-    return content
-
-
-# 获取系统默认编码
 def zy_noti_conf():
     noti_config = ConfigParser()
     try:
@@ -295,3 +283,10 @@ def get_all_video(username, page=1, per_page=10):
 def get_all_xmind(username, page=1, per_page=10):
     videos, has_next_page, has_previous_page = get_media_list(username, category='xmind')
     return videos, has_next_page, has_previous_page
+
+
+def generate_random_text():
+    # 生成随机的验证码文本
+    characters = list('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789')
+    captcha_text = ''.join(random.choices(characters, k=4))
+    return captcha_text

@@ -1,9 +1,7 @@
 import datetime
 import os
-import random
 import re
 import urllib
-from urllib.parse import quote_plus
 
 import markdown
 
@@ -149,13 +147,6 @@ def clear_html_format(text):
     return clean_text
 
 
-def generate_random_text():
-    # 生成随机的验证码文本
-    characters = list('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789')
-    captcha_text = ''.join(random.choices(characters, k=4))
-    return captcha_text
-
-
 def get_blog_author(title):
     db = get_database_connection()
 
@@ -181,26 +172,6 @@ def get_blog_author(title):
         except NameError:
             pass
         db.close()
-
-
-def get_file_date(file_path):
-    try:
-        decoded_name = urllib.parse.unquote(file_path)  # 对文件名进行解码处理
-        file_path = os.path.join('articles', decoded_name + '.md')
-        # 获取文件的创建时间
-        # create_time = os.path.getctime(file_path)
-        # 获取文件的修改时间
-        modify_time = os.path.getmtime(file_path)
-        # 获取文件的访问时间
-        # access_time = os.path.getatime(file_path)
-
-        formatted_modify_time = datetime.datetime.fromtimestamp(modify_time).strftime("%Y-%m-%d %H:%M")
-
-        return formatted_modify_time
-
-    except FileNotFoundError:
-        # 处理文件不存在的情况
-        return None
 
 
 def auth_articles(title, username):
@@ -463,3 +434,22 @@ def set_article_visibility(article, hide=True):
         except NameError:
             pass
         db.close()
+
+def get_file_date(file_path):
+    try:
+        decoded_name = urllib.parse.unquote(file_path)  # 对文件名进行解码处理
+        file_path = os.path.join('articles', decoded_name + '.md')
+        # 获取文件的创建时间
+        # create_time = os.path.getctime(file_path)
+        # 获取文件的修改时间
+        modify_time = os.path.getmtime(file_path)
+        # 获取文件的访问时间
+        # access_time = os.path.getatime(file_path)
+
+        formatted_modify_time = datetime.datetime.fromtimestamp(modify_time).strftime("%Y-%m-%d %H:%M")
+
+        return formatted_modify_time
+
+    except FileNotFoundError:
+        # 处理文件不存在的情况
+        return None

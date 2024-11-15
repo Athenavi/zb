@@ -93,28 +93,6 @@ def zy_register(ip):
     return render_template('LoginRegister.html', title="注册", type="register")
 
 
-def get_email(username):
-    email = 'guest@7trees.cn'
-    if username is not None and isinstance(username, str):
-        username = bleach.clean(username)
-    db = get_database_connection()
-    cursor = db.cursor()
-
-    try:
-        query = "SELECT email FROM users WHERE username = %s"
-        cursor.execute(query, (username,))
-        result = cursor.fetchone()  # 获取查询结果
-
-        if result:
-            email = result[0]  # 从结果中提取email值
-
-    finally:
-        cursor.close()
-        db.close()
-
-    return email
-
-
 def zy_mail_login(user_email, ip):
     username = 'qks' + format(random.randint(1000, 9999))
     password = '123456'

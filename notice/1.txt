@@ -1,4 +1,0 @@
-<a target="_blank" rel="noreferrer noopener" href="https://nextcloud.com/sharing#7trees@pan.7trees.cn" style="padding:10px;background-color:#00679e;color:#ffffff;border-radius:3px;padding-left:4px;">
-	<span style="background-image:url(https://pan.7trees.cn/core/img/logo/logo.svg?v=0);width:50px;height:30px;position:relative;top:8px;background-size:contain;display:inline-block;background-repeat:no-repeat; background-position: center center;"></span>
-	通过联合云与我共享
-</a>
