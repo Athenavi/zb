@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}-账户</title>
+    <link rel="stylesheet" href="/static/css/LR.css">
+    <style>
+        .alert-danger {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        .checkbox-container input {
+            margin-right: 10px;
+        }
+
+        .error-message {
+            background: #ffdddd;
+            color: #d8000c;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            border: 1px solid #d8000c;
+        }
+
+        .small-window-button {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .small-window-button img {
+            height: 28px;
+        }
+
+        .small-window-button span {
+            color: #0073aa;
+        }
+    </style>
+    <script>
+        function openSmallWindow(provider) {
+            const checkbox = document.querySelector('input[type="checkbox"]');
+            if (!checkbox.checked) {
+                return alert('您还未同意本站的法律声明以及隐私协议');
+            }
+
+            const smallWindow = window.open(`/login/${provider}`, 'newWindow', `width=${window.innerWidth / 2},height=${window.innerHeight / 2}`);
+
+            const checkWindowClosed = setInterval(() => {
+                if (smallWindow.closed) {
+                    clearInterval(checkWindowClosed);
+                    location.reload();
+                }
+            }, 1000);
+        }
+    </script>
+</head>
+
+<body>
+<div class="container">
+    <div class="form-box login">
+        <form id="login-form" method="post"
+              action="/login?callback={{ request.args.get('callback', 'home') }}"
+              onsubmit="return validateForm()">
+            {% if error %}
+                <div class="alert-danger" role="alert">
+                    {{ error }}
+                </div>
+            {% endif %}
+            <h1>登录</h1>
+            <div class="input-box">
+                <input type="text" id="username" name="username" placeholder="用户名 或 邮箱" required>
+                <i class="bx bxs-user"></i>
+            </div>
+            <div class="input-box">
+                <input type="password" id="password" name="password" placeholder="密码" required>
+                <i class="bx bxs-lock-alt"></i>
+            </div>
+            <button type="submit" class="btn">安全登录</button>
+            <div class="forgot-link">
+                <div class="checkbox-container">
+                    <input type="checkbox" required>
+                    <label for="">阅读并接受</label>
+                    <a href="/blog/legal-agreement">法律声明</a>和
+                    <a href="/blog/privacy">隐私协议</a>
+                </div>
+                <a href="#">忘记密码?</a>
+            </div>
+            <div class="social-icons">
+                <div class="small-window-button">
+                    <a href="#">
+                        <div onclick="openSmallWindow('qq')"><img src="/static/image/qq.png" alt="QQ"></div>
+                    </a>
+                    <a href="#">
+                        <div onclick="openSmallWindow('wx')"><img src="/static/image/wx.png" alt="WeChat"></div>
+                    </a>
+                    <a href="#">
+                        <div onclick="openSmallWindow('alipay')"><img src="/static/image/zfb.png" alt="Alipay"></div>
+                    </a>
+                    <a href="#">
+                        <div onclick="openSmallWindow('dingtalk')"><img src="/static/image/dingtalk.png" alt="Dingtalk">
+                        </div>
+                    </a>
+                    <a href="#">
+                        <div onclick="openSmallWindow('douyin')"><img src="/static/image/douyin.png" alt="Douyin"></div>
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div class="form-box register">
+        <form method="post" action="/register" onsubmit="return R_validateForm()">
+            <h1>注册账户</h1>
+            {% if msg %}
+                <div class="error-message">{{ msg }}</div>
+            {% endif %}
+            <div class="input-box">
+                <input type="text" id="username" name="username" placeholder="用户名" required>
+                <i class="bx bxs-user"></i>
+            </div>
+            <div class="input-box">
+                <input type="password" id="password" name="password" placeholder="密码" required>
+                <i class="bx bxs-envelope"></i>
+            </div>
+            <div class="input-box">
+                <input type="password" id="confirm_password" name="confirm_password" placeholder="确认密码" required>
+                <i class="bx bxs-lock-alt"></i>
+            </div>
+            <div class="input-box">
+                <input type="text" id="invite_code" name="invite_code" placeholder="邀请码" required>
+                <i class="bx bxs-lock-alt"></i>
+            </div>
+            <button type="submit" class="btn">提交注册</button>
+        </form>
+    </div>
+
+    <div class="toggle-box">
+        <div class="toggle-panel toggle-left">
+            <h1>Hello, Welcome!</h1>
+            <p>还没有账号?</p>
+            <button class="btn register-btn">Register</button>
+        </div>
+
+        <div class="toggle-panel toggle-right">
+            <h1>Welcome Back!</h1>
+            <p>已有账号?</p>
+            <button class="btn login-btn">Login</button>
+        </div>
+    </div>
+</div>
+<script>
+    const container = document.querySelector('.container')
+    const registerBtn = document.querySelector('.register-btn')
+    const loginBtn = document.querySelector('.login-btn')
+
+    registerBtn.addEventListener('click', () => {
+        container.classList.add('active')
+    })
+
+    loginBtn.addEventListener('click', () => {
+        container.classList.remove('active')
+    })
+</script>
+<script>
+    window.onload = function () {
+        {% if type %}
+            const container = document.querySelector('.container')
+            const registerBtn = document.querySelector('.register-btn')
+            container.classList.add('active')
+        {% endif %}
+        document.getElementById("username").focus();
+    };
+
+    function validateForm() {
+        var username = document.getElementById("username").value;
+        var password = document.getElementById("password").value;
+
+        if (username === "") {
+            alert("请输入账号！");
+            return false;
+        }
+
+        if (password === "") {
+            alert("请输入密码！");
+            return false;
+        }
+
+        return true;
+    }
+
+    function R_validateForm() {
+        var password = document.getElementById("password").value;
+        var confirm_password = document.getElementById("confirm_password").value;
+
+        if (password !== confirm_password) {
+            alert("密码和确认密码不一致");
+            return false;
+        }
+    }
+</script>
+</body>
+
+</html>

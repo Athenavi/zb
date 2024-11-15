@@ -131,3 +131,38 @@ def get_owner_articles(owner_id=None, user_name=None):
         db.close()
 
     return articles
+
+
+def get_userInfo(user_id=None, user_name=None):
+    db = get_database_connection()
+    info_list = []
+
+    try:
+        with db.cursor() as cursor:
+            # 确定需要查询的条件
+            if user_name:
+                query = "SELECT * FROM users WHERE `username` = %s;"
+                params = (user_name,)
+            elif user_id:
+                query = "SELECT * FROM users WHERE `id` = %s;"
+                params = (user_id,)
+            else:
+                return info_list  # 没有提供有效的查询条件
+
+            cursor.execute(query, params)
+            info = cursor.fetchone()
+
+            if info:
+                print(info)
+                info_list = list(info)  # 转换为列表
+
+                # 移除第三个元素（如果存在）
+                if len(info_list) > 2:
+                    del info_list[2]
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        db.close()
+
+    return info_list

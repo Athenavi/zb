@@ -15,7 +15,7 @@ def zy_login(callback_route):
     password = bleach.clean(request.form['password'])
 
     if input_value == 'guest@7trees.cn':
-        return render_template('Login.html', error="宾客账户仅能使用用户名登录")
+        return render_template('LoginRegister.html', error="宾客账户仅能使用用户名登录")
 
     db = get_database_connection()
     cursor = db.cursor()
@@ -42,7 +42,7 @@ def zy_login(callback_route):
 
             return response
         else:
-            return render_template('Login.html', error="Invalid username or password")
+            return render_template('LoginRegister.html', error="Invalid username or password")
 
     except Exception as e:
         logging.error(f"Error logging in: {e}")
@@ -70,8 +70,8 @@ def zy_register(ip):
             existing_user = cursor.fetchone()
 
             if existing_user:
-                return render_template('Register.html', title="注册新用户",
-                                       msg='该用户名已被注册，请选择其他用户名!')
+                return render_template('LoginRegister.html', title="注册",
+                                       msg='该用户名已被注册，请选择其他用户名!', type="register")
 
             # 执行用户注册的逻辑
             hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
@@ -84,13 +84,13 @@ def zy_register(ip):
 
         except Exception as e:
             logging.error(f"Error registering user: {e}")
-            return render_template('Register.html', title="注册新用户", msg='注册失败!')
+            return render_template('LoginRegister.html', title="注册", msg='注册失败!', type="register")
 
         finally:
             cursor.close()
             db.close()
 
-    return render_template('Register.html', title="注册新用户")
+    return render_template('LoginRegister.html', title="注册", type="register")
 
 
 def get_email(username):

@@ -31,7 +31,7 @@ from src.BlogDeal import get_article_names, get_article_content, clear_html_form
     get_tags_by_article, set_article_info, write_tags_to_database, set_article_visibility
 from src.database import get_database_connection
 from src.links import create_special_url
-from src.user import zyadmin, zy_delete_article, error, get_owner_articles, zy_general_conf
+from src.user import zyadmin, zy_delete_article, error, get_owner_articles, zy_general_conf, get_userInfo
 from src.utils import zy_upload_file, get_client_ip, read_file, \
     zy_noti_conf, generate_jwt, secret_key, authenticate_jwt, \
     authenticate_refresh_token, handle_file_upload, is_allowed_file, is_valid_domain_with_slash, \
@@ -99,7 +99,7 @@ def login():
     if request.method == 'POST':
         return zy_login(callback_route)
 
-    return render_template('Login.html', title="登录")
+    return render_template('LoginRegister.html', title="登录")
 
 
 @app.route('/logout')
@@ -112,6 +112,11 @@ def logout():
 
 @app.route('/register', methods=['POST', 'GET'])
 def register():
+    callback_route = request.args.get('callback', 'home')
+    if request.cookies.get('jwt'):
+        user_id = authenticate_jwt(request.cookies.get('jwt'))
+        if user_id:
+            return redirect(url_for(callback_route))
     ip = get_client_ip(request, session)
     return zy_register(ip)
 
@@ -1145,7 +1150,7 @@ def callback(provider):
         user_email = social_uid + f"@{provider}.com"
         return zy_mail_login(user_email, ip)
 
-    return render_template('Login.html', error=msg)
+    return render_template('LoginRegister.html', error=msg)
 
 
 @cache.cached(timeout=300, key_prefix='display_detail')
