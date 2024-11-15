@@ -1,3 +1,4 @@
+import base64
 import configparser
 import datetime
 import hashlib
@@ -14,6 +15,7 @@ from functools import wraps
 from pathlib import Path
 
 import jwt
+import qrcode
 import requests
 from flask import Flask, render_template, redirect, session, request, url_for, Response, jsonify, send_file, \
     make_response, send_from_directory
@@ -55,6 +57,8 @@ app.config['ALLOWED_EXTENSIONS'] = {'.jpg', '.png', '.webp', '.jfif', '.pjpeg', 
 app.config['UPLOAD_LIMIT'] = 60 * 1024 * 1024
 # 定义文件最大可编辑的行数
 app.config['MAX_LINE_LIMIT'] = 360
+# 定义rss和站点地图的缓存时间（单位:s）
+app.config['MAX_CACHE_TIMESTAMP'] = 7200
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)  # 添加 ProxyFix 中间件
 
 # 移除默认的日志处理程序
@@ -518,7 +522,7 @@ def generate_sitemap():
 
     if os.path.exists(cache_file):
         cache_timestamp = os.path.getmtime(cache_file)
-        if datetime.now().timestamp() - cache_timestamp <= 3600:
+        if datetime.now().timestamp() - cache_timestamp <= app.config['MAX_CACHE_TIMESTAMP']:
             with open(cache_file, 'r') as f:
                 cached_xml_data = f.read()
             response = Response(cached_xml_data, mimetype='text/xml')
@@ -564,7 +568,7 @@ def generate_rss():
 
     if os.path.exists(cache_file):
         cache_timestamp = os.path.getmtime(cache_file)
-        if datetime.now().timestamp() - cache_timestamp <= 3600:
+        if datetime.now().timestamp() - cache_timestamp <= app.config['MAX_CACHE_TIMESTAMP']:
             with open(cache_file, 'r', encoding=global_encoding, errors='ignore') as f:
                 cached_xml_data = f.read()
             response = Response(cached_xml_data, mimetype='application/rss+xml')
@@ -578,7 +582,7 @@ def generate_rss():
     xml_data += '<channel>\n'
     xml_data += '<title>' + title + 'RSS Feed </title>\n'
     xml_data += '<link>' + domain + '</link>\n'
-    xml_data += '<description>Your RSS Feed Description</description>\n'
+    xml_data += '<description>' + title + 'RSS Feed</description>\n'
     xml_data += '<language>en-us</language>\n'
     xml_data += '<lastBuildDate>' + datetime.now().strftime("%a, %d %b %Y %H:%M:%S %z") + '</lastBuildDate>\n'
     xml_data += '<atom:link href="' + domain + 'rss" rel="self" type="application/rss+xml" />\n'
@@ -1346,11 +1350,11 @@ def donate():
 @app.route('/links')
 def friendslink():
     friends_links = {
-        '七棵树': domain,
-        'github': "https://github.com/Athenavi",
+        '本站地址': domain,
+        'GitHub': "https://github.com/Athenavi",
         '博客园': "https://cnblogs.com/Athenavi/",
     }
-    return friends_links
+    return render_template("friend.html", friends_links=friends_links)
 
 
 @app.route('/api/ip')
@@ -1556,6 +1560,98 @@ def get_current_theme():
     if current_theme is None:
         current_theme = 'default'
     return current_theme
+
+
+def sanitize_user_agent(user_agent):
+    if user_agent is None:
+        return None
+    sanitized_agent = re.sub(r'[.;,()/\s]', '', user_agent)  # 移除分号、逗号和空格等
+    return sanitized_agent
+
+
+def gen_qr_token(input_string, current_time):
+    ct = current_time
+    rd_num = random.randint(617, 1013)
+    input_string = sys_version + ct + input_string + str(rd_num)
+    print(input_string)
+    sha256_hash = hashlib.sha256()
+    sha256_hash.update(input_string.encode('utf-8'))
+    return sha256_hash.hexdigest()
+
+
+@app.route("/qrlogin")
+def qrlogin():
+    ct = str(int(time.time()))
+    user_agent = sanitize_user_agent(request.headers.get('User-Agent'))
+    token = gen_qr_token(user_agent, ct)  # 生成唯一标识
+    token_expire = str(int(time.time() + 180))
+    qr_data = f"{domain}api/phone/scan?login_token={token}"
+
+    # 生成二维码
+    qr_img = qrcode.make(qr_data)
+    buffered = io.BytesIO()
+    qr_img.save(buffered, format="PNG")
+    qr_code_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+
+    # 存储二维码状态（可以根据需要扩展）
+    token_json = {'status': 'pending', 'created_at': ct, 'expire_at': token_expire}
+    cache.set(f"QR-token_{token}", token_json, timeout=200)
+
+    return jsonify({
+        'qr_code': f"data:image/png;base64,{qr_code_base64}",
+        'token': token,
+        'expire': token_expire
+    })
+
+
+@app.route("/checkQRLogin")
+def check_qr_login():
+    token = request.args.get('token')
+    cache_QR_token = cache.get(f"QR-token_{token}")
+    if cache_QR_token:
+        expire_at = cache_QR_token['expire_at']
+        if int(expire_at) > int(time.time()):
+            return success_scan(token)
+        else:
+            return jsonify({'status': 'pending'})
+    else:
+        return jsonify({'status': 'invalid_token'})
+
+
+def success_scan(token):
+    # 扫码成功调用此接口
+    token = request.args.get('token')
+    cache_QR_allowed = cache.get(f"QR-allow_{token}")
+    if token and cache_QR_allowed:
+        token_expire = cache_QR_allowed['expire_at']
+        if int(token_expire) > int(time.time()):
+            return jsonify(cache_QR_allowed)
+    else:
+        token_json = {'status': 'failed'}
+        return jsonify(token_json)
+
+
+@app.route("/api/phone/scan")
+@jwt_required
+def phone_scan(token):
+    # 用户扫码调用此接口
+    token = request.args.get('login_token')
+    phone_token = request.cookies.get('jwt')
+    refresh_token = request.cookies.get('refresh_token')
+    if token:
+        cache_QR_token = cache.get(f"QR-token_{token}")
+        if cache_QR_token:
+            ct = str(int(time.time()))
+            token_expire = str(int(time.time() + 30))
+            page_json = {'status': 'success', 'created_at': ct, 'expire_at': token_expire}
+            cache.set(f"QR-token_{token}", page_json, timeout=60)
+            allow_json = {'status': 'success', 'created_at': ct, 'expire_at': token_expire, 'token': phone_token,
+                          'refresh_token': refresh_token}
+            cache.set(f"QR-allow_{token}", allow_json, timeout=60)
+            return jsonify(page_json)
+    else:
+        token_json = {'status': 'failed'}
+        return jsonify(token_json)
 
 
 @app.errorhandler(404)
