@@ -17,7 +17,7 @@ from src.user import error
 
 secret_key = 'your_secret_key'
 
-JWT_EXPIRATION_DELTA = 10800  # JWT过期时间设置为3小时
+JWT_EXPIRATION_DELTA = 21600  # JWT过期时间设置为6小时
 REFRESH_TOKEN_EXPIRATION_DELTA = 604800  # 刷新令牌过期时间设置为7天
 
 

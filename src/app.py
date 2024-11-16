@@ -141,14 +141,34 @@ def jwt_required(f):
     return decorated_function
 
 
+def finger_required(f):
+    @wraps(f)
+    def fingerAuth_func(*args, **kwargs):
+        token = request.cookies.get('jwt')
+        user_id = authenticate_jwt(token)
+        if user_id is None:
+            callback_route = request.endpoint  # 获取请求的端点名称
+            return redirect(url_for('login', callback=callback_route))
+        cachedFinger = cache.get(f'fingerprint_{user_id}') or []
+        chrome_fingerprint = request.cookies.get('finger')
+        if not chrome_fingerprint:
+            return render_template('Authentication.html', form='finger')
+        if chrome_fingerprint not in cachedFinger:
+            cachedFinger.append(chrome_fingerprint)
+            cache.set(f'fingerprint_{user_id}', cachedFinger)
+        return f(user_id, *args, **kwargs)
+
+    return fingerAuth_func
+
+
 @app.before_request
 def check_jwt_expiration():
     # 检查 JWT 是否即将过期
     token = request.cookies.get('jwt')
     if token:
         payload = jwt.decode(token, app.secret_key, algorithms=['HS256'], options={"verify_exp": False})
-        if 'exp' in payload and datetime.utcfromtimestamp(payload['exp']) < datetime.utcnow() + timedelta(minutes=5):
-            # 如果 JWT 将在 5 分钟内过期，允许校验刷新令牌
+        if 'exp' in payload and datetime.utcfromtimestamp(payload['exp']) < datetime.utcnow() + timedelta(minutes=60):
+            # 如果 JWT 将在 60 分钟内过期，允许校验刷新令牌
             refresh_token = request.cookies.get('refresh_token')
             user_id = authenticate_refresh_token(refresh_token)
             if user_id:
@@ -298,7 +318,7 @@ def profile(user_id):
 
 
 @app.route('/setting/profiles', methods=['GET', 'POST'])
-@jwt_required
+@finger_required
 def setting_profiles(user_id):
     UserInfo = cache.get(f"{user_id}_userInfo") or get_userInfo(user_id=user_id, user_name=None)
     cache.set(f'{user_id}_userInfo', UserInfo)
@@ -1652,6 +1672,33 @@ def phone_scan(token):
     else:
         token_json = {'status': 'failed'}
         return jsonify(token_json)
+
+
+# 获取在线设备
+@app.route('/api/devices', methods=['GET'])
+@finger_required
+def get_devices(user_id):
+    cachedFinger = cache.get(f'fingerprint_{user_id}') or []
+    return jsonify(cachedFinger), 200
+
+
+@app.route('/finger', methods=['GET', 'POST'])
+@jwt_required
+def finger(user_id):
+    if request.method == 'POST':
+        data = request.json
+        chrome_fingerprint = data.get('fingerprint')
+        if user_id and chrome_fingerprint:
+            cachedFinger = cache.get(f'fingerprint_{user_id}') or []
+            if chrome_fingerprint not in cachedFinger:
+                cachedFinger.append(chrome_fingerprint)
+                cache.set(f'fingerprint_{user_id}', cachedFinger)
+                print(cachedFinger)
+                return jsonify({"msg": "Fingerprint saved successfully"}), 200
+            return jsonify({"msg": "Fingerprint Auth"}), 200
+        return jsonify({"msg": "Failed to save fingerprint"}), 400
+    if request.method == 'GET':
+        return render_template("Authentication.html", form='finger')
 
 
 @app.errorhandler(404)

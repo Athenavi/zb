@@ -28,7 +28,7 @@ def zy_change_password(user_id, ip):
                 db.commit()
 
                 notice_query = "INSERT INTO `notifications` (`id`, `user_id`, `type`, `message`, `is_read`, `created_at`, `updated_at`) VALUES (NULL, %s, 'safe', %s, '0', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);"
-                cursor.execute(notice_query, (user_id,f"{ip} changed password"))
+                cursor.execute(notice_query, (user_id, f"{ip} changed password"))
                 db.commit()
 
                 cursor.close()
@@ -37,7 +37,7 @@ def zy_change_password(user_id, ip):
                 flash('密码修改成功！')
                 session.clear()
                 return render_template('inform.html', status_code='200', message='密码修改成功！')
-    return render_template('zyPW.html', form='change')
+    return render_template('Authentication.html', form='change')
 
 
 def zy_confirm_password(user_id):
@@ -63,6 +63,6 @@ def zy_confirm_password(user_id):
         else:
             cursor.close()
             db.close()
-            return render_template('zyPW.html', error="密码错误", form='confirm')
+            return render_template('Authentication.html', error="密码错误", form='confirm')
 
-    return render_template('zyPW.html', form='confirm')
+    return render_template('Authentication.html', form='confirm')

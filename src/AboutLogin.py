@@ -35,10 +35,11 @@ def zy_login(callback_route):
             response = make_response(redirect(url_for(callback_route)))
 
             # 设置 Cookie 的过期时间为 7 天
-            expires = datetime.now() + timedelta(days=7)
+            expires = datetime.now() + timedelta(seconds=21600)
+            refresh_expires = datetime.now() + timedelta(days=7)
 
             response.set_cookie('jwt', token, httponly=True, expires=expires)
-            response.set_cookie('refresh_token', refresh_token, httponly=True, expires=expires)
+            response.set_cookie('refresh_token', refresh_token, httponly=True, expires=refresh_expires)
 
             return response
         else:
