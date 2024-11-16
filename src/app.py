@@ -141,14 +141,34 @@ def jwt_required(f):
     return decorated_function
 
 
+def finger_required(f):
+    @wraps(f)
+    def fingerAuth_func(*args, **kwargs):
+        token = request.cookies.get('jwt')
+        user_id = authenticate_jwt(token)
+        if user_id is None:
+            callback_route = request.endpoint  # 获取请求的端点名称
+            return redirect(url_for('login', callback=callback_route))
+        cachedFinger = cache.get(f'fingerprint_{user_id}') or []
+        chrome_fingerprint = request.cookies.get('finger')
+        if not chrome_fingerprint:
+            return render_template('Authentication.html', form='finger')
+        if chrome_fingerprint not in cachedFinger:
+            cachedFinger.append(chrome_fingerprint)
+            cache.set(f'fingerprint_{user_id}', cachedFinger)
+        return f(user_id, *args, **kwargs)
+
+    return fingerAuth_func
+
+
 @app.before_request
 def check_jwt_expiration():
     # 检查 JWT 是否即将过期
     token = request.cookies.get('jwt')
     if token:
         payload = jwt.decode(token, app.secret_key, algorithms=['HS256'], options={"verify_exp": False})
-        if 'exp' in payload and datetime.utcfromtimestamp(payload['exp']) < datetime.utcnow() + timedelta(minutes=5):
-            # 如果 JWT 将在 5 分钟内过期，允许校验刷新令牌
+        if 'exp' in payload and datetime.utcfromtimestamp(payload['exp']) < datetime.utcnow() + timedelta(minutes=60):
+            # 如果 JWT 将在 60 分钟内过期，允许校验刷新令牌
             refresh_token = request.cookies.get('refresh_token')
             user_id = authenticate_refresh_token(refresh_token)
             if user_id:
@@ -298,7 +318,7 @@ def profile(user_id):
 
 
 @app.route('/setting/profiles', methods=['GET', 'POST'])
-@jwt_required
+@finger_required
 def setting_profiles(user_id):
     UserInfo = cache.get(f"{user_id}_userInfo") or get_userInfo(user_id=user_id, user_name=None)
     cache.set(f'{user_id}_userInfo', UserInfo)
@@ -384,6 +404,8 @@ def home():
             app.logger.warning('获取文章信息失败，返回错误提示')
             return error(message="没有找到任何文章", status_code=404)
 
+        friends_links = get_friends_link()
+
         # 渲染模板并存储渲染后的页面内容到缓存中
         rendered_content = template.render(
             articles_time_list=articles_time_list,
@@ -393,7 +415,8 @@ def home():
             has_previous_page=has_previous_page,
             current_page=page,
             tags=tags,
-            tag=tag
+            tag=tag,
+            friends_links=friends_links
         )
 
         # 确保渲染的内容是字符串
@@ -1348,13 +1371,13 @@ def donate():
 
 
 @app.route('/links')
-def friendslink():
+def get_friends_link():
     friends_links = {
         '本站地址': domain,
         'GitHub': "https://github.com/Athenavi",
         '博客园': "https://cnblogs.com/Athenavi/",
     }
-    return render_template("friend.html", friends_links=friends_links)
+    return friends_links
 
 
 @app.route('/api/ip')
@@ -1380,10 +1403,10 @@ def following(user_id):
 
     if request.method == 'GET':
 
-        cache_key = f'subscriber_ids_uid:{user_id}'
+        userFllowed_key = f'subscriber_ids_uid:{user_id}'
 
         # 尝试从缓存中获取页面内容
-        content = cache.get(cache_key)
+        content = cache.get(userFllowed_key)
         if content:
             # 设置浏览器缓存
             resp = make_response(content)
@@ -1413,7 +1436,7 @@ def following(user_id):
         )
 
         # 缓存渲染后的页面内容，并设置服务端缓存过期时间
-        cache.set(cache_key, rendered_content, timeout=600)  # 服务端缓存10分钟
+        cache.set(userFllowed_key, rendered_content, timeout=600)  # 服务端缓存10分钟
         resp = make_response(rendered_content)
         return resp
 
@@ -1652,6 +1675,53 @@ def phone_scan(token):
     else:
         token_json = {'status': 'failed'}
         return jsonify(token_json)
+
+
+# 获取在线设备
+@app.route('/api/devices', methods=['GET'])
+@finger_required
+def get_devices(user_id):
+    cachedFinger = cache.get(f'fingerprint_{user_id}') or []
+    return jsonify(cachedFinger), 200
+
+
+@app.route('/finger', methods=['GET', 'POST'])
+@jwt_required
+def finger(user_id):
+    if request.method == 'POST':
+        data = request.json
+        chrome_fingerprint = data.get('fingerprint')
+        if user_id and chrome_fingerprint:
+            cachedFinger = cache.get(f'fingerprint_{user_id}') or []
+            if chrome_fingerprint not in cachedFinger:
+                cachedFinger.append(chrome_fingerprint)
+                cache.set(f'fingerprint_{user_id}', cachedFinger)
+                print(cachedFinger)
+                return jsonify({"msg": "Fingerprint saved successfully"}), 200
+            return jsonify({"msg": "Fingerprint Auth"}), 200
+        return jsonify({"msg": "Failed to save fingerprint"}), 400
+    if request.method == 'GET':
+        return render_template("Authentication.html", form='finger')
+
+
+@app.route('/api/user/export', methods=['GET', 'POST'])
+@jwt_required
+def export(user_id):
+    key = request.cookies.get('key')
+    cached_ip = cache.get(key)
+    cachedFinger = cache.get(f'fingerprint_{user_id}')
+    UserInfo = cache.get(f'{user_id}_userInfo')
+    user_followed = cache.get(f'{user_id}_followed')
+    user_liked = cache.get(f'{user_id}_liked')
+    result = {
+        'key': key,
+        'ip': cached_ip,
+        'cachedFinger': cachedFinger,
+        'UserInfo': UserInfo,
+        'user_followed': user_followed,
+        'user_liked': user_liked,
+    }
+    return jsonify(result)
 
 
 @app.errorhandler(404)

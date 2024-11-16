@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<!-- 网站主语言 -->
+<html lang="zh-cn">
+
+<head>
+    <!-- 网站采用的字符编码 -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <!-- 预留网站标题的位置 -->
+    <title>{% block title %}{% endblock %}</title>
+    <!-- 引入Tailwind CSS的样式文件 -->
+    <link href="/static/css/tailwind.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-image: url("/static/image/day.jpg");
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            color: #2c3e50;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: -1;
+        }
+
+        #myFooter {
+            background: transparent;
+        }
+    </style>
+
+</head>
+<!-- 导航栏 -->
+<body class="bg-gray-100 text-gray-900" data-theme="light">
+<!-- Navigation -->
+<!-- 页面内容 -->
+<div class="container mx-auto">
+    <div class="flex justify-center">
+        <div class="w-1/2">
+            <br>
+            {% if form =='confirm' %}
+                <form method="post" action="/confirm-password">
+                    <div class="mb-4">
+                        <label for="password"
+                               class="block text-gray-700 text-sm font-bold mb-2">你需要输入当前密码来确认身份</label>
+                        <input type="password"
+                               class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                               id="password" name="password" required>
+                    </div>
+                    <button type="submit"
+                            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                    >
+                        我已确认
+                    </button>
+                </form>
+            {% endif %}
+
+            {% if form =='change' %}
+                <form id="changePasswordForm" action="/change-password" method="POST">
+                    <h1>修改密码</h1>
+                    <div class="mb-4">
+                        <label for="new_password" class="block text-gray-700 text-sm font-bold mb-2">新密码</label>
+                        <input type="password"
+                               class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                               id="new_password" name="new_password" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="confirm_password"
+                               class="block text-gray-700 text-sm font-bold mb-2">再次确认新密码</label>
+                        <input type="password"
+                               class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                               id="confirm_password" name="confirm_password" required>
+                    </div>
+                    <button type="submit"
+                            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                    >
+                        提交修改
+                    </button>
+                </form>
+            {% endif %}
+
+            {% if form == 'finger' %}
+                <script>
+                    // 使用 FingerprintJS 的最新 CDN 进行加载
+                    const fpPromise = import('https://openfpcdn.io/fingerprintjs/v4')
+                        .then(FingerprintJS => FingerprintJS.load());
+
+                    fpPromise.then(fp => {
+                        const button = document.getElementById('get-fingerprint');
+                        const resultDiv = document.getElementById('fingerprint-result');
+
+                        button.addEventListener('click', async () => {
+                            // 获取设备指纹
+                            const result = await fp.get();
+                            const fingerprint = result.visitorId;
+                            refresh_btn = '<button class="bg-blue-500 hover:bg-blue-700" onclick="location.reload();">点击刷新</button>';
+                            resultDiv.innerHTML = "ok！现在请你刷新页面 " + refresh_btn;
+                            // 将指纹发送到后端
+                            fetch('/finger', {
+                                method: 'POST',
+                                credentials: 'include',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({fingerprint: fingerprint}), // 发送指纹
+                            })
+                                .then(response => response.json())
+                                .then(data => {
+                                    console.log('成功:', data);
+                                    alert(data.msg); // 显示后端响应消息
+                                    document.cookie = `finger=${fingerprint}; path=/; max-age=31536000`;
+                                    document.getElementById('auth_div').style.display = 'none';
+                                })
+                                .catch((error) => {
+                                    console.error('错误:', error);
+                                    alert('发生错误: ' + error);
+                                });
+                        });
+                    }).catch(err => {
+                        console.error('加载 FingerprintJS 失败:', err);
+                    });
+                </script>
+                <h1>初次进入需要获取您的许可</h1>
+                <div id="auth_div">
+                    <span>否则将退出</span>
+                    <button id="get-fingerprint"
+                            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                        我授权在本设备进行操作
+                    </button>
+                    <button onclick="goBack()"
+                            class="bg-red-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                        取消并返回
+                    </button>
+                    <script>
+                        function goBack() {
+                            window.history.back();
+                            // 或者
+                            // window.history.go(-1);
+                        }
+                    </script>
+                </div>
+                <div id="fingerprint-result" class="mb-4"></div>
+            {% endif %}
+
+
+        </div>
+    </div>
+</div>
+
+<!-- 页面底部 -->
+{% from 'footer.html' import zyfooter %}
+{{ zyfooter(notice) }}
+</body>
+
+</html>
