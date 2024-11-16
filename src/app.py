@@ -1704,6 +1704,26 @@ def finger(user_id):
         return render_template("Authentication.html", form='finger')
 
 
+@app.route('/api/user/export', methods=['GET', 'POST'])
+@jwt_required
+def export(user_id):
+    key = request.cookies.get('key')
+    cached_ip = cache.get(key)
+    cachedFinger = cache.get(f'fingerprint_{user_id}')
+    UserInfo = cache.get(f'{user_id}_userInfo')
+    user_followed = cache.get(f'{user_id}_followed')
+    user_liked = cache.get(f'{user_id}_liked')
+    result = {
+        'key': key,
+        'ip': cached_ip,
+        'cachedFinger': cachedFinger,
+        'UserInfo': UserInfo,
+        'user_followed': user_followed,
+        'user_liked': user_liked,
+    }
+    return jsonify(result)
+
+
 @app.errorhandler(404)
 def page_not_found(error_message):
     app.logger.error(error_message)
