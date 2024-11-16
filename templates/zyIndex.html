@@ -105,14 +105,12 @@
                         .catch(error => console.log(error));
                 })();</script>
             </div>
-            <p class="text-gray-600 mb-4">Ctrl + F 搜索内容</p>
             <div class="announcement_content">
                 <div class="loading-spinner"></div>
                 <div id="welcome-info" style="display: none;">
                     <script src="/static/js/side.js" defer></script>
                 </div>
             </div>
-            <img src="/static/image/gzh.png" alt="Wx——qrcode" class="w-full h-auto mb-4 rounded-lg shadow">
             <div class="textwidget custom-html-widget">
                 <div class="qqg-card-widget" id="qqg-card-wechat">
                     <div id="qqg-flip-wrapper">
@@ -122,6 +120,16 @@
                         </div>
                     </div>
                 </div>
+            </div>
+            <div class="w-full h-auto mb-4 rounded-lg shadow">
+                <h4 class="font-bold text-gray-800 mb-4">友情链接</h4>
+                <ul class="link-list">
+                    {% if friend_links %}
+                        {% for name, url in friends_links.items() %}
+                            <li><a href="{{ url }}" target="_blank">{{ name }}</a></li>
+                        {% endfor %}
+                    {% endif %}
+                </ul>
             </div>
         </aside>
     </div>

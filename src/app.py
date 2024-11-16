@@ -404,6 +404,8 @@ def home():
             app.logger.warning('获取文章信息失败，返回错误提示')
             return error(message="没有找到任何文章", status_code=404)
 
+        friends_links = get_friends_link()
+
         # 渲染模板并存储渲染后的页面内容到缓存中
         rendered_content = template.render(
             articles_time_list=articles_time_list,
@@ -413,7 +415,8 @@ def home():
             has_previous_page=has_previous_page,
             current_page=page,
             tags=tags,
-            tag=tag
+            tag=tag,
+            friends_links=friends_links
         )
 
         # 确保渲染的内容是字符串
@@ -1368,13 +1371,13 @@ def donate():
 
 
 @app.route('/links')
-def friendslink():
+def get_friends_link():
     friends_links = {
         '本站地址': domain,
         'GitHub': "https://github.com/Athenavi",
         '博客园': "https://cnblogs.com/Athenavi/",
     }
-    return render_template("friend.html", friends_links=friends_links)
+    return friends_links
 
 
 @app.route('/api/ip')
@@ -1400,10 +1403,10 @@ def following(user_id):
 
     if request.method == 'GET':
 
-        cache_key = f'subscriber_ids_uid:{user_id}'
+        userFllowed_key = f'subscriber_ids_uid:{user_id}'
 
         # 尝试从缓存中获取页面内容
-        content = cache.get(cache_key)
+        content = cache.get(userFllowed_key)
         if content:
             # 设置浏览器缓存
             resp = make_response(content)
@@ -1433,7 +1436,7 @@ def following(user_id):
         )
 
         # 缓存渲染后的页面内容，并设置服务端缓存过期时间
-        cache.set(cache_key, rendered_content, timeout=600)  # 服务端缓存10分钟
+        cache.set(userFllowed_key, rendered_content, timeout=600)  # 服务端缓存10分钟
         resp = make_response(rendered_content)
         return resp
 
