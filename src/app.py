@@ -1743,28 +1743,63 @@ def diy_space(page):
 @app.route('/guestbook', methods=['GET', 'POST'])
 def guestbook():
     avatar_url = get_avatar(1)
-    message_list = [
-        ("xiaofei","2023-10-01 10:15:30", "Welcome to the guestbook!"),
-        ("dudu","2023-10-02 12:45:50", "Had a great time visiting the site!"),
-        ("roya","2023-10-03 09:00:00", "This is an amazing platform. Keep it up!"),
-        ("princess","2023-10-04 14:30:10", "Thanks for the wonderful experience."),
-        ("hh","2023-10-05 16:55:00", "Looking forward to more updates!"),
-        ("wuli","2023-10-06 11:20:05", "I really enjoyed the community here."),
-    ]
+    message_list = get_guestbook() or []
+    print(message_list)
     if request.method == 'POST':
         data = request.get_json()  # 获取 JSON 数据
         nickname = data.get('nickname')
         message = data.get('message')
-        timestamp = data.get('time')  # 假设前端传递时间
-
-        # 将留言添加到 message_list
-        message_list.append((timestamp, message))
-
+        content = f'"{nickname}":"{message}"'
+        upload_guestbook(content)
+        cache.set(f"guestbook", None)
         # 返回一个成功消息，可以返回新的留言内容
         return jsonify({'status': 'success', 'message_list': message_list}), 201
 
     # GET 请求返回留言页面
     return render_template('guestbook.html', avatar_url=avatar_url, message_list=message_list)
+
+
+def get_guestbook():
+    cached_guestbook = cache.get(f"guestbook")
+    if cached_guestbook:
+        return cached_guestbook
+    try:
+        db = get_database_connection()
+
+        try:
+            with db.cursor() as cursor:
+                query = "SELECT * FROM `events` WHERE Title = 'guestbook'"
+                cursor.execute(query)
+                result = cursor.fetchall()
+                if result:
+                    cache.set(f"guestbook", result)
+        except Exception as e:
+            print(f"An error occurred during the database operation: {e}")
+
+        finally:
+            db.close()  # 确保数据库连接被关闭
+            return result
+
+    except Exception as e:  # 捕获所有异常，而不是仅 FileNotFoundError
+        print(f"An error occurred while getting the database connection: {e}")
+        return None
+
+
+def upload_guestbook(content):
+    try:
+        db = get_database_connection()
+        try:
+            with db.cursor() as cursor:
+                query = "INSERT INTO `events` (`title`, `description`, `event_date`,`created_at`) VALUES ('guestbook',%s,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);"
+                cursor.execute(query, (content,))
+                db.commit()
+        except Exception as e:
+            print(f"An error occurred during the database operation: {e}")
+
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"An error occurred while getting the database connection: {e}")
 
 
 @app.errorhandler(404)
