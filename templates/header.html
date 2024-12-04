@@ -1,40 +1,34 @@
 {% macro zytopbar() -%}
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
     <link href="/static/css/tailwind.min.css" rel="stylesheet">
     <link href="/static/css/side.css" rel="stylesheet">
+
     <div id="loading">Loading...</div>
     <nav class="bg-blue-500">
-        <div class="container mx-auto flex justify-between items-center">
-            <a class="text-xl text-white font-bold py-4" href="/"><img src="../static/favicon.ico"
-                                                                       style="height: 32px"/>{{ title }}</a>
-            <div class="container mx-auto flex justify-between items-center">
-                <div class="flex space-x-4">
-                    <div class="dropdown">
-                        <button class="text-white hover:bg-blue-600 px-4 py-2">🔻探索</button>
-                        <div class="dropdown-content">
-                            <a href="/search" target="_blank">搜索</a>
-                            <a href="/travel" target="_blank">随机文章</a>
-                            <a href="/rss" target="_blank">rss</a>
-                            <a href="/sitemap" target="_blank">站点地图</a>
-                        </div>
+        <div class="container mx-auto flex justify-between items-center p-4">
+            <div class="flex items-center"><img src="../static/favicon.ico"
+                                                style="height: 32px"/>
+            </div>
+            <div class="flex space-x-6">
+                <a href="/" class="text-white hover:bg-purple-700 px-4 py-2 rounded">首页</a>
+                <a href="/profile" class="text-white hover:bg-purple-700 px-4 py-2 rounded">我的</a>
+                <a href="/guestbook" class="text-white hover:bg-purple-700 px-4 py-2 rounded">留言板</a>
+                <div class="dropdown">
+                    <button class="text-white hover:bg-blue-600 px-4 py-2">🔻资源</button>
+                    <div class="dropdown-content">
+                        <a href="/media">媒体</a>
+                        <a href="/register">注册</a>
+                        <a href="/links">友链</a>
                     </div>
-                    <div class="dropdown">
-                        <button class="text-white hover:bg-blue-600 px-4 py-2">🔻关于</button>
-                        <div class="dropdown-content">
-                            <a href="/blog/README">readme</a>
-                            <a href="/blog/legal-agreement">隐私协议</a>
-                            <a href="/donate">打赏捐赠</a>
-                            <a href="mailto:support@7trees.cn" target="_blank">📧邮件联系</a>
-                            <a href="https://github.com/Athenavi/zb/issues" target="_blank">💬issue提交</a>
-                        </div>
-                    </div>
-                    <div class="dropdown">
-                        <button class="text-white hover:bg-blue-600 px-4 py-2">🔻资源</button>
-                        <div class="dropdown-content">
-                            <a href="/profile">我的</a>
-                            <a href="/media">媒体</a>
-                            <a href="/register">注册</a>
-                            <a href="/links">友链</a>
-                        </div>
+                </div>
+                <div class="dropdown">
+                    <button class="text-white hover:bg-blue-600 px-4 py-2">🔻关于</button>
+                    <div class="dropdown-content">
+                        <a href="/blog/README">readme</a>
+                        <a href="/blog/legal-agreement">隐私协议</a>
+                        <a href="/donate">打赏捐赠</a>
+                        <a href="mailto:support@7trees.cn" target="_blank">📧邮件联系</a>
+                        <a href="https://github.com/Athenavi/zb/issues" target="_blank">💬issue提交</a>
                     </div>
                 </div>
             </div>
@@ -49,7 +43,6 @@
             }
         </script>
     </div>
-
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.1/umd/popper.min.js"></script>
     <script>
@@ -91,4 +84,34 @@
             });
         });
     </script>
+    <style>.dropdown {
+        position: relative;
+        display: inline-block;
+    }
+
+    .dropdown-content {
+        display: none;
+        position: absolute;
+        background-color: #ffffff;
+        min-width: 160px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        z-index: 1;
+        border-radius: 4px;
+    }
+
+    .dropdown-content a {
+        color: #333;
+        padding: 10px 12px;
+        text-decoration: none;
+        display: block;
+    }
+
+    .dropdown-content a:hover {
+        background-color: #f1f1f1;
+        color: #000;
+    }
+
+    .dropdown:hover .dropdown-content {
+        display: block;
+    }</style>
 {% endmacro %}

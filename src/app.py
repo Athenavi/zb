@@ -1740,6 +1740,33 @@ def diy_space(page):
     return error(message="Not Found", status_code=404)
 
 
+@app.route('/guestbook', methods=['GET', 'POST'])
+def guestbook():
+    avatar_url = get_avatar(1)
+    message_list = [
+        ("xiaofei","2023-10-01 10:15:30", "Welcome to the guestbook!"),
+        ("dudu","2023-10-02 12:45:50", "Had a great time visiting the site!"),
+        ("roya","2023-10-03 09:00:00", "This is an amazing platform. Keep it up!"),
+        ("princess","2023-10-04 14:30:10", "Thanks for the wonderful experience."),
+        ("hh","2023-10-05 16:55:00", "Looking forward to more updates!"),
+        ("wuli","2023-10-06 11:20:05", "I really enjoyed the community here."),
+    ]
+    if request.method == 'POST':
+        data = request.get_json()  # 获取 JSON 数据
+        nickname = data.get('nickname')
+        message = data.get('message')
+        timestamp = data.get('time')  # 假设前端传递时间
+
+        # 将留言添加到 message_list
+        message_list.append((timestamp, message))
+
+        # 返回一个成功消息，可以返回新的留言内容
+        return jsonify({'status': 'success', 'message_list': message_list}), 201
+
+    # GET 请求返回留言页面
+    return render_template('guestbook.html', avatar_url=avatar_url, message_list=message_list)
+
+
 @app.errorhandler(404)
 def page_not_found(error_message):
     app.logger.error(error_message)
