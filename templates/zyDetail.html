@@ -21,7 +21,7 @@
         {% endfor %}
     </div>
     <div class="comments-author">
-        本文作者：<a href="/profile?tun={{ author }}&id={{ authorUID }}" target="_blank">{{ author }}</a>
+        本文作者：<a href="/@{{ author }}?id={{ authorUID }}" target="_blank">{{ author }}</a>
     </div>
     <button onclick="liked(`{{ articleName }}`)" class="like-button">❤️</button>
     <div id="tcomment"></div>
