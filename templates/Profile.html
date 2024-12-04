@@ -11,6 +11,7 @@
     <!-- Tailwind CSS -->
     <link href="/static/css/tailwind.min.css" rel="stylesheet">
     <link href="/static/css/main.css" rel="stylesheet">
+    <link href="/static/css/idcard.css" rel="stylesheet">
     <style>
         #myFooter {
             background: transparent;
@@ -19,14 +20,35 @@
 </head>
 
 <body class="bg-cover bg-center">
-{% from 'header.html' import zytopbar %}
-{{ zytopbar() }}
 <div class="container mx-auto mt-8 px-4">
     <div class="flex justify-center">
         <div class="w-full md:w-8/12 bg-white rounded-lg shadow-lg p-6">
             {% if userStatus %}
                 <div class="flex items-center mb-4">
-                    <img src="{{ avatar_url }}" class="h-10 w-10 rounded-full" alt="">
+                    <div class="id-card">
+                        <div class="imgBx">
+                            <img src="{{ avatar_url }}">
+                        </div>
+                        <div class="id-content">
+                            <div class="id-details">
+                                <h2>{{ username }}<br><span>{{ userBio }}</span></h2>
+                                <div class="id-data">
+                                    <h3>{% if Articles %}
+                                        {{ Articles|length }}
+                                    {% else %}
+                                        0
+                                    {% endif %}<br><span>Posts</span></h3>
+                                    <h3>{{ follower }}<br><span>Followers</span></h3>
+                                    <h3>{{ following }}<br><span>Following</span></h3>
+                                </div>
+                                <div class="id-actionBtn">
+                                    <button onclick="followed()" id="follow-btn">Follow</button>
+                                    <button>Message</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <a href="/" class="ml-4 text-blue-700">Home</a>
                     <a href="/media" class="ml-4 text-blue-700">📂 媒体</a>
                     <a href="/setting/profiles" class="ml-4 text-blue-700">⚙️ 设置</a>
                 </div>
@@ -44,9 +66,6 @@
                 <a href="/login?callback=profile" class="text-blue-700">需要登录</a>
             {% endif %}
             <hr class="my-4">
-            {% if Articles %}
-                <div class="text-2xl font-bold mb-4" id="idH2"></div>
-            {% endif %}
             <div class="space-y-4">
                 {% for article in Articles %}
                     <div class="bg-gray-100 p-4 rounded-lg flex justify-between items-center">
@@ -55,8 +74,6 @@
                         <div class="menu_div">
                             <div class="flex items-center space-x-4">
                                 <a href="/edit/{{ article }}" class="text-green-500">编辑</a>
-                                <a href="#" data-article={{ article }} class="hidden121">隐藏/取消隐藏</a>
-                                <a href="#" data-article={{ article }} class="delete121">删除</a>
                             </div>
                         </div>
                     </div>
@@ -65,73 +82,9 @@
         </div>
     </div>
 </div>
-{% from 'footer.html' import zyfooter %}
-{{ zyfooter(notice) }}
 </body>
 </html>
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.slim.min.js"></script>
-<script>
-    const hiddenLinks = document.querySelectorAll('a.hidden121');
-
-    hiddenLinks.forEach(link => {
-        link.addEventListener('click', event => {
-            event.preventDefault();
-            const article = link.getAttribute('data-article');
-            const requestBody = JSON.stringify({article});
-
-            if (confirm('您正在尝试对文章进行一个操作，是否继续？')) {
-                fetch('/hidden/article', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: requestBody
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.deal === 'hide') {
-                            alert('文章已隐藏');
-                        } else if (data.deal === 'unhide') {
-                            alert('已经取消隐藏');
-                        } else if (data.deal === 'noAuth') {
-                            alert('无权限操作');
-                        } else {
-                            alert(data.deal);
-                            console.log(data.message);
-                        }
-                    })
-                    .catch(error => {
-                        alert('请求出错');
-                        console.error('请求出错:', error);
-                    });
-            }
-        });
-    });
-
-    const deleteLinks = document.querySelectorAll('a.delete121');
-
-    deleteLinks.forEach(link => {
-        link.addEventListener('click', event => {
-            event.preventDefault();
-            const article = link.getAttribute('data-article');
-
-            if (confirm('您正在尝试永久删除该文章！！！是否继续？')) {
-                if (confirm('再次确认呢？是否继续？')) {
-                    fetch(`/delete/${article}`, {method: 'POST'})
-                        .then(response => {
-                            if (response.ok) {
-                                alert('文章删除成功！');
-                                location.reload();
-                            } else {
-                                alert('文章删除失败！');
-                            }
-                        })
-                        .catch(error => {
-                            alert('请求出错：' + error);
-                        });
-                }
-            }
-        });
-    });
-</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/3.1.3/socket.io.min.js"></script>
 <script>
     window.onload = function () {
@@ -252,9 +205,9 @@
             if (followBtn) {
                 followBtn.style.display = 'none';
             }
-            // 在idH2中插入取消关注按钮
+            // 在id-actionBtn中插入取消关注按钮
             if (!unfollowBtn) {
-                var idh2 = document.getElementById('idH2');
+                var idh2 = document.getElementById('id-actionBtn');
                 idh2.innerHTML += '<button onclick="unfollowed()" id="unfollow-btn">取消关注</button>';
             }
         }
@@ -275,14 +228,10 @@
         return decodeURIComponent(results[2].replace(/\+/g, " "));
     }
 
-    window.onload = function () {
-        var idh2 = document.getElementById('idH2');
-        idh2.innerHTML = "Ta的文章";
+    {#window.onload = function () {
         var menuDivs = document.getElementsByClassName('menu_div');
         for (var i = 0; i < menuDivs.length; i++) {
             menuDivs[i].style.display = 'none';
         }
-        // 在idH2中插入按钮
-        idh2.innerHTML += '<button onclick="followed()" id="follow-btn" style="color:red;">关注</button>';
-    }
+    }#}
 </script>

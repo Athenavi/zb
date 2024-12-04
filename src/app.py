@@ -56,7 +56,7 @@ app.config['AVATAR_SERVER'] = "https://api.7trees.cn/avatar"
 app.config['ALLOWED_EXTENSIONS'] = {'.jpg', '.png', '.webp', '.jfif', '.pjpeg', '.jpeg', '.pjp', '.mp4', '.xmind'}
 app.config['UPLOAD_LIMIT'] = 60 * 1024 * 1024
 # 定义文件最大可编辑的行数
-app.config['MAX_LINE_LIMIT'] = 360
+app.config['MAX_LINE'] = 360
 # 定义rss和站点地图的缓存时间（单位:s）
 app.config['MAX_CACHE_TIMESTAMP'] = 7200
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)  # 添加 ProxyFix 中间件
@@ -209,8 +209,9 @@ def search(user_id):
         os.makedirs(cache_dir, exist_ok=True)
         cache_path = os.path.join(cache_dir, keyword + '.xml')
 
-        # 检查缓存是否存在且在一个小时之内
-        if os.path.isfile(cache_path) and (time.time() - os.path.getmtime(cache_path) < 3600):
+        # 检查缓存是否失效
+        if os.path.isfile(cache_path) and (
+                time.time() - os.path.getmtime(cache_path) < app.config['MAX_CACHE_TIMESTAMP']):
             # 读取缓存并继续处理
             with open(cache_path, 'r') as cache_file:
                 match_data = cache_file.read()
@@ -299,21 +300,16 @@ def get_avatar(username):
 def profile(user_id):
     username = get_username()
     avatar_url = get_avatar(username)
-    owner_id = request.args.get('id')
-    owner_username = request.args.get('tun')
-    if owner_username:
-        owner_articles = get_owner_articles(owner_id=None, user_name=owner_username) or []
-    else:
-        if owner_id is None or owner_id == '':
-            owner_articles = get_owner_articles(owner_id=None, user_name=username) or []
-        else:
-            owner_articles = get_owner_articles(owner_id=owner_id, user_name=None) or []
-
+    userBio = '年度大会员'
+    owner_articles = get_owner_articles(owner_id=None, user_name=username) or []
     noti_host, noti_port = zy_noti_conf()
 
+    following = 72
+    follower = 265
     # 确保 render_template 返回正确对象
     return render_template('Profile.html', url_for=url_for, avatar_url=avatar_url,
-                           userStatus=bool(user_id), username=username,
+                           userStatus=bool(user_id), username=username, userBio=userBio,
+                           following=following, follower=follower,
                            Articles=owner_articles, notiHost=noti_host, notiPort=noti_port)
 
 
@@ -824,7 +820,7 @@ def delete_file(user_id, filename):
 @app.route('/robots.txt')
 def static_from_root():
     content = "User-agent: *\nDisallow: /admin"
-    modified_content = content + '\nSitemap: ' + domain + 'sitemap.xml'  # Add your additional rule here
+    modified_content = content + '\nSitemap: ' + domain + 'sitemap.xml'
 
     response = Response(modified_content, mimetype='text/plain')
     return response
@@ -843,7 +839,7 @@ def markdown_editor(article):
 
     if auth:
         if request.method == 'GET':
-            edit_html = zy_edit_article(article, max_line=app.config['MAX_LINES'])
+            edit_html = zy_edit_article(article, max_line=app.config['MAX_LINE'])
 
             tags = get_tags_by_article(article)
 
@@ -1228,20 +1224,6 @@ def get_screenshot(theme_id, img_name):
 @app.route('/favicon.ico', methods=['GET', 'POST'])
 def favicon():
     return send_file('../static/favicon.ico', mimetype='image/png')
-
-
-@app.route('/@<page>', methods=['GET', 'POST'])
-def diy_space(page):
-    template_path = os.path.join(base_dir, 'media', page, 'index.html')
-    print(template_path)
-    if os.path.exists(template_path):
-        with open(template_path, 'r', encoding=global_encoding) as file:
-            html_content = file.read()
-            resp = make_response(html_content)
-            visit_id = sys_version + format(random.randint(10000, 99999))  # 可以设置一个默认值或者抛出异常，具体根据需求进行处理
-            resp.set_cookie('visitID', 'zyBLOG' + visit_id, 7200)
-        return resp
-    return error(message="Not Found", status_code=404)
 
 
 @cache.cached(timeout=300, key_prefix='short_link')
@@ -1722,6 +1704,102 @@ def export(user_id):
         'user_liked': user_liked,
     }
     return jsonify(result)
+
+
+@app.route('/@<username>', methods=['GET', 'POST'])
+def userCenter(username):
+    # 正则表达式，限制用户名的格式 (只允许字母和数字)
+    if not re.match(r'^[a-zA-Z0-9]+$', username):
+        return error("Invalid username", 400)
+
+    spm = request.args.get('spm')
+    if spm:
+        return diy_space(page=username)
+    userBio = '年度大会员'
+    owner_articles = get_owner_articles(owner_id=None, user_name=username) or []
+    noti_host, noti_port = zy_noti_conf()
+
+    following = 72
+    follower = 265
+    return render_template('Profile.html', url_for=url_for, avatar_url=get_avatar(username),
+                           userStatus=bool(username), username=username, userBio=userBio,
+                           following=following, follower=follower,
+                           Articles=owner_articles, notiHost=noti_host, notiPort=noti_port)
+
+
+def diy_space(page):
+    template_path = os.path.join(base_dir, 'media', page, 'index.html')
+    print(template_path)
+    if os.path.exists(template_path):
+        with open(template_path, 'r', encoding=global_encoding) as file:
+            html_content = file.read()
+            resp = make_response(html_content)
+            visit_id = sys_version + format(random.randint(10000, 99999))  # 可以设置一个默认值或者抛出异常，具体根据需求进行处理
+            resp.set_cookie('visitID', 'zyBLOG' + visit_id, 7200)
+        return resp
+    return error(message="Not Found", status_code=404)
+
+
+@app.route('/guestbook', methods=['GET', 'POST'])
+def guestbook():
+    avatar_url = get_avatar(1)
+    message_list = get_guestbook() or []
+    print(message_list)
+    if request.method == 'POST':
+        data = request.get_json()  # 获取 JSON 数据
+        nickname = data.get('nickname')
+        message = data.get('message')
+        content = f'"{nickname}":"{message}"'
+        upload_guestbook(content)
+        cache.set(f"guestbook", None)
+        # 返回一个成功消息，可以返回新的留言内容
+        return jsonify({'status': 'success', 'message_list': message_list}), 201
+
+    # GET 请求返回留言页面
+    return render_template('guestbook.html', avatar_url=avatar_url, message_list=message_list)
+
+
+def get_guestbook():
+    cached_guestbook = cache.get(f"guestbook")
+    if cached_guestbook:
+        return cached_guestbook
+    try:
+        db = get_database_connection()
+
+        try:
+            with db.cursor() as cursor:
+                query = "SELECT * FROM `events` WHERE Title = 'guestbook'"
+                cursor.execute(query)
+                result = cursor.fetchall()
+                if result:
+                    cache.set(f"guestbook", result)
+        except Exception as e:
+            print(f"An error occurred during the database operation: {e}")
+
+        finally:
+            db.close()  # 确保数据库连接被关闭
+            return result
+
+    except Exception as e:  # 捕获所有异常，而不是仅 FileNotFoundError
+        print(f"An error occurred while getting the database connection: {e}")
+        return None
+
+
+def upload_guestbook(content):
+    try:
+        db = get_database_connection()
+        try:
+            with db.cursor() as cursor:
+                query = "INSERT INTO `events` (`title`, `description`, `event_date`,`created_at`) VALUES ('guestbook',%s,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);"
+                cursor.execute(query, (content,))
+                db.commit()
+        except Exception as e:
+            print(f"An error occurred during the database operation: {e}")
+
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"An error occurred while getting the database connection: {e}")
 
 
 @app.errorhandler(404)

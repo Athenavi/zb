@@ -30,6 +30,8 @@
                     文章页
                 </button>
             </a>
+            <a href="#" data-article={{ articleName }} class="hidden121">隐藏/取消隐藏</a>
+            <a href="#" data-article={{ articleName }} class="delete121">删除</a>
         </div>
 
         <label for="md-editor" class="block text-gray-700 text-sm font-bold mb-2"></label>
@@ -94,3 +96,65 @@
 <!-- 调用footer -->
 {{ zyfooter() }}
 </html>
+<script>
+    const hiddenLinks = document.querySelectorAll('a.hidden121');
+
+    hiddenLinks.forEach(link => {
+        link.addEventListener('click', event => {
+            event.preventDefault();
+            const article = link.getAttribute('data-article');
+            const requestBody = JSON.stringify({article});
+
+            if (confirm('您正在尝试对文章进行一个操作，是否继续？')) {
+                fetch('/hidden/article', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: requestBody
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.deal === 'hide') {
+                            alert('文章已隐藏');
+                        } else if (data.deal === 'unhide') {
+                            alert('已经取消隐藏');
+                        } else if (data.deal === 'noAuth') {
+                            alert('无权限操作');
+                        } else {
+                            alert(data.deal);
+                            console.log(data.message);
+                        }
+                    })
+                    .catch(error => {
+                        alert('请求出错');
+                        console.error('请求出错:', error);
+                    });
+            }
+        });
+    });
+
+    const deleteLinks = document.querySelectorAll('a.delete121');
+
+    deleteLinks.forEach(link => {
+        link.addEventListener('click', event => {
+            event.preventDefault();
+            const article = link.getAttribute('data-article');
+
+            if (confirm('您正在尝试永久删除该文章！！！是否继续？')) {
+                if (confirm('再次确认呢？是否继续？')) {
+                    fetch(`/delete/${article}`, {method: 'POST'})
+                        .then(response => {
+                            if (response.ok) {
+                                alert('文章删除成功！');
+                                location.reload();
+                            } else {
+                                alert('文章删除失败！');
+                            }
+                        })
+                        .catch(error => {
+                            alert('请求出错：' + error);
+                        });
+                }
+            }
+        });
+    });
+</script>

@@ -1,40 +1,24 @@
 {% macro zytopbar() -%}
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
     <link href="/static/css/tailwind.min.css" rel="stylesheet">
     <link href="/static/css/side.css" rel="stylesheet">
+    <link href="/static/css/header.css" rel="stylesheet">
+
     <div id="loading">Loading...</div>
     <nav class="bg-blue-500">
-        <div class="container mx-auto flex justify-between items-center">
-            <a class="text-xl text-white font-bold py-4" href="/"><img src="../static/favicon.ico"
-                                                                       style="height: 32px"/>{{ title }}</a>
-            <div class="container mx-auto flex justify-between items-center">
-                <div class="flex space-x-4">
-                    <div class="dropdown">
-                        <button class="text-white hover:bg-blue-600 px-4 py-2">🔻探索</button>
-                        <div class="dropdown-content">
-                            <a href="/search" target="_blank">搜索</a>
-                            <a href="/travel" target="_blank">随机文章</a>
-                            <a href="/rss" target="_blank">rss</a>
-                            <a href="/sitemap" target="_blank">站点地图</a>
-                        </div>
-                    </div>
-                    <div class="dropdown">
-                        <button class="text-white hover:bg-blue-600 px-4 py-2">🔻关于</button>
-                        <div class="dropdown-content">
-                            <a href="/blog/README">readme</a>
-                            <a href="/blog/legal-agreement">隐私协议</a>
-                            <a href="/donate">打赏捐赠</a>
-                            <a href="mailto:support@7trees.cn" target="_blank">📧邮件联系</a>
-                            <a href="https://github.com/Athenavi/zb/issues" target="_blank">💬issue提交</a>
-                        </div>
-                    </div>
-                    <div class="dropdown">
-                        <button class="text-white hover:bg-blue-600 px-4 py-2">🔻资源</button>
-                        <div class="dropdown-content">
-                            <a href="/profile">我的</a>
-                            <a href="/media">媒体</a>
-                            <a href="/register">注册</a>
-                            <a href="/links">友链</a>
-                        </div>
+        <div class="container mx-auto flex justify-between items-center p-4">
+            <div class="flex items-center"><img src="../static/favicon.ico"
+                                                style="height: 32px"/>
+            </div>
+            <div class="flex space-x-6">
+                <a href="/" class="text-white hover:bg-purple-700 px-4 py-2 rounded">首页</a>
+                <a href="/profile" class="text-white hover:bg-purple-700 px-4 py-2 rounded">我的</a>
+                <div class="dropdown">
+                    <button class="text-white hover:bg-blue-600 px-4 py-2">🔻资源</button>
+                    <div class="dropdown-content">
+                        <a href="/media">媒体</a>
+                        <a href="/register">注册</a>
+                        <a href="/links">友链</a>
                     </div>
                 </div>
             </div>
@@ -49,7 +33,6 @@
             }
         </script>
     </div>
-
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.1/umd/popper.min.js"></script>
     <script>
@@ -71,7 +54,47 @@
             🌙
         </button>
     </div>
+
+    <ul class="menu">
+        <li id="home">主页</li>
+        <li id="refresh">刷新</li>
+        <li id="search">搜索</li>
+        <li id="travel">随机文章</li>
+        <li id="guestbook">留言板</li>
+    </ul>
+
     <script>
+        // 获取菜单项
+        const home = document.getElementById('home');
+        const search = document.getElementById('search');
+        const refresh = document.getElementById('refresh');
+        const travel = document.getElementById('travel');
+        const guestbook = document.getElementById('guestbook');
+
+        guestbook.addEventListener('click', function () {
+            window.location.href = '/guestbook';
+        });
+
+        travel.addEventListener('click', function () {
+            window.location.href = '/travel';
+        });
+
+        home.addEventListener('click', function () {
+            console.log('执行主页功能');
+            window.location.href = '/';
+        });
+
+        search.addEventListener('click', function () {
+            console.log('执行搜索功能');
+            window.location.href = '/search';
+        });
+
+        refresh.addEventListener('click', function () {
+            console.log('执行刷新功能');
+            // 在这里添加刷新页面的相关功能
+            location.reload(); // 刷新页面
+        });
+
         document.addEventListener("DOMContentLoaded", function () {
             const button = document.getElementById('theme-toggle');
 
@@ -90,5 +113,57 @@
                 localStorage.setItem('theme', isDark ? 'dark' : 'light');
             });
         });
+
+        // 菜单
+        const menu = document.querySelector('.menu');
+
+        // 绑定右键事件
+        document.addEventListener('contextmenu', function (e) {
+            // 取消默认的浏览器自带右键
+            e.preventDefault();
+            // 窗口宽高
+            let winWidth = window.innerWidth;
+            let winHeight = window.innerHeight;
+            // 鼠标点击的位置
+            let posX = e.pageX;
+            let posY = e.pageY;
+            // 菜单宽高
+            let menuWidth = menu.getBoundingClientRect().width;
+            let menuHeight = menu.getBoundingClientRect().height;
+            // 菜单要显示的位置
+            let posLeft = 0, posTop = 0;
+            // 菜单显示时可能遇到的几种情况：
+            // 右边和底部同时超出
+            if (posX + menuWidth >= winWidth && posY + menuHeight >= winHeight) {
+                posLeft = posX - menuWidth;
+                posTop = posY - menuHeight;
+            }
+            // 右侧超出
+            else if (posX + menuWidth >= winWidth) {
+                posLeft = posX - menuWidth;
+                posTop = posY;
+            }
+            // 底部超出
+            else if (posY + menuHeight >= winHeight) {
+                posLeft = posX;
+                posTop = posY - menuHeight;
+            }
+            // 默认情况，都不超出
+            else {
+                posLeft = posX;
+                posTop = posY;
+            }
+            // 设置菜单的位置并显示
+            menu.style.left = posLeft + 'px';
+            menu.style.top = posTop + 'px';
+            menu.style.opacity = 1;
+            menu.style.zIndex = 99;
+        })
+
+        // 最后，加个单击其他地方关闭菜单
+        document.addEventListener('click', function () {
+            menu.style.opacity = 0;
+            menu.style.zIndex = -1;
+        })
     </script>
 {% endmacro %}
