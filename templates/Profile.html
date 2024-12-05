@@ -48,20 +48,13 @@
                             </div>
                         </div>
                     </div>
-                    <a href="/" class="ml-4 text-blue-700">Home</a>
-                    <a href="/media" class="ml-4 text-blue-700">📂 媒体</a>
-                    <a href="/setting/profiles" class="ml-4 text-blue-700">⚙️ 设置</a>
                 </div>
+                <br/>
+                <br/>
+                <a href="/" class="ml-4 text-blue-700">Home</a>
+                <a href="/media" class="ml-4 text-blue-700">📂 媒体</a>
+                <a href="/setting/profiles" class="ml-4 text-blue-700">⚙️ 设置</a>
                 <div id="notifications" class="mb-6"></div>
-
-                <script>
-                    $(document).ready(function () {
-                        var socket = io('{{ notiHost }}');
-                        socket.on('new_notification', function (data) {
-                            $('#notifications').append('<p class="text-red-600 mb-4">' + data.message + '</p>');
-                        });
-                    });
-                </script>
             {% else %}
                 <a href="/login?callback=profile" class="text-blue-700">需要登录</a>
             {% endif %}
@@ -89,9 +82,9 @@
 <script>
     window.onload = function () {
         setTimeout(function () {
-            fetch('{{ notiHost }}', {
+            fetch('/api/notice', {
                 method: 'GET',
-                credentials: 'include'
+                credentials: 'include' // 允许携带cookie
             })
                 .then(response => {
                     if (!response.ok) {
@@ -101,6 +94,16 @@
                 })
                 .then(data => {
                     console.log(data);
+                    if (data.error) {
+                        alert(data.error);
+                    } else if (data.length === 0) {
+                        alert("没有新的通知");
+                    } else {
+                        let message = data.map(notice =>
+                            `${notice.title}: ${notice.message}`
+                        ).join('<br />');
+                        alert(message);
+                    }
                 })
                 .catch(error => {
                     console.error('There has been a problem with your fetch operation:', error);
@@ -110,14 +113,15 @@
 </script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        const parentContainer = document.getElementById('notice'); // 这里假设有个notice容器
+        // <button class="notice_read" id="${notice.id}">close</button>
+        const parentContainer = document.getElementById('notifications'); // 这里假设有个notice容器
 
         parentContainer.addEventListener('click', function (event) {
             if (event.target && event.target.classList.contains('notice_read')) {
                 if (confirm('是否删除此通知？')) {
                     const nid = event.target.id;
 
-                    fetch('{{ notiHost }}/read?nid=' + nid, {
+                    fetch('api/notice/read?nid=' + nid, {
                         method: 'GET',
                         credentials: 'include'
                     })

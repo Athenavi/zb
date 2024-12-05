@@ -1,14 +1,20 @@
-from datetime import timedelta
+import datetime
+import smtplib
+import threading
+from datetime import timedelta, time
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 import flask_socketio
+import schedule
 from flask import Flask, request, jsonify
 from flask_caching import Cache
 
 from src.database import get_database_connection
-from src.utils import zy_noti_conf, authenticate_jwt, secret_key
+from src.utils import zy_noti_conf, authenticate_jwt, secret_key, zy_mail_conf
 
 noti = Flask(__name__, template_folder='../templates')
-socketio = flask_socketio.SocketIO(noti, cors_allowed_origins='*', async_mode='threading')
+socketio = flask_socketio.SocketIO(noti, cors_allowed_origins='*')
 noti.secret_key = secret_key
 noti.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=3)
 noti.config['SESSION_COOKIE_NAME'] = 'zb_session'
@@ -61,9 +67,14 @@ def emit_notification(notification_message):
 
 
 def get_sys_notice(user_id):
+    notices = [{
+        "id": 0,
+        "title": "系统",
+        "message": "暂无新信息"
+    }]
     if not user_id:
-        notice = "当前没有更多通知"
-        return notice
+        return notices
+
     try:
         with get_database_connection() as db:
             with db.cursor() as cursor:
@@ -73,13 +84,20 @@ def get_sys_notice(user_id):
                 print(f'获取的通知记录: {existing_records}')
 
                 if existing_records:
-                    notice = '<br />'.join(
-                        [f"""{record[2]}: {record[3]} <button class="notice_read" id={record[0]}>close</button>""" for
-                         record in existing_records]
-                    )
+                    notices = [
+                        {
+                            "id": record[0],
+                            "title": record[2],
+                            "message": record[3]
+                        }
+                        for record in existing_records
+                    ]
+
     except Exception as e:
         print(f"获取通知时发生错误: {e}")
-    return notice
+        notices = {"error": "获取通知时发生错误，详情已记录"}  # 出现异常时，返回错误消息
+
+    return notices
 
 
 @noti.route('/read')
@@ -113,12 +131,11 @@ def read_notification():
     return response
 
 
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+last_check_time = None
+last_check_data = None
 
 
-def send_email(sender_email, password, receiver_email, smtp_server, stmp_port, subject, body):
+def send_email(sender_email, password, receiver_email, smtp_server, smtp_port, subject, body):
     # 创建邮件对象
     msg = MIMEMultipart()
     msg['From'] = sender_email
@@ -130,9 +147,55 @@ def send_email(sender_email, password, receiver_email, smtp_server, stmp_port, s
 
     try:
         # 连接到SMTP服务器，使用SMTP_SSL
-        with smtplib.SMTP_SSL(smtp_server, stmp_port) as server:  # 465 是SSL的常用端口
+        with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
             server.login(sender_email, password)  # 登录
             server.sendmail(sender_email, receiver_email, msg.as_string())  # 发送邮件
         print("邮件发送成功!")
     except Exception as e:
         print(f"邮件发送失败: {e}")
+
+
+def check_for_changes():
+    global last_check_time, last_check_data
+
+    db = get_database_connection()
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT * FROM `events` WHERE `created_at` > %s"
+            cursor.execute(query, (last_check_time,))
+            current_data = cursor.fetchone()
+
+            if current_data:
+                # 检查数据是否有变化
+                if last_check_data is None or current_data != last_check_data:
+                    print("Data has changed!")
+                    # 发送邮件通知
+                    subject = "留言数据变化通知"
+                    body = f"检测新的内容: {current_data}"
+                    smtp_server, stmp_port, sender_email, password = zy_mail_conf()
+                    receiver_email = sender_email
+                    send_email(sender_email, password, receiver_email, smtp_server, stmp_port=int(stmp_port),
+                               subject=subject,
+                               body=body)
+
+                    # 更新最后的数据
+                    last_check_data = current_data
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        db.close()
+        last_check_time = datetime.now()
+
+
+def run_scheduler():
+    schedule.every(10).minutes.do(check_for_changes)
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
+
+
+@noti.route('/start_monitoring')
+def start_monitoring():
+    threading.Thread(target=run_scheduler).start()
+    return jsonify({"message": "Monitoring started!"})

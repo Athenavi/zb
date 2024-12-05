@@ -23,7 +23,11 @@
                 <h2 class="text-xl font-bold mb-2">{{ page_mark }}最新文章</h2>
                 <button id="toggleLayout"
                         class="bg-transparent-500 text-white px-4 py-2 rounded  transition duration-200">
-                    🎚️
+                    <i class="fa-solid fa-table"></i>
+                </button>
+                <button onclick="hiddenSitebar()"
+                        class="bg-transparent-500 text-white">
+                    <i class="fa-solid fa-arrow-right" id="right"></i>
                 </button>
             </div>
 
@@ -91,45 +95,16 @@
                     {% endfor %}
                 </div>
             </div>
-            <div class="p-6 bg-gray-100 rounded-lg shadow">
-                <p id="hitokoto">:D 获取中...</p>——<small id="creator">李白</small>
-                <script>(function hitokoto() {
-                    fetch('https://v1.hitokoto.cn')
-                        .then(response => response.json())
-                        .then(data => {
-                            var hitokoto = data.hitokoto;
-                            var creator = data.creator;
-                            document.querySelector('#hitokoto').innerText = hitokoto;
-                            document.querySelector('#creator').innerText = creator;
-                        })
-                        .catch(error => console.log(error));
-                })();</script>
-            </div>
-            <div class="announcement_content">
-                <div class="loading-spinner"></div>
-                <div id="welcome-info" style="display: none;">
-                    <script src="/static/js/side.js" defer></script>
-                </div>
-            </div>
-            <div class="textwidget custom-html-widget">
-                <div class="qqg-card-widget" id="qqg-card-wechat">
-                    <div id="qqg-flip-wrapper">
-                        <div id="qqg-flip-content">
-                            <div class="qqg-face"></div>
-                            <div class="qqg-back qqg-face"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            {% from 'musicPlayer.html' import player %}
+            {{ player() }}
             <div class="w-full h-auto mb-4 rounded-lg shadow">
-                <h4 class="font-bold text-gray-800 mb-4">友情链接</h4>
-                <ul class="link-list">
-                    {% if friend_links %}
-                        {% for name, url in friends_links.items() %}
-                            <li><a href="{{ url }}" target="_blank">{{ name }}</a></li>
-                        {% endfor %}
-                    {% endif %}
-                </ul>
+                {% if friends_links %}
+                    <h4 class="font-bold text-gray-800 mb-4">友情链接</h4>
+                    {% for site_name, site_url in friends_links.items() %}
+                        <a href="{{ site_url }}"
+                           style="text-decoration: none; color: #4CAF50; font-weight: bold; font-size: 18px; padding: 5px; transition: background-color 0.3s, color 0.3s;">{{ site_name }}</a>
+                    {% endfor %}
+                {% endif %}
             </div>
         </aside>
     </div>
@@ -137,7 +112,7 @@
 
 <!-- Footer -->
 {% from 'footer.html' import zyfooter %}
-{{ zyfooter(notice) }}
+{{ zyfooter(notice[0].title ~ notice[0].message) }}
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
@@ -162,6 +137,24 @@
             }
         });
     });
+
+    let isSidebarVisible = true;
+
+    function hiddenSitebar() {
+        const sidebar = document.getElementById('sideDIV');
+        const main = document.getElementById('articleDIV');
+
+        if (isSidebarVisible) {
+            sidebar.style.display = 'none'; // 隐藏侧边栏
+            main.className = 'w-full'; // 设置 main 为全宽
+        } else {
+            sidebar.style.display = 'block'; // 显示侧边栏
+            main.className = 'w-full md:w-3/4'; // 设置 main 为 3/4 宽
+            sidebar.className = 'w-full md:w-1/4 lg:w-1/5'; // 设置 sidebar 为 1/4 宽
+        }
+
+        isSidebarVisible = !isSidebarVisible; // 切换状态
+    }
 </script>
 </body>
 </html>

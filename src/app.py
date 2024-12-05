@@ -33,7 +33,7 @@ from src.BlogDeal import get_article_names, get_article_content, clear_html_form
     get_tags_by_article, set_article_info, write_tags_to_database, set_article_visibility
 from src.database import get_database_connection
 from src.links import create_special_url, redirect_to_long_url
-from src.notification import get_sys_notice
+from src.notification import get_sys_notice, read_notification
 from src.user import zyadmin, zy_delete_article, error, get_owner_articles, zy_general_conf, get_userInfo
 from src.utils import zy_upload_file, get_client_ip, \
     zy_noti_conf, generate_jwt, secret_key, authenticate_jwt, \
@@ -302,15 +302,13 @@ def profile(user_id):
     avatar_url = get_avatar(username)
     userBio = '年度大会员'
     owner_articles = get_owner_articles(owner_id=None, user_name=username) or []
-    noti_host, noti_port = zy_noti_conf()
-
     following = 72
     follower = 265
     # 确保 render_template 返回正确对象
     return render_template('Profile.html', url_for=url_for, avatar_url=avatar_url,
                            userStatus=bool(user_id), username=username, userBio=userBio,
                            following=following, follower=follower,
-                           Articles=owner_articles, notiHost=noti_host, notiPort=noti_port)
+                           Articles=owner_articles)
 
 
 @app.route('/setting/profiles', methods=['GET', 'POST'])
@@ -400,7 +398,7 @@ def home():
             app.logger.warning('获取文章信息失败，返回错误提示')
             return error(message="没有找到任何文章", status_code=404)
 
-        friends_links = get_friends_link()
+        friends_links = get_friends_link(type=1)
 
         # 渲染模板并存储渲染后的页面内容到缓存中
         rendered_content = template.render(
@@ -1352,16 +1350,6 @@ def donate():
         return f'你要捐赠的是{for_uid},他的捐款通道为{channel_url}'
 
 
-@app.route('/links')
-def get_friends_link():
-    friends_links = {
-        '本站地址': domain,
-        'GitHub': "https://github.com/Athenavi",
-        '博客园': "https://cnblogs.com/Athenavi/",
-    }
-    return friends_links
-
-
 @app.route('/api/ip')
 def ip_api():
     key = request.cookies.get('key')
@@ -1741,22 +1729,29 @@ def diy_space(page):
 
 
 @app.route('/guestbook', methods=['GET', 'POST'])
-def guestbook():
+@finger_required
+def guestbook(user_id):
+    username = get_username()
     avatar_url = get_avatar(1)
     message_list = get_guestbook() or []
-    print(message_list)
+    user_finger = request.cookies.get('finger')
     if request.method == 'POST':
         data = request.get_json()  # 获取 JSON 数据
-        nickname = data.get('nickname')
+        nickname = data.get('nickname') or username
         message = data.get('message')
         content = f'"{nickname}":"{message}"'
+
+        cached_user_guestbook = cache.get(f"guestbook_{user_finger}")
+        if cached_user_guestbook:
+            return jsonify({'status': 'failed', 'message_list': message_list}), 503
         upload_guestbook(content)
         cache.set(f"guestbook", None)
+        cache.set(f"guestbook_{user_finger}", True, timeout=180)
         # 返回一个成功消息，可以返回新的留言内容
         return jsonify({'status': 'success', 'message_list': message_list}), 201
 
     # GET 请求返回留言页面
-    return render_template('guestbook.html', avatar_url=avatar_url, message_list=message_list)
+    return render_template('guestbook.html', avatar_url=avatar_url, username=username, message_list=message_list)
 
 
 def get_guestbook():
@@ -1800,6 +1795,89 @@ def upload_guestbook(content):
             db.close()
     except Exception as e:
         print(f"An error occurred while getting the database connection: {e}")
+
+
+@app.route('/links')
+def get_friends_link(type=0):
+    avatar_url = get_avatar(1)
+    friends_links = {
+        '本站地址': domain,
+        'GitHub': "https://github.com/Athenavi",
+        '博客园': "https://cnblogs.com/Athenavi/",
+    }
+    if type == 1:
+        return friends_links
+    return render_template('guestbook.html', avatar_url=avatar_url, link_list=friends_links)
+
+
+@app.route('/api/notice', methods=['GET'])
+@jwt_required
+def user_notification(user_id):
+    user_notices = get_sys_notice(user_id)
+    return jsonify(user_notices)
+
+
+@app.route('/api/notice/read')
+def read_user_notification():
+    readContent = read_notification()
+    return jsonify(readContent), 200
+
+
+@app.route('/audio/<username>/<audio_name>')
+def get_audio_path(username, audio_name):
+    try:
+        audio_dir = Path(base_dir) / 'media' / username / audio_name
+        if os.path.isfile(audio_dir):
+            return send_file(audio_dir, mimetype='audio/mp3')
+    except Exception as e:
+        pass
+
+
+@app.route('/api/music/music.json')
+def music_json():
+    default_json = [
+        {
+            "name": "我记得",
+            "audio_url": "/audio/test/我记得.mp3",
+            "singer": "赵雷",
+            "album": "署前街少年",
+            "cover": "http://p2.music.126.net/FCWD6ibS2JK2B3QAnXuzwQ==/109951167805892385.jpg",
+            "time": "05:29"
+        },
+        {
+            "name": "成都",
+            "audio_url": "/audio/test/成都.mp3",
+            "singer": "赵雷",
+            "album": "成都",
+            "cover": "http://p2.music.126.net/34YW1QtKxJ_3YnX9ZzKhzw==/2946691234868155.jpg",
+            "time": "05:28"
+        },
+        {
+            "name": "南方姑娘",
+            "audio_url": "/audio/test/南方姑娘.mp3",
+            "singer": "赵雷",
+            "album": "赵小雷",
+            "cover": "http://p2.music.126.net/wldFtES1Cjnbqr5bjlqQbg==/18876415625841069.jpg",
+            "time": "05:32"
+        },
+        {
+            "name": "阴天快乐",
+            "audio_url": "/audio/test/阴天快乐.mp3",
+            "singer": "陈奕迅",
+            "album": "Rice & Shine",
+            "cover": "http://p2.music.126.net/itkdsMFR8nYzaTiDdHO3tA==/109951165995320408.jpg",
+            "time": "04:20"
+        },
+        {
+            "name": "爱情转移",
+            "audio_url": "/audio/test/爱情转移.mp3",
+            "singer": "陈奕迅",
+            "album": "认了吧",
+            "cover": "http://p2.music.126.net/o_OjL_NZNoeog9fIjBXAyw==/18782957139233959.jpg",
+            "time": "04:20"
+        }
+    ]
+    return default_json
 
 
 @app.errorhandler(404)
