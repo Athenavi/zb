@@ -33,7 +33,7 @@ from src.BlogDeal import get_article_names, get_article_content, clear_html_form
     get_tags_by_article, set_article_info, write_tags_to_database, set_article_visibility
 from src.database import get_database_connection
 from src.links import create_special_url, redirect_to_long_url
-from src.notification import get_sys_notice
+from src.notification import get_sys_notice, read_notification
 from src.user import zyadmin, zy_delete_article, error, get_owner_articles, zy_general_conf, get_userInfo
 from src.utils import zy_upload_file, get_client_ip, \
     zy_noti_conf, generate_jwt, secret_key, authenticate_jwt, \
@@ -302,15 +302,13 @@ def profile(user_id):
     avatar_url = get_avatar(username)
     userBio = '年度大会员'
     owner_articles = get_owner_articles(owner_id=None, user_name=username) or []
-    noti_host, noti_port = zy_noti_conf()
-
     following = 72
     follower = 265
     # 确保 render_template 返回正确对象
     return render_template('Profile.html', url_for=url_for, avatar_url=avatar_url,
                            userStatus=bool(user_id), username=username, userBio=userBio,
                            following=following, follower=follower,
-                           Articles=owner_articles, notiHost=noti_host, notiPort=noti_port)
+                           Articles=owner_articles)
 
 
 @app.route('/setting/profiles', methods=['GET', 'POST'])
@@ -400,7 +398,7 @@ def home():
             app.logger.warning('获取文章信息失败，返回错误提示')
             return error(message="没有找到任何文章", status_code=404)
 
-        friends_links = get_friends_link()
+        friends_links = get_friends_link(type=1)
 
         # 渲染模板并存储渲染后的页面内容到缓存中
         rendered_content = template.render(
@@ -1352,16 +1350,6 @@ def donate():
         return f'你要捐赠的是{for_uid},他的捐款通道为{channel_url}'
 
 
-@app.route('/links')
-def get_friends_link():
-    friends_links = {
-        '本站地址': domain,
-        'GitHub': "https://github.com/Athenavi",
-        '博客园': "https://cnblogs.com/Athenavi/",
-    }
-    return friends_links
-
-
 @app.route('/api/ip')
 def ip_api():
     key = request.cookies.get('key')
@@ -1807,6 +1795,32 @@ def upload_guestbook(content):
             db.close()
     except Exception as e:
         print(f"An error occurred while getting the database connection: {e}")
+
+
+@app.route('/links')
+def get_friends_link(type=0):
+    avatar_url = get_avatar(1)
+    friends_links = {
+        '本站地址': domain,
+        'GitHub': "https://github.com/Athenavi",
+        '博客园': "https://cnblogs.com/Athenavi/",
+    }
+    if type == 1:
+        return friends_links
+    return render_template('guestbook.html', avatar_url=avatar_url, link_list=friends_links)
+
+
+@app.route('/api/notice', methods=['GET'])
+@jwt_required
+def user_notification(user_id):
+    user_notices = get_sys_notice(user_id)
+    return jsonify(user_notices)
+
+
+@app.route('/api/notice/read')
+def read_user_notification():
+    readContent = read_notification()
+    return jsonify(readContent), 200
 
 
 @app.errorhandler(404)

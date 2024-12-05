@@ -8,7 +8,7 @@ from src.database import get_database_connection
 from src.utils import zy_noti_conf, authenticate_jwt, secret_key
 
 noti = Flask(__name__, template_folder='../templates')
-socketio = flask_socketio.SocketIO(noti, cors_allowed_origins='*', async_mode='threading')
+socketio = flask_socketio.SocketIO(noti, cors_allowed_origins='*')
 noti.secret_key = secret_key
 noti.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=3)
 noti.config['SESSION_COOKIE_NAME'] = 'zb_session'
@@ -61,9 +61,14 @@ def emit_notification(notification_message):
 
 
 def get_sys_notice(user_id):
+    notices = [{
+        "id": 0,
+        "title": "系统",
+        "message": "暂无新信息"
+    }]
     if not user_id:
-        notice = "当前没有更多通知"
-        return notice
+        return notices
+
     try:
         with get_database_connection() as db:
             with db.cursor() as cursor:
@@ -73,13 +78,20 @@ def get_sys_notice(user_id):
                 print(f'获取的通知记录: {existing_records}')
 
                 if existing_records:
-                    notice = '<br />'.join(
-                        [f"""{record[2]}: {record[3]} <button class="notice_read" id={record[0]}>close</button>""" for
-                         record in existing_records]
-                    )
+                    notices = [
+                        {
+                            "id": record[0],
+                            "title": record[2],
+                            "message": record[3]
+                        }
+                        for record in existing_records
+                    ]
+
     except Exception as e:
         print(f"获取通知时发生错误: {e}")
-    return notice
+        notices = {"error": "获取通知时发生错误，详情已记录"}  # 出现异常时，返回错误消息
+
+    return notices
 
 
 @noti.route('/read')
