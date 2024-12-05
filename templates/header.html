@@ -3,7 +3,7 @@
     <link href="/static/css/tailwind.min.css" rel="stylesheet">
     <link href="/static/css/header.css" rel="stylesheet">
 
-    <div id="loading">Loading...</div>
+    <div class="loader" id="loader"></div>
     <nav class="bg-blue-500">
         <div class="container mx-auto flex justify-between items-center p-4">
             <div class="flex items-center"><img src="../static/favicon.ico"
@@ -36,7 +36,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.1/umd/popper.min.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            document.getElementById("loading").style.display = "none";
+            document.getElementById("loader").style.display = "none";
         });
         window.addEventListener('contextmenu', function (e) {
             e.preventDefault();

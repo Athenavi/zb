@@ -33,7 +33,7 @@ from src.BlogDeal import get_article_names, get_article_content, clear_html_form
     get_tags_by_article, set_article_info, write_tags_to_database, set_article_visibility
 from src.database import get_database_connection
 from src.links import create_special_url, redirect_to_long_url
-from src.notification import get_sys_notice, read_notification
+from src.notification import get_sys_notice, read_notification, send_change_mail
 from src.user import zyadmin, zy_delete_article, error, get_owner_articles, zy_general_conf, get_userInfo
 from src.utils import zy_upload_file, get_client_ip, \
     zy_noti_conf, generate_jwt, secret_key, authenticate_jwt, \
@@ -1793,6 +1793,7 @@ def upload_guestbook(content):
 
         finally:
             db.close()
+            send_change_mail(content, kind='guestbook')
     except Exception as e:
         print(f"An error occurred while getting the database connection: {e}")
 
