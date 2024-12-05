@@ -104,14 +104,45 @@
 
         <h3>Leave a Message</h3>
         <form id="guestbook-form" style="margin: auto; font-family: Arial, sans-serif;">
+
             <div class="card"
                  style="border: 1px solid #ccc; border-radius: 10px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);">
                 <div class="card-header"
                      style="background-color: #f7f7f7; border-bottom: 1px solid #ccc; padding: 10px; border-radius: 10px 10px 0 0;">
                     <div class="user-info">
-                        <input type="text" class="nickname" id="nickname" placeholder="Your nickname" required
+                        <input type="text" class="nickname" id="nickname" placeholder="{{ username }}"
                                style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px;">
                     </div>
+                    <button id="generateButton"
+                            style="background-color: #721c24; color: white;cursor: pointer; transition: background-color 0.3s;">
+                        面具
+                    </button>
+                    <script>
+                        const names = [
+                            "晨曦微露", "爱意随风", "游离孤独", "微凉半夏",
+                            "冷言如霜", "天边梦影", "夜色轻语", "久别伊人",
+                            "心动瞬间", "岁月无歌", "随心而行", "独自流浪",
+                            "梦回旧时", "晨曦如歌", "繁花梦境", "月影轻柔",
+                            "风吹思绪", "雨落心声", "云中漫步", "光阴故事"
+                        ];
+
+                        const specialSymbols = [
+                            "⊙∫⊙", "(_ぐ", "→お", "╰", "ふダ＿", "ζั͡ޓއއއ๓",
+                            "じ☆ve", "═╬", ";..", "∩_∩", "★☆", "ꦿ尜҉ꦿོ轩҉ྂ҉ꦿ",
+                            "じづ", "♂︶ㄣ", "∩_∩", "༄༊࿆࿆࿐", "゛灬づ", "乄℡", ">^ω^<",
+                            "ꦿ⚘", "ゞ", "ˊ丅┮╱", "﹏ღ๓๓", "ิۣۖิۣۖ", "℡sy",
+                            "ヘξ☆ぜ", "じわ", "♀℉", "乄灬", "༻ ོ ོོ甜ོོ心ོꦿ࿐₅₂ₒ", "ৡ念้้ꦿ᭄࿐"
+                        ];
+
+                        document.getElementById('generateButton').addEventListener('click', function () {
+                            const randomName = names[Math.floor(Math.random() * names.length)];
+                            const specialSymbol = specialSymbols[Math.floor(Math.random() * specialSymbols.length)];
+                            const insertPosition = Math.floor(Math.random() * (randomName.length + 1)); // 包括末尾位置
+                            const nicknameWithSymbols = randomName.slice(0, insertPosition) + specialSymbol + randomName.slice(insertPosition);
+                            document.getElementById('nickname').value = nicknameWithSymbols;
+                        });
+                    </script>
+
                 </div>
                 <div class="card-content" style="padding: 10px;">
                     <textarea id="message" class="text" placeholder="Your message" required
@@ -154,24 +185,23 @@
 
         const nickname = document.getElementById('nickname').value;
         const message = document.getElementById('message').value;
-        const time = new Date().toISOString(); // Get the current time in ISO format
 
         fetch('/guestbook', {
             method: 'POST',
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({nickname, message, time}),
+            body: JSON.stringify({nickname, message}),
         })
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    // Optionally clear the form
-                    document.getElementById('nickname').value = '';
                     document.getElementById('message').value = '';
-                    location.reload(); // Reload the page to see the new message
+                    location.reload();
                 } else {
                     console.error('Error adding message:', data);
+                    alert(data.status + "留言功能进入冷却，请稍后再来")
                 }
             })
             .catch((error) => {

@@ -1741,22 +1741,29 @@ def diy_space(page):
 
 
 @app.route('/guestbook', methods=['GET', 'POST'])
-def guestbook():
+@finger_required
+def guestbook(user_id):
+    username = get_username()
     avatar_url = get_avatar(1)
     message_list = get_guestbook() or []
-    print(message_list)
+    user_finger = request.cookies.get('finger')
     if request.method == 'POST':
         data = request.get_json()  # 获取 JSON 数据
-        nickname = data.get('nickname')
+        nickname = data.get('nickname') or username
         message = data.get('message')
         content = f'"{nickname}":"{message}"'
+
+        cached_user_guestbook = cache.get(f"guestbook_{user_finger}")
+        if cached_user_guestbook:
+            return jsonify({'status': 'failed', 'message_list': message_list}), 503
         upload_guestbook(content)
         cache.set(f"guestbook", None)
+        cache.set(f"guestbook_{user_finger}", True, timeout=180)
         # 返回一个成功消息，可以返回新的留言内容
         return jsonify({'status': 'success', 'message_list': message_list}), 201
 
     # GET 请求返回留言页面
-    return render_template('guestbook.html', avatar_url=avatar_url, message_list=message_list)
+    return render_template('guestbook.html', avatar_url=avatar_url, username=username, message_list=message_list)
 
 
 def get_guestbook():
