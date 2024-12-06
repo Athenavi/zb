@@ -1888,10 +1888,10 @@ def music_json():
     return default_json
 
 
-@app.route('/api/test')
+@app.route('/changelog')
 def test_api():
     updates = parse_update_file('update.txt')
-    return render_template('test.html', updates=updates)
+    return render_template('changelog.html', updates=updates)
 
 
 def parse_update_file(filename):
