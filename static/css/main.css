@@ -1,18 +1,23 @@
 .body {
-    background-color: gray;
+    background-color: transparent;
     font-family: "Nunito", sans-serif;
 }
 
-.close-button {
-    cursor: pointer;
-}
-
 .card {
-    border: None;
+    border: none;
 }
 
 .card:hover {
     box-shadow: 0 0 10px #877725;
+}
+
+.fixed-icon {
+    position: fixed;
+    top: 50%;
+    right: 0;
+    transform: translateY(-50%);
+    opacity: 1;
+    transition: opacity 0.5s;
 }
 
 .hidden {
@@ -45,24 +50,13 @@
     font-weight: bold;
 }
 
-#myFooter {
-    transition: opacity 0.5s ease, visibility 0.5s ease;
-    opacity: 1;
-    visibility: visible;
-}
-
-#myFooter.hide {
-    opacity: 0;
-    visibility: hidden;
+.pagination .page-item.active .page-link {
+    background-color: #007bff;
+    border-color: #007bff;
 }
 
 .pagination .page-item.disabled .page-link {
     color: #6c757d;
-}
-
-.pagination .page-item.active .page-link {
-    background-color: #007bff;
-    border-color: #007bff;
 }
 
 .pagination .page-link,
@@ -100,24 +94,19 @@
     align-items: center;
 }
 
-@media (max-width: 768px) {
-    .card {
-        flex: 1 1 90%;
-        max-width: calc(90% - 2%);
-    }
-}
-
-.fixed-icon {
-    position: fixed;
-    top: 50%;
-    right: 0;
-    transform: translateY(-50%);
-    opacity: 1;
-    transition: opacity 0.5s;
-}
-
 #articleDIV {
     padding: 45px;
+}
+
+#myFooter {
+    transition: opacity 0.5s ease, visibility 0.5s ease;
+    opacity: 1;
+    visibility: visible;
+}
+
+#myFooter.hide {
+    opacity: 0;
+    visibility: hidden;
 }
 
 #sideDIV {
@@ -139,8 +128,18 @@
 }
 
 [data-theme="dark"] .bg-white {
-    background-color: #877725 !important;
+    background-color: transparent !important;
     border-color: #877725 !important;
+}
+
+[data-theme="dark"] h2 {
+    background-color: transparent !important;
+    color: #877725 !important;
+}
+
+[data-theme="dark"] h5 {
+    background-color: transparent !important;
+    color: #877725 !important;
 }
 
 [data-theme="dark"] .text-gray-600 {
@@ -152,7 +151,7 @@
     background-size: cover;
     background-repeat: no-repeat;
     background-attachment: fixed;
-    color: #1e1f22;
+    color: #202746;
     top: 0;
     left: 0;
     right: 0;
@@ -160,3 +159,19 @@
     z-index: -1;
 }
 
+[data-theme="light"] h2:hover {
+    background-color: transparent !important;
+    color: #000000 !important;
+}
+
+[data-theme="light"] h5:hover {
+    background-color: transparent !important;
+    color: #000000 !important;
+}
+
+@media (max-width: 768px) {
+    .card {
+        flex: 1 1 90%;
+        max-width: calc(90% - 2%);
+    }
+}

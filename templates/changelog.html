@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <title>更新日志</title>
+</head>
+<body class="bg-gray-100">
+<div class="container mx-auto px-4 py-8">
+    <header class="mb-8">
+        <h1 class="text-3xl font-bold" onclick="window.location.href = '/'">更新日志</h1>
+        <p class="text-gray-600">感谢您的支持和反馈！如有任何建议或意见，请随时联系我们。</p>
+    </header>
+
+    <section class="space-y-8">
+        {% for update in updates %}
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-xl font-semibold">V {{ update.version }}</h2>
+                <p class="text-gray-500">{{ update.date }}</p>
+                <ul class="list-disc pl-5 mt-2">
+                    {% for change in update.updates %}
+                        <li>{{ change }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endfor %}
+    </section>
+</div>
+
+<footer class="mt-10 text-center text-gray-500">
+    <p>无论如何，感谢您的支持！</p>
+</footer>
+</body>
+</html>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // 获取所有的无序列表
+        const lists = document.querySelectorAll('ul');
+
+        lists.forEach(list => {
+            // 获取所有的列表项
+            const items = list.querySelectorAll('li');
+
+            items.forEach(item => {
+                // 移除包含短横线的li标签
+                if (item.innerHTML.trim() === '---------------------------------------------') {
+                    item.remove();
+                } else {
+                    // 替换短横线为相应的符号
+                    item.innerHTML = item.innerHTML
+                        .replace(/- \[优化\]\:/g, '⭐【优化】')
+                        .replace(/- \[修复\]\:/g, '🐞【修复】')
+                        .replace(/- \[新增\]\:/g, '🌟【新增】')
+                        .replace(/- \[移除\]\:/g, '➖【移除】')
+                        .replace(/- \[Tips\]\:/g, '✨【提示】');
+                }
+            });
+        });
+    });
+</script>

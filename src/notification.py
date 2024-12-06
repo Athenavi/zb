@@ -1,12 +1,10 @@
-import datetime
 import smtplib
-import threading
-from datetime import timedelta, time
+import time
+from datetime import timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 import flask_socketio
-import schedule
 from flask import Flask, request, jsonify
 from flask_caching import Cache
 
@@ -131,10 +129,6 @@ def read_notification():
     return response
 
 
-last_check_time = None
-last_check_data = None
-
-
 def send_email(sender_email, password, receiver_email, smtp_server, smtp_port, subject, body):
     # 创建邮件对象
     msg = MIMEMultipart()
@@ -155,47 +149,17 @@ def send_email(sender_email, password, receiver_email, smtp_server, smtp_port, s
         print(f"邮件发送失败: {e}")
 
 
-def check_for_changes():
-    global last_check_time, last_check_data
-
-    db = get_database_connection()
+def send_change_mail(content, kind):
     try:
-        with db.cursor() as cursor:
-            query = "SELECT * FROM `events` WHERE `created_at` > %s"
-            cursor.execute(query, (last_check_time,))
-            current_data = cursor.fetchone()
-
-            if current_data:
-                # 检查数据是否有变化
-                if last_check_data is None or current_data != last_check_data:
-                    print("Data has changed!")
-                    # 发送邮件通知
-                    subject = "留言数据变化通知"
-                    body = f"检测新的内容: {current_data}"
-                    smtp_server, stmp_port, sender_email, password = zy_mail_conf()
-                    receiver_email = sender_email
-                    send_email(sender_email, password, receiver_email, smtp_server, stmp_port=int(stmp_port),
-                               subject=subject,
-                               body=body)
-
-                    # 更新最后的数据
-                    last_check_data = current_data
-
+        if content and kind:
+            subject = "数据变化通知"
+            body = f"来自{kind}新的内容: {content}"
+            smtp_server, stmp_port, sender_email, password = zy_mail_conf()
+            receiver_email = sender_email
+            send_email(sender_email, password, receiver_email, smtp_server, smtp_port=int(stmp_port),
+                       subject=subject,
+                       body=body)
     except Exception as e:
         print(f"An error occurred: {e}")
     finally:
-        db.close()
-        last_check_time = datetime.now()
-
-
-def run_scheduler():
-    schedule.every(10).minutes.do(check_for_changes)
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
-
-
-@noti.route('/start_monitoring')
-def start_monitoring():
-    threading.Thread(target=run_scheduler).start()
-    return jsonify({"message": "Monitoring started!"})
+        pass

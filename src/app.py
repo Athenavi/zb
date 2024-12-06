@@ -15,6 +15,7 @@ from functools import wraps
 from pathlib import Path
 
 import jwt
+import markdown
 import qrcode
 import requests
 from flask import Flask, render_template, redirect, session, request, url_for, Response, jsonify, send_file, \
@@ -33,7 +34,7 @@ from src.BlogDeal import get_article_names, get_article_content, clear_html_form
     get_tags_by_article, set_article_info, write_tags_to_database, set_article_visibility
 from src.database import get_database_connection
 from src.links import create_special_url, redirect_to_long_url
-from src.notification import get_sys_notice, read_notification
+from src.notification import get_sys_notice, read_notification, send_change_mail
 from src.user import zyadmin, zy_delete_article, error, get_owner_articles, zy_general_conf, get_userInfo
 from src.utils import zy_upload_file, get_client_ip, \
     zy_noti_conf, generate_jwt, secret_key, authenticate_jwt, \
@@ -392,7 +393,8 @@ def home():
 
         # 检查获取的文章是否为空
         info_list = get_article_info(articles)
-        articles_time_list = zip(articles, info_list)
+        summary_list = get_summary(articles)
+        compressed_list = list(zip(articles, summary_list, info_list))
 
         if not info_list:
             app.logger.warning('获取文章信息失败，返回错误提示')
@@ -402,7 +404,7 @@ def home():
 
         # 渲染模板并存储渲染后的页面内容到缓存中
         rendered_content = template.render(
-            articles_time_list=articles_time_list,
+            articles_time_list=compressed_list,
             url_for=url_for,
             notice=notice,
             has_next_page=has_next_page,
@@ -437,7 +439,6 @@ def home():
 
 @cache.cached(timeout=1800, key_prefix='article_info')
 def get_article_info(articles):
-    print(articles)
     articles_info = []
     for a_title in articles:
         try:
@@ -472,6 +473,31 @@ def get_article_info(articles):
         except FileNotFoundError:
             articles_info.append('点赞：0 评论：0')
     return articles_info
+
+
+@cache.cached(timeout=1800, key_prefix='summary')
+def get_summary(articles):
+    articles_summary = []
+    for a_title in articles:
+        try:
+            summary = get_file_summary(a_title)
+            articles_summary.append(summary)
+        except FileNotFoundError:
+            articles_summary.append('获取摘要失败')
+    return articles_summary
+
+
+def get_file_summary(a_title):
+    articles_dir = os.path.join(base_dir, 'articles', a_title + ".md")
+    try:
+        with open(articles_dir, 'r', encoding='utf-8') as file:
+            content = file.read()
+    except FileNotFoundError:
+        return "未找到文件"
+    html_content = markdown.markdown(content)
+    text_content = clear_html_format(html_content)
+    summary = (text_content[:75] + "...") if len(text_content) > 75 else text_content
+    return summary
 
 
 @cache.memoize(30)
@@ -1700,6 +1726,13 @@ def userCenter(username):
     if not re.match(r'^[a-zA-Z0-9]+$', username):
         return error("Invalid username", 400)
 
+    try:
+        user_dir = Path(base_dir) / 'media' / username
+        if not os.path.exists(user_dir):
+            return error("Invalid username", 400)
+    except Exception as e:
+        pass
+
     spm = request.args.get('spm')
     if spm:
         return diy_space(page=username)
@@ -1793,6 +1826,7 @@ def upload_guestbook(content):
 
         finally:
             db.close()
+            send_change_mail(content, kind='guestbook')
     except Exception as e:
         print(f"An error occurred while getting the database connection: {e}")
 
@@ -1878,6 +1912,38 @@ def music_json():
         }
     ]
     return default_json
+
+
+@app.route('/changelog')
+def changelog():
+    updates = parse_update_file('update.txt')
+    return render_template('changelog.html', updates=updates)
+
+
+def parse_update_file(filename):
+    updates = []
+    with open(filename, 'r', encoding='utf-8') as file:
+        content = file.read()
+
+    # print("Raw content from file: ", content)  # 打印文件的原始内容
+
+    # 使用正则表达式提取版本信息
+    pattern = re.compile(r"版本 (.+?)\s+发布日期:(.+?)\s+[-]*\n((?:-.*(?:\n|$))*)", re.MULTILINE)
+    matches = pattern.findall(content)
+
+    for match in matches:
+        version_info = {
+            'version': match[0].strip(),
+            'date': match[1].strip(),
+            'updates': [update.strip() for update in match[2].strip().splitlines() if update.strip()]
+        }
+        updates.append(version_info)
+    return updates
+
+
+@app.route('/api/test')
+def test_api():
+    return render_template('test.html')
 
 
 @app.errorhandler(404)
