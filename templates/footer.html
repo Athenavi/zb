@@ -1,51 +1,12 @@
 <!-- footer.html -->
 {% macro zyfooter(notice) -%}
 
-    <footer id="myFooter" class="bg-black text-gray-200 py-6">
-        <div class="container mx-auto px-4">
-            <div class="flex flex-col md:flex-row justify-between items-center">
-                <div class="flex flex-col md:flex-row items-center">
-                    <p class="m-0 text-center md:text-left text-sm">
-                        <a href="https://github.com/Athenavi/zyBLOG/" target="_blank" class="hover:underline">
-                            © 2024 zyBLOG All Rights Reserved.
-                        </a>
-                    </p>
-                </div>
-                <div class="mt-4 md:mt-0 flex flex-col md:flex-row">
-                    <p class="m-0 text-center md:text-left text-sm">
-                        <a href="https://beian.miit.gov.cn/" target="_blank" class="hover:underline">{{ beian }}</a>
-                    </p>
-                </div>
-            </div>
-            <div class="mt-4">
-                <div class="flex justify-center space-x-4">
-                    <a href="/blog/legal-agreement" class="text-gray-400 hover:text-white">隐私政策</a>
-                    <a href="/blog/README" class="text-gray-400 hover:text-white">使用条款</a>
-                    <a href="https://github.com/Athenavi/zb/issues" target="_blank"
-                       class="text-gray-400 hover:text-white">支持</a>
-                    <a href="mailto:support@7trees.cn" target="_blank" class="text-gray-400 hover:text-white">联系</a>
-                </div>
-            </div>
+    <footer class="bg-transparent mt-8 py-6">
+        <div class="container mx-auto text-center">
+            <p class="text-gray-500"><a href="https://github.com/Athenavi/zb">© 2024 zyBLOG. 版权所有.</a></p>
         </div>
     </footer>
-    <script>
-        let footerTimeout;
 
-        const footer = document.getElementById('myFooter');
-
-        window.addEventListener('wheel', function () {
-            // 如果已经有隐藏的定时器，清除它
-            clearTimeout(footerTimeout);
-
-            // 添加隐藏类
-            footer.classList.add('hide');
-
-            // 1.7秒后再次显示
-            footerTimeout = setTimeout(() => {
-                footer.classList.remove('hide');
-            }, 1700);
-        });
-    </script>
     <div class="top-bar">
         <script>
             function copyAndAlert() {
@@ -60,15 +21,9 @@
         <div class="top-bar">
             <div>
                 <span style="color: green;">{{ notice | safe }}</span>
-                <br/>
-                <a href="weixin://" onclick="copyAndAlert()" style="text-align: center;">
-      <span style="color: red;">
-        点击这里打开微信
-      </span> 搜索“奇客舒”体验GPT-3.5
-                </a>&nbsp;
+                <span id="timer">30</span>秒后自动
+                <a id="close-btn">__关闭</a>
             </div>
-            <span id="timer">30</span>秒后自动
-            <a id="close-btn">__关闭</a>
         </div>
     </div>
     <script type="text/javascript">

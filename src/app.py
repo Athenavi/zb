@@ -1889,7 +1889,7 @@ def music_json():
 
 
 @app.route('/changelog')
-def test_api():
+def changelog():
     updates = parse_update_file('update.txt')
     return render_template('changelog.html', updates=updates)
 
@@ -1899,7 +1899,7 @@ def parse_update_file(filename):
     with open(filename, 'r', encoding='utf-8') as file:
         content = file.read()
 
-    print("Raw content from file: ", content)  # 打印文件的原始内容
+    # print("Raw content from file: ", content)  # 打印文件的原始内容
 
     # 使用正则表达式提取版本信息
     pattern = re.compile(r"版本 (.+?)\s+发布日期:(.+?)\s+[-]*\n((?:-.*(?:\n|$))*)", re.MULTILINE)
@@ -1913,6 +1913,11 @@ def parse_update_file(filename):
         }
         updates.append(version_info)
     return updates
+
+
+@app.route('/api/test')
+def test_api():
+    return render_template('test.html')
 
 
 @app.errorhandler(404)

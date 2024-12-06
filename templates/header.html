@@ -4,25 +4,37 @@
     <link href="/static/css/header.css" rel="stylesheet">
 
     <div class="loader" id="loader"></div>
-    <nav class="bg-blue-500">
-        <div class="container mx-auto flex justify-between items-center p-4">
-            <div class="flex items-center"><img src="../static/favicon.ico"
-                                                style="height: 32px"/>
-            </div>
-            <div class="flex space-x-6">
-                <a href="/" class="text-white hover:bg-purple-700 px-4 py-2 rounded">首页</a>
-                <a href="/profile" class="text-white hover:bg-purple-700 px-4 py-2 rounded">我的</a>
-                <div class="dropdown">
-                    <button class="text-white hover:bg-blue-600 px-4 py-2">🔻资源</button>
-                    <div class="dropdown-content">
-                        <a href="/media">媒体</a>
-                        <a href="/register">注册</a>
-                        <a href="/links">友链</a>
-                    </div>
-                </div>
-            </div>
+    <header class="bg-blue-500 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center py-6">
+            <h1 class="text-2xl font-bold text-gray-800" onclick="window.location.href = '/'"><img
+                    src="/static/favicon.ico" style="height: 32px"></h1>
+            <nav>
+                <ul class="flex space-x-6">
+                    <li>
+                        <div class="dropdown">
+                            <button class="text-white hover:bg-blue-600 px-4 py-2">🔻我的</button>
+                            <div class="dropdown-content">
+                                <a href="/profile">个人中心</a>
+                                <a href="/setting/profiles">设置</a>
+                                <a href="/media">媒体</a>
+                            </div>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="dropdown">
+                            <button class="text-white hover:bg-blue-600 px-4 py-2">🔻更多</button>
+                            <div class="dropdown-content">
+                                <a href="/register">注册</a>
+                                <a href="/links">友链</a>
+                                <a href="/changelog">更新日志</a>
+                                <a href="/guestbook">留言</a>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+            </nav>
         </div>
-    </nav>
+    </header>
 
     <div class="fixed-icon">
         <script>
