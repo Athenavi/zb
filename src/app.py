@@ -15,6 +15,7 @@ from functools import wraps
 from pathlib import Path
 
 import jwt
+import markdown
 import qrcode
 import requests
 from flask import Flask, render_template, redirect, session, request, url_for, Response, jsonify, send_file, \
@@ -392,7 +393,8 @@ def home():
 
         # 检查获取的文章是否为空
         info_list = get_article_info(articles)
-        articles_time_list = zip(articles, info_list)
+        summary_list = get_summary(articles)
+        compressed_list = list(zip(articles, summary_list, info_list))
 
         if not info_list:
             app.logger.warning('获取文章信息失败，返回错误提示')
@@ -402,7 +404,7 @@ def home():
 
         # 渲染模板并存储渲染后的页面内容到缓存中
         rendered_content = template.render(
-            articles_time_list=articles_time_list,
+            articles_time_list=compressed_list,
             url_for=url_for,
             notice=notice,
             has_next_page=has_next_page,
@@ -437,7 +439,6 @@ def home():
 
 @cache.cached(timeout=1800, key_prefix='article_info')
 def get_article_info(articles):
-    print(articles)
     articles_info = []
     for a_title in articles:
         try:
@@ -472,6 +473,31 @@ def get_article_info(articles):
         except FileNotFoundError:
             articles_info.append('点赞：0 评论：0')
     return articles_info
+
+
+@cache.cached(timeout=1800, key_prefix='summary')
+def get_summary(articles):
+    articles_summary = []
+    for a_title in articles:
+        try:
+            summary = get_file_summary(a_title)
+            articles_summary.append(summary)
+        except FileNotFoundError:
+            articles_summary.append('获取摘要失败')
+    return articles_summary
+
+
+def get_file_summary(a_title):
+    articles_dir = os.path.join(base_dir, 'articles', a_title + ".md")
+    try:
+        with open(articles_dir, 'r', encoding='utf-8') as file:
+            content = file.read()
+    except FileNotFoundError:
+        return "未找到文件"
+    html_content = markdown.markdown(content)
+    text_content = clear_html_format(html_content)
+    summary = (text_content[:75] + "...") if len(text_content) > 75 else text_content
+    return summary
 
 
 @cache.memoize(30)

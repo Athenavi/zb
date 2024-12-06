@@ -28,11 +28,11 @@
                 </a>
             </div>
         {% endfor %}
-        {% for article, info in articles_time_list %}
+        {% for article, summary, info in articles_time_list %}
             <article class="bg-white p-6 rounded-lg shadow hover:shadow-xl transition-shadow duration-300">
                 <a href="{{ url_for('blog_detail', article=article) }}"><h2
                         class="text-xl font-semibold text-gray-800">{{ article }}</h2></a>
-                <p class="text-gray-600 mt-2"></p>
+                <p class="text-gray-600 mt-2">{{ summary }}</p>
                 <time class="text-gray-500 mt-4 block">{{ info }}</time>
             </article>
         {% endfor %}
