@@ -1700,6 +1700,13 @@ def userCenter(username):
     if not re.match(r'^[a-zA-Z0-9]+$', username):
         return error("Invalid username", 400)
 
+    try:
+        user_dir = Path(base_dir) / 'media' / username
+        if not os.path.exists(user_dir):
+            return error("Invalid username", 400)
+    except Exception as e:
+        pass
+
     spm = request.args.get('spm')
     if spm:
         return diy_space(page=username)
@@ -1879,6 +1886,33 @@ def music_json():
         }
     ]
     return default_json
+
+
+@app.route('/api/test')
+def test_api():
+    updates = parse_update_file('update.txt')
+    return render_template('test.html', updates=updates)
+
+
+def parse_update_file(filename):
+    updates = []
+    with open(filename, 'r', encoding='utf-8') as file:
+        content = file.read()
+
+    print("Raw content from file: ", content)  # 打印文件的原始内容
+
+    # 使用正则表达式提取版本信息
+    pattern = re.compile(r"版本 (.+?)\s+发布日期:(.+?)\s+[-]*\n((?:-.*(?:\n|$))*)", re.MULTILINE)
+    matches = pattern.findall(content)
+
+    for match in matches:
+        version_info = {
+            'version': match[0].strip(),
+            'date': match[1].strip(),
+            'updates': [update.strip() for update in match[2].strip().splitlines() if update.strip()]
+        }
+        updates.append(version_info)
+    return updates
 
 
 @app.errorhandler(404)
