@@ -18,6 +18,20 @@
 <main class="container mx-auto mt-8 flex">
     <section class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6">
         <h2 class="text-xl font-bold mb-2">{{ page_mark }}最新文章</h2>
+        <div class="p-6 mb-6 bg-gray-50 rounded-lg shadow">
+            <h4 class="font-bold text-gray-800 mb-4">标签</h4>
+            <div class="flex flex-wrap">
+                {% for tag in tags %}
+                    <a href="/?tag={{ tag }}"
+                       class="bg-gray-200 text-blue-700 px-3 py-1 mr-2 mb-2 rounded-full hover:bg-blue-200 transition duration-200">
+                        {{ tag }}
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% from 'musicPlayer.html' import player %}
+        {{ player() }}
+        <hr style="visibility: hidden"/>
         {% for sub_id,sub_name in subscriber_ids_list %}
             <div class="card bg-lightblue-500 shadow-lg rounded-lg overflow-hidden border border-gray-200">
                 <a href="/profile?id={{ sub_id }}&sn={{ sub_name }}"
@@ -56,21 +70,6 @@
                 {% endif %}
             </ul>
         </nav>
-    </section>
-    <aside class="md:block w-1/4 lg:w-1/5 md:pl-8 lg:pl-12" id="sideDIV">
-        <div class="p-6 mb-6 bg-gray-50 rounded-lg shadow">
-            <h4 class="font-bold text-gray-800 mb-4">标签</h4>
-            <div class="flex flex-wrap">
-                {% for tag in tags %}
-                    <a href="/?tag={{ tag }}"
-                       class="bg-gray-200 text-blue-700 px-3 py-1 mr-2 mb-2 rounded-full hover:bg-blue-200 transition duration-200">
-                        {{ tag }}
-                    </a>
-                {% endfor %}
-            </div>
-        </div>
-        {% from 'musicPlayer.html' import player %}
-        {{ player() }}
         <div class="w-full h-auto mb-4 rounded-lg shadow">
             {% if friends_links %}
                 <h4 class="font-bold text-gray-800 mb-4">友情链接</h4>
@@ -80,7 +79,7 @@
                 {% endfor %}
             {% endif %}
         </div>
-    </aside>
+    </section>
 </main>
 <!-- Footer -->
 {% from 'footer.html' import zyfooter %}
