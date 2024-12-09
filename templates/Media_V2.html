@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html dir="ltr" lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="description" content="">
+    <meta name="keywords" content=""/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="author" content="">
+    <title>{{ title }}</title>
+    <link rel="shortcut icon" type="image/ico" href="/favicon.ico">
+    <link href="https://cdn.bootcdn.net/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.bootcdn.net/ajax/libs/normalize/8.0.1/normalize.css" rel="stylesheet">
+    <script src="https://cdn.bootcdn.net/ajax/libs/jquery/3.7.1/jquery.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/jquery-mousewheel/3.1.9/jquery.mousewheel.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/fancybox/3.5.7/jquery.fancybox.js"></script>
+    <link href="https://cdn.bootcdn.net/ajax/libs/fancybox/3.5.7/jquery.fancybox.css" rel="stylesheet">
+    <script src="/static/js/media-fancybox.js" type="text/javascript"></script>
+    <link rel="stylesheet" href="/static/css/dropzone.css">
+    <style>
+        body {
+            background: url(/static/image/day.jpg) no-repeat center/cover;
+        }
+
+        .btn-primary:hover {
+            background-color: #FFC107; /* 悬停时变为亮黄色 */
+        }
+
+        #video-popup, #xmind-popup {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+
+        .video-wrapper, .xmind-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+        }
+
+        .video-wrapper video {
+            max-width: 80%;
+            max-height: 80%;
+            border: 2px solid #fff; /* 保留原来风格 */
+            border-radius: 5px;
+        }
+
+        .xmind-wrapper button {
+            font-size: 16px;
+            margin-top: 10px;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .col-md-6 {
+                flex: 0 0 100%; /* 小屏幕时每个卡片占满一行 */
+            }
+
+            .block-content {
+                padding: 10px; /* 更小的内边距 */
+            }
+        }
+
+        @media (min-width: 768px) {
+            .block-content {
+                margin-bottom: 30px;
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100">
+
+<div class="container mx-auto p-6">
+    <header class="bg-white rounded-lg shadow mb-6 p-4">
+        <h1 class="text-2xl font-bold"><a href="/">🏠</a>媒体文件</h1>
+        {% if userid %}
+            <div class="flex justify-between mt-2">
+                <div>
+                    <a href="/profile" class="text-blue-500 hover:underline">{{ userid }}</a>
+                    <a href="{{ url_for('media_v2', username=userid, page=1) }}"
+                       class="ml-2 text-blue-500 hover:underline">仅图片</a>
+                    <a href="{{ url_for('media_v2', username=userid, page=1,type='video') }}"
+                       class="ml-2 text-blue-500 hover:underline">仅视频</a>
+                    <a href="{{ url_for('media_v2', username=userid, page=1,type='xmind') }}"
+                       class="ml-2 text-blue-500 hover:underline">Xmind文件</a>
+                </div>
+            </div>
+        {% endif %}
+    </header>
+
+    <div class="content bg-white rounded-lg shadow p-4">
+        <!-- 文件上传 -->
+        <form action="/upload_file" class="dropzone border-dashed border-2 border-gray-400 rounded-lg p-8 mb-6"
+              method="POST" enctype="multipart/form-data" id="myDropzone"></form>
+        <script src="/static/js/dropzone.js"></script>
+        <script>
+            // Initialize Dropzone
+            Dropzone.options.myDropzone = {
+                acceptedFiles: '.jpg, .png, .webp, .jfif, .pjpeg, .jpeg, .pjp, .mp4, .xmind',
+                maxFilesize: 60,
+                maxFiles: 1,
+                dictFileTooBig: '超出文件大小限制 ({{filesize}}MB). 最大文件大小: {{maxFilesize}}MB.',
+                dictInvalidFileType: '无效的文件类型. 仅支持 JPG, PNG, WEBP, JFIF, PJPEG, JPEG, PJP, MP4 文件。',
+                init: function () {
+                    this.on('success', function (file, response) {
+                        console.log('文件上传成功');
+                    });
+                    this.on('error', function (file, errorMessage) {
+                        console.log('文件上传错误: ' + errorMessage);
+                    });
+                }
+            };
+        </script>
+
+        <hr class="my-4">
+
+        <section>
+            <ul class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {% for img in imgs %}
+                    <li class="group">
+                        <div class="bg-gray-200 rounded-lg overflow-hidden shadow">
+                            <a href="/zyImg/{{ userid }}/{{ img }}" class="fancybox block" data-rel="group" title="">
+                                <img src="/img/{{ userid }}/thumbs/{{ img }}" alt="" class="w-full h-40 object-cover"/>
+                            </a>
+                        </div>
+                    </li>
+                {% endfor %}
+                {% for video in videos %}
+                    <li class="group">
+                        <div class="bg-gray-200 rounded-lg overflow-hidden shadow">
+                            <a class="card-link" onclick="startVideo('{{ video }}')">
+                                <button class="btn btn-primary" onclick="copyVideoURL('{{ video }}')">copy</button>
+                                <img src="/video/{{ userid }}/thumbs/{{ video }}.png" alt=""
+                                     class="w-full h-40 object-cover"/>
+                            </a>
+                        </div>
+                    </li>
+                {% endfor %}
+                {% for xmind in xminds %}
+                    <li class="group">
+                        <div class="bg-gray-200 rounded-lg overflow-hidden shadow">
+                            <a class="card-link"
+                               onclick="prewXmind('{{ domain }}preview?user={{ userid }}&file_name={{ xmind }}')">
+                                {{ xmind }}
+                                <img src="/xmind/{{ userid }}/thumbs/{{ xmind }}.png" alt=""
+                                     class="w-full h-40 object-cover"/>
+                            </a>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
+        <!-- 翻页按钮 -->
+        {% if has_previous_page and imgs %}
+            <a href="{{ url_for('media_v2', username=userid, page=current_page-1) }}"
+               class="btn btn-secondary">Previous</a>
+        {% endif %}
+        <span>----------</span>
+        {% if has_next_page and imgs %}
+            <a href="{{ url_for('media_v2', username=userid, page=current_page+1)}}"
+               class="btn btn-secondary">Next</a>
+        {% endif %}
+
+        {% if has_previous_page and videos %}
+            <a href="{{ url_for('media_v2', username=userid, page=current_page-1,type='video') }}"
+               class="btn btn-secondary">Previous</a>
+        {% endif %}
+        <span>----------</span>
+        {% if has_next_page and videos %}
+            <a href="{{ url_for('media_v2', username=userid, page=current_page+1,type='video')}}"
+               class="btn btn-secondary">Next</a>
+        {% endif %}
+
+        {% if has_previous_page and xminds %}
+            <a href="{{ url_for('media_v2', username=userid, page=current_page-1,type='xmind') }}"
+               class="btn btn-secondary">Previous</a>
+        {% endif %}
+        <span>----------</span>
+        {% if has_next_page and xminds %}
+            <a href="{{ url_for('media_v2', username=userid, page=current_page+1,type='xmind')}}"
+               class="btn btn-secondary">Next</a>
+        {% endif %}
+    </div>
+
+    <!-- Footer -->
+    {% from 'footer.html' import zyfooter %}
+    {{ zyfooter("请勿上传违规文件") }}
+</div>
+
+</body>
+</html>
+<div id="video-popup">
+    <div class="video-wrapper">
+        <video id="video-image" src="" controls></video>
+        <button class="btn btn-primary" onclick="closeVideo()">关闭</button>
+    </div>
+</div>
+<div id="xmind-popup">
+    <div class="xmind-wrapper">
+        <button class="btn btn-primary" onclick="closeXmind()">关闭预览</button>
+    </div>
+</div>
+<script>
+    function closeVideo() {
+        document.getElementById('video-popup').style.display = 'none';
+    }
+
+    function copyVideoURL(video) {
+        const URL = "{{ domain }}" + "zyVideo/{{ userid }}/" + video;
+        navigator.clipboard.writeText(URL).then(function () {
+            alert("已复制到剪切板，可在博客中使用此外链视频");
+        }).catch(function (error) {
+            alert("复制失败：" + error);
+        });
+    }
+
+    function copyXmindURL(xmind) {
+        const URL = "{{ domain }}" + "blog/f/{{ userid }}/" + xmind;
+        navigator.clipboard.writeText(URL).then(function () {
+            alert("已复制到剪切板，可在博客中使用此外链 Xmind");
+        }).catch(function (error) {
+            alert("复制失败：" + error);
+        });
+    }
+
+    function startVideo(video) {
+        var videoSrc = "/zyVideo/{{ userid }}/" + video;
+        document.getElementById("video-image").src = videoSrc;
+        document.getElementById("video-popup").style.display = "block";
+    }
+</script>
+<script src="/static/js/prewXmind.js"></script>

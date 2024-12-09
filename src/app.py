@@ -1,4 +1,5 @@
 import base64
+import concurrent.futures
 import configparser
 import datetime
 import hashlib
@@ -39,7 +40,8 @@ from src.user import zyadmin, zy_delete_article, error, get_owner_articles, zy_g
 from src.utils import zy_upload_file, get_client_ip, \
     zy_noti_conf, generate_jwt, secret_key, authenticate_jwt, \
     authenticate_refresh_token, handle_file_upload, is_allowed_file, is_valid_domain_with_slash, \
-    get_all_img, get_all_video, get_all_xmind, get_list_intersection
+    get_all_img, get_all_video, get_all_xmind, get_list_intersection, generate_thumbs, generate_video_thumb, \
+    get_media_list
 
 global_encoding = 'utf-8'
 
@@ -1941,9 +1943,92 @@ def parse_update_file(filename):
     return updates
 
 
+@app.route('/media_V2', methods=['GET', 'POST'])
+@jwt_required
+def media_v2(user_id):
+    media_type = request.args.get('type', default='img')
+    page = request.args.get('page', default=1, type=int)
+    username = get_username()
+    if request.method == 'GET':
+        if not media_type or media_type == 'img':
+            imgs, has_next_page, has_previous_page = get_media_list(username, category='img', page=page, per_page=20)
+
+            return render_template('Media_V2.html', imgs=imgs, title='Media', url_for=url_for,
+                                   has_next_page=has_next_page,
+                                   has_previous_page=has_previous_page, current_page=page, userid=username,
+                                   domain=domain)
+        if media_type == 'video':
+            videos, has_next_page, has_previous_page = get_all_video(username, page=page)
+
+            return render_template('Media_V2.html', videos=videos, title='Media', url_for=url_for,
+                                   has_next_page=has_next_page,
+                                   has_previous_page=has_previous_page, current_page=page, userid=username,
+                                   domain=domain)
+
+        if media_type == 'xmind':
+            xminds, has_next_page, has_previous_page = get_all_xmind(username, page=page)
+
+            return render_template('Media_V2.html', xminds=xminds, title='Media', url_for=url_for,
+                                   has_next_page=has_next_page,
+                                   has_previous_page=has_previous_page, current_page=page, userid=username,
+                                   domain=domain)
+    elif request.method == 'POST':
+        img_name = request.json.get('img_name')
+        if not img_name:
+            return error(message='缺少图像名称', status_code=400)
+
+        image = get_image_path(username, img_name)
+        if not image:
+            return error(message='未找到图像', status_code=404)
+
+        return image
+
+
+@app.route('/img/<username>/thumbs/<img>', methods=['GET', 'POST'])
+def api_img(username, img):
+    if request.method == 'GET':
+        img_dir = Path(base_dir) / 'media' / username / img
+        img_thumbs = Path(base_dir) / 'media' / username / 'thumbs' / img
+        if os.path.isfile(img_dir) and os.path.isfile(img_thumbs):
+            return send_file(img_thumbs, mimetype='image/jpeg')
+        if os.path.isfile(img_dir) and not os.path.isfile(img_thumbs):
+            # 使用线程池异步执行 gen_thumbs 函数
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                thumbs_path = os.path.join(base_dir, 'media', username, 'thumbs')
+                if not os.path.exists(thumbs_path):
+                    os.makedirs(thumbs_path)
+                executor.submit(generate_thumbs(img_dir, img_thumbs))
+            return send_file('../static/favicon.ico', mimetype='image/png')
+
+
+@app.route('/video/<username>/thumbs/<video>.png', methods=['GET', 'POST'])
+def api_video(username, video):
+    if request.method == 'GET':
+        video_dir = Path(base_dir) / 'media' / username / video
+        video_thumbs = Path(base_dir) / 'media' / username / 'thumbs' / f"V-thumbs_{video}.png"
+        if os.path.isfile(video_dir) and os.path.isfile(video_thumbs):
+            return send_file(video_thumbs, mimetype='image/jpeg')
+        if os.path.isfile(video_dir) and not os.path.isfile(video_thumbs):
+            # 使用线程池异步执行 gen_thumbs 函数
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                thumbs_path = os.path.join(base_dir, 'media', username, 'thumbs')
+                if not os.path.exists(thumbs_path):
+                    os.makedirs(thumbs_path)
+                executor.submit(generate_video_thumb(video_dir, video_thumbs))
+            return send_file('../static/favicon.ico', mimetype='image/png')
+
+
+@app.route('/xmind/<username>/thumbs/<xmind>.png', methods=['GET', 'POST'])
+def api_xmind(username, xmind):
+    if request.method == 'GET':
+        video_dir = Path(base_dir) / 'media' / username / xmind
+        if os.path.isfile(video_dir):
+            return send_file('../static/image/xmind.png', mimetype='image/jpeg')
+
+
 @app.route('/api/test')
 def test_api():
-    return render_template('test.html')
+    return render_template('Media_V2.html')
 
 
 @app.errorhandler(404)

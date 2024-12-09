@@ -17,3 +17,5 @@ pillow==11.0.0
 packaging~=24.1
 mysql~=0.0.3
 qrcode~=8.0
+pillow==11.0.0
+opencv-python==4.10.0.84
