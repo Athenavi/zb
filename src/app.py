@@ -1828,7 +1828,8 @@ def upload_guestbook(content):
 
         finally:
             db.close()
-            send_change_mail(content, kind='guestbook')
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                executor.submit(send_change_mail(content, kind='guestbook'))
     except Exception as e:
         print(f"An error occurred while getting the database connection: {e}")
 
@@ -2026,9 +2027,128 @@ def api_xmind(username, xmind):
             return send_file('../static/image/xmind.png', mimetype='image/jpeg')
 
 
-@app.route('/api/test')
-def test_api():
-    return render_template('Media_V2.html')
+@app.route('/api/wx/home', methods=['GET'])
+def api_wx_home():
+    # 获取请求参数
+    page = request.args.get('page', default=1, type=int)
+    tag = request.args.get('tag', default='None')
+
+    if page <= 0:
+        page = 1
+
+    # 获取文章内容
+    articles, has_next_page, has_previous_page = get_a_list(chanel=2, page=page)
+    # 获取其他变量
+    notice = ''
+    try:
+        notice = get_sys_notice(0)
+    except Exception as e:
+        app.logger.error(f'读取通知文件出错: {e}')
+
+    tags = []
+    try:
+        tags = get_unique_tags()
+    except Exception as e:
+        app.logger.error(f'获取标签出错: {e}')
+
+    # 处理标签过滤
+    if tag != 'None':
+        tag_articles = get_articles_by_tag(tag)
+        if tag_articles:
+            articles = get_list_intersection(articles, tag_articles)
+        else:
+            app.logger.warning(f'没有找到标签: {tag} 下的文章！')
+
+    # 获取文章信息和摘要
+    info_list = get_article_info(articles)
+    summary_list = get_summary(articles)
+    compressed_list = list(zip(articles, summary_list, info_list))
+
+    friends_links = get_friends_link(type=1)
+
+    # 构建返回的数据
+    response_data = {
+        'articles': compressed_list,
+        'notice': notice,
+        'has_next_page': has_next_page,
+        'has_previous_page': has_previous_page,
+        'current_page': page,
+        'tags': tags,
+        'tag': tag,
+        'friends_links': friends_links
+    }
+
+    return jsonify(response_data)
+
+
+@app.route('/api/wx/blog_detail/<article>', methods=['GET'])
+def api_wx_blog_detail(article):
+    def generate_response_data(message="文章不存在"):
+        return jsonify({
+            'article_name': message,
+            'author': message,
+            'author_uid': message,
+            'update_date': message,
+            'domain': domain,
+            'article_surl': message,
+            'article_tags': message,
+            'content': message,
+        })
+
+    try:
+        article_names = get_a_list(chanel=1)
+        hidden_articles = read_hidden_articles()
+
+        if article in hidden_articles or article not in article_names:
+            return generate_response_data()
+
+        article_tags = get_tags_by_article(article)
+        article_url = f"{domain}blog/{article}"
+        article_surl = api_shortlink(article_url)
+        author, author_uid = get_blog_author(article)
+        update_date = get_file_date(article)
+        content = api_wx_content(article)
+
+        response_data = {
+            'article_name': article,
+            'author': author,
+            'author_uid': str(author_uid),
+            'update_date': update_date,
+            'domain': domain,
+            'article_surl': article_surl,
+            'article_tags': article_tags,
+            'content': content,
+        }
+
+        return jsonify(response_data)
+
+    except FileNotFoundError:
+        return generate_response_data()
+
+
+def api_wx_content(article):
+    articles_dir = os.path.join(base_dir, 'articles', article + ".md")
+    html_content = '<p>没有找到内容</p>'
+    try:
+        with open(articles_dir, 'r', encoding='utf-8') as file:
+            content = file.read()
+            html_content = markdown.markdown(content)
+            return html_content
+    finally:
+        return html_content
+
+
+@app.route('/api/wx/guestbook', methods=['GET', 'POST'])
+def api_wx_guestbook():
+    avatar_url = get_avatar(1)
+    message_list = get_guestbook() or []
+    response_data = {
+        'avatar_url': avatar_url,
+        'username': "陌生人",
+        'message_list': message_list
+    }
+
+    return jsonify(response_data)
 
 
 @app.errorhandler(404)
