@@ -94,6 +94,32 @@
     align-items: center;
 }
 
+.tooltip {
+    position: relative;
+    cursor: pointer;
+}
+
+.tooltip::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%; /* 在上方显示 */
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    padding: 5px;
+    border-radius: 5px;
+    white-space: nowrap;
+    visibility: hidden; /* 初始为不可见 */
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.tooltip:hover::after {
+    visibility: visible; /* 悬浮时可见 */
+    opacity: 1;
+}
+
 #articleDIV {
     padding: 45px;
 }

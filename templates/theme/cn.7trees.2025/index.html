@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="zyBLOG|基于flask的博客程序">
+    <meta name="keywords" content="zyBLOG, flask, 七棵树, 奇客舒, 博客">
+    <meta name="robots" content="index, follow">
+    <title>{{ title }}</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        .new-year-bg {
+            background-image: url('/theme/cn.7trees.2025/—Pngtree—2025 year of the snake_15945435.jpg');
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            color: #877725;
+        }
+
+        section a span {
+            color: #dd566a;
+        }
+
+        .new-year-text {
+            color: #c0392b;
+        }
+
+        @media (max-width: 768px) {
+            .card {
+                flex: 1 1 90%;
+                max-width: calc(90% - 2%);
+            }
+
+            .new-year-bg {
+                background-attachment: scroll;
+                background-position: right;
+            }
+        }
+
+    </style>
+</head>
+
+<body class="bg-gray-100 new-year-bg">
+
+<!-- Header -->
+{% from 'header.html' import zytopbar %}
+{{ zytopbar() }}
+<!-- Main Content -->
+<main class="container mx-auto px-4 py-6">
+    <div class="mb-6">
+        <h2 class="text-3xl font-bold mb-4 new-year-text"></h2>
+        <p class="text-gray-700 mb-4"></p>
+    </div>
+
+    <!-- Article Section -->
+    <section class="my-8">
+        <h2 class="text-2xl font-bold mb-4 new-year-text"></h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for tag in tags %}
+                <a href="/?tag={{ tag }}"
+                   class="bg-gray-200 text-blue-700 px-3 py-1 mr-2 mb-2 rounded-full hover:bg-blue-200 transition duration-200">
+                    {{ tag }}
+                </a>
+            {% endfor %}
+            {% for sub_id, sub_name in subscriber_ids_list %}
+                <div class="card bg-lightblue-500 shadow-lg rounded-lg overflow-hidden border border-gray-200">
+                    <a href="/profile?id={{ sub_id }}&sn={{ sub_name }}"
+                       class="flex hover:bg-gray-100 transition duration-200">
+                        <div class="flex-1 p-4">
+                            <h5 class="text-xl font-bold mb-2">{{ sub_name }}</h5>
+                        </div>
+                    </a>
+                </div>
+            {% endfor %}
+            <!-- Article Card -->
+            {% for article, summary, info in articles_time_list %}
+                {% set parts = info.split(';') %}
+                {% set date_time = parts[0] %}
+                {% set author = parts[1] %}
+                {% set likes = parts[2] | int %}
+                {% set comments = parts[3] | int %}
+                <div class="bg-blue-450 p-4 rounded-lg shadow-lg transition-transform transform hover:scale-105">
+                    <h3 class="text-xl font-semibold"><a href="/blog/{{ article }}">{{ article }}</a></h3>
+                    <p class="text-gray-600">{{ summary }}</p>
+                    <time class="block mt-2 text-sm text-gray-500">{{ date_time }}</time>
+                    {% if author != '官方' or likes + comments != 0 %}
+                        <div class="flex justify-between items-center mt-4">
+                            <span class="text-gray-400">{{ author }}</span>
+                            <span class="text-gray-400">点赞:{{ likes }} 评论:{{ comments }}</span>
+                        </div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+            <nav aria-label="Page navigation example" class="my-4">
+                <ul class="flex justify-center space-x-2">
+                    {% if has_previous_page %}
+                        <li>
+                            <a class="page-link text-white px-4 py-2 rounded hover:bg-blue-600"
+                               href="/?page={{ current_page-1 }}&tag={{ tag }}">
+                                &laquo; 上一页
+                            </a>
+                        </li>
+                    {% endif %}
+                    {% if has_next_page %}
+                        <li>
+                            <a class="page-link text-white px-4 py-2 rounded hover:bg-blue-600"
+                               href="/?page={{ current_page+1 }}&tag={{ tag }}">
+                                下一页 &raquo;
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+    </section>
+
+    <!-- Popular Voting Section -->
+    <section class="my-8">
+        <h2 class="text-2xl font-bold mb-4 new-year-text">留言板</h2>
+        <div class="bg-white p-4 rounded-lg shadow-lg">
+            <p class="text-gray-600">你用来这里看什么？你有什么建议？</p>
+            <a href="/guestbook" class="text-blue-500 hover:underline">了解更多</a>
+        </div>
+    </section>
+
+    <!-- News Section -->
+    <section class="my-8">
+        <h2 class="text-2xl font-bold mb-4 new-year-text">友情链接</h2>
+        <article class="bg-white p-4 rounded-lg shadow-lg">
+            <h3 class="font-semibold">去这里看看吧！</h3>
+            <ul class="list-disc pl-5 mt-2">
+                {% if friends_links %}
+                    {% for site_name, site_url in friends_links.items() %}
+                        <li><a href="{{ site_url }}" class="text-blue-500 hover:underline">{{ site_name }}</a></li>
+                    {% endfor %}
+                {% endif %}
+            </ul>
+        </article>
+    </section>
+</main>
+
+<!-- Footer -->
+{% from 'footer.html' import zyfooter %}
+{{ zyfooter(notice[0].title ~ notice[0].message) }}
+
+</body>
+
+</html>
