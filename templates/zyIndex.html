@@ -43,11 +43,24 @@
             </div>
         {% endfor %}
         {% for article, summary, info in articles_time_list %}
+            {% set parts = info.split(';') %}
+            {% set date_time = parts[0] %}
+            {% set author = parts[1] %}
+            {% set likes = parts[2] | int %}
+            {% set comments = parts[3] | int %}
             <article class="bg-white p-6 rounded-lg shadow hover:shadow-xl transition-shadow duration-300">
                 <a href="{{ url_for('blog_detail', article=article) }}"><h2
                         class="text-xl font-semibold text-gray-800">{{ article }}</h2></a>
                 <p class="text-gray-600 mt-2">{{ summary }}</p>
-                <time class="text-gray-500 mt-4 block">{{ info }}</time>
+                <time class="text-gray-500 mt-4 block">{{ date_time }}</time>
+                {% if author != '官方' or likes + comments != 0 %}
+                    <div class="flex justify-between items-center mt-4">
+                        <span class="text-gray-400">{{ author }}</span>
+                        <span class="text-gray-400">
+                            点赞:{{ likes }} 评论:{{ comments }}
+                    </span>
+                    </div>
+                {% endif %}
             </article>
         {% endfor %}
         <nav aria-label="Page navigation example" class="my-4">

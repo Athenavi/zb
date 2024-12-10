@@ -144,6 +144,7 @@
                     <p id="author"></p>
                     <p id="authorWebsite"></p>
                     <p id="title"></p>
+                    <p id="description"></p>
                     <p id="version"></p>
                     <p id="versionCode"></p>
                     <p id="statu"></p>
@@ -176,6 +177,7 @@
                 document.getElementById("authorWebsite").textContent = "作者网站: " + data.authorWebsite;
                 document.getElementById("themeId").textContent = data.id;
                 document.getElementById("title").textContent = "标题: " + data.title;
+                document.getElementById("description").innerHTML = "描述: " + data.description;
                 document.getElementById("version").textContent = "适配版本: " + data.version;
                 document.getElementById("versionCode").textContent = "主题版本代码（标识符）: " + data.versionCode;
                 // 显示弹出窗口

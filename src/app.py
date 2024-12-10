@@ -449,6 +449,8 @@ def get_article_info(articles):
             db = get_database_connection()
 
             try:
+                articleInfo += get_file_date(a_title)
+                articleInfo += ';'
                 with db.cursor() as cursor:
                     query = "SELECT * FROM articles WHERE Title = %s"
                     cursor.execute(query, (a_title,))
@@ -456,12 +458,12 @@ def get_article_info(articles):
                     # print(result)
                     if result:
                         articleInfo += result[2]
-                        articleInfo += " 点赞: "
+                        articleInfo += ";"
                         articleInfo += str(result[5])
-                        articleInfo += " 评论: "
+                        articleInfo += ";"
                         articleInfo += str(result[6])
                     else:
-                        articleInfo += get_file_date(a_title)
+                        articleInfo += '官方;0;0'
             except Exception as e:
                 print(f"An error occurred: {e}")
             finally:
@@ -749,6 +751,7 @@ def theme_safe_check(theme_id, channel=1):
         tid = theme_detail.get('default', 'id').strip("'")
         author = theme_detail.get('default', 'author').strip("'")
         theme_title = theme_detail.get('default', 'title').strip("'")
+        theme_description = theme_detail.get('default', 'description').strip("'")
         author_website = theme_detail.get('default', 'authorWebsite').strip("'")
         theme_version = theme_detail.get('default', 'version').strip("'")
         theme_version_code = theme_detail.get('default', 'versionCode').strip("'")
@@ -759,6 +762,7 @@ def theme_safe_check(theme_id, channel=1):
             'id': tid,
             'author': author,
             'title': theme_title,
+            'description': theme_description,
             'authorWebsite': author_website,
             'version': theme_version,
             'versionCode': theme_version_code,
@@ -2149,6 +2153,11 @@ def api_wx_guestbook():
     }
 
     return jsonify(response_data)
+
+
+@app.route('/api/test', methods=['GET', 'POST'])
+def api_test():
+    return render_template('chatRoom.html')
 
 
 @app.errorhandler(404)
