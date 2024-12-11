@@ -1864,63 +1864,6 @@ def read_user_notification():
     return jsonify(readContent), 200
 
 
-@app.route('/audio/<username>/<audio_name>')
-def get_audio_path(username, audio_name):
-    try:
-        audio_dir = Path(base_dir) / 'media' / username / audio_name
-        if os.path.isfile(audio_dir):
-            return send_file(audio_dir, mimetype='audio/mp3')
-    except Exception as e:
-        pass
-
-
-@app.route('/api/music/music.json')
-def music_json():
-    default_json = [
-        {
-            "name": "我记得",
-            "audio_url": "/audio/test/我记得.mp3",
-            "singer": "赵雷",
-            "album": "署前街少年",
-            "cover": "http://p2.music.126.net/FCWD6ibS2JK2B3QAnXuzwQ==/109951167805892385.jpg",
-            "time": "05:29"
-        },
-        {
-            "name": "成都",
-            "audio_url": "/audio/test/成都.mp3",
-            "singer": "赵雷",
-            "album": "成都",
-            "cover": "http://p2.music.126.net/34YW1QtKxJ_3YnX9ZzKhzw==/2946691234868155.jpg",
-            "time": "05:28"
-        },
-        {
-            "name": "南方姑娘",
-            "audio_url": "/audio/test/南方姑娘.mp3",
-            "singer": "赵雷",
-            "album": "赵小雷",
-            "cover": "http://p2.music.126.net/wldFtES1Cjnbqr5bjlqQbg==/18876415625841069.jpg",
-            "time": "05:32"
-        },
-        {
-            "name": "阴天快乐",
-            "audio_url": "/audio/test/阴天快乐.mp3",
-            "singer": "陈奕迅",
-            "album": "Rice & Shine",
-            "cover": "http://p2.music.126.net/itkdsMFR8nYzaTiDdHO3tA==/109951165995320408.jpg",
-            "time": "04:20"
-        },
-        {
-            "name": "爱情转移",
-            "audio_url": "/audio/test/爱情转移.mp3",
-            "singer": "陈奕迅",
-            "album": "认了吧",
-            "cover": "http://p2.music.126.net/o_OjL_NZNoeog9fIjBXAyw==/18782957139233959.jpg",
-            "time": "04:20"
-        }
-    ]
-    return default_json
-
-
 @app.route('/changelog')
 def changelog():
     updates = parse_update_file('update.txt')
