@@ -68,7 +68,12 @@ url=https://download.bt.cn/install/install_lts.sh;if [ -f /usr/bin/curl ];then c
 $ pip install -r requirements.txt
 $ python wsgi.py
 ```
-
+(可选)使用gunicorn运行一个高性能守护进程(--daemon)实例
+```bash
+$ touch ./temp/access.log && touch ./temp/error.log
+$ sudo chmod 777 ./temp/access.log && sudo chmod 777 ./temp/error.log
+$ gunicorn --workers 4 --threads 2 --bind 0.0.0.0:9421 --timeout 60 --access-logfile ./temp/access.log --error-logfile ./temp/error.log --daemon src.app:app
+```
 1. 在浏览器中访问 `http://localhost:9421`，即可进入 zyBLOG。
 2. 默认管理员账号 'test' 默认密码 '123456'
 

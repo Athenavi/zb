@@ -1761,7 +1761,7 @@ def diy_space(page):
         with open(template_path, 'r', encoding=global_encoding) as file:
             html_content = file.read()
             resp = make_response(html_content)
-            visit_id = sys_version + format(random.randint(10000, 99999))  # 可以设置一个默认值或者抛出异常，具体根据需求进行处理
+            visit_id = sys_version + format(random.randint(10000, 99999))
             resp.set_cookie('visitID', 'zyBLOG' + visit_id, 7200)
         return resp
     return error(message="Not Found", status_code=404)
@@ -2177,3 +2177,7 @@ def undefined_route(undefined_path):
 def handle_unexpected_error(error_message):
     app.logger.error(error_message)
     return error(error_message, status_code=500)
+
+
+if __name__ == "__main__":
+    app.run()
