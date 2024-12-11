@@ -2155,11 +2155,6 @@ def api_wx_guestbook():
     return jsonify(response_data)
 
 
-@app.route('/api/test', methods=['GET', 'POST'])
-def api_test():
-    return render_template('chatRoom.html')
-
-
 @app.errorhandler(404)
 def page_not_found(error_message):
     app.logger.error(error_message)

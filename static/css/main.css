@@ -94,6 +94,10 @@
     align-items: center;
 }
 
+#theme-toggle {
+    background: transparent;
+}
+
 .tooltip {
     position: relative;
     cursor: pointer;

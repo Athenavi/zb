@@ -4,11 +4,11 @@
     <footer class="bg-transparent mt-8 py-6">
         <div class="container mx-auto px-4 py-4 text-center">
             <p class="text-gray-600">
-                <span class="tooltip" data-tooltip="公众号信息">公众号</span> |
+                <span class="tooltip" data-tooltip="公众号信息"><a onclick="copyAndAlert()">公众号</a></span> |
                 <span class="tooltip" data-tooltip="关于我们的信息">关于我们</span> |
                 <span class="tooltip" data-tooltip="用户协议信息">用户协议</span>
             </p>
-            <p class="text-gray-500"><a href="https://github.com/Athenavi/zb">© 2024 zyBLOG. 版权所有.</a></p>
+            <p class="text-gray-500 tooltip" data-tooltip="版权信息"><a href="https://github.com/Athenavi/zb">© 2024 zyBLOG. 版权所有.</a></p>
         </div>
     </footer>
 
@@ -70,24 +70,6 @@
             topBar.style.display = 'none';
         });
 
-
-        // 自动Nav跳转
-        window.addEventListener('DOMContentLoaded', function () {
-            setTimeout(function () {
-                var hash = window.location.hash;
-
-                if (hash !== '') {
-                    var anchor = hash.slice(1);
-
-                    var targetElement = document.getElementById(anchor);
-
-                    if (targetElement) {
-                        targetElement.scrollIntoView();
-                    }
-                }
-            }, 1500);
-        });
-
     </script>
     <script>
         document.addEventListener('click', function (event) {
@@ -108,15 +90,6 @@
                 }
             }
         });
-
-        (function () {
-            'use strict';
-            var devtools = /./;
-            devtools.toString = function () {
-                this.opened = true;
-            };
-            console.log('%c', devtools);
-        })();
     </script>
     <script>
         document.addEventListener('mousedown', function (e) {
