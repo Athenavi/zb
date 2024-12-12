@@ -32,7 +32,7 @@ from src.AboutPW import zy_change_password, zy_confirm_password
 from src.BlogDeal import get_article_names, get_article_content, clear_html_format, \
     get_blog_author, read_hidden_articles, auth_articles, get_file_date, \
     zy_edit_article, get_subscriber_ids, get_unique_tags, get_articles_by_tag, \
-    get_tags_by_article, set_article_info, write_tags_to_database, set_article_visibility
+    get_tags_by_article, set_article_info, write_tags_to_database, set_article_visibility, auth_by_id, article_changePW
 from src.database import get_database_connection
 from src.links import create_special_url, redirect_to_long_url
 from src.notification import get_sys_notice, read_notification, send_change_mail
@@ -877,7 +877,7 @@ def markdown_editor(article):
             aid, tags = get_tags_by_article(article)
 
             # 渲染编辑页面并将转换后的HTML传递到模板中
-            return render_template('editor.html', edit_html=edit_html, articleName=article,
+            return render_template('editor.html', edit_html=edit_html, aid=aid, articleName=article,
                                    tags=tags)
         elif request.method == 'POST':
             content = request.json['content']
@@ -2120,7 +2120,7 @@ def api_article_unlock(user_id):
 
     # 验证密码长度
     if len(entered_password) != 4:
-        return jsonify({"message": "Invalid Password Length"}), 400
+        return jsonify({"message": "Invalid Password"}), 400
 
     passwd = article_passwd(aid) or None
 
@@ -2128,14 +2128,11 @@ def api_article_unlock(user_id):
         return jsonify({"message": "Authentication failed"}), 401
 
     if entered_password == passwd:
-        if user_finger:
-            finger_md5 = gen_md5(user_finger)
-            cache.set(f"temp-url_{user_finger}", aid, timeout=900)
-            temp_url = f'{domain}tmpView?url={finger_md5}'
-            response_data['temp_url'] = temp_url
-            return jsonify(response_data), 200
-        else:
-            return jsonify({"message": "User fingerprint not found"}), 401
+        finger_md5 = gen_md5(user_finger)
+        cache.set(f"temp-url_{user_finger}", aid, timeout=900)
+        temp_url = f'{domain}tmpView?url={finger_md5}'
+        response_data['temp_url'] = temp_url
+        return jsonify(response_data), 200
     else:
         return jsonify({"message": "Authentication failed"}), 401
 
@@ -2202,6 +2199,47 @@ def gen_md5(text):
     md5_hash.update(text.encode('utf-8'))
     # 获取十六进制表示的哈希值
     return md5_hash.hexdigest()
+
+
+@app.route('/api/article/PW', methods=['GET', 'POST'])
+@finger_required
+def api_article_PW(user_id):
+    try:
+        aid = int(request.args.get('aid'))
+    except (TypeError, ValueError):
+        return jsonify({"message": "Invalid Article ID"}), 400
+
+    user_finger = request.cookies.get('finger')
+
+    if aid == cache.get(f"PWLock_{user_finger}"):
+        return jsonify({"message": "操作过于频繁"}), 400
+
+    new_password = request.args.get('new-passwd')
+
+    result = False
+    response_data = {
+        'aid': aid,
+        'changed': result,
+    }
+
+    # 验证密码长度
+    if len(new_password) != 4:
+        return jsonify({"message": "Invalid Password"}), 400
+
+    auth = auth_by_id(aid, username=get_username())
+
+    if auth:
+        cache.set(f"PWLock_{user_finger}", aid, timeout=30)
+        response_data['result'] = article_changePW(aid, new_password)
+        return jsonify(response_data), 200
+    else:
+        return jsonify({"message": "Authentication failed"}), 401
+
+
+@app.route('/api/test', methods=['GET', 'POST'])
+def test():
+    aid = 1
+    return render_template('test.html', aid=aid)
 
 
 @app.errorhandler(404)

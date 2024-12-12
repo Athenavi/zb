@@ -30,6 +30,14 @@
                     文章页
                 </button>
             </a>
+            <form onsubmit="changePassword(event)">
+                <input type="password" id="new-password" maxlength="4" required
+                       class="border rounded text-gray-700 leading-tight">
+                <button type="submit"
+                        class="hover:bg-red-700">
+                    🔑
+                </button>
+            </form>
             <a href="#" data-article={{ articleName }} class="hidden121">隐藏/取消隐藏</a>
             <a href="#" data-article={{ articleName }} class="delete121">删除</a>
         </div>
@@ -157,4 +165,25 @@
             }
         });
     });
+</script>
+<script>
+    async function changePassword(event) {
+        event.preventDefault(); // 防止默认表单提交
+
+        const aid = "{{ aid }}";
+        const newPassword = document.getElementById('new-password').value;
+
+        const response = await fetch(`/api/article/PW?aid=${aid}&new-passwd=${newPassword}`, {
+            method: 'POST',
+            credentials: 'include', // 发送 cookies
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            alert('Password changed successfully!');
+        } else {
+            alert(`Error: ${result.message}`);
+        }
+    }
 </script>

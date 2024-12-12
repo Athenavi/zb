@@ -198,6 +198,29 @@ def auth_articles(title, username):
         db.close()
 
 
+def auth_by_id(aid, username):
+    db = get_database_connection()
+
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT * FROM articles WHERE ArticleID = %s and Author = %s"
+            cursor.execute(query, (aid, username,))
+            result = cursor.fetchone()
+            if result:
+                return True
+            else:
+                return False
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return False
+    finally:
+        try:
+            cursor.close()
+        except NameError:
+            pass
+        db.close()
+
+
 def zy_edit_article(article, max_line):
     limit = max_line
     try:
@@ -456,3 +479,30 @@ def get_file_date(file_path):
     except FileNotFoundError:
         # 处理文件不存在的情况
         return None
+
+
+def article_changePW(aid, newPass):
+    db = get_database_connection()
+    aid = int(aid)
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT * FROM article_pass WHERE aid = %s;"
+            cursor.execute(query, (aid,))
+            result = cursor.fetchone()
+            if result:
+                query = "UPDATE `article_pass` SET `pass` = %s WHERE `article_pass`.`aid` = %s;"
+                cursor.execute(query, (newPass, aid,))
+            else:
+                query = "INSERT INTO `article_pass` (`aid`, `pass`) VALUES (%s, %s);"
+                cursor.execute(query, (aid, newPass,))
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return False
+    finally:
+        db.commit()
+        try:
+            cursor.close()
+        except NameError:
+            pass
+        db.close()
+        return True
