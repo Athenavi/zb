@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- 主机： host.docker.internal:3306
--- 生成日期： 2024-10-19 02:52:02
+-- 生成日期： 2024-12-12 05:18:04
 -- 服务器版本： 8.4.2
 -- PHP 版本： 8.2.8
 
@@ -48,7 +48,7 @@ CREATE TABLE `articles` (
 --
 
 INSERT INTO `articles` (`ArticleID`, `Title`, `Author`, `Hidden`, `Views`, `Likes`, `Comments`, `Status`, `CoverImage`, `ArticleType`, `excerpt`, `is_featured`, `tags`) VALUES
-(1, 'README', 'test', 0, 0, 0, 0, 'Draft', NULL, NULL, NULL, 0, '2024');
+(1, 'README', 'test', 0, 666, 66, 0, 'Published', NULL, NULL, NULL, 0, '2024;');
 
 -- --------------------------------------------------------
 
@@ -115,6 +115,13 @@ CREATE TABLE `events` (
   `event_date` datetime NOT NULL COMMENT '事件日期',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- 转存表中的数据 `events`
+--
+
+INSERT INTO `events` (`id`, `title`, `description`, `event_date`, `created_at`) VALUES
+(23, 'gusetbook', '\"7trees\":\"Welcome to the guestbook!\"', '2024-12-04 13:59:55', '2024-12-04 14:00:56');
 
 -- --------------------------------------------------------
 
@@ -213,7 +220,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `username`, `password`, `email`, `created_at`, `updated_at`, `profile_picture`, `bio`, `role`, `register_ip`) VALUES
-(1, 'test', '$2b$12$ajk/HNbJRcZZf3nSRGklUeYLhwzasmvnpskmtP4pzZ7WlOepWIpYa', 'guest@7trees.cn', '2024-10-18 13:37:13', '2024-10-18 15:16:51', NULL, NULL, 'Admin', '0');
+(1, 'test', '$2b$12$kF4nZn6kESHtj0cjNeaoZugUlWXSgXp27iKAXHepyzSwUxrrhVTz2', 'guest@7trees.cn', '2024-10-18 13:37:13', '2024-12-12 05:15:16', NULL, NULL, 'Admin', '0');
 
 --
 -- 转储表的索引
@@ -230,7 +237,7 @@ ALTER TABLE `articles`
 -- 表的索引 `article_pass`
 --
 ALTER TABLE `article_pass`
-  ADD KEY `aid` (`aid`);
+  ADD PRIMARY KEY (`aid`);
 
 --
 -- 表的索引 `comments`
@@ -311,7 +318,7 @@ ALTER TABLE `users`
 -- 使用表AUTO_INCREMENT `articles`
 --
 ALTER TABLE `articles`
-  MODIFY `ArticleID` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `ArticleID` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=50;
 
 --
 -- 使用表AUTO_INCREMENT `comments`
@@ -335,19 +342,19 @@ ALTER TABLE `email_subscriptions`
 -- 使用表AUTO_INCREMENT `events`
 --
 ALTER TABLE `events`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=100;
 
 --
 -- 使用表AUTO_INCREMENT `media`
 --
 ALTER TABLE `media`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=300;
 
 --
 -- 使用表AUTO_INCREMENT `notifications`
 --
 ALTER TABLE `notifications`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=500;
 
 --
 -- 使用表AUTO_INCREMENT `reports`
@@ -359,19 +366,19 @@ ALTER TABLE `reports`
 -- 使用表AUTO_INCREMENT `subscriptions`
 --
 ALTER TABLE `subscriptions`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=700;
 
 --
 -- 使用表AUTO_INCREMENT `urls`
 --
 ALTER TABLE `urls`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=45;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=900;
 
 --
 -- 使用表AUTO_INCREMENT `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- 限制导出的表

@@ -529,11 +529,13 @@ def blog_detail(article):
     try:
         article_names = get_a_list(chanel=1)
         hidden_articles = read_hidden_articles()
+        if article not in article_names:
+            pass
 
-        if article in hidden_articles or article not in article_names:
-            return error(message="页面不见了", status_code=404)
+        aid, article_tags = get_tags_by_article(article)
+        if article in hidden_articles:
+            return render_template('inform.html', aid=aid)
 
-        article_tags = get_tags_by_article(article)
         article_url = domain + 'blog/' + article
         article_surl = api_shortlink(article_url)
         author, author_uid = get_blog_author(article)
@@ -541,6 +543,7 @@ def blog_detail(article):
 
         response = make_response(render_template('zyDetail.html',
                                                  article_content=1,
+                                                 aid=aid,
                                                  articleName=article,
                                                  author=author,
                                                  authorUID=str(author_uid),
@@ -871,7 +874,7 @@ def markdown_editor(article):
         if request.method == 'GET':
             edit_html = zy_edit_article(article, max_line=app.config['MAX_LINE'])
 
-            tags = get_tags_by_article(article)
+            aid, tags = get_tags_by_article(article)
 
             # 渲染编辑页面并将转换后的HTML传递到模板中
             return render_template('editor.html', edit_html=edit_html, articleName=article,
@@ -2049,7 +2052,7 @@ def api_wx_blog_detail(article):
         if article in hidden_articles or article not in article_names:
             return generate_response_data()
 
-        article_tags = get_tags_by_article(article)
+        aid, article_tags = get_tags_by_article(article)
         article_url = f"{domain}blog/{article}"
         article_surl = api_shortlink(article_url)
         author, author_uid = get_blog_author(article)
@@ -2096,6 +2099,109 @@ def api_wx_guestbook():
     }
 
     return jsonify(response_data)
+
+
+@app.route('/api/article/unlock', methods=['GET', 'POST'])
+@finger_required
+def api_article_unlock(user_id):
+    try:
+        aid = int(request.args.get('aid'))
+    except (TypeError, ValueError):
+        return jsonify({"message": "Invalid Article ID"}), 400
+
+    entered_password = request.args.get('passwd')
+    temp_url = ''
+    user_finger = request.cookies.get('finger')
+
+    response_data = {
+        'aid': aid,
+        'temp_url': temp_url,
+    }
+
+    # 验证密码长度
+    if len(entered_password) != 4:
+        return jsonify({"message": "Invalid Password Length"}), 400
+
+    passwd = article_passwd(aid) or None
+
+    if passwd is None:
+        return jsonify({"message": "Authentication failed"}), 401
+
+    if entered_password == passwd:
+        if user_finger:
+            finger_md5 = gen_md5(user_finger)
+            cache.set(f"temp-url_{user_finger}", aid, timeout=900)
+            temp_url = f'{domain}tmpView?url={finger_md5}'
+            response_data['temp_url'] = temp_url
+            return jsonify(response_data), 200
+        else:
+            return jsonify({"message": "User fingerprint not found"}), 401
+    else:
+        return jsonify({"message": "Authentication failed"}), 401
+
+
+@app.route('/tmpView', methods=['GET', 'POST'])
+def tmpView():
+    url = request.args.get('url')
+    if url is None:
+        return jsonify({"message": "Missing URL parameter"}), 400
+
+    user_finger = request.cookies.get('finger')
+    aid = cache.get(f"temp-url_{user_finger}")
+
+    if aid:
+        content = '<p>无法加载文章内容</p>'
+        db = get_database_connection()
+
+        try:
+            with db.cursor() as cursor:
+                query = "SELECT `Title` FROM articles WHERE ArticleID = %s"
+                cursor.execute(query, (int(aid),))
+                result = cursor.fetchone()
+                if result:
+                    a_title = result[0]
+
+                    content = api_wx_content(a_title)
+
+        except Exception as e:
+            return jsonify({"message": "Database error"}, 500)
+
+        finally:
+            cursor.close()
+            db.close()
+
+        return content
+    else:
+        return jsonify({"message": "Temporary URL expired or invalid"}), 404
+
+
+@cache.cached(timeout=600, key_prefix='article_passwd')
+def article_passwd(aid):
+    db = get_database_connection()
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT `pass` FROM article_pass WHERE aid = %s"
+            cursor.execute(query, (int(aid),))
+            result = cursor.fetchone()
+            if result:
+                a_pass = result[0]
+                return a_pass
+    except Exception:
+        return None
+
+    finally:
+        cursor.close()
+        db.close()
+
+
+@cache.cached(timeout=600, key_prefix='md5')
+def gen_md5(text):
+    # 创建MD5哈希对象
+    md5_hash = hashlib.md5()
+    # 更新哈希对象
+    md5_hash.update(text.encode('utf-8'))
+    # 获取十六进制表示的哈希值
+    return md5_hash.hexdigest()
 
 
 @app.errorhandler(404)

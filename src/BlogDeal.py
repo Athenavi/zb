@@ -302,29 +302,31 @@ def get_articles_by_tag(tag_name):
     return tag_articles
 
 
-def get_tags_by_article(article_title):
+def get_tags_by_article(article_name):
     db = get_database_connection()
     cursor = db.cursor()
     unique_tags = []
+    aid = 0
 
     try:
-        query = "SELECT Tags FROM articles WHERE Title = %s"
-        cursor.execute(query, (article_title,))
+        query = "SELECT ArticleID,Tags FROM articles WHERE Title = %s"
+        cursor.execute(query, (article_name,))
 
         result = cursor.fetchone()
         if result:
-            tags_str = result[0]
+            aid = result[0] or 0
+            tags_str = result[1]
             if tags_str:
                 tags_list = tags_str.split(';')
                 unique_tags = list(set(tags_list))
 
     except Exception as e:
-        return error(f"未知错误{e}", 500), 500
+        return aid, []
     finally:
         cursor.close()
         db.close()
 
-    return unique_tags
+    return aid, unique_tags
 
 
 def set_article_info(a_title, username):
@@ -434,6 +436,7 @@ def set_article_visibility(article, hide=True):
         except NameError:
             pass
         db.close()
+
 
 def get_file_date(file_path):
     try:
