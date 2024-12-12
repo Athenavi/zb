@@ -2236,10 +2236,43 @@ def api_article_PW(user_id):
         return jsonify({"message": "Authentication failed"}), 401
 
 
-@app.route('/api/test', methods=['GET', 'POST'])
-def test():
-    aid = 1
-    return render_template('test.html', aid=aid)
+@app.route('/api/comment', methods=['GET', 'POST'])
+@jwt_required
+def api_comment(user_id):
+    try:
+        aid = int(request.args.get('aid'))
+    except (TypeError, ValueError):
+        return jsonify({"message": "Invalid Article ID"}), 400
+
+    if aid == cache.get(f"CommentLock_{user_id}"):
+        return jsonify({"message": "操作过于频繁"}), 400
+
+    new_comment = request.args.get('new-comment')
+    if not new_comment:
+        return jsonify({"message": "评论内容不能为空"}), 400
+
+    cache.set(f"CommentLock_{user_id}", aid, timeout=30)
+    result = comment_add(aid, user_id, new_comment)
+
+    if result:
+        return jsonify({'aid': aid, 'changed': True}), 200
+    else:
+        return jsonify({"message": "评论失败"}), 503
+
+
+def comment_add(aid, user_id, comment_content):
+    db = get_database_connection()
+    try:
+        with db.cursor() as cursor:
+            query = "INSERT INTO `comments` (`article_id`, `user_id`, `content`) VALUES (%s, %s, %s);"
+            cursor.execute(query, (int(aid), int(user_id), comment_content))
+            db.commit()
+            return True
+    except Exception as e:
+        print(f'Error: {e}')
+        return False
+    finally:
+        db.close()
 
 
 @app.errorhandler(404)

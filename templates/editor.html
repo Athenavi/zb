@@ -30,6 +30,8 @@
                     文章页
                 </button>
             </a>
+            <br/>
+            <br/>
             <form onsubmit="changePassword(event)">
                 <input type="password" id="new-password" maxlength="4" required
                        class="border rounded text-gray-700 leading-tight">
@@ -38,8 +40,7 @@
                     🔑
                 </button>
             </form>
-            <a href="#" data-article={{ articleName }} class="hidden121">隐藏/取消隐藏</a>
-            <a href="#" data-article={{ articleName }} class="delete121">删除</a>
+
         </div>
 
         <label for="md-editor" class="block text-gray-700 text-sm font-bold mb-2"></label>
@@ -47,6 +48,8 @@
                 class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
             保存内容
         </button>
+        <a href="#" data-article={{ articleName }} class="hidden121">隐藏/取消隐藏</a>
+        <a href="#" data-article={{ articleName }} class="delete121">删除</a>
         <textarea id="md-editor" class="shadow border rounded py-2 px-3 text-grey-darker mb-3 w-full"
                   rows="10">{{ edit_html }}</textarea>
     </div>
