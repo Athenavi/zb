@@ -4,6 +4,7 @@ import configparser
 import datetime
 import hashlib
 import io
+import json
 import logging
 import os
 import random
@@ -1552,26 +1553,26 @@ def unfollow_user(user_id):
 @app.route('/like', methods=['GET', 'POST'])
 @jwt_required
 def like(user_id):
-    article_name = request.args.get('at')
+    aid = request.args.get('aid')
     if request.method == 'POST':
-        if not article_name:
+        if not aid:
             return jsonify({'like_code': 'failed', 'message': "error"})
         user_liked = cache.get(f'{user_id}_liked')
         if user_liked is None:
             user_liked = []
-        if article_name in user_liked:
+        if aid in user_liked:
             return jsonify({'like_code': 'failed', 'message': "你已经点赞过了!!"})
         db = get_database_connection()
         try:
             with db.cursor() as cursor:
                 rd_like = random.randint(3, 8)
                 rd_view = random.randint(22, 33)
-                query = "UPDATE `articles` SET `Likes` = `Likes` + %s WHERE `articles`.`Title` = %s;"
-                cursor.execute(query, (rd_like, article_name,))
-                query2 = "UPDATE `articles` SET `Views` = `Views` + %s WHERE `articles`.`Title` = %s;"
-                cursor.execute(query2, (rd_view, article_name,))
+                query = "UPDATE `articles` SET `Likes` = `Likes` + %s WHERE `articles`.`ArticleID` = %s;"
+                cursor.execute(query, (rd_like, int(aid),))
+                query2 = "UPDATE `articles` SET `Views` = `Views` + %s WHERE `articles`.`ArticleID` = %s;"
+                cursor.execute(query2, (rd_view, int(aid),))
                 db.commit()
-                user_liked.append(article_name)
+                user_liked.append(aid)
                 cache.set(f'{user_id}_liked', user_liked)
                 return jsonify({'like_code': 'success'})
 
@@ -1611,7 +1612,7 @@ def gen_qr_token(input_string, current_time):
 def qrlogin():
     ct = str(int(time.time()))
     user_agent = sanitize_user_agent(request.headers.get('User-Agent'))
-    token = gen_qr_token(user_agent, ct)  # 生成唯一标识
+    token = gen_qr_token(user_agent, ct)
     token_expire = str(int(time.time() + 180))
     qr_data = f"{domain}api/phone/scan?login_token={token}"
 
@@ -2236,36 +2237,41 @@ def api_article_PW(user_id):
         return jsonify({"message": "Authentication failed"}), 401
 
 
-@app.route('/api/comment', methods=['GET', 'POST'])
+@app.route('/api/comment', methods=['POST'])
 @jwt_required
 def api_comment(user_id):
     try:
-        aid = int(request.args.get('aid'))
+        aid = int(request.json.get('aid'))
     except (TypeError, ValueError):
         return jsonify({"message": "Invalid Article ID"}), 400
 
     if aid == cache.get(f"CommentLock_{user_id}"):
         return jsonify({"message": "操作过于频繁"}), 400
 
-    new_comment = request.args.get('new-comment')
+    new_comment = request.json.get('new-comment')
     if not new_comment:
         return jsonify({"message": "评论内容不能为空"}), 400
 
+    userIP = get_client_ip(request, session) or ''
+    userAgent = request.headers.get('User-Agent') or ''
+
     cache.set(f"CommentLock_{user_id}", aid, timeout=30)
-    result = comment_add(aid, user_id, new_comment)
+    result = comment_add(aid, user_id, new_comment, userIP, userAgent)
 
     if result:
-        return jsonify({'aid': aid, 'changed': True}), 200
+        return jsonify({'aid': aid, 'changed': True}), 201
     else:
-        return jsonify({"message": "评论失败"}), 503
+        return jsonify({"message": "评论失败"}), 500
 
 
-def comment_add(aid, user_id, comment_content):
+def comment_add(aid, user_id, comment_content, ip, ua):
+    c_json = {'content': comment_content, 'ip': ip, 'ua': ua}
+    comment_json = json.dumps(c_json)
     db = get_database_connection()
     try:
         with db.cursor() as cursor:
             query = "INSERT INTO `comments` (`article_id`, `user_id`, `content`) VALUES (%s, %s, %s);"
-            cursor.execute(query, (int(aid), int(user_id), comment_content))
+            cursor.execute(query, (int(aid), int(user_id), comment_json))
             db.commit()
             return True
     except Exception as e:
@@ -2273,6 +2279,59 @@ def comment_add(aid, user_id, comment_content):
         return False
     finally:
         db.close()
+
+
+def json_filter(value):
+    """将 JSON 字符串解析为 Python 对象"""
+    print(f"Raw JSON string: {value}")  # 打印即将解析的原始 JSON
+    if not isinstance(value, str):
+        print(f"Unexpected type for value: {type(value)}. Expected a string.")
+        return None  # 如果不是字符串，直接返回 None
+
+    try:
+        result = json.loads(value)
+        print(f"Parsed result: {result}")  # 打印解析后的结果
+        return result
+    except (ValueError, TypeError) as e:
+        print(f"Error parsing JSON: {e}, Value: {value}")  # 打印错误信息
+        return None
+
+
+@app.route("/api/test")
+@jwt_required
+def test(user_id):
+    from jinja2 import Environment, FileSystemLoader
+    import json
+
+    # 创建 Jinja2 环境
+    env = Environment(loader=FileSystemLoader('templates'))
+    env.filters['fromjson'] = json_filter
+
+    aid = 1
+    comments = getComments(aid)
+
+    # 调试输出评论
+    for c in comments:
+        print(f"Comment JSON string: {c[3]}")
+
+    template = env.get_template('test.html')
+    rendered = template.render(aid=aid, user_id=user_id, username=get_username(), comments=comments)
+    return rendered
+
+
+def getComments(aid):
+    comments = []
+    db = get_database_connection()
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT * FROM `comments` WHERE `article_id` = %s"
+            cursor.execute(query, (int(aid),))
+            comments = cursor.fetchall()
+    except Exception as e:
+        print(f'Error: {e}')
+    finally:
+        db.close()
+        return comments
 
 
 @app.errorhandler(404)
