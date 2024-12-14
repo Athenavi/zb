@@ -172,13 +172,13 @@ def get_blog_author(title):
         db.close()
 
 
-def auth_articles(title, username):
+def auth_articles(article_name, username):
     db = get_database_connection()
 
     try:
         with db.cursor() as cursor:
             query = "SELECT Author FROM articles WHERE Title = %s"
-            cursor.execute(query, (title,))
+            cursor.execute(query, (article_name,))
             result = cursor.fetchone()
 
             if result and result[0] == username:
@@ -389,7 +389,7 @@ def set_article_info(a_title, username):
         db.close()
 
 
-def write_tags_to_database(tags_list, a_title):
+def write_tags_to_database(aid, tags_list):
     tags_str = ';'.join(tags_list)
 
     db = get_database_connection()
@@ -397,19 +397,14 @@ def write_tags_to_database(tags_list, a_title):
 
     try:
         # 检查文章是否存在
-        query = "SELECT * FROM articles WHERE Title = %s"
-        cursor.execute(query, (a_title,))
+        query = "SELECT * FROM articles WHERE ArticleID = %s"
+        cursor.execute(query, (int(aid),))
         result = cursor.fetchone()
 
         if result:
             # 如果文章存在，则更新标签
-            update_query = "UPDATE articles SET Tags = %s WHERE Title = %s"
-            cursor.execute(update_query, (tags_str, a_title))
-            db.commit()
-        else:
-            # 如果文章不存在，则创建新文章记录
-            insert_query = "INSERT INTO articles (Title, Tags) VALUES (%s, %s)"
-            cursor.execute(insert_query, (a_title, tags_str))
+            update_query = "UPDATE articles SET Tags = %s WHERE ArticleID = %s"
+            cursor.execute(update_query, (tags_str, int(aid)))
             db.commit()
 
     except Exception as e:
@@ -504,3 +499,31 @@ def article_change_pw(aid, passwd):
             pass
         db.close()
         return True
+
+
+def get_file_summary(a_title):
+    articles_dir = os.path.join('articles', a_title + ".md")
+    try:
+        with open(articles_dir, 'r', encoding='utf-8') as file:
+            content = file.read()
+    except FileNotFoundError:
+        return "未找到文件"
+    html_content = markdown.markdown(content)
+    text_content = clear_html_format(html_content)
+    summary = (text_content[:75] + "...") if len(text_content) > 75 else text_content
+    return summary
+
+
+def get_comments(aid):
+    comments = []
+    db = get_database_connection()
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT * FROM `comments` WHERE `article_id` = %s"
+            cursor.execute(query, (int(aid),))
+            comments = cursor.fetchall()
+    except Exception as e:
+        print(f'Error: {e}')
+    finally:
+        db.close()
+        return comments
