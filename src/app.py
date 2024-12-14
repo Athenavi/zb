@@ -33,11 +33,11 @@ from src.AboutPW import zy_change_password, zy_confirm_password
 from src.BlogDeal import get_article_names, get_article_content, clear_html_format, \
     get_blog_author, read_hidden_articles, auth_articles, get_file_date, \
     zy_edit_article, get_subscriber_ids, get_unique_tags, get_articles_by_tag, \
-    get_tags_by_article, set_article_info, write_tags_to_database, set_article_visibility, auth_by_id, article_changePW
+    get_tags_by_article, set_article_info, write_tags_to_database, set_article_visibility, auth_by_id, article_change_pw
 from src.database import get_database_connection
 from src.links import create_special_url, redirect_to_long_url
 from src.notification import get_sys_notice, read_notification, send_change_mail
-from src.user import zyadmin, zy_delete_article, error, get_owner_articles, zy_general_conf, get_userInfo
+from src.user import zyadmin, zy_delete_article, error, get_owner_articles, zy_general_conf, get_profiles
 from src.utils import zy_upload_file, get_client_ip, \
     zy_noti_conf, generate_jwt, secret_key, authenticate_jwt, \
     authenticate_refresh_token, handle_file_upload, is_allowed_file, is_valid_domain_with_slash, \
@@ -147,22 +147,22 @@ def jwt_required(f):
 
 def finger_required(f):
     @wraps(f)
-    def fingerAuth_func(*args, **kwargs):
+    def finger_func(*args, **kwargs):
         token = request.cookies.get('jwt')
         user_id = authenticate_jwt(token)
         if user_id is None:
             callback_route = request.endpoint  # 获取请求的端点名称
             return redirect(url_for('login', callback=callback_route))
-        cachedFinger = cache.get(f'fingerprint_{user_id}') or []
+        cached_finger = cache.get(f'fingerprint_{user_id}') or []
         chrome_fingerprint = request.cookies.get('finger')
         if not chrome_fingerprint:
             return render_template('Authentication.html', form='finger')
-        if chrome_fingerprint not in cachedFinger:
-            cachedFinger.append(chrome_fingerprint)
-            cache.set(f'fingerprint_{user_id}', cachedFinger)
+        if chrome_fingerprint not in cached_finger:
+            cached_finger.append(chrome_fingerprint)
+            cache.set(f'fingerprint_{user_id}', cached_finger)
         return f(user_id, *args, **kwargs)
 
-    return fingerAuth_func
+    return finger_func
 
 
 @app.before_request
@@ -294,7 +294,7 @@ def temp_preview(file_name):
 
 
 @cache.memoize(600)
-def get_avatar(username):
+def get_avatar():
     avatar = app.config['AVATAR_SERVER']
     return avatar
 
@@ -303,22 +303,22 @@ def get_avatar(username):
 @jwt_required
 def profile(user_id):
     username = get_username()
-    avatar_url = get_avatar(username)
-    userBio = '年度大会员'
+    avatar_url = get_avatar()
+    user_bio = '年度大会员'
     owner_articles = get_owner_articles(owner_id=None, user_name=username) or []
-    following = 72
+    user_follow = 72
     follower = 265
     # 确保 render_template 返回正确对象
     return render_template('Profile.html', url_for=url_for, avatar_url=avatar_url,
-                           userStatus=bool(user_id), username=username, userBio=userBio,
-                           following=following, follower=follower,
+                           userStatus=bool(user_id), username=username, userBio=user_bio,
+                           following=user_follow, follower=follower,
                            Articles=owner_articles)
 
 
 @app.route('/setting/profiles', methods=['GET', 'POST'])
 @finger_required
 def setting_profiles(user_id):
-    UserInfo = cache.get(f"{user_id}_userInfo") or get_userInfo(user_id=user_id, user_name=None)
+    UserInfo = cache.get(f"{user_id}_userInfo") or get_profiles(user_id=user_id, user_name=None)
     cache.set(f'{user_id}_userInfo', UserInfo)
     avatar_url = UserInfo[5] or app.config['AVATAR_SERVER']
     Bio = UserInfo[5] or "这人很懒，什么也没留下"
@@ -427,12 +427,12 @@ def home():
         resp = make_response(rendered_content)
 
         if 'key' in request.cookies:
-            visiter = request.cookies.get('key')
-            app.logger.info('访客已存在，使用现有用户名: %s', visiter)
+            visitor = request.cookies.get('key')
+            app.logger.info('访客已存在，使用现有用户名: %s', visitor)
         else:
-            visiter = 'qks' + format(random.randint(10000, 99999))
-            app.logger.warning('新访客，生成随机用户名: %s', visiter)
-            resp.set_cookie('key', 'zyBLOG_' + sys_version + visiter, 7200)
+            visitor = 'qks' + format(random.randint(10000, 99999))
+            app.logger.warning('新访客，生成随机用户名: %s', visitor)
+            resp.set_cookie('key', 'zyBLOG_' + sys_version + visitor, 7200)
 
         return resp
 
@@ -584,7 +584,7 @@ def generate_sitemap():
     # 创建XML文件头
     xml_data = '<?xml version="1.0" encoding="UTF-8"?>\n'
     xml_data += '<?xml-stylesheet type="text/xsl" href="./static/sitemap.xsl"?>\n'
-    xml_data += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    xml_data += '<urlset xmlns="https://www.sitemaps.org/schemas/sitemap/0.9/">\n'
 
     for file in markdown_files:
         article_url = domain + 'blog/' + file
@@ -1000,25 +1000,7 @@ def hidden_article():
 
 @app.route('/travel', methods=['GET'])
 def travel():
-    response = requests.get(domain + 'sitemap.xml')  # 发起对/sitemap接口的请求
-    if response.status_code == 200:
-        tree = ElementTree.fromstring(response.content)  # 使用xml.etree.ElementTree解析响应内容
-
-        urls = []  # 用于记录提取的URL列表
-        for url_element in tree.findall('{http://www.sitemaps.org/schemas/sitemap/0.9}url'):
-            loc_element = url_element.find('{http://www.sitemaps.org/schemas/sitemap/0.9}loc')
-            if loc_element is not None:
-                urls.append(loc_element.text)  # 将标签中的内容添加到列表中
-
-        if urls:
-            random.shuffle(urls)  # 随机打乱URL列表的顺序
-            random_url = urls[0]  # 选择打乱后的第一个URL
-            return render_template('inform.html', url=random_url, domian=domain)
-        # 如果没有找到任何<loc>标签，则返回适当的错误信息或默认页面
-        return "No URLs found in the response."
-    else:
-        # 处理无法获取响应内容的情况，例如返回错误页面或错误消息
-        return "Failed to fetch sitemap content."
+    return '此接口暂时启用'
 
 
 @app.route('/media', methods=['GET', 'POST'])
@@ -1370,7 +1352,7 @@ def api_mail(user_id):
     receiver_email = sender_email
     subject = '安全通知邮件'  # 邮件主题
     body = '这是一封测试邮件。'  # 邮件正文
-    send_email(sender_email, password, receiver_email, smtp_server, stmp_port=int(stmp_port), subject=subject,
+    send_email(sender_email, password, receiver_email, smtp_server, int(stmp_port), subject=subject,
                body=body)
     app.logger.info(f'{user_id} sendMail')
     return 'success'
@@ -1640,14 +1622,14 @@ def check_qr_login():
     if cache_QR_token:
         expire_at = cache_QR_token['expire_at']
         if int(expire_at) > int(time.time()):
-            return success_scan(token)
+            return success_scan()
         else:
             return jsonify({'status': 'pending'})
     else:
         return jsonify({'status': 'invalid_token'})
 
 
-def success_scan(token):
+def success_scan():
     # 扫码成功调用此接口
     token = request.args.get('token')
     cache_QR_allowed = cache.get(f"QR-allow_{token}")
@@ -1662,7 +1644,7 @@ def success_scan(token):
 
 @app.route("/api/phone/scan")
 @jwt_required
-def phone_scan(token):
+def phone_scan():
     # 用户扫码调用此接口
     token = request.args.get('login_token')
     phone_token = request.cookies.get('jwt')
@@ -1731,7 +1713,7 @@ def export(user_id):
 
 
 @app.route('/@<username>', methods=['GET', 'POST'])
-def userCenter(username):
+def user_center(username):
     # 正则表达式，限制用户名的格式 (只允许字母和数字)
     if not re.match(r'^[a-zA-Z0-9]+$', username):
         return error("Invalid username", 400)
@@ -1740,7 +1722,7 @@ def userCenter(username):
         user_dir = Path(base_dir) / 'media' / username
         if not os.path.exists(user_dir):
             return error("Invalid username", 400)
-    except Exception as e:
+    except Exception:
         pass
 
     spm = request.args.get('spm')
@@ -1752,7 +1734,7 @@ def userCenter(username):
 
     following = 72
     follower = 265
-    return render_template('Profile.html', url_for=url_for, avatar_url=get_avatar(username),
+    return render_template('Profile.html', url_for=url_for, avatar_url=get_avatar(),
                            userStatus=bool(username), username=username, userBio=userBio,
                            following=following, follower=follower,
                            Articles=owner_articles, notiHost=noti_host, notiPort=noti_port)
@@ -1775,7 +1757,7 @@ def diy_space(page):
 @finger_required
 def guestbook(user_id):
     username = get_username()
-    avatar_url = get_avatar(1)
+    avatar_url = get_avatar()
     message_list = get_guestbook() or []
     user_finger = request.cookies.get('finger')
     if request.method == 'POST':
@@ -1790,7 +1772,7 @@ def guestbook(user_id):
         upload_guestbook(content)
         cache.set(f"guestbook", None)
         cache.set(f"guestbook_{user_finger}", True, timeout=180)
-        # 返回一个成功消息，可以返回新的留言内容
+        # 返回一个成功消息，可以返回 新的 留言内容
         return jsonify({'status': 'success', 'message_list': message_list}), 201
 
     # GET 请求返回留言页面
@@ -1844,7 +1826,7 @@ def upload_guestbook(content):
 
 @app.route('/links')
 def get_friends_link(type=0):
-    avatar_url = get_avatar(1)
+    avatar_url = get_avatar()
     friends_links = {
         '本站地址': domain,
         'GitHub': "https://github.com/Athenavi",
@@ -1882,7 +1864,7 @@ def parse_update_file(filename):
     # print("Raw content from file: ", content)  # 打印文件的原始内容
 
     # 使用正则表达式提取版本信息
-    pattern = re.compile(r"版本 (.+?)\s+发布日期:(.+?)\s+[-]*\n((?:-.*(?:\n|$))*)", re.MULTILINE)
+    pattern = re.compile(r"版本 (.+?)\s+发布日期:(.+?)\s+-*\n((?:-.*(?:\n|$))*)", re.MULTILINE)
     matches = pattern.findall(content)
 
     for match in matches:
@@ -2091,7 +2073,7 @@ def api_wx_content(article):
 
 @app.route('/api/wx/guestbook', methods=['GET', 'POST'])
 def api_wx_guestbook():
-    avatar_url = get_avatar(1)
+    avatar_url = get_avatar()
     message_list = get_guestbook() or []
     response_data = {
         'avatar_url': avatar_url,
@@ -2139,7 +2121,7 @@ def api_article_unlock(user_id):
 
 
 @app.route('/tmpView', methods=['GET', 'POST'])
-def tmpView():
+def temp_view():
     url = request.args.get('url')
     if url is None:
         return jsonify({"message": "Missing URL parameter"}), 400
@@ -2161,8 +2143,8 @@ def tmpView():
 
                     content = api_wx_content(a_title)
 
-        except Exception as e:
-            return jsonify({"message": "Database error"}, 500)
+        except Exception:
+            return jsonify({f"message": "Database error"}, 500)
 
         finally:
             cursor.close()
@@ -2204,7 +2186,7 @@ def gen_md5(text):
 
 @app.route('/api/article/PW', methods=['GET', 'POST'])
 @finger_required
-def api_article_PW(user_id):
+def api_article_pw(user_id):
     try:
         aid = int(request.args.get('aid'))
     except (TypeError, ValueError):
@@ -2231,7 +2213,7 @@ def api_article_PW(user_id):
 
     if auth:
         cache.set(f"PWLock_{user_finger}", aid, timeout=30)
-        response_data['result'] = article_changePW(aid, new_password)
+        response_data['result'] = article_change_pw(aid, new_password)
         return jsonify(response_data), 200
     else:
         return jsonify({"message": "Authentication failed"}), 401
@@ -2301,14 +2283,13 @@ def json_filter(value):
 @jwt_required
 def test(user_id):
     from jinja2 import Environment, FileSystemLoader
-    import json
 
     # 创建 Jinja2 环境
     env = Environment(loader=FileSystemLoader('templates'))
     env.filters['fromjson'] = json_filter
 
     aid = 1
-    comments = getComments(aid)
+    comments = get_comments(aid)
 
     # 调试输出评论
     for c in comments:
@@ -2319,7 +2300,7 @@ def test(user_id):
     return rendered
 
 
-def getComments(aid):
+def get_comments(aid):
     comments = []
     db = get_database_connection()
     try:

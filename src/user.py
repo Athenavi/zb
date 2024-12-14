@@ -133,7 +133,7 @@ def get_owner_articles(owner_id=None, user_name=None):
     return articles
 
 
-def get_userInfo(user_id=None, user_name=None):
+def get_profiles(user_id=None, user_name=None):
     db = get_database_connection()
     info_list = []
 
@@ -147,7 +147,7 @@ def get_userInfo(user_id=None, user_name=None):
                 query = "SELECT * FROM users WHERE `id` = %s;"
                 params = (user_id,)
             else:
-                return info_list  # 没有提供有效的查询条件
+                return info_list
 
             cursor.execute(query, params)
             info = cursor.fetchone()

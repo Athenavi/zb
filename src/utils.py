@@ -142,11 +142,6 @@ def zy_upload_file():
 
 
 def get_client_ip(request, session):
-    # 尝试从 session 中读取 IP 地址
-    public_ip = session.get('public_ip')
-    if public_ip:
-        return public_ip
-
     # 按顺序尝试获取真实 IP 地址
     headers = ["X-Real-IP", "X-Forwarded-For"]
     for header in headers:
@@ -154,23 +149,7 @@ def get_client_ip(request, session):
         if ip:
             session['public_ip'] = ip
             return ip
-
-    # 获取公共 IP 地址
-    if 'public_ip' not in session:
-        try:
-            response = requests.get('http://ip-api.com/json')
-            data = response.json()
-            if data.get('status') == 'success':
-                public_ip = data.get('query')
-            else:
-                public_ip = ''
-        except requests.RequestException:
-            public_ip = ''
-
-        # 将 IP 存入 session 中
-        session['public_ip'] = public_ip
-
-    return public_ip
+    return None
 
 
 def zy_noti_conf():
@@ -273,17 +252,17 @@ def get_media_list(username, category, page=1, per_page=10):
 
 
 def get_all_img(username, page=1, per_page=10):
-    imgs, has_next_page, has_previous_page = get_media_list(username, category='img')
+    imgs, has_next_page, has_previous_page = get_media_list(username, category='img', page=page, per_page=per_page)
     return imgs, has_next_page, has_previous_page
 
 
 def get_all_video(username, page=1, per_page=10):
-    videos, has_next_page, has_previous_page = get_media_list(username, category='video')
+    videos, has_next_page, has_previous_page = get_media_list(username, category='video', page=page, per_page=per_page)
     return videos, has_next_page, has_previous_page
 
 
 def get_all_xmind(username, page=1, per_page=10):
-    videos, has_next_page, has_previous_page = get_media_list(username, category='xmind')
+    videos, has_next_page, has_previous_page = get_media_list(username, category='xmind', page=page, per_page=per_page)
     return videos, has_next_page, has_previous_page
 
 

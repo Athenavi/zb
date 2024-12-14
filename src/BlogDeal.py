@@ -1,4 +1,6 @@
+import codecs
 import datetime
+import html
 import os
 import re
 import urllib
@@ -60,10 +62,6 @@ def read_hidden_articles():
         db.close()
 
     return hidden_articles
-
-
-import codecs
-import html
 
 
 def get_article_content(article, limit):
@@ -343,7 +341,7 @@ def get_tags_by_article(article_name):
                 tags_list = tags_str.split(';')
                 unique_tags = list(set(tags_list))
 
-    except Exception as e:
+    except Exception:
         return aid, []
     finally:
         cursor.close()
@@ -481,7 +479,7 @@ def get_file_date(file_path):
         return None
 
 
-def article_changePW(aid, newPass):
+def article_change_pw(aid, passwd):
     db = get_database_connection()
     aid = int(aid)
     try:
@@ -491,10 +489,10 @@ def article_changePW(aid, newPass):
             result = cursor.fetchone()
             if result:
                 query = "UPDATE `article_pass` SET `pass` = %s WHERE `article_pass`.`aid` = %s;"
-                cursor.execute(query, (newPass, aid,))
+                cursor.execute(query, (passwd, aid,))
             else:
                 query = "INSERT INTO `article_pass` (`aid`, `pass`) VALUES (%s, %s);"
-                cursor.execute(query, (aid, newPass,))
+                cursor.execute(query, (aid, passwd,))
     except Exception as e:
         print(f"An error occurred: {e}")
         return False
