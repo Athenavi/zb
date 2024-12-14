@@ -198,6 +198,29 @@ def auth_articles(title, username):
         db.close()
 
 
+def auth_by_id(aid, username):
+    db = get_database_connection()
+
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT * FROM articles WHERE ArticleID = %s and Author = %s"
+            cursor.execute(query, (aid, username,))
+            result = cursor.fetchone()
+            if result:
+                return True
+            else:
+                return False
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return False
+    finally:
+        try:
+            cursor.close()
+        except NameError:
+            pass
+        db.close()
+
+
 def zy_edit_article(article, max_line):
     limit = max_line
     try:
@@ -302,29 +325,31 @@ def get_articles_by_tag(tag_name):
     return tag_articles
 
 
-def get_tags_by_article(article_title):
+def get_tags_by_article(article_name):
     db = get_database_connection()
     cursor = db.cursor()
     unique_tags = []
+    aid = 0
 
     try:
-        query = "SELECT Tags FROM articles WHERE Title = %s"
-        cursor.execute(query, (article_title,))
+        query = "SELECT ArticleID,Tags FROM articles WHERE Title = %s"
+        cursor.execute(query, (article_name,))
 
         result = cursor.fetchone()
         if result:
-            tags_str = result[0]
+            aid = result[0] or 0
+            tags_str = result[1]
             if tags_str:
                 tags_list = tags_str.split(';')
                 unique_tags = list(set(tags_list))
 
     except Exception as e:
-        return error(f"未知错误{e}", 500), 500
+        return aid, []
     finally:
         cursor.close()
         db.close()
 
-    return unique_tags
+    return aid, unique_tags
 
 
 def set_article_info(a_title, username):
@@ -435,6 +460,7 @@ def set_article_visibility(article, hide=True):
             pass
         db.close()
 
+
 def get_file_date(file_path):
     try:
         decoded_name = urllib.parse.unquote(file_path)  # 对文件名进行解码处理
@@ -453,3 +479,30 @@ def get_file_date(file_path):
     except FileNotFoundError:
         # 处理文件不存在的情况
         return None
+
+
+def article_changePW(aid, newPass):
+    db = get_database_connection()
+    aid = int(aid)
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT * FROM article_pass WHERE aid = %s;"
+            cursor.execute(query, (aid,))
+            result = cursor.fetchone()
+            if result:
+                query = "UPDATE `article_pass` SET `pass` = %s WHERE `article_pass`.`aid` = %s;"
+                cursor.execute(query, (newPass, aid,))
+            else:
+                query = "INSERT INTO `article_pass` (`aid`, `pass`) VALUES (%s, %s);"
+                cursor.execute(query, (aid, newPass,))
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return False
+    finally:
+        db.commit()
+        try:
+            cursor.close()
+        except NameError:
+            pass
+        db.close()
+        return True

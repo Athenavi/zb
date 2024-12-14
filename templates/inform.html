@@ -13,29 +13,72 @@
         <a href="{{ domain }}">
             <img alt="{{ title }}" src="/static/favicon.ico" class="logo-img"/>
         </a>
-        {% if status_code %}
-            <div class="tips-title">{{ status_code }}</div>
-            <div class="tips-subtitle"><h2 id="message">{{ message }}</h2></div>
+        {% if not aid %}
+            {% if status_code %}
+                <div class="tips-title">{{ status_code }}</div>
+                <div class="tips-subtitle"><h2 id="message">{{ message }}</h2></div>
+                <div class="btn-groups">
+                    <button onclick="window.history.back()" type="button"
+                            class="ant-btn ant-btn-default">返回上一级页面
+                    </button>
+                    <a href="/" rel="nofollow">
+                        <button type="button" class="ant-btn ant-btn-primary">返回主页</button>
+                    </a>
+                </div>
+            {% else %}
+                <div class="tips-title">您即将离开本站博客，跳转到第三方链接</div>
+                <div class="address">{{ url }}</div>
+                <div class="tips-subtitle">请注意您的账号和财产安全</div>
+                <div class="btn-groups">
+                    <button onclick="try { window.close(); } catch(e) { alert('请手动关闭此页面'); }" type="button"
+                            class="ant-btn ant-btn-default">取消访问
+                    </button>
+                    <a href="{{ url }}" rel="nofollow">
+                        <button type="button" class="ant-btn ant-btn-primary">继续访问</button>
+                    </a>
+                </div>
+            {% endif %}
+        {% endif %}
+        {% if aid %}
+            <div class="tips-title" id="pwTips">您访问的页面需要输入密码</div>
+            <div class="address" id="response" style="display: none;"></div>
+            <input type="password" id="passwd" maxlength="4" required
+                   style="padding: 0.5rem; border: 2px solid #28a745; border-radius: 0.375rem; color: #28a745; font-size: 1rem; width: 200px; transition: border-color 0.3s ease;"
+                   onfocus="this.style.borderColor='#007bff'"
+                   onblur="this.style.borderColor='#28a745'">
             <div class="btn-groups">
                 <button onclick="window.history.back()" type="button"
                         class="ant-btn ant-btn-default">返回上一级页面
                 </button>
-                <a href="/" rel="nofollow">
-                    <button type="button" class="ant-btn ant-btn-primary">返回主页</button>
+                <a href="#" rel="nofollow">
+                    <button type="button" class="ant-btn ant-btn-primary" onclick="unlockArticle()">Unlock</button>
                 </a>
             </div>
-        {% else %}
-            <div class="tips-title">您即将离开本站博客，跳转到第三方链接</div>
-            <div class="address">{{ url }}</div>
-            <div class="tips-subtitle">请注意您的账号和财产安全</div>
-            <div class="btn-groups">
-                <button onclick="try { window.close(); } catch(e) { alert('请手动关闭此页面'); }" type="button"
-                        class="ant-btn ant-btn-default">取消访问
-                </button>
-                <a href="{{ url }}" rel="nofollow">
-                    <button type="button" class="ant-btn ant-btn-primary">继续访问</button>
-                </a>
-            </div>
+            <script>
+                async function unlockArticle() {
+                    const aid = '{{ aid }}';
+                    const passwd = document.getElementById('passwd').value;
+
+                    const response = await fetch(`/api/article/unlock?aid=${aid}&passwd=${passwd}`, {
+                        method: 'POST',
+                        credentials: 'include',
+                    });
+
+                    const data = await response.json();
+                    const responseElement = document.getElementById('response');
+                    const passwdElement = document.getElementById('passwd');
+
+                    if (response.ok) {
+                        responseElement.innerHTML = `<a href="${data.temp_url}">${data.temp_url}</a>`;
+                        responseElement.style.display = "block"; // 显示响应元素
+                        passwdElement.style.display = "none"; // 隐藏密码输入框
+                        document.getElementById('pwTips').textContent = '成功创建您的临时访问链接！';
+                    } else {
+                        responseElement.textContent = `Error: ${data.message}`;
+                        responseElement.style.display = "block";
+                    }
+                }
+            </script>
         {% endif %}
     </div>
 </div>

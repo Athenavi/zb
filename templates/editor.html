@@ -30,8 +30,17 @@
                     文章页
                 </button>
             </a>
-            <a href="#" data-article={{ articleName }} class="hidden121">隐藏/取消隐藏</a>
-            <a href="#" data-article={{ articleName }} class="delete121">删除</a>
+            <br/>
+            <br/>
+            <form onsubmit="changePassword(event)">
+                <input type="password" id="new-password" maxlength="4" required
+                       class="border rounded text-gray-700 leading-tight">
+                <button type="submit"
+                        class="hover:bg-red-700">
+                    🔑
+                </button>
+            </form>
+
         </div>
 
         <label for="md-editor" class="block text-gray-700 text-sm font-bold mb-2"></label>
@@ -39,6 +48,8 @@
                 class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
             保存内容
         </button>
+        <a href="#" data-article={{ articleName }} class="hidden121">隐藏/取消隐藏</a>
+        <a href="#" data-article={{ articleName }} class="delete121">删除</a>
         <textarea id="md-editor" class="shadow border rounded py-2 px-3 text-grey-darker mb-3 w-full"
                   rows="10">{{ edit_html }}</textarea>
     </div>
@@ -157,4 +168,25 @@
             }
         });
     });
+</script>
+<script>
+    async function changePassword(event) {
+        event.preventDefault(); // 防止默认表单提交
+
+        const aid = "{{ aid }}";
+        const newPassword = document.getElementById('new-password').value;
+
+        const response = await fetch(`/api/article/PW?aid=${aid}&new-passwd=${newPassword}`, {
+            method: 'POST',
+            credentials: 'include', // 发送 cookies
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            alert('Password changed successfully!');
+        } else {
+            alert(`Error: ${result.message}`);
+        }
+    }
 </script>
