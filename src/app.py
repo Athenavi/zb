@@ -31,7 +31,7 @@ from src.BlogDeal import get_article_names, get_article_content, clear_html_form
     get_blog_author, read_hidden_articles, auth_articles, get_file_date, \
     zy_edit_article, get_subscriber_ids, get_unique_tags, get_articles_by_tag, \
     get_tags_by_article, set_article_info, write_tags_to_database, set_article_visibility, auth_by_id, \
-    article_change_pw, get_file_summary, get_comments
+    article_change_pw, get_file_summary, get_comments, auth_files
 from src.database import get_database_connection
 from src.links import create_special_url, redirect_to_long_url
 from src.notification import get_sys_notice, read_notification, send_change_mail
@@ -2154,20 +2154,19 @@ def test(user_id):
     return rendered
 
 
-@app.route('/delete/<filename>', methods=['POST'])
+@app.route('/api/delete/<filename>', methods=['GET','delete'])
 @jwt_required
-def delete_file(user_id, filename):
-    aid = int(request.json.get('aid'))
-    fileid = int(request.json.get('file-id'))
-    if aid:
-        auth = auth_articles(title=filename, username=get_username())
-        if auth:
-            app.logger.info(f'{user_id} Delete: {filename}')
-            return zy_delete_article(filename)
-
-    elif fileid:
+def api_delete(user_id, filename):
+    username = get_username()
+    file_path = os.path.join('media', username, filename)
+    auth = auth_files(file_path, user_id)
+    if auth:
+        if os.path.exists(file_path):
+            os.remove(file_path)  # 删除 文件
+        return jsonify({'filename': filename, 'Deleted': True}), 201
+    else:
         app.logger.info(f'{user_id} Delete: {filename} :error')
-        return error(message='您没有权限', status_code=503)
+        return jsonify({'filename': filename, 'Deleted': False}), 503
 
 
 @app.errorhandler(404)

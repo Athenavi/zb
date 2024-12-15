@@ -527,3 +527,26 @@ def get_comments(aid):
     finally:
         db.close()
         return comments
+
+
+def auth_files(file_path, user_id):
+    db = get_database_connection()
+    Auth = False
+    print(file_path)
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT * FROM `media` WHERE `user_id` = %s and file_path = %s"
+            cursor.execute(query, (user_id, file_path,))
+            result = cursor.fetchone()
+            if result:
+                Auth = True
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        try:
+            cursor.close()
+        except NameError:
+            pass
+        db.close()
+        return Auth
