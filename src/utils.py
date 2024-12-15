@@ -1,3 +1,4 @@
+import configparser
 import json
 import os
 import random
@@ -7,15 +8,16 @@ import string
 import zipfile
 from configparser import ConfigParser
 from datetime import datetime, timedelta
+from functools import wraps
 
 import cv2
 import jwt
-import requests
 from PIL import Image
-from flask import request, make_response, jsonify
+from flask import request, make_response, jsonify, redirect, url_for, render_template
+from packaging.version import Version
 from werkzeug.utils import secure_filename
 
-from src.user import error
+from src.user import error, zy_general_conf
 
 secret_key = 'your_secret_key'
 
@@ -67,6 +69,53 @@ def authenticate_jwt(token):
 def authenticate_refresh_token(token):
     # 认证刷新令牌
     return authenticate_token(token)
+
+
+def get_username():
+    token = request.cookies.get('jwt')
+    if token:
+        payload = jwt.decode(token, secret_key, algorithms=['HS256'], options={"verify_exp": False})
+        return payload['username']
+
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = request.cookies.get('jwt')
+        user_id = authenticate_jwt(token)
+        if user_id != 1:
+            return error(message="Unauthorized", status_code=403)
+        return f(user_id, *args, **kwargs)
+
+    return decorated_function
+
+
+def jwt_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = request.cookies.get('jwt')
+        user_id = authenticate_jwt(token)
+        if user_id is None:
+            callback_route = request.endpoint
+            return redirect(url_for('login', callback=callback_route))
+        return f(user_id, *args, **kwargs)
+
+    return decorated_function
+
+
+def finger_required(f):
+    @wraps(f)
+    def finger_func(*args, **kwargs):
+        token = request.cookies.get('jwt')
+        user_id = authenticate_jwt(token)
+        if user_id is None:
+            callback_route = request.endpoint
+            return redirect(url_for('login', callback=callback_route))
+        chrome_fingerprint = request.cookies.get('finger')
+        if not chrome_fingerprint:
+            return render_template('Authentication.html', form='finger')
+
+    return finger_func
 
 
 def generate_short_url():
@@ -142,11 +191,6 @@ def zy_upload_file():
 
 
 def get_client_ip(request, session):
-    # 尝试从 session 中读取 IP 地址
-    public_ip = session.get('public_ip')
-    if public_ip:
-        return public_ip
-
     # 按顺序尝试获取真实 IP 地址
     headers = ["X-Real-IP", "X-Forwarded-For"]
     for header in headers:
@@ -154,23 +198,7 @@ def get_client_ip(request, session):
         if ip:
             session['public_ip'] = ip
             return ip
-
-    # 获取公共 IP 地址
-    if 'public_ip' not in session:
-        try:
-            response = requests.get('http://ip-api.com/json')
-            data = response.json()
-            if data.get('status') == 'success':
-                public_ip = data.get('query')
-            else:
-                public_ip = ''
-        except requests.RequestException:
-            public_ip = ''
-
-        # 将 IP 存入 session 中
-        session['public_ip'] = public_ip
-
-    return public_ip
+    return None
 
 
 def zy_noti_conf():
@@ -273,17 +301,17 @@ def get_media_list(username, category, page=1, per_page=10):
 
 
 def get_all_img(username, page=1, per_page=10):
-    imgs, has_next_page, has_previous_page = get_media_list(username, category='img')
+    imgs, has_next_page, has_previous_page = get_media_list(username, category='img', page=page, per_page=per_page)
     return imgs, has_next_page, has_previous_page
 
 
 def get_all_video(username, page=1, per_page=10):
-    videos, has_next_page, has_previous_page = get_media_list(username, category='video')
+    videos, has_next_page, has_previous_page = get_media_list(username, category='video', page=page, per_page=per_page)
     return videos, has_next_page, has_previous_page
 
 
 def get_all_xmind(username, page=1, per_page=10):
-    videos, has_next_page, has_previous_page = get_media_list(username, category='xmind')
+    videos, has_next_page, has_previous_page = get_media_list(username, category='xmind', page=page, per_page=per_page)
     return videos, has_next_page, has_previous_page
 
 
@@ -375,3 +403,52 @@ def generate_video_thumb(video_path, thumb_path, time=1):
 
     # 释放视频捕捉对象
     cap.release()
+
+
+domain, title, beian, sys_version, api_host, app_id, app_key = zy_general_conf()
+
+
+def theme_safe_check(theme_id, channel=1):
+    theme_path = f'templates/theme/{theme_id}'
+    if not os.path.exists(theme_path):
+        return False
+    has_index_html = os.path.exists(os.path.join(theme_path, 'index.html'))
+    has_template_ini = os.path.exists(os.path.join(theme_path, 'template.ini'))
+
+    if has_index_html and has_template_ini:
+        theme_detail = configparser.ConfigParser()
+        # 读取 template.ini 文件
+        theme_detail.read(f'templates/theme/{theme_id}/template.ini', encoding='utf-8')
+        # 获取配置文件中的属性值
+        tid = theme_detail.get('default', 'id').strip("'")
+        author = theme_detail.get('default', 'author').strip("'")
+        theme_title = theme_detail.get('default', 'title').strip("'")
+        theme_description = theme_detail.get('default', 'description').strip("'")
+        author_website = theme_detail.get('default', 'authorWebsite').strip("'")
+        theme_version = theme_detail.get('default', 'version').strip("'")
+        theme_version_code = theme_detail.get('default', 'versionCode').strip("'")
+        update_url = theme_detail.get('default', 'updateUrl').strip("'")
+        screenshot = theme_detail.get('default', 'screenshot').strip("'")
+
+        theme_properties = {
+            'id': tid,
+            'author': author,
+            'title': theme_title,
+            'description': theme_description,
+            'authorWebsite': author_website,
+            'version': theme_version,
+            'versionCode': theme_version_code,
+            'updateUrl': update_url,
+            'screenshot': screenshot,
+        }
+
+        if channel == 1:
+            return jsonify(theme_properties)
+        else:
+            # print(Version(theme_version) > Version(sys_version))
+            if Version(theme_version) < Version(sys_version):
+                return False
+            else:
+                return True
+    else:
+        return False

@@ -1,6 +1,5 @@
 import base64
 import concurrent.futures
-import configparser
 import datetime
 import hashlib
 import io
@@ -13,7 +12,6 @@ import time
 import urllib.parse
 import xml.etree.ElementTree as ElementTree
 from datetime import datetime, timedelta
-from functools import wraps
 from pathlib import Path
 
 import jwt
@@ -24,7 +22,6 @@ from flask import Flask, render_template, redirect, session, request, url_for, R
     make_response, send_from_directory
 from flask_caching import Cache
 from jinja2 import select_autoescape
-from packaging.version import Version
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
 
@@ -33,16 +30,17 @@ from src.AboutPW import zy_change_password, zy_confirm_password
 from src.BlogDeal import get_article_names, get_article_content, clear_html_format, \
     get_blog_author, read_hidden_articles, auth_articles, get_file_date, \
     zy_edit_article, get_subscriber_ids, get_unique_tags, get_articles_by_tag, \
-    get_tags_by_article, set_article_info, write_tags_to_database, set_article_visibility, auth_by_id, article_changePW
+    get_tags_by_article, set_article_info, write_tags_to_database, set_article_visibility, auth_by_id, \
+    article_change_pw, get_file_summary, get_comments, auth_files
 from src.database import get_database_connection
 from src.links import create_special_url, redirect_to_long_url
 from src.notification import get_sys_notice, read_notification, send_change_mail
-from src.user import zyadmin, zy_delete_article, error, get_owner_articles, zy_general_conf, get_userInfo
+from src.user import zyadmin, error, get_owner_articles, zy_general_conf, get_profiles
 from src.utils import zy_upload_file, get_client_ip, \
     zy_noti_conf, generate_jwt, secret_key, authenticate_jwt, \
     authenticate_refresh_token, handle_file_upload, is_allowed_file, is_valid_domain_with_slash, \
     get_all_img, get_all_video, get_all_xmind, get_list_intersection, generate_thumbs, generate_video_thumb, \
-    get_media_list
+    get_username, admin_required, jwt_required, finger_required, theme_safe_check
 
 global_encoding = 'utf-8'
 
@@ -103,7 +101,6 @@ def inject_variables():
 def login():
     callback_route = request.args.get('callback', 'home')
     if request.cookies.get('jwt'):
-        # 如果存在 jwt，解析并获取用户状态
         user_id = authenticate_jwt(request.cookies.get('jwt'))
         if user_id:
             return redirect(url_for(callback_route))
@@ -132,39 +129,6 @@ def register():
     return zy_register(ip)
 
 
-def jwt_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        token = request.cookies.get('jwt')
-        user_id = authenticate_jwt(token)
-        if user_id is None:
-            callback_route = request.endpoint  # 获取请求的端点名称
-            return redirect(url_for('login', callback=callback_route))
-        return f(user_id, *args, **kwargs)
-
-    return decorated_function
-
-
-def finger_required(f):
-    @wraps(f)
-    def fingerAuth_func(*args, **kwargs):
-        token = request.cookies.get('jwt')
-        user_id = authenticate_jwt(token)
-        if user_id is None:
-            callback_route = request.endpoint  # 获取请求的端点名称
-            return redirect(url_for('login', callback=callback_route))
-        cachedFinger = cache.get(f'fingerprint_{user_id}') or []
-        chrome_fingerprint = request.cookies.get('finger')
-        if not chrome_fingerprint:
-            return render_template('Authentication.html', form='finger')
-        if chrome_fingerprint not in cachedFinger:
-            cachedFinger.append(chrome_fingerprint)
-            cache.set(f'fingerprint_{user_id}', cachedFinger)
-        return f(user_id, *args, **kwargs)
-
-    return fingerAuth_func
-
-
 @app.before_request
 def check_jwt_expiration():
     # 检查 JWT 是否即将过期
@@ -180,25 +144,6 @@ def check_jwt_expiration():
                 response = make_response()
                 response.set_cookie('jwt', new_token, httponly=True)  # 刷新 JWT
                 return response
-
-
-def get_username():
-    token = request.cookies.get('jwt')
-    if token:
-        payload = jwt.decode(token, app.secret_key, algorithms=['HS256'], options={"verify_exp": False})
-        return payload['username']
-
-
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        token = request.cookies.get('jwt')
-        user_id = authenticate_jwt(token)
-        if user_id != 1:
-            return error(message="Unauthorized", status_code=403)
-        return f(user_id, *args, **kwargs)
-
-    return decorated_function
 
 
 @app.route('/search', methods=['GET', 'POST'])
@@ -265,7 +210,17 @@ def search(user_id):
 @app.route('/api/<article_name>', methods=['GET', 'POST'])
 def sys_out_file(article_name):
     if article_name.startswith("tempPrev_"):
-        return temp_preview(article_name[:-3])
+        parts = article_name[:-3].rsplit('_', 1)
+        if len(parts) == 2:
+            author, file_name = parts
+        author = get_username()
+        prev = f"""
+        ```xmind preview
+        ../blog/f/{author}/{file_name}
+        ```
+
+        """
+        return prev
 
     # 隐藏文章判别
     hidden_articles = read_hidden_articles()
@@ -278,23 +233,8 @@ def sys_out_file(article_name):
     return send_from_directory(articles_dir, article_name)
 
 
-def temp_preview(file_name):
-    parts = file_name.rsplit('_', 1)
-    if len(parts) == 2:
-        author, file_name = parts
-        print(author, file_name)
-    author = get_username()
-    prev = f"""
-```xmind preview
-../blog/f/{author}/{file_name}
-```
-
-"""
-    return prev
-
-
 @cache.memoize(600)
-def get_avatar(username):
+def get_avatar():
     avatar = app.config['AVATAR_SERVER']
     return avatar
 
@@ -303,22 +243,22 @@ def get_avatar(username):
 @jwt_required
 def profile(user_id):
     username = get_username()
-    avatar_url = get_avatar(username)
-    userBio = '年度大会员'
+    avatar_url = get_avatar()
+    user_bio = '年度大会员'
     owner_articles = get_owner_articles(owner_id=None, user_name=username) or []
-    following = 72
+    user_follow = 72
     follower = 265
     # 确保 render_template 返回正确对象
     return render_template('Profile.html', url_for=url_for, avatar_url=avatar_url,
-                           userStatus=bool(user_id), username=username, userBio=userBio,
-                           following=following, follower=follower,
+                           userStatus=bool(user_id), username=username, userBio=user_bio,
+                           following=user_follow, follower=follower,
                            Articles=owner_articles)
 
 
 @app.route('/setting/profiles', methods=['GET', 'POST'])
 @finger_required
 def setting_profiles(user_id):
-    UserInfo = cache.get(f"{user_id}_userInfo") or get_userInfo(user_id=user_id, user_name=None)
+    UserInfo = cache.get(f"{user_id}_userInfo") or get_profiles(user_id=user_id, user_name=None)
     cache.set(f'{user_id}_userInfo', UserInfo)
     avatar_url = UserInfo[5] or app.config['AVATAR_SERVER']
     Bio = UserInfo[5] or "这人很懒，什么也没留下"
@@ -427,12 +367,12 @@ def home():
         resp = make_response(rendered_content)
 
         if 'key' in request.cookies:
-            visiter = request.cookies.get('key')
-            app.logger.info('访客已存在，使用现有用户名: %s', visiter)
+            visitor = request.cookies.get('key')
+            app.logger.info('访客已存在，使用现有用户名: %s', visitor)
         else:
-            visiter = 'qks' + format(random.randint(10000, 99999))
-            app.logger.warning('新访客，生成随机用户名: %s', visiter)
-            resp.set_cookie('key', 'zyBLOG_' + sys_version + visiter, 7200)
+            visitor = 'qks' + format(random.randint(10000, 99999))
+            app.logger.warning('新访客，生成随机用户名: %s', visitor)
+            resp.set_cookie('key', 'zyBLOG_' + sys_version + visitor, 7200)
 
         return resp
 
@@ -445,7 +385,6 @@ def get_article_info(articles):
     articles_info = []
     for a_title in articles:
         try:
-            # 获取文件的修改时间
             articleInfo = ''
             db = get_database_connection()
 
@@ -456,7 +395,6 @@ def get_article_info(articles):
                     query = "SELECT * FROM articles WHERE Title = %s"
                     cursor.execute(query, (a_title,))
                     result = cursor.fetchone()
-                    # print(result)
                     if result:
                         articleInfo += result[2]
                         articleInfo += ";"
@@ -490,19 +428,6 @@ def get_summary(articles):
         except FileNotFoundError:
             articles_summary.append('获取摘要失败')
     return articles_summary
-
-
-def get_file_summary(a_title):
-    articles_dir = os.path.join(base_dir, 'articles', a_title + ".md")
-    try:
-        with open(articles_dir, 'r', encoding='utf-8') as file:
-            content = file.read()
-    except FileNotFoundError:
-        return "未找到文件"
-    html_content = markdown.markdown(content)
-    text_content = clear_html_format(html_content)
-    summary = (text_content[:75] + "...") if len(text_content) > 75 else text_content
-    return summary
 
 
 @cache.memoize(30)
@@ -584,7 +509,7 @@ def generate_sitemap():
     # 创建XML文件头
     xml_data = '<?xml version="1.0" encoding="UTF-8"?>\n'
     xml_data += '<?xml-stylesheet type="text/xsl" href="./static/sitemap.xsl"?>\n'
-    xml_data += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    xml_data += '<urlset xmlns="https://www.sitemaps.org/schemas/sitemap/0.9/">\n'
 
     for file in markdown_files:
         article_url = domain + 'blog/' + file
@@ -694,6 +619,8 @@ def admin(user_id, key):
 @app.route('/admin/changeTheme', methods=['POST'])
 @admin_required
 def change_display(user_id):
+    if cache.get("Theme_Lock"):
+        return "failed"
     theme_id = request.args.get('NT')
 
     if not theme_id:
@@ -707,10 +634,8 @@ def change_display(user_id):
     # 使用上下文管理器处理数据库连接
     try:
         if theme_id == 'default':
-            print(f"recover theme to {theme_id}")
             cache.set('display_theme', theme_id)
-            # 缓存最后变更主题的记录
-            cache.set(f"last_change_{user_id}", theme_id, timeout=60)  # 设置超时
+            cache.set(f"Theme_Lock", theme_id, timeout=15)  # 设置超时
             return 'success'
 
         if not theme_safe_check(theme_id, channel=2):
@@ -718,10 +643,7 @@ def change_display(user_id):
 
         # 更新缓存并插入数据库记录
         cache.set('display_theme', theme_id)
-        log_theme_change(theme_id, user_id)
-
-        # 缓存最后变更主题的记录
-        cache.set(f"last_change_{user_id}", theme_id, timeout=60)  # 设置超时
+        cache.set(f"Theme_Lock", theme_id, timeout=15)  # 设置超时
 
         app.logger.info(f'{user_id} : change theme to {theme_id}')
         return "success"
@@ -731,67 +653,11 @@ def change_display(user_id):
         return error("未知错误", 500), 500
 
 
-def log_theme_change(theme_id, user_id):
-    db = get_database_connection()
-    with db.cursor() as cursor:
-        query = ("INSERT INTO `events` (`id`, `title`, `description`, `event_date`, `created_at`) VALUES ("
-                 "NULL, 'theme change', %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);")
-        cursor.execute(query, (theme_id,))
-        db.commit()
-
-
-def theme_safe_check(theme_id, channel=1):
-    theme_path = f'templates/theme/{theme_id}'
-    if not os.path.exists(theme_path):
-        return False
-    has_index_html = os.path.exists(os.path.join(theme_path, 'index.html'))
-    has_template_ini = os.path.exists(os.path.join(theme_path, 'template.ini'))
-
-    if has_index_html and has_template_ini:
-        theme_detail = configparser.ConfigParser()
-        # 读取 template.ini 文件
-        theme_detail.read(f'templates/theme/{theme_id}/template.ini', encoding=global_encoding)
-        # 获取配置文件中的属性值
-        tid = theme_detail.get('default', 'id').strip("'")
-        author = theme_detail.get('default', 'author').strip("'")
-        theme_title = theme_detail.get('default', 'title').strip("'")
-        theme_description = theme_detail.get('default', 'description').strip("'")
-        author_website = theme_detail.get('default', 'authorWebsite').strip("'")
-        theme_version = theme_detail.get('default', 'version').strip("'")
-        theme_version_code = theme_detail.get('default', 'versionCode').strip("'")
-        update_url = theme_detail.get('default', 'updateUrl').strip("'")
-        screenshot = theme_detail.get('default', 'screenshot').strip("'")
-
-        theme_properties = {
-            'id': tid,
-            'author': author,
-            'title': theme_title,
-            'description': theme_description,
-            'authorWebsite': author_website,
-            'version': theme_version,
-            'versionCode': theme_version_code,
-            'updateUrl': update_url,
-            'screenshot': screenshot,
-        }
-
-        if channel == 1:
-            return jsonify(theme_properties)
-        else:
-            # print(Version(theme_version) > Version(sys_version))
-            if Version(theme_version) < Version(sys_version):
-                return False
-            else:
-                return True
+def forbid_submit(user_id):
+    if cache.get(f'forbid_{user_id}'):
+        return True
     else:
         return False
-
-
-last_newArticle_time = {}  # 全局变量，用于记录用户最后递交时间
-
-
-def can_user_submit(username, current_time):
-    last_time = last_newArticle_time.get(username)
-    return last_time is None or current_time - last_time >= 600
 
 
 @app.route('/newArticle', methods=['GET', 'POST'])
@@ -801,15 +667,14 @@ def new_article(user_id):
     if not username:
         error(message='请先登录', status_code=401)
     if request.method == 'GET':
-        if not can_user_submit(user_id, time.time()):
+        if forbid_submit(user_id):
             return error('您完成了一次服务（无论成功与否），此服务短期内将变得不可达，请您10分钟之后再来', 503)
         return render_template('postNewArticle.html')
 
     elif request.method == 'POST':
-        if not can_user_submit(user_id, time.time()):
+        if forbid_submit(user_id):
             return error('距离您上次上传时间过短，请十分钟后重试', 503)
 
-        last_newArticle_time[user_id] = time.time()
         file = request.files['file']
 
         logging.info(f"User {user_id} attempting to upload: {file.filename}")
@@ -822,8 +687,10 @@ def new_article(user_id):
         if set_article_info(file_name, username):
             message = '上传成功。但请您检查错误以及编辑。'
             logging.info(f"Article info successfully saved for {file_name} by user:{user_id}.")
+            cache.set(f'forbid_{user_id}', True, timeout=600)
         else:
             message = '上传成功，但文章信息未能更新，请重试。'
+            cache.set(f'forbid_{user_id}', True, timeout=600)
             logging.error("Failed to update article information in the database.")
 
         return render_template('postNewArticle.html', message=message)
@@ -834,20 +701,6 @@ def new_article(user_id):
 def upload_file1(user_id):
     app.logger.info(f'{user_id} : Try Upload file')
     return zy_upload_file()
-
-
-@app.route('/delete/<filename>', methods=['POST'])
-@jwt_required
-def delete_file(user_id, filename):
-    username = get_username()
-    if username:
-        auth = auth_articles(title=filename, username=username)
-        if auth:
-            app.logger.info(f'{user_id} Delete: {filename}')
-            return zy_delete_article(filename)
-    else:
-        app.logger.info(f'{user_id} Delete: {filename} :error')
-        return error(message='您没有权限', status_code=503)
 
 
 @cache.cached(timeout=14400)
@@ -865,27 +718,25 @@ def markdown_editor(article):
     if article == 'default':
         return error(404, status_code=404)
     username = get_username()
-    auth = False  # 设置默认值
+    auth = False
 
     if username is not None:
-        # Auth 认证
         auth = auth_articles(article, username)
 
     if auth:
+        aid, tags = get_tags_by_article(article)
         if request.method == 'GET':
             edit_html = zy_edit_article(article, max_line=app.config['MAX_LINE'])
-
-            aid, tags = get_tags_by_article(article)
 
             # 渲染编辑页面并将转换后的HTML传递到模板中
             return render_template('editor.html', edit_html=edit_html, aid=aid, articleName=article,
                                    tags=tags)
         elif request.method == 'POST':
             content = request.json['content']
-            return zy_save_edit(article, content)
+            return zy_save_edit(aid, content, article)
         elif request.method == 'PUT':
             tags_input = request.get_json().get('tags')
-            return zy_save_tags(article, tags_input)
+            return zy_save_tags(aid, tags_input)
         else:
             # 渲染编辑页面
             return render_template('editor.html')
@@ -894,7 +745,7 @@ def markdown_editor(article):
         return error(message='您没有权限', status_code=503)
 
 
-def zy_save_tags(article, tags_input):
+def zy_save_tags(aid, tags_input):
     # 将中文逗号转换为英文逗号
     tags_input = tags_input.replace("，", ",")
 
@@ -905,55 +756,51 @@ def zy_save_tags(article, tags_input):
 
     # 计算标签的哈希值
     current_tag_hash = hashlib.md5(tags_input.encode('utf-8')).hexdigest()
-    previous_content_hash = cache.get(f"{article}:tag_hash")
+    previous_content_hash = cache.get(f"{aid}:tag_hash")
 
     # 检查内容是否与上一次提交相同
     if current_tag_hash == previous_content_hash:
         return jsonify({'show_edit': 'success'})
 
     # 更新缓存中的标签哈希值
-    cache.set(f"{article}:tag_hash", current_tag_hash, timeout=28800)
+    cache.set(f"{aid}:tag_hash", current_tag_hash, timeout=28800)
 
     # 写入更新后的标签到数据库
-    write_tags_to_database(tags_list, article)
+    write_tags_to_database(tags_list, aid)
     return jsonify({'show_edit': "success"})
 
 
-def zy_save_edit(article, content):
-    if article and content:
-        save_directory = 'articles/'
+def zy_save_edit(aid, content, a_name):
+    save_directory = 'articles/'
 
-        # 计算内容的哈希值
-        current_content_hash = hashlib.md5(content.encode('utf-8')).hexdigest()
+    # 计算内容的哈希值
+    current_content_hash = hashlib.md5(content.encode('utf-8')).hexdigest()
 
-        # 从缓存中获取之前的哈希值
-        previous_content_hash = cache.get(f"{article}_lasted_hash")
+    # 从缓存中获取之前的哈希值
+    previous_content_hash = cache.get(f"{aid}_lasted_hash")
 
-        # 检查内容是否与上一次提交相同
-        if current_content_hash == previous_content_hash:
-            # print(current_content_hash)
-            return jsonify({'show_edit_code': 'success'})
-
-        # 更新缓存中的哈希值
-        cache.set(f"{article}_lasted_hash", current_content_hash, timeout=28800)
-
-        # 将文章名转换为字节字符串
-        article_name_bytes = article.encode('utf-8')
-
-        # 将字节字符串和目录拼接为文件路径
-        file_path = os.path.join(save_directory, article_name_bytes.decode('utf-8') + ".md")
-
-        # 检查保存目录是否存在，如果不存在则创建它
-        if not os.path.exists(save_directory):
-            os.makedirs(save_directory)
-
-        # 将文件保存到指定的目录上，覆盖任何已存在的文件
-        with open(file_path, 'w', encoding='utf-8') as file:
-            file.write(content)
-
+    # 检查内容是否与上一次提交相同
+    if current_content_hash == previous_content_hash:
         return jsonify({'show_edit_code': 'success'})
 
-    return jsonify({'show_edit_code': 'failed'})
+    # 更新缓存中的哈希值
+    cache.set(f"{aid}_lasted_hash", current_content_hash, timeout=28800)
+
+    # 将文章名转换为字节字符串
+    article_name_bytes = a_name.encode('utf-8')
+
+    # 将字节字符串和目录拼接为文件路径
+    file_path = os.path.join(save_directory, article_name_bytes.decode('utf-8') + ".md")
+
+    # 检查保存目录是否存在，如果不存在则创建它
+    if not os.path.exists(save_directory):
+        os.makedirs(save_directory)
+
+    # 将文件保存到指定的目录上，覆盖任何已存在的文件
+    with open(file_path, 'w', encoding='utf-8') as file:
+        file.write(content)
+
+    return jsonify({'show_edit_code': 'success'})
 
 
 last_request_time = {}
@@ -998,29 +845,6 @@ def hidden_article():
         return jsonify({'deal': 'unhide'})
 
 
-@app.route('/travel', methods=['GET'])
-def travel():
-    response = requests.get(domain + 'sitemap.xml')  # 发起对/sitemap接口的请求
-    if response.status_code == 200:
-        tree = ElementTree.fromstring(response.content)  # 使用xml.etree.ElementTree解析响应内容
-
-        urls = []  # 用于记录提取的URL列表
-        for url_element in tree.findall('{http://www.sitemaps.org/schemas/sitemap/0.9}url'):
-            loc_element = url_element.find('{http://www.sitemaps.org/schemas/sitemap/0.9}loc')
-            if loc_element is not None:
-                urls.append(loc_element.text)  # 将标签中的内容添加到列表中
-
-        if urls:
-            random.shuffle(urls)  # 随机打乱URL列表的顺序
-            random_url = urls[0]  # 选择打乱后的第一个URL
-            return render_template('inform.html', url=random_url, domian=domain)
-        # 如果没有找到任何<loc>标签，则返回适当的错误信息或默认页面
-        return "No URLs found in the response."
-    else:
-        # 处理无法获取响应内容的情况，例如返回错误页面或错误消息
-        return "Failed to fetch sitemap content."
-
-
 @app.route('/media', methods=['GET', 'POST'])
 @jwt_required
 def media(user_id):
@@ -1028,17 +852,21 @@ def media(user_id):
     page = request.args.get('page', default=1, type=int)
     username = get_username()
     if request.method == 'GET':
+        preference = request.cookies.get('preference')
+        template_choose = 'Media.html'
+        if preference == 'V2':
+            template_choose = 'Media_V2.html'
         if not media_type or media_type == 'img':
             imgs, has_next_page, has_previous_page = get_all_img(username, page=page)
 
-            return render_template('Media.html', imgs=imgs, title='Media', url_for=url_for,
+            return render_template(template_choose, imgs=imgs, title='Media', url_for=url_for,
                                    has_next_page=has_next_page,
                                    has_previous_page=has_previous_page, current_page=page, userid=username,
                                    domain=domain)
         if media_type == 'video':
             videos, has_next_page, has_previous_page = get_all_video(username, page=page)
 
-            return render_template('Media.html', videos=videos, title='Media', url_for=url_for,
+            return render_template(template_choose, videos=videos, title='Media', url_for=url_for,
                                    has_next_page=has_next_page,
                                    has_previous_page=has_previous_page, current_page=page, userid=username,
                                    domain=domain)
@@ -1046,7 +874,7 @@ def media(user_id):
         if media_type == 'xmind':
             xminds, has_next_page, has_previous_page = get_all_xmind(username, page=page)
 
-            return render_template('Media.html', xminds=xminds, title='Media', url_for=url_for,
+            return render_template(template_choose, xminds=xminds, title='Media', url_for=url_for,
                                    has_next_page=has_next_page,
                                    has_previous_page=has_previous_page, current_page=page, userid=username,
                                    domain=domain)
@@ -1280,8 +1108,8 @@ def redirect_to_long_url_route(short_url):
 def api_shortlink(long_url):
     if not long_url.startswith('https://') and not long_url.startswith('http://'):
         return 'error'
-    username = '7trees'
-    short_url = create_special_url(long_url, username)  # 传递用户名参数
+    username = title
+    short_url = create_special_url(long_url, username)
     article_surl = domain + 's/' + short_url
     return article_surl
 
@@ -1305,7 +1133,6 @@ def id_find_article(article_id):
             long_url = result[0]
             last_slash_index = long_url.rfind("/")
             article = long_url[last_slash_index + 1:]
-            # print(article)
             return blog_detail(article)
         else:
             # If no URL is found
@@ -1370,20 +1197,10 @@ def api_mail(user_id):
     receiver_email = sender_email
     subject = '安全通知邮件'  # 邮件主题
     body = '这是一封测试邮件。'  # 邮件正文
-    send_email(sender_email, password, receiver_email, smtp_server, stmp_port=int(stmp_port), subject=subject,
+    send_email(sender_email, password, receiver_email, smtp_server, int(stmp_port), subject=subject,
                body=body)
     app.logger.info(f'{user_id} sendMail')
     return 'success'
-
-
-@app.route('/donate')
-def donate():
-    for_uid = request.args.get('for-uid')
-    if not for_uid:
-        return "此用户不存在"
-    else:
-        channel_url = 'http://test.com'
-        return f'你要捐赠的是{for_uid},他的捐款通道为{channel_url}'
 
 
 @app.route('/api/ip')
@@ -1469,7 +1286,6 @@ def follow_user(user_id):
                 cursor.execute("SELECT `subscribe_to_id` FROM `subscriptions` WHERE `subscriber_id` = %s", (user_id,))
                 user_followed = [row[0] for row in cursor.fetchall()]  # 获取所有关注ID
                 cache.set(f'{user_id}_followed', user_followed)  # 更新缓存
-                print('here')
         except Exception as e:
             print(f"Exception occurred when loading from DB: {e}")
             return jsonify({'follow_code': 'failed', 'message': "error"})
@@ -1490,7 +1306,6 @@ def follow_user(user_id):
 
             user_followed.append(follow_id)  # 更新列表
             cache.set(f'{user_id}_followed', user_followed)  # 更新缓存
-            print('here2')
             return jsonify({'follow_code': 'success'})
 
     except Exception as e:
@@ -1585,7 +1400,7 @@ def like(user_id):
 
 
 def get_current_theme():
-    current_theme = cache.get('display_theme')  # 获取缓存
+    current_theme = cache.get('display_theme')
     if current_theme is None:
         current_theme = 'default'
     return current_theme
@@ -1594,7 +1409,7 @@ def get_current_theme():
 def sanitize_user_agent(user_agent):
     if user_agent is None:
         return None
-    sanitized_agent = re.sub(r'[.;,()/\s]', '', user_agent)  # 移除分号、逗号和空格等
+    sanitized_agent = re.sub(r'[.;,()/\s]', '', user_agent)
     return sanitized_agent
 
 
@@ -1640,14 +1455,14 @@ def check_qr_login():
     if cache_QR_token:
         expire_at = cache_QR_token['expire_at']
         if int(expire_at) > int(time.time()):
-            return success_scan(token)
+            return success_scan()
         else:
             return jsonify({'status': 'pending'})
     else:
         return jsonify({'status': 'invalid_token'})
 
 
-def success_scan(token):
+def success_scan():
     # 扫码成功调用此接口
     token = request.args.get('token')
     cache_QR_allowed = cache.get(f"QR-allow_{token}")
@@ -1662,7 +1477,7 @@ def success_scan(token):
 
 @app.route("/api/phone/scan")
 @jwt_required
-def phone_scan(token):
+def phone_scan():
     # 用户扫码调用此接口
     token = request.args.get('login_token')
     phone_token = request.cookies.get('jwt')
@@ -1702,7 +1517,6 @@ def finger(user_id):
             if chrome_fingerprint not in cachedFinger:
                 cachedFinger.append(chrome_fingerprint)
                 cache.set(f'fingerprint_{user_id}', cachedFinger)
-                print(cachedFinger)
                 return jsonify({"msg": "Fingerprint saved successfully"}), 200
             return jsonify({"msg": "Fingerprint Auth"}), 200
         return jsonify({"msg": "Failed to save fingerprint"}), 400
@@ -1731,17 +1545,14 @@ def export(user_id):
 
 
 @app.route('/@<username>', methods=['GET', 'POST'])
-def userCenter(username):
+def user_center(username):
     # 正则表达式，限制用户名的格式 (只允许字母和数字)
     if not re.match(r'^[a-zA-Z0-9]+$', username):
         return error("Invalid username", 400)
 
-    try:
-        user_dir = Path(base_dir) / 'media' / username
-        if not os.path.exists(user_dir):
-            return error("Invalid username", 400)
-    except Exception as e:
-        pass
+    user_dir = Path(base_dir) / 'media' / username
+    if not os.path.exists(user_dir):
+        return error("Invalid username", 400)
 
     spm = request.args.get('spm')
     if spm:
@@ -1752,7 +1563,7 @@ def userCenter(username):
 
     following = 72
     follower = 265
-    return render_template('Profile.html', url_for=url_for, avatar_url=get_avatar(username),
+    return render_template('Profile.html', url_for=url_for, avatar_url=get_avatar(),
                            userStatus=bool(username), username=username, userBio=userBio,
                            following=following, follower=follower,
                            Articles=owner_articles, notiHost=noti_host, notiPort=noti_port)
@@ -1775,11 +1586,11 @@ def diy_space(page):
 @finger_required
 def guestbook(user_id):
     username = get_username()
-    avatar_url = get_avatar(1)
+    avatar_url = get_avatar()
     message_list = get_guestbook() or []
     user_finger = request.cookies.get('finger')
     if request.method == 'POST':
-        data = request.get_json()  # 获取 JSON 数据
+        data = request.get_json()
         nickname = data.get('nickname') or username
         message = data.get('message')
         content = f'"{nickname}":"{message}"'
@@ -1790,10 +1601,8 @@ def guestbook(user_id):
         upload_guestbook(content)
         cache.set(f"guestbook", None)
         cache.set(f"guestbook_{user_finger}", True, timeout=180)
-        # 返回一个成功消息，可以返回新的留言内容
         return jsonify({'status': 'success', 'message_list': message_list}), 201
 
-    # GET 请求返回留言页面
     return render_template('guestbook.html', avatar_url=avatar_url, username=username, message_list=message_list)
 
 
@@ -1844,7 +1653,7 @@ def upload_guestbook(content):
 
 @app.route('/links')
 def get_friends_link(type=0):
-    avatar_url = get_avatar(1)
+    avatar_url = get_avatar()
     friends_links = {
         '本站地址': domain,
         'GitHub': "https://github.com/Athenavi",
@@ -1879,10 +1688,8 @@ def parse_update_file(filename):
     with open(filename, 'r', encoding='utf-8') as file:
         content = file.read()
 
-    # print("Raw content from file: ", content)  # 打印文件的原始内容
-
     # 使用正则表达式提取版本信息
-    pattern = re.compile(r"版本 (.+?)\s+发布日期:(.+?)\s+[-]*\n((?:-.*(?:\n|$))*)", re.MULTILINE)
+    pattern = re.compile(r"版本 (.+?)\s+发布日期:(.+?)\s+-*\n((?:-.*(?:\n|$))*)", re.MULTILINE)
     matches = pattern.findall(content)
 
     for match in matches:
@@ -1893,47 +1700,6 @@ def parse_update_file(filename):
         }
         updates.append(version_info)
     return updates
-
-
-@app.route('/media_V2', methods=['GET', 'POST'])
-@jwt_required
-def media_v2(user_id):
-    media_type = request.args.get('type', default='img')
-    page = request.args.get('page', default=1, type=int)
-    username = get_username()
-    if request.method == 'GET':
-        if not media_type or media_type == 'img':
-            imgs, has_next_page, has_previous_page = get_media_list(username, category='img', page=page, per_page=20)
-
-            return render_template('Media_V2.html', imgs=imgs, title='Media', url_for=url_for,
-                                   has_next_page=has_next_page,
-                                   has_previous_page=has_previous_page, current_page=page, userid=username,
-                                   domain=domain)
-        if media_type == 'video':
-            videos, has_next_page, has_previous_page = get_all_video(username, page=page)
-
-            return render_template('Media_V2.html', videos=videos, title='Media', url_for=url_for,
-                                   has_next_page=has_next_page,
-                                   has_previous_page=has_previous_page, current_page=page, userid=username,
-                                   domain=domain)
-
-        if media_type == 'xmind':
-            xminds, has_next_page, has_previous_page = get_all_xmind(username, page=page)
-
-            return render_template('Media_V2.html', xminds=xminds, title='Media', url_for=url_for,
-                                   has_next_page=has_next_page,
-                                   has_previous_page=has_previous_page, current_page=page, userid=username,
-                                   domain=domain)
-    elif request.method == 'POST':
-        img_name = request.json.get('img_name')
-        if not img_name:
-            return error(message='缺少图像名称', status_code=400)
-
-        image = get_image_path(username, img_name)
-        if not image:
-            return error(message='未找到图像', status_code=404)
-
-        return image
 
 
 @app.route('/img/<username>/thumbs/<img>', methods=['GET', 'POST'])
@@ -1961,7 +1727,6 @@ def api_video(username, video):
         if os.path.isfile(video_dir) and os.path.isfile(video_thumbs):
             return send_file(video_thumbs, mimetype='image/jpeg')
         if os.path.isfile(video_dir) and not os.path.isfile(video_thumbs):
-            # 使用线程池异步执行 gen_thumbs 函数
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 thumbs_path = os.path.join(base_dir, 'media', username, 'thumbs')
                 if not os.path.exists(thumbs_path):
@@ -1980,16 +1745,13 @@ def api_xmind(username, xmind):
 
 @app.route('/api/wx/home', methods=['GET'])
 def api_wx_home():
-    # 获取请求参数
     page = request.args.get('page', default=1, type=int)
     tag = request.args.get('tag', default='None')
 
     if page <= 0:
         page = 1
 
-    # 获取文章内容
     articles, has_next_page, has_previous_page = get_a_list(chanel=2, page=page)
-    # 获取其他变量
     notice = ''
     try:
         notice = get_sys_notice(0)
@@ -2002,7 +1764,6 @@ def api_wx_home():
     except Exception as e:
         app.logger.error(f'获取标签出错: {e}')
 
-    # 处理标签过滤
     if tag != 'None':
         tag_articles = get_articles_by_tag(tag)
         if tag_articles:
@@ -2017,7 +1778,6 @@ def api_wx_home():
 
     friends_links = get_friends_link(type=1)
 
-    # 构建返回的数据
     response_data = {
         'articles': compressed_list,
         'notice': notice,
@@ -2091,7 +1851,7 @@ def api_wx_content(article):
 
 @app.route('/api/wx/guestbook', methods=['GET', 'POST'])
 def api_wx_guestbook():
-    avatar_url = get_avatar(1)
+    avatar_url = get_avatar()
     message_list = get_guestbook() or []
     response_data = {
         'avatar_url': avatar_url,
@@ -2139,7 +1899,7 @@ def api_article_unlock(user_id):
 
 
 @app.route('/tmpView', methods=['GET', 'POST'])
-def tmpView():
+def temp_view():
     url = request.args.get('url')
     if url is None:
         return jsonify({"message": "Missing URL parameter"}), 400
@@ -2161,8 +1921,8 @@ def tmpView():
 
                     content = api_wx_content(a_title)
 
-        except Exception as e:
-            return jsonify({"message": "Database error"}, 500)
+        except Exception:
+            return jsonify({f"message": "Database error"}, 500)
 
         finally:
             cursor.close()
@@ -2204,15 +1964,13 @@ def gen_md5(text):
 
 @app.route('/api/article/PW', methods=['GET', 'POST'])
 @finger_required
-def api_article_PW(user_id):
+def api_article_pw(user_id):
     try:
         aid = int(request.args.get('aid'))
     except (TypeError, ValueError):
         return jsonify({"message": "Invalid Article ID"}), 400
 
-    user_finger = request.cookies.get('finger')
-
-    if aid == cache.get(f"PWLock_{user_finger}"):
+    if aid == cache.get(f"PWLock_{user_id}"):
         return jsonify({"message": "操作过于频繁"}), 400
 
     new_password = request.args.get('new-passwd')
@@ -2223,15 +1981,14 @@ def api_article_PW(user_id):
         'changed': result,
     }
 
-    # 验证密码长度
     if len(new_password) != 4:
         return jsonify({"message": "Invalid Password"}), 400
 
     auth = auth_by_id(aid, username=get_username())
 
     if auth:
-        cache.set(f"PWLock_{user_finger}", aid, timeout=30)
-        response_data['result'] = article_changePW(aid, new_password)
+        cache.set(f"PWLock_{user_id}", aid, timeout=30)
+        response_data['result'] = article_change_pw(aid, new_password)
         return jsonify(response_data), 200
     else:
         return jsonify({"message": "Authentication failed"}), 401
@@ -2283,17 +2040,15 @@ def comment_add(aid, user_id, comment_content, ip, ua):
 
 def json_filter(value):
     """将 JSON 字符串解析为 Python 对象"""
-    print(f"Raw JSON string: {value}")  # 打印即将解析的原始 JSON
     if not isinstance(value, str):
         print(f"Unexpected type for value: {type(value)}. Expected a string.")
-        return None  # 如果不是字符串，直接返回 None
+        return None
 
     try:
         result = json.loads(value)
-        print(f"Parsed result: {result}")  # 打印解析后的结果
         return result
     except (ValueError, TypeError) as e:
-        print(f"Error parsing JSON: {e}, Value: {value}")  # 打印错误信息
+        print(f"Error parsing JSON: {e}, Value: {value}")
         return None
 
 
@@ -2301,37 +2056,33 @@ def json_filter(value):
 @jwt_required
 def test(user_id):
     from jinja2 import Environment, FileSystemLoader
-    import json
-
-    # 创建 Jinja2 环境
     env = Environment(loader=FileSystemLoader('templates'))
     env.filters['fromjson'] = json_filter
-
     aid = 1
-    comments = getComments(aid)
-
-    # 调试输出评论
-    for c in comments:
-        print(f"Comment JSON string: {c[3]}")
-
+    comments = get_comments(aid)
     template = env.get_template('test.html')
     rendered = template.render(aid=aid, user_id=user_id, username=get_username(), comments=comments)
     return rendered
 
 
-def getComments(aid):
-    comments = []
-    db = get_database_connection()
-    try:
-        with db.cursor() as cursor:
-            query = "SELECT * FROM `comments` WHERE `article_id` = %s"
-            cursor.execute(query, (int(aid),))
-            comments = cursor.fetchall()
-    except Exception as e:
-        print(f'Error: {e}')
-    finally:
-        db.close()
-        return comments
+@app.route('/api/delete/<filename>', methods=['GET', 'delete'])
+@jwt_required
+def api_delete(user_id, filename):
+    username = get_username()
+    file_path = os.path.join('media', username, filename)
+    auth = auth_files(file_path, user_id)
+    if auth:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        return jsonify({'filename': filename, 'Deleted': True}), 201
+    else:
+        app.logger.info(f'{user_id} Delete: {filename} :error')
+        return jsonify({'filename': filename, 'Deleted': False}), 503
+
+
+@app.route('/travel', methods=['GET'])
+def travel():
+    return '此接口暂时弃用'
 
 
 @app.errorhandler(404)

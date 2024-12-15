@@ -19,23 +19,9 @@
             color: #fff;
         }
 
-        .card-title, .card-body h6 {
-            white-space: nowrap; /* 不换行 */
-            overflow: hidden; /* 隐藏超出部分 */
-            text-overflow: ellipsis; /* 使用省略号 */
-        }
-
-        .card-body {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px;
-            background: transparent;
-            transition: background 0.3s ease;
-        }
 
         .btn-primary:hover {
-            background-color: #FFC107; /* 悬停时变为亮黄色 */
+            background-color: #FFC107;
         }
 
         #image-popup, #video-popup, #xmind-popup {
@@ -108,8 +94,11 @@
                         <div>
                             <a href="/profile">{{ userid }}</a>
                             <a href="{{ url_for('media', username=userid, page=1) }}" class="ml-2">仅图片</a>
-                            <a href="{{ url_for('media', username=userid, page=1,type='video') }}" class="ml-2">仅视频</a>
-                            <a href="{{ url_for('media', username=userid, page=1,type='xmind') }}" class="ml-2">Xmind文件</a>
+                            <a href="{{ url_for('media', username=userid, page=1,type='video') }}"
+                               class="ml-2">仅视频</a>
+                            <a href="{{ url_for('media', username=userid, page=1,type='xmind') }}"
+                               class="ml-2">Xmind文件</a>
+                            <button onclick="setPreference('V2')">新版界面</button>
                         </div>
                     </div>
                 {% else %}
@@ -141,76 +130,32 @@
                     };
                 </script>
                 <hr>
-                <!-- 翻页按钮 -->
-                {% if has_previous_page and imgs %}
-                    <a href="{{ url_for('media', username=userid, page=current_page-1) }}"
-                       class="btn btn-secondary">Previous</a>
-                {% endif %}
-                <span>----------</span>
-                {% if has_next_page and imgs %}
-                    <a href="{{ url_for('media', username=userid, page=current_page+1)}}"
-                       class="btn btn-secondary">Next</a>
-                {% endif %}
-
-                {% if has_previous_page and videos %}
-                    <a href="{{ url_for('media', username=userid, page=current_page-1,type='video') }}"
-                       class="btn btn-secondary">Previous</a>
-                {% endif %}
-                <span>----------</span>
-                {% if has_next_page and videos %}
-                    <a href="{{ url_for('media', username=userid, page=current_page+1,type='video')}}"
-                       class="btn btn-secondary">Next</a>
-                {% endif %}
-
-                {% if has_previous_page and xminds %}
-                    <a href="{{ url_for('media', username=userid, page=current_page-1,type='xmind') }}"
-                       class="btn btn-secondary">Previous</a>
-                {% endif %}
-                <span>----------</span>
-                {% if has_next_page and xminds %}
-                    <a href="{{ url_for('media', username=userid, page=current_page+1,type='xmind')}}"
-                       class="btn btn-secondary">Next</a>
-                {% endif %}
             </div>
 
             <div class="row mt-4">
                 {% for img in imgs %}
-                    <div class="col-md-6 mb-4">
+                    <div class="col-md-6 mb-4 card card-body">
                         <a class="card-link" onclick="showImage('{{ img }}')">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h3 class="card-title">{{ img }}</h3>
-                                    <button class="btn btn-primary" onclick="copyImgURL('{{ img }}')"></button>
-                                </div>
-                            </div>
-                        </a>
+                            <h3 class="card-title">{{ img }}</h3></a>
+                        <button onclick="copyImgURL('{{ img }}')">链接</button>
+                        <button onclick="deleteFile('{{ img }}')">删除</button>
                     </div>
                 {% endfor %}
 
                 {% for video in videos %}
-                    <div class="col-md-6 mb-4">
-                        <a class="card-link" onclick="startVideo('{{ video }}')">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h3 class="card-title">{{ video }}</h3>
-                                    <button class="btn btn-primary" onclick="copyVideoURL('{{ video }}')">
-                                    </button>
-                                </div>
-                            </div>
-                        </a>
+                    <div class="col-md-6 mb-4 card card-body">
+                        <a class="card-link" onclick="startVideo('{{ video }}')"><h3
+                                class="card-title">{{ video }}</h3></a>
+                        <button class="btn btn-primary" onclick="copyVideoURL('{{ video }}')">
+                        </button>
                     </div>
                 {% endfor %}
 
                 {% for xmind in xminds %}
-                    <div class="col-md-6 mb-4">
+                    <div class="col-md-6 mb-4 card card-body">
                         <a class="card-link"
                            onclick="prewXmind('{{ domain }}preview?user={{ userid }}&file_name={{ xmind }}')">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h3 class="card-title">{{ xmind }}</h3>
-                                </div>
-                            </div>
-                        </a>
+                            <h3 class="card-title">{{ xmind }}</h3></a>
                     </div>
                 {% endfor %}
             </div>
@@ -283,33 +228,43 @@
         integrity="sha384-Fy6S3B9q64WdZWQUiU+q4/2Lc9npb8tCaSX9FK7E8HnRr0Jz8D6OP9dO5Vg3Q9ct"
         crossorigin="anonymous"></script>
 
+<script src="/static/js/media.js"></script>
+<script src="/static/js/docsify.min.js"></script>
+<script src='/static/js/docsify-xmind.js'></script>
+<script src="/static/js/prewXmind.js"></script>
+</body>
+</html>
+<div id="overlay"></div>
+<style>
+    #preferenceDiv {
+        display: none; /* 初始隐藏 */
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: #f9f9f9;
+        border: 1px solid #ccc;
+        padding: 20px;
+        z-index: 1000;
+    }
+
+    #overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+    }
+</style>
+<div id="preferenceDiv">
+    <p>请选择您的媒体页面偏好：</p>
+    <button class="btn btn-primary" onclick="setPreference('V1')">旧版(7天内不再提醒)</button>
+    <button class="btn btn-primary" onclick="setPreference('V2')">新版界面</button>
+</div>
 <script>
-    function showImage(img) {
-        fetch('/media', {
-            method: 'POST',
-            credentials: 'include',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({img_name: img})
-        })
-            .then(response => response.blob())
-            .then(blob => {
-                const imageURL = URL.createObjectURL(blob);
-                document.getElementById('popup-image').src = imageURL;
-                document.getElementById('image-popup').style.display = 'block';
-            })
-            .catch(error => console.error(error));
-    }
-
-    function closeImage() {
-        document.getElementById('image-popup').style.display = 'none';
-    }
-
-    function closeVideo() {
-        document.getElementById('video-popup').style.display = 'none';
-    }
-
     function copyImgURL(img) {
         const URL = "{{ domain }}" + "zyImg/{{ userid }}/" + img;
         navigator.clipboard.writeText(URL).then(function () {
@@ -342,21 +297,4 @@
         document.getElementById("video-image").src = videoSrc;
         document.getElementById("video-popup").style.display = "block";
     }
-
-    document.addEventListener('DOMContentLoaded', function () {
-        const h3Elements = document.querySelectorAll('.card-title');
-
-        h3Elements.forEach(element => {
-            if (element.textContent.trim().length > 12) {
-                const h6Element = document.createElement('h6');
-                h6Element.innerHTML = element.innerHTML;
-                element.parentNode.replaceChild(h6Element, element);
-            }
-        });
-    });
 </script>
-<script src="../static/js/docsify.min.js"></script>
-<script src='../static/js/docsify-xmind.js'></script>
-<script src="../static/js/prewXmind.js"></script>
-</body>
-</html>
