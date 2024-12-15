@@ -102,7 +102,7 @@ function setPreference(preference) {
     document.cookie = `preference=${preference}; path=/; max-age=604800`;
     document.getElementById('preferenceDiv').style.display = 'none';
     document.getElementById('overlay').style.display = 'none';
-    window.location.href = '/media';
+    window.location.reload();
 }
 
 function getCookie(cname) {

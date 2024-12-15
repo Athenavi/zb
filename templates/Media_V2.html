@@ -86,11 +86,11 @@
             <div class="flex justify-between mt-2">
                 <div>
                     <a href="/profile" class="text-blue-500 hover:underline">{{ userid }}</a>
-                    <a href="{{ url_for('media_v2', username=userid, page=1) }}"
+                    <a href="{{ url_for('media', username=userid, page=1) }}"
                        class="ml-2 text-blue-500 hover:underline">仅图片</a>
-                    <a href="{{ url_for('media_v2', username=userid, page=1,type='video') }}"
+                    <a href="{{ url_for('media', username=userid, page=1,type='video') }}"
                        class="ml-2 text-blue-500 hover:underline">仅视频</a>
-                    <a href="{{ url_for('media_v2', username=userid, page=1,type='xmind') }}"
+                    <a href="{{ url_for('media', username=userid, page=1,type='xmind') }}"
                        class="ml-2 text-blue-500 hover:underline">Xmind文件</a>
                     <button onclick="setPreference('V1')">回到旧版</button>
                 </div>
@@ -162,32 +162,32 @@
         </section>
         <!-- 翻页按钮 -->
         {% if has_previous_page and imgs %}
-            <a href="{{ url_for('media_v2', username=userid, page=current_page-1) }}"
+            <a href="{{ url_for('media', username=userid, page=current_page-1) }}"
                class="btn btn-secondary">Previous</a>
         {% endif %}
         <span>----------</span>
         {% if has_next_page and imgs %}
-            <a href="{{ url_for('media_v2', username=userid, page=current_page+1)}}"
+            <a href="{{ url_for('media', username=userid, page=current_page+1)}}"
                class="btn btn-secondary">Next</a>
         {% endif %}
 
         {% if has_previous_page and videos %}
-            <a href="{{ url_for('media_v2', username=userid, page=current_page-1,type='video') }}"
+            <a href="{{ url_for('media', username=userid, page=current_page-1,type='video') }}"
                class="btn btn-secondary">Previous</a>
         {% endif %}
         <span>----------</span>
         {% if has_next_page and videos %}
-            <a href="{{ url_for('media_v2', username=userid, page=current_page+1,type='video')}}"
+            <a href="{{ url_for('media', username=userid, page=current_page+1,type='video')}}"
                class="btn btn-secondary">Next</a>
         {% endif %}
 
         {% if has_previous_page and xminds %}
-            <a href="{{ url_for('media_v2', username=userid, page=current_page-1,type='xmind') }}"
+            <a href="{{ url_for('media', username=userid, page=current_page-1,type='xmind') }}"
                class="btn btn-secondary">Previous</a>
         {% endif %}
         <span>----------</span>
         {% if has_next_page and xminds %}
-            <a href="{{ url_for('media_v2', username=userid, page=current_page+1,type='xmind')}}"
+            <a href="{{ url_for('media', username=userid, page=current_page+1,type='xmind')}}"
                class="btn btn-secondary">Next</a>
         {% endif %}
     </div>

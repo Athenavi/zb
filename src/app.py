@@ -1737,47 +1737,6 @@ def parse_update_file(filename):
     return updates
 
 
-@app.route('/media_V2', methods=['GET', 'POST'])
-@jwt_required
-def media_v2(user_id):
-    media_type = request.args.get('type', default='img')
-    page = request.args.get('page', default=1, type=int)
-    username = get_username()
-    if request.method == 'GET':
-        if not media_type or media_type == 'img':
-            imgs, has_next_page, has_previous_page = get_media_list(username, category='img', page=page, per_page=20)
-
-            return render_template('Media_V2.html', imgs=imgs, title='Media', url_for=url_for,
-                                   has_next_page=has_next_page,
-                                   has_previous_page=has_previous_page, current_page=page, userid=username,
-                                   domain=domain)
-        if media_type == 'video':
-            videos, has_next_page, has_previous_page = get_all_video(username, page=page)
-
-            return render_template('Media_V2.html', videos=videos, title='Media', url_for=url_for,
-                                   has_next_page=has_next_page,
-                                   has_previous_page=has_previous_page, current_page=page, userid=username,
-                                   domain=domain)
-
-        if media_type == 'xmind':
-            xminds, has_next_page, has_previous_page = get_all_xmind(username, page=page)
-
-            return render_template('Media_V2.html', xminds=xminds, title='Media', url_for=url_for,
-                                   has_next_page=has_next_page,
-                                   has_previous_page=has_previous_page, current_page=page, userid=username,
-                                   domain=domain)
-    elif request.method == 'POST':
-        img_name = request.json.get('img_name')
-        if not img_name:
-            return error(message='缺少图像名称', status_code=400)
-
-        image = get_image_path(username, img_name)
-        if not image:
-            return error(message='未找到图像', status_code=404)
-
-        return image
-
-
 @app.route('/img/<username>/thumbs/<img>', methods=['GET', 'POST'])
 def api_img(username, img):
     if request.method == 'GET':
