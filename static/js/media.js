@@ -24,39 +24,6 @@ function closeVideo() {
     document.getElementById('video-popup').style.display = 'none';
 }
 
-function copyImgURL(img) {
-    const URL = "{{ domain }}" + "zyImg/{{ userid }}/" + img;
-    navigator.clipboard.writeText(URL).then(function () {
-        alert("已复制到剪切板，可在博客中使用此外链图片");
-    }).catch(function (error) {
-        alert("复制失败：" + error);
-    });
-}
-
-function copyVideoURL(video) {
-    const URL = "{{ domain }}" + "zyVideo/{{ userid }}/" + video;
-    navigator.clipboard.writeText(URL).then(function () {
-        alert("已复制到剪切板，可在博客中使用此外链视频");
-    }).catch(function (error) {
-        alert("复制失败：" + error);
-    });
-}
-
-function copyXmindURL(xmind) {
-    const URL = "{{ domain }}" + "blog/f/{{ userid }}/" + xmind;
-    navigator.clipboard.writeText(URL).then(function () {
-        alert("已复制到剪切板，可在博客中使用此外链 Xmind");
-    }).catch(function (error) {
-        alert("复制失败：" + error);
-    });
-}
-
-function startVideo(video) {
-    var videoSrc = "/zyVideo/{{ userid }}/" + video;
-    document.getElementById("video-image").src = videoSrc;
-    document.getElementById("video-popup").style.display = "block";
-}
-
 document.addEventListener('DOMContentLoaded', function () {
     const h3Elements = document.querySelectorAll('.card-title');
 
