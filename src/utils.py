@@ -96,7 +96,7 @@ def jwt_required(f):
         token = request.cookies.get('jwt')
         user_id = authenticate_jwt(token)
         if user_id is None:
-            callback_route = request.endpoint  # 获取请求的端点名称
+            callback_route = request.endpoint
             return redirect(url_for('login', callback=callback_route))
         return f(user_id, *args, **kwargs)
 

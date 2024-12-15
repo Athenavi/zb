@@ -866,17 +866,21 @@ def media(user_id):
     page = request.args.get('page', default=1, type=int)
     username = get_username()
     if request.method == 'GET':
+        preference = request.cookies.get('preference')
+        template_choose = 'Media.html'
+        if preference == 'V2':
+            template_choose = 'Media_V2.html'
         if not media_type or media_type == 'img':
             imgs, has_next_page, has_previous_page = get_all_img(username, page=page)
 
-            return render_template('Media.html', imgs=imgs, title='Media', url_for=url_for,
+            return render_template(template_choose, imgs=imgs, title='Media', url_for=url_for,
                                    has_next_page=has_next_page,
                                    has_previous_page=has_previous_page, current_page=page, userid=username,
                                    domain=domain)
         if media_type == 'video':
             videos, has_next_page, has_previous_page = get_all_video(username, page=page)
 
-            return render_template('Media.html', videos=videos, title='Media', url_for=url_for,
+            return render_template(template_choose, videos=videos, title='Media', url_for=url_for,
                                    has_next_page=has_next_page,
                                    has_previous_page=has_previous_page, current_page=page, userid=username,
                                    domain=domain)
@@ -884,7 +888,7 @@ def media(user_id):
         if media_type == 'xmind':
             xminds, has_next_page, has_previous_page = get_all_xmind(username, page=page)
 
-            return render_template('Media.html', xminds=xminds, title='Media', url_for=url_for,
+            return render_template(template_choose, xminds=xminds, title='Media', url_for=url_for,
                                    has_next_page=has_next_page,
                                    has_previous_page=has_previous_page, current_page=page, userid=username,
                                    domain=domain)
@@ -2154,7 +2158,7 @@ def test(user_id):
     return rendered
 
 
-@app.route('/api/delete/<filename>', methods=['GET','delete'])
+@app.route('/api/delete/<filename>', methods=['GET', 'delete'])
 @jwt_required
 def api_delete(user_id, filename):
     username = get_username()

@@ -92,6 +92,7 @@
                        class="ml-2 text-blue-500 hover:underline">仅视频</a>
                     <a href="{{ url_for('media_v2', username=userid, page=1,type='xmind') }}"
                        class="ml-2 text-blue-500 hover:underline">Xmind文件</a>
+                    <button onclick="setPreference('V1')">回到旧版</button>
                 </div>
             </div>
         {% endif %}
@@ -210,3 +211,33 @@
 <script src="/static/js/prewXmind.js"></script>
 </body>
 </html>
+<div id="overlay"></div>
+<style>
+    #preferenceDiv {
+        display: none; /* 初始隐藏 */
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: #f9f9f9;
+        border: 1px solid #ccc;
+        padding: 20px;
+        z-index: 1000;
+    }
+
+    #overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+    }
+</style>
+<div id="preferenceDiv">
+    <p>请选择您的媒体页面偏好：</p>
+    <button class="btn btn-primary" onclick="setPreference('V1')">旧版(7天内不再提醒)</button>
+    <button class="btn btn-primary" onclick="setPreference('V2')">新版界面</button>
+</div>
