@@ -35,12 +35,12 @@ from src.BlogDeal import get_article_names, get_article_content, clear_html_form
 from src.database import get_database_connection
 from src.links import create_special_url, redirect_to_long_url
 from src.notification import get_sys_notice, read_notification, send_change_mail
-from src.user import zyadmin, zy_delete_article, error, get_owner_articles, zy_general_conf, get_profiles
+from src.user import zyadmin, error, get_owner_articles, zy_general_conf, get_profiles
 from src.utils import zy_upload_file, get_client_ip, \
     zy_noti_conf, generate_jwt, secret_key, authenticate_jwt, \
     authenticate_refresh_token, handle_file_upload, is_allowed_file, is_valid_domain_with_slash, \
     get_all_img, get_all_video, get_all_xmind, get_list_intersection, generate_thumbs, generate_video_thumb, \
-    get_media_list, get_username, admin_required, jwt_required, finger_required, theme_safe_check
+    get_username, admin_required, jwt_required, finger_required, theme_safe_check
 
 global_encoding = 'utf-8'
 
@@ -101,7 +101,6 @@ def inject_variables():
 def login():
     callback_route = request.args.get('callback', 'home')
     if request.cookies.get('jwt'):
-        # 如果存在 jwt，解析并获取用户状态
         user_id = authenticate_jwt(request.cookies.get('jwt'))
         if user_id:
             return redirect(url_for(callback_route))
@@ -214,7 +213,6 @@ def sys_out_file(article_name):
         parts = article_name[:-3].rsplit('_', 1)
         if len(parts) == 2:
             author, file_name = parts
-            print(author, file_name)
         author = get_username()
         prev = f"""
         ```xmind preview
@@ -387,7 +385,6 @@ def get_article_info(articles):
     articles_info = []
     for a_title in articles:
         try:
-            # 获取文件的修改时间
             articleInfo = ''
             db = get_database_connection()
 
@@ -398,7 +395,6 @@ def get_article_info(articles):
                     query = "SELECT * FROM articles WHERE Title = %s"
                     cursor.execute(query, (a_title,))
                     result = cursor.fetchone()
-                    # print(result)
                     if result:
                         articleInfo += result[2]
                         articleInfo += ";"
@@ -623,6 +619,8 @@ def admin(user_id, key):
 @app.route('/admin/changeTheme', methods=['POST'])
 @admin_required
 def change_display(user_id):
+    if cache.get("Theme_Lock"):
+        return "failed"
     theme_id = request.args.get('NT')
 
     if not theme_id:
@@ -636,10 +634,8 @@ def change_display(user_id):
     # 使用上下文管理器处理数据库连接
     try:
         if theme_id == 'default':
-            print(f"recover theme to {theme_id}")
             cache.set('display_theme', theme_id)
-            # 缓存最后变更主题的记录
-            cache.set(f"last_change_{user_id}", theme_id, timeout=60)  # 设置超时
+            cache.set(f"Theme_Lock", theme_id, timeout=15)  # 设置超时
             return 'success'
 
         if not theme_safe_check(theme_id, channel=2):
@@ -647,10 +643,7 @@ def change_display(user_id):
 
         # 更新缓存并插入数据库记录
         cache.set('display_theme', theme_id)
-        # log_theme_change(theme_id, user_id)
-
-        # 缓存最后变更主题的记录
-        cache.set(f"last_change_{user_id}", theme_id, timeout=60)  # 设置超时
+        cache.set(f"Theme_Lock", theme_id, timeout=15)  # 设置超时
 
         app.logger.info(f'{user_id} : change theme to {theme_id}')
         return "success"
@@ -679,7 +672,7 @@ def new_article(user_id):
         return render_template('postNewArticle.html')
 
     elif request.method == 'POST':
-        if forbid_submit(user_id, time.time()):
+        if forbid_submit(user_id):
             return error('距离您上次上传时间过短，请十分钟后重试', 503)
 
         file = request.files['file']
@@ -725,10 +718,9 @@ def markdown_editor(article):
     if article == 'default':
         return error(404, status_code=404)
     username = get_username()
-    auth = False  # 设置默认值
+    auth = False
 
     if username is not None:
-        # Auth 认证
         auth = auth_articles(article, username)
 
     if auth:
@@ -789,7 +781,6 @@ def zy_save_edit(aid, content, a_name):
 
     # 检查内容是否与上一次提交相同
     if current_content_hash == previous_content_hash:
-        # print(current_content_hash)
         return jsonify({'show_edit_code': 'success'})
 
     # 更新缓存中的哈希值
@@ -852,11 +843,6 @@ def hidden_article():
         current_hidden_status = set_article_visibility(article, hide=False)
         cache.set(hidden_status_key, current_hidden_status)
         return jsonify({'deal': 'unhide'})
-
-
-@app.route('/travel', methods=['GET'])
-def travel():
-    return '此接口暂时启用'
 
 
 @app.route('/media', methods=['GET', 'POST'])
@@ -1122,8 +1108,8 @@ def redirect_to_long_url_route(short_url):
 def api_shortlink(long_url):
     if not long_url.startswith('https://') and not long_url.startswith('http://'):
         return 'error'
-    username = '7trees'
-    short_url = create_special_url(long_url, username)  # 传递用户名参数
+    username = title
+    short_url = create_special_url(long_url, username)
     article_surl = domain + 's/' + short_url
     return article_surl
 
@@ -1147,7 +1133,6 @@ def id_find_article(article_id):
             long_url = result[0]
             last_slash_index = long_url.rfind("/")
             article = long_url[last_slash_index + 1:]
-            # print(article)
             return blog_detail(article)
         else:
             # If no URL is found
@@ -1216,16 +1201,6 @@ def api_mail(user_id):
                body=body)
     app.logger.info(f'{user_id} sendMail')
     return 'success'
-
-
-@app.route('/donate')
-def donate():
-    for_uid = request.args.get('for-uid')
-    if not for_uid:
-        return "此用户不存在"
-    else:
-        channel_url = 'http://test.com'
-        return f'你要捐赠的是{for_uid},他的捐款通道为{channel_url}'
 
 
 @app.route('/api/ip')
@@ -1311,7 +1286,6 @@ def follow_user(user_id):
                 cursor.execute("SELECT `subscribe_to_id` FROM `subscriptions` WHERE `subscriber_id` = %s", (user_id,))
                 user_followed = [row[0] for row in cursor.fetchall()]  # 获取所有关注ID
                 cache.set(f'{user_id}_followed', user_followed)  # 更新缓存
-                print('here')
         except Exception as e:
             print(f"Exception occurred when loading from DB: {e}")
             return jsonify({'follow_code': 'failed', 'message': "error"})
@@ -1332,7 +1306,6 @@ def follow_user(user_id):
 
             user_followed.append(follow_id)  # 更新列表
             cache.set(f'{user_id}_followed', user_followed)  # 更新缓存
-            print('here2')
             return jsonify({'follow_code': 'success'})
 
     except Exception as e:
@@ -1544,7 +1517,6 @@ def finger(user_id):
             if chrome_fingerprint not in cachedFinger:
                 cachedFinger.append(chrome_fingerprint)
                 cache.set(f'fingerprint_{user_id}', cachedFinger)
-                print(cachedFinger)
                 return jsonify({"msg": "Fingerprint saved successfully"}), 200
             return jsonify({"msg": "Fingerprint Auth"}), 200
         return jsonify({"msg": "Failed to save fingerprint"}), 400
@@ -1578,12 +1550,9 @@ def user_center(username):
     if not re.match(r'^[a-zA-Z0-9]+$', username):
         return error("Invalid username", 400)
 
-    try:
-        user_dir = Path(base_dir) / 'media' / username
-        if not os.path.exists(user_dir):
-            return error("Invalid username", 400)
-    except Exception:
-        pass
+    user_dir = Path(base_dir) / 'media' / username
+    if not os.path.exists(user_dir):
+        return error("Invalid username", 400)
 
     spm = request.args.get('spm')
     if spm:
@@ -1621,7 +1590,7 @@ def guestbook(user_id):
     message_list = get_guestbook() or []
     user_finger = request.cookies.get('finger')
     if request.method == 'POST':
-        data = request.get_json()  # 获取 JSON 数据
+        data = request.get_json()
         nickname = data.get('nickname') or username
         message = data.get('message')
         content = f'"{nickname}":"{message}"'
@@ -1632,10 +1601,8 @@ def guestbook(user_id):
         upload_guestbook(content)
         cache.set(f"guestbook", None)
         cache.set(f"guestbook_{user_finger}", True, timeout=180)
-        # 返回一个成功消息，可以返回 新的 留言内容
         return jsonify({'status': 'success', 'message_list': message_list}), 201
 
-    # GET 请求返回留言页面
     return render_template('guestbook.html', avatar_url=avatar_url, username=username, message_list=message_list)
 
 
@@ -1721,8 +1688,6 @@ def parse_update_file(filename):
     with open(filename, 'r', encoding='utf-8') as file:
         content = file.read()
 
-    # print("Raw content from file: ", content)  # 打印文件的原始内容
-
     # 使用正则表达式提取版本信息
     pattern = re.compile(r"版本 (.+?)\s+发布日期:(.+?)\s+-*\n((?:-.*(?:\n|$))*)", re.MULTILINE)
     matches = pattern.findall(content)
@@ -1762,7 +1727,6 @@ def api_video(username, video):
         if os.path.isfile(video_dir) and os.path.isfile(video_thumbs):
             return send_file(video_thumbs, mimetype='image/jpeg')
         if os.path.isfile(video_dir) and not os.path.isfile(video_thumbs):
-            # 使用线程池异步执行 gen_thumbs 函数
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 thumbs_path = os.path.join(base_dir, 'media', username, 'thumbs')
                 if not os.path.exists(thumbs_path):
@@ -1781,16 +1745,13 @@ def api_xmind(username, xmind):
 
 @app.route('/api/wx/home', methods=['GET'])
 def api_wx_home():
-    # 获取请求参数
     page = request.args.get('page', default=1, type=int)
     tag = request.args.get('tag', default='None')
 
     if page <= 0:
         page = 1
 
-    # 获取文章内容
     articles, has_next_page, has_previous_page = get_a_list(chanel=2, page=page)
-    # 获取其他变量
     notice = ''
     try:
         notice = get_sys_notice(0)
@@ -1803,7 +1764,6 @@ def api_wx_home():
     except Exception as e:
         app.logger.error(f'获取标签出错: {e}')
 
-    # 处理标签过滤
     if tag != 'None':
         tag_articles = get_articles_by_tag(tag)
         if tag_articles:
@@ -1818,7 +1778,6 @@ def api_wx_home():
 
     friends_links = get_friends_link(type=1)
 
-    # 构建返回的数据
     response_data = {
         'articles': compressed_list,
         'notice': notice,
@@ -2011,9 +1970,7 @@ def api_article_pw(user_id):
     except (TypeError, ValueError):
         return jsonify({"message": "Invalid Article ID"}), 400
 
-    user_finger = request.cookies.get('finger')
-
-    if aid == cache.get(f"PWLock_{user_finger}"):
+    if aid == cache.get(f"PWLock_{user_id}"):
         return jsonify({"message": "操作过于频繁"}), 400
 
     new_password = request.args.get('new-passwd')
@@ -2024,14 +1981,13 @@ def api_article_pw(user_id):
         'changed': result,
     }
 
-    # 验证密码长度
     if len(new_password) != 4:
         return jsonify({"message": "Invalid Password"}), 400
 
     auth = auth_by_id(aid, username=get_username())
 
     if auth:
-        cache.set(f"PWLock_{user_finger}", aid, timeout=30)
+        cache.set(f"PWLock_{user_id}", aid, timeout=30)
         response_data['result'] = article_change_pw(aid, new_password)
         return jsonify(response_data), 200
     else:
@@ -2084,17 +2040,15 @@ def comment_add(aid, user_id, comment_content, ip, ua):
 
 def json_filter(value):
     """将 JSON 字符串解析为 Python 对象"""
-    print(f"Raw JSON string: {value}")  # 打印即将解析的原始 JSON
     if not isinstance(value, str):
         print(f"Unexpected type for value: {type(value)}. Expected a string.")
-        return None  # 如果不是字符串，直接返回 None
+        return None
 
     try:
         result = json.loads(value)
-        print(f"Parsed result: {result}")  # 打印解析后的结果
         return result
     except (ValueError, TypeError) as e:
-        print(f"Error parsing JSON: {e}, Value: {value}")  # 打印错误信息
+        print(f"Error parsing JSON: {e}, Value: {value}")
         return None
 
 
@@ -2104,14 +2058,8 @@ def test(user_id):
     from jinja2 import Environment, FileSystemLoader
     env = Environment(loader=FileSystemLoader('templates'))
     env.filters['fromjson'] = json_filter
-
     aid = 1
     comments = get_comments(aid)
-
-    # 调试输出评论
-    for c in comments:
-        print(f"Comment JSON string: {c[3]}")
-
     template = env.get_template('test.html')
     rendered = template.render(aid=aid, user_id=user_id, username=get_username(), comments=comments)
     return rendered
@@ -2125,11 +2073,16 @@ def api_delete(user_id, filename):
     auth = auth_files(file_path, user_id)
     if auth:
         if os.path.exists(file_path):
-            os.remove(file_path)  # 删除 文件
+            os.remove(file_path)
         return jsonify({'filename': filename, 'Deleted': True}), 201
     else:
         app.logger.info(f'{user_id} Delete: {filename} :error')
         return jsonify({'filename': filename, 'Deleted': False}), 503
+
+
+@app.route('/travel', methods=['GET'])
+def travel():
+    return '此接口暂时弃用'
 
 
 @app.errorhandler(404)
