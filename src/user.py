@@ -121,7 +121,10 @@ def get_owner_articles(owner_id=None, user_name=None):
 
             if owner_id:
                 query = """
-                SELECT a.Title FROM articles AS a JOIN users AS u ON a.Author = u.username WHERE u.id = %s and a.`Status` != 'Deleted';
+                SELECT a.Title
+                FROM articles AS a 
+                JOIN users AS u ON a.Author = u.username
+                WHERE u.id = %s and a.`Status` != 'Deleted';
                 """
                 cursor.execute(query, (owner_id,))
                 articles.extend(result[0] for result in cursor.fetchall())
@@ -177,7 +180,8 @@ def get_following_count(user_id, subscribe_type='User'):
                 query = "SELECT COUNT(*) FROM subscriptions WHERE `subscriber_id` = %s AND `subscribe_type` = 'User';"
                 cursor.execute(query, (int(user_id),))
             else:
-                query = "SELECT COUNT(*) FROM subscriptions WHERE `subscriber_id` = %s AND `subscribe_type` = 'Category';"
+                query = ("SELECT COUNT(*) FROM subscriptions WHERE `subscriber_id` = %s AND `subscribe_type` = "
+                         "'Category';")
                 cursor.execute(query, (int(user_id),))
 
             # 读取查询结果
@@ -199,7 +203,8 @@ def get_follower_count(user_id, subscribe_type='User'):
                 query = "SELECT COUNT(*) FROM subscriptions WHERE `subscribe_to_id` = %s AND `subscribe_type` = 'User';"
                 cursor.execute(query, (int(user_id),))
             else:
-                query = "SELECT COUNT(*) FROM subscriptions WHERE `subscribe_to_id` = %s AND `subscribe_type` = 'Category';"
+                query = ("SELECT COUNT(*) FROM subscriptions WHERE `subscribe_to_id` = %s AND `subscribe_type` = "
+                         "'Category';")
                 cursor.execute(query, (int(user_id),))
 
             count = cursor.fetchone()[0]
@@ -211,7 +216,7 @@ def get_follower_count(user_id, subscribe_type='User'):
     return count
 
 
-def getCanFollowd(user_id, target_id):
+def get_can_followed(user_id, target_id):
     db = get_database_connection()
     can_follow = 1
     try:

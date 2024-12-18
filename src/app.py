@@ -11,7 +11,7 @@ import re
 import time
 import urllib.parse
 import xml.etree.ElementTree as ElementTree
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import jwt
@@ -36,7 +36,7 @@ from src.database import get_database_connection
 from src.links import create_special_url, redirect_to_long_url
 from src.notification import get_sys_notice, read_notification, send_change_mail
 from src.user import zyadmin, error, get_owner_articles, zy_general_conf, get_profiles, get_following_count, \
-    get_follower_count, getCanFollowd, get_user_id
+    get_follower_count, get_can_followed, get_user_id
 from src.utils import admin_upload_file, get_client_ip, \
     zy_noti_conf, generate_jwt, secret_key, authenticate_jwt, \
     authenticate_refresh_token, handle_file_upload, is_allowed_file, is_valid_domain_with_slash, \
@@ -137,7 +137,8 @@ def check_jwt_expiration():
     token = request.cookies.get('jwt')
     if token:
         payload = jwt.decode(token, app.secret_key, algorithms=['HS256'], options={"verify_exp": False})
-        if 'exp' in payload and datetime.utcfromtimestamp(payload['exp']) < datetime.utcnow() + timedelta(minutes=60):
+        if 'exp' in payload and datetime.fromtimestamp(payload['exp'], tz=timezone.utc) < datetime.now(
+                tz=timezone.utc) + timedelta(minutes=60):
             # 如果 JWT 将在 60 分钟内过期，允许校验刷新令牌
             refresh_token = request.cookies.get('refresh_token')
             user_id = authenticate_refresh_token(refresh_token)
@@ -246,7 +247,7 @@ def get_avatar():
 def profile(user_id):
     user_name = get_username()
     avatar_url = get_avatar()
-    user_bio = get_userBio(user_id) or "这人很懒，什么也没留下"
+    user_bio = get_user_bio(user_id) or "这人很懒，什么也没留下"
     owner_articles = get_owner_articles(owner_id=None, user_name=user_name) or []
     user_follow = get_following_count(user_id=user_id) or 0
     follower = get_follower_count(user_id=user_id) or 0
@@ -257,7 +258,7 @@ def profile(user_id):
                            Articles=owner_articles)
 
 
-def get_userBio(user_id):
+def get_user_bio(user_id):
     UserInfo = cache.get(f"{user_id}_userInfo") or get_profiles(user_id=user_id, user_name=None)
 
     if UserInfo is None:
@@ -1551,10 +1552,10 @@ def user_center(user_id, user_name):
         return error("Invalid username", 400)
 
     target_id = get_user_id(user_name)
-    userBio = get_userBio(user_id=target_id)
+    userBio = get_user_bio(user_id=target_id)
     canFollowed = 1
     if user_id != 0 and target_id != 0:
-        canFollowed = getCanFollowd(user_id, target_id)
+        canFollowed = get_can_followed(user_id, target_id)
     owner_articles = get_owner_articles(owner_id=None, user_name=user_name) or []
     noti_host, noti_port = zy_noti_conf()
     return render_template('Profile.html', url_for=url_for, avatar_url=get_avatar(),
@@ -1643,19 +1644,6 @@ def upload_guestbook(content):
                 executor.submit(send_change_mail(content, kind='guestbook'))
     except Exception as e:
         print(f"An error occurred while getting the database connection: {e}")
-
-
-@app.route('/links')
-def get_friends_link(type=0):
-    avatar_url = get_avatar()
-    friends_links = {
-        '本站地址': domain,
-        'GitHub': "https://github.com/Athenavi",
-        '博客园': "https://cnblogs.com/Athenavi/",
-    }
-    if type == 1:
-        return friends_links
-    return render_template('guestbook.html', avatar_url=avatar_url, link_list=friends_links)
 
 
 @app.route('/api/notice', methods=['GET'])
@@ -2053,6 +2041,19 @@ def api_delete(user_id, filename):
     else:
         app.logger.info(f'{user_id} Delete: {filename} :error')
         return jsonify({'filename': filename, 'Deleted': False}), 503
+
+
+@app.route('/links')
+def get_friends_link(type=0):
+    avatar_url = get_avatar()
+    friends_links = {
+        '本站地址': domain,
+        'GitHub': "https://github.com/Athenavi",
+        '博客园': "https://cnblogs.com/Athenavi/",
+    }
+    if type == 1:
+        return friends_links
+    return render_template('guestbook.html', avatar_url=avatar_url, link_list=friends_links)
 
 
 @app.route('/travel', methods=['GET'])

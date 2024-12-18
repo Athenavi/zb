@@ -7,8 +7,9 @@ import shutil
 import string
 import zipfile
 from configparser import ConfigParser
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
+from pathlib import Path
 
 import cv2
 import jwt
@@ -26,11 +27,11 @@ REFRESH_TOKEN_EXPIRATION_DELTA = 604800  # 刷新令牌过期时间设置为7天
 
 
 def generate_jwt(user_id, user_name):
-    expiration_time = datetime.utcnow() + timedelta(seconds=JWT_EXPIRATION_DELTA)
+    expiration_time = datetime.now(tz=timezone.utc) + timedelta(seconds=JWT_EXPIRATION_DELTA)
     payload = {
         'user_id': user_id,
         'username': user_name,
-        'exp': expiration_time
+        'exp': expiration_time.timestamp()  # 使用 timestamp() 获取 UNIX 时间戳
     }
 
     return jwt.encode(payload, secret_key, algorithm='HS256')
@@ -38,11 +39,11 @@ def generate_jwt(user_id, user_name):
 
 def generate_refresh_token(user_id, user_name):
     # 生成刷新令牌
-    expiration_time = datetime.utcnow() + timedelta(seconds=REFRESH_TOKEN_EXPIRATION_DELTA)
+    expiration_time = datetime.now(tz=timezone.utc) + timedelta(seconds=REFRESH_TOKEN_EXPIRATION_DELTA)
     payload = {
         'user_id': user_id,
         'username': user_name,
-        'exp': expiration_time
+        'exp': expiration_time.timestamp()  # 使用 timestamp() 获取 UNIX 时间戳
     }
     return jwt.encode(payload, secret_key, algorithm='HS256')
 
@@ -202,13 +203,13 @@ def admin_upload_file(size_limit):
     return 'File uploaded successfully'
 
 
-def get_client_ip(request):
-    if 'X-Forwarded-For' in request.headers:
-        ip = request.headers['X-Forwarded-For'].split(',')[0].strip()
-    elif 'X-Real-IP' in request.headers:
-        ip = request.headers['X-Real-IP'].strip()
+def get_client_ip(req):
+    if 'X-Forwarded-For' in req.headers:
+        ip = req.headers['X-Forwarded-For'].split(',')[0].strip()
+    elif 'X-Real-IP' in req.headers:
+        ip = req.headers['X-Real-IP'].strip()
     else:
-        ip = request.remote_addr
+        ip = req.remote_addr
 
     return ip
 
@@ -254,16 +255,20 @@ def handle_file_upload(file, upload_folder):
     if not file.filename.endswith('.md') or file.content_length > 10 * 1024 * 1024:
         return 'Invalid file format or file too large.', 400
 
-    os.makedirs(upload_folder, exist_ok=True)
-    file_path = os.path.join(upload_folder, file.filename)
+    # 使用 pathlib 创建上传文件夹
+    upload_path = Path(upload_folder)
+    upload_path.mkdir(parents=True, exist_ok=True)
+
+    # 构建文件路径
+    file_path = upload_path / file.filename
 
     # 避免文件名冲突
-    if os.path.isfile(os.path.join('articles', file.filename)):
+    if file_path.is_file():
         return 'Upload failed, the file already exists.', 400
 
     # 保存文件
-    file.save(file_path)
-    shutil.copy(file_path, 'articles')
+    file.save(str(file_path))  # 确保转换为字符串
+    shutil.copy(str(file_path), str(Path('articles') / file.filename))
     return None
 
 
