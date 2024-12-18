@@ -108,12 +108,20 @@ def finger_required(f):
     def finger_func(*args, **kwargs):
         token = request.cookies.get('jwt')
         user_id = authenticate_jwt(token)
+
+        # 身份验证失败
         if user_id is None:
             callback_route = request.endpoint
             return redirect(url_for('login', callback=callback_route))
+
         chrome_fingerprint = request.cookies.get('finger')
+
+        # 如果指纹不存在，呈现指纹认证模板
         if not chrome_fingerprint:
             return render_template('Authentication.html', form='finger')
+
+        # 调用原始视图函数，并返回其响应
+        return f(user_id, *args, **kwargs)
 
     return finger_func
 
@@ -190,15 +198,25 @@ def zy_upload_file():
     return make_response('success')
 
 
-def get_client_ip(request, session):
-    # 按顺序尝试获取真实 IP 地址
-    headers = ["X-Real-IP", "X-Forwarded-For"]
-    for header in headers:
-        ip = request.headers.get(header)
-        if ip:
-            session['public_ip'] = ip
-            return ip
-    return None
+def get_client_ip(request):
+    if 'X-Forwarded-For' in request.headers:
+        ip = request.headers['X-Forwarded-For'].split(',')[0].strip()
+    elif 'X-Real-IP' in request.headers:
+        ip = request.headers['X-Real-IP'].strip()
+    else:
+        ip = request.remote_addr
+
+    return ip
+
+
+def mask_ip(ip):
+    # 将 IP 地址分割成四个部分
+    parts = ip.split('.')
+    if len(parts) == 4:
+        # 隐藏最后两个部分
+        masked_ip = f"{parts[0]}.{parts[1]}.xxx.xxx"
+        return masked_ip
+    return ip
 
 
 def zy_noti_conf():

@@ -40,7 +40,7 @@ from src.utils import zy_upload_file, get_client_ip, \
     zy_noti_conf, generate_jwt, secret_key, authenticate_jwt, \
     authenticate_refresh_token, handle_file_upload, is_allowed_file, is_valid_domain_with_slash, \
     get_all_img, get_all_video, get_all_xmind, get_list_intersection, generate_thumbs, generate_video_thumb, \
-    get_username, admin_required, jwt_required, finger_required, theme_safe_check
+    get_username, admin_required, jwt_required, finger_required, theme_safe_check, mask_ip
 
 global_encoding = 'utf-8'
 
@@ -125,7 +125,7 @@ def register():
         user_id = authenticate_jwt(request.cookies.get('jwt'))
         if user_id:
             return redirect(url_for(callback_route))
-    ip = get_client_ip(request, session)
+    ip = get_client_ip(request)
     return zy_register(ip)
 
 
@@ -259,14 +259,20 @@ def profile(user_id):
 @finger_required
 def setting_profiles(user_id):
     UserInfo = cache.get(f"{user_id}_userInfo") or get_profiles(user_id=user_id, user_name=None)
+
+    if UserInfo is None:
+        # 处理未找到用户信息的情况
+        return "用户信息未找到", 404
+
     cache.set(f'{user_id}_userInfo', UserInfo)
-    avatar_url = UserInfo[5] or app.config['AVATAR_SERVER']
-    Bio = UserInfo[5] or "这人很懒，什么也没留下"
-    username = UserInfo[1]
+
+    # 确保索引存在
+    avatar_url = UserInfo[5] if len(UserInfo) > 5 and UserInfo[5] else app.config['AVATAR_SERVER']
+    Bio = UserInfo[5] if len(UserInfo) > 5 and UserInfo[5] else "这人很懒，什么也没留下"
+    username = UserInfo[1] if len(UserInfo) > 1 else "匿名用户"
 
     return render_template(
         'setting.html',
-        url_for=url_for,
         avatar_url=avatar_url,
         userStatus=bool(user_id),
         username=username,
@@ -462,8 +468,8 @@ def blog_detail(article):
         if article in hidden_articles:
             return render_template('inform.html', aid=aid)
 
-        article_url = domain + 'blog/' + article
-        article_surl = api_shortlink(article_url)
+        # article_url = domain + 'blog/' + article
+        # article_surl = api_shortlink(article_url)
         author, author_uid = get_blog_author(article)
         update_date = get_file_date(article)
 
@@ -476,7 +482,7 @@ def blog_detail(article):
                                                  blogDate=update_date,
                                                  domain=domain,
                                                  url_for=url_for,
-                                                 article_Surl=article_surl,
+                                                 # article_Surl=article_surl,
                                                  article_tags=article_tags))
 
         # 只设置缓存的 max_age
@@ -602,7 +608,7 @@ def confirm_password(user_id):
 @app.route('/change-password', methods=['GET', 'POST'])
 @jwt_required
 def change_password(user_id):
-    ip = get_client_ip(request, session)
+    ip = get_client_ip(request)
     return zy_change_password(user_id, ip)
 
 
@@ -857,7 +863,7 @@ def media(user_id):
         if preference == 'V2':
             template_choose = 'Media_V2.html'
         if not media_type or media_type == 'img':
-            imgs, has_next_page, has_previous_page = get_all_img(username, page=page)
+            imgs, has_next_page, has_previous_page = get_all_img(username, page=page, per_page=20)
 
             return render_template(template_choose, imgs=imgs, title='Media', url_for=url_for,
                                    has_next_page=has_next_page,
@@ -1040,7 +1046,7 @@ def callback(provider):
     msg = data.get('msg')
     if code == 0:
         social_uid = data.get('social_uid')
-        ip = get_client_ip(request, session)
+        ip = get_client_ip(request)
         user_email = social_uid + f"@{provider}.com"
         return zy_mail_login(user_email, ip)
 
@@ -1143,7 +1149,7 @@ def id_find_article(article_id):
         db.rollback()
         return error(message='服务器内部错误', status_code=500)
     finally:
-        ip_address = get_client_ip(request, session)
+        ip_address = get_client_ip(request)
         app.logger.info(f'IP:{ip_address}, UA:{user_agent}')
         cursor.close()
         db.close()
@@ -1214,7 +1220,7 @@ def ip_api():
             print(f"{key} cache ip : {cached_ip} with {query_params}")
             return jsonify({'ip': cached_ip})
 
-    ip = get_client_ip(request, session)
+    ip = get_client_ip(request)
     cache.set(key, ip, timeout=600)
     return jsonify({'ip': ip})
 
@@ -1222,7 +1228,7 @@ def ip_api():
 @app.route('/following', methods=['GET', 'POST'])
 @jwt_required
 def following(user_id):
-    ip = get_client_ip(request, session)
+    ip = get_client_ip(request)
 
     if request.method == 'GET':
 
@@ -1962,36 +1968,30 @@ def gen_md5(text):
     return md5_hash.hexdigest()
 
 
-@app.route('/api/article/PW', methods=['GET', 'POST'])
+@app.route('/api/article/PW', methods=['POST'])
 @finger_required
 def api_article_pw(user_id):
     try:
         aid = int(request.args.get('aid'))
     except (TypeError, ValueError):
-        return jsonify({"message": "Invalid Article ID"}), 400
+        return jsonify({"message": "无效的文章ID"}), 400
 
     if aid == cache.get(f"PWLock_{user_id}"):
         return jsonify({"message": "操作过于频繁"}), 400
 
     new_password = request.args.get('new-passwd')
 
-    result = False
-    response_data = {
-        'aid': aid,
-        'changed': result,
-    }
-
     if len(new_password) != 4:
-        return jsonify({"message": "Invalid Password"}), 400
+        return jsonify({"message": "无效的密码"}), 400
 
     auth = auth_by_id(aid, username=get_username())
 
     if auth:
         cache.set(f"PWLock_{user_id}", aid, timeout=30)
-        response_data['result'] = article_change_pw(aid, new_password)
-        return jsonify(response_data), 200
+        result = article_change_pw(aid, new_password)
+        return jsonify({'aid': aid, 'changed': result}), 200
     else:
-        return jsonify({"message": "Authentication failed"}), 401
+        return jsonify({"message": "身份验证失败"}), 401
 
 
 @app.route('/api/comment', methods=['POST'])
@@ -2009,11 +2009,14 @@ def api_comment(user_id):
     if not new_comment:
         return jsonify({"message": "评论内容不能为空"}), 400
 
-    userIP = get_client_ip(request, session) or ''
+    userIP = get_client_ip(request) or ''
+    if userIP:
+        maskedIP = mask_ip(userIP)
+
     userAgent = request.headers.get('User-Agent') or ''
 
     cache.set(f"CommentLock_{user_id}", aid, timeout=30)
-    result = comment_add(aid, user_id, new_comment, userIP, userAgent)
+    result = comment_add(aid, user_id, new_comment, maskedIP, userAgent)
 
     if result:
         return jsonify({'aid': aid, 'changed': True}), 201
@@ -2052,13 +2055,15 @@ def json_filter(value):
         return None
 
 
-@app.route("/api/test")
+@app.route("/Comment")
 @jwt_required
-def test(user_id):
+def comment(user_id):
     from jinja2 import Environment, FileSystemLoader
     env = Environment(loader=FileSystemLoader('templates'))
     env.filters['fromjson'] = json_filter
-    aid = 1
+    aid = request.args.get('aid')
+    if not aid:
+        pass
     comments = get_comments(aid)
     template = env.get_template('test.html')
     rendered = template.render(aid=aid, user_id=user_id, username=get_username(), comments=comments)
