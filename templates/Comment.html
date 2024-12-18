@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>评论系统</title>
+    <link href="/static/css/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 font-sans p-6">
+<div id="comment-form" class="bg-white p-6 rounded-lg shadow-md mb-6">
+    <textarea id="comment" rows="4" required class="w-full p-3 border border-gray-300 rounded" maxlength="500"
+              oninput="updateCounter()"></textarea>
+    <div id="charCount" style="display: none;">剩余字符数: 100</div>
+    <script>
+        function updateCounter() {
+            const textarea = document.getElementById('comment');
+            const charCount = document.getElementById('charCount');
+            const maxLength = textarea.maxLength;
+            const currentLength = textarea.value.length;
+            const remainingChars = maxLength - currentLength;
+            if (remainingChars <= 100) {
+                charCount.style.display = 'block'; // 显示字符计数
+                charCount.innerHTML = `剩余字符数: ${remainingChars}`; // 更新剩余字符数
+            } else {
+                charCount.style.display = 'none'; // 隐藏字符计数
+            }
+        }
+    </script>
+    <div class="mt-2 flex space-x-2">
+        <button class="text-xl" onclick="insertEmoji('😊')">😊</button>
+        <button class="text-xl" onclick="insertEmoji('😂')">😂</button>
+        <button class="text-xl" onclick="insertEmoji('❤️')">❤️</button>
+        <button class="text-xl" onclick="insertEmoji('👍')">👍</button>
+        <button class="text-xl" onclick="insertEmoji('😢')">😢</button>
+    </div>
+
+    <button id="submit-comment" class="mt-4 w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+        提交评论 <i class="fas fa-paper-plane"></i>
+    </button>
+
+    <div id="message" class="text-red-600 font-medium mt-2"></div>
+</div>
+
+<div id="comments" class="space-y-4">
+    {% for c in comments %}
+        {% set user = c[2] %}
+        {% set comment = c[3] |fromjson %}
+        {% set date_time = c[4] %}
+
+        <div class="bg-white p-4 rounded-lg shadow-md flex">
+            <img src="https://api.7trees.cn/avatar?{{ user }}" alt="Avatar" class="w-10 h-10 rounded-full mr-4">
+            <div class="flex-1">
+                <div class="font-semibold text-gray-700">匿名
+                    <div class="text-sm text-gray-500">{{ date_time }}</div>
+                </div>
+                <div class="text-gray-800 mb-1">{{ comment['content'] | e }}</div>
+                <div class="text-sm text-gray-500 flex items-center">
+                    <span class="mr-2"><i class="fas fa-desktop"></i></span>
+                    <span class="mr-2 ua">{{ comment['ua'] if comment['ua'] else 'N/A' }}</span>
+                    <span class="mr-2"><i
+                            class="fas fa-globe"></i> {{ comment['ip'] if comment['ip'] else 'N/A' }}</span>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+<script>
+    // 插入表情符号
+    function insertEmoji(emoji) {
+        const commentBox = document.getElementById('comment');
+        const start = commentBox.selectionStart;
+        const end = commentBox.selectionEnd;
+
+        commentBox.value = commentBox.value.substring(0, start) + emoji + commentBox.value.substring(end);
+        commentBox.selectionStart = commentBox.selectionEnd = start + emoji.length;
+        commentBox.focus();
+    }
+
+    // 提交评论
+    document.getElementById('submit-comment').addEventListener('click', async () => {
+        const articleId = getParameterByName('aid');
+        const commentContent = document.getElementById('comment').value;
+        const token = localStorage.getItem('jwtToken');
+
+        if (!articleId || !commentContent) {
+            document.getElementById('message').innerText = "所有字段都是必填的。";
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/comment', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    aid: articleId,
+                    'new-comment': commentContent
+                })
+            });
+
+            const result = await response.json();
+            if (response.ok) {
+                document.getElementById('message').innerText = "评论成功！";
+                document.getElementById('comment').value = "";
+                const now = new Date();
+                const formattedDate = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+                console.log(formattedDate);
+                addMessage(commentContent, formattedDate);
+            } else {
+                document.getElementById('message').innerText = result.message || "评论失败。";
+            }
+        } catch (error) {
+            console.error("提交评论时出错:", error);
+            document.getElementById('message').innerText = "发生错误，请重试。";
+        }
+    });
+
+    // 添加评论信息
+    function addMessage(message, date) {
+        const commentsDiv = document.getElementById('comments');
+        const defaultAvatar = "https://api.7trees.cn/avatar";
+        const username = "{{ username }}"; // 提取用户名
+        let messageHTML = `
+            <div class="bg-white p-4 rounded-lg shadow-md flex">
+                <img src="${defaultAvatar}?${username}" alt="Avatar" class="w-10 h-10 rounded-full mr-4">
+                <div class="flex-1">
+                    <div class="font-semibold text-gray-700">${username}<div class="text-sm text-gray-500">${date}</div></div>
+                    <div class="text-gray-800 mb-1">${message}</div>
+                    <div class="text-sm text-gray-500 flex items-center">
+                        <span class="mr-2"><i class="fas fa-desktop"></i> 设备</span>
+                    </div>
+                </div>
+            </div>`;
+        commentsDiv.innerHTML += messageHTML;
+    }
+
+    window.onload = function () {
+        // UAParser.js的功能
+        const parser = new UAParser();
+        const uaElements = document.querySelectorAll('.mr-2.ua');
+
+
+        uaElements.forEach(uaSpan => {
+            const originalUserAgent = uaSpan.textContent;
+            const result = parser.setUA(originalUserAgent).getResult();
+
+            let convertedUA = "Unknown Device";
+
+            if (result.os.name === "Windows") {
+                if (result.browser.name === "Edge") {
+                    convertedUA = "Windows Edge";
+                } else if (result.browser.name === "Chrome") {
+                    convertedUA = "Windows Chrome";
+                } else if (result.browser.name === "Firefox") {
+                    convertedUA = "Windows Firefox";
+                }
+            } else if (result.os.name === "iOS") {
+                convertedUA = "Apple iPhone/iPad";
+            } else if (result.os.name === "Mac OS") {
+                convertedUA = "Apple Desktop";
+            } else if (result.os.name === "Android") {
+                convertedUA = "Android Device";
+            } else if (result.os.name === "HarmonyOS") {
+                convertedUA = "HarmonyOS Device";
+            }
+
+            uaSpan.textContent = convertedUA;
+        });
+    }
+
+
+    // 获取URL参数的函数
+    function getParameterByName(name) {
+        name = name.replace(/[\[\]]/g, "\\$&");
+        var url = window.location.href;
+        var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)");
+        var results = regex.exec(url);
+        if (!results) return 0;
+        if (!results[2]) return 0;
+        return decodeURIComponent(results[2].replace(/\+/g, " "));
+    }
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/UAParser.js/0.7.28/ua-parser.min.js"></script>
+</body>
+</html>

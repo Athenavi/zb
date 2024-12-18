@@ -18,7 +18,7 @@ import jwt
 import markdown
 import qrcode
 import requests
-from flask import Flask, render_template, redirect, session, request, url_for, Response, jsonify, send_file, \
+from flask import Flask, render_template, redirect, request, url_for, Response, jsonify, send_file, \
     make_response, send_from_directory
 from flask_caching import Cache
 from jinja2 import select_autoescape
@@ -35,12 +35,14 @@ from src.BlogDeal import get_article_names, get_article_content, clear_html_form
 from src.database import get_database_connection
 from src.links import create_special_url, redirect_to_long_url
 from src.notification import get_sys_notice, read_notification, send_change_mail
-from src.user import zyadmin, error, get_owner_articles, zy_general_conf, get_profiles
-from src.utils import zy_upload_file, get_client_ip, \
+from src.user import zyadmin, error, get_owner_articles, zy_general_conf, get_profiles, get_following_count, \
+    get_follower_count, getCanFollowd, get_user_id
+from src.utils import admin_upload_file, get_client_ip, \
     zy_noti_conf, generate_jwt, secret_key, authenticate_jwt, \
     authenticate_refresh_token, handle_file_upload, is_allowed_file, is_valid_domain_with_slash, \
     get_all_img, get_all_video, get_all_xmind, get_list_intersection, generate_thumbs, generate_video_thumb, \
-    get_username, admin_required, jwt_required, finger_required, theme_safe_check, mask_ip
+    get_username, admin_required, jwt_required, finger_required, theme_safe_check, mask_ip, parse_update_file, \
+    user_id_required
 
 global_encoding = 'utf-8'
 
@@ -49,7 +51,7 @@ app.config['CACHE_TYPE'] = 'simple'
 cache = Cache(app)
 app.secret_key = secret_key
 app.config['SESSION_COOKIE_NAME'] = 'zb_session'
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=3)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=4)
 app.config['USER_BASE_PATH'] = 'media'
 app.config['TEMP_FOLDER'] = 'temp/upload'
 # 定义随机头像服务器
@@ -242,17 +244,29 @@ def get_avatar():
 @app.route('/profile', methods=['GET', 'POST'])
 @jwt_required
 def profile(user_id):
-    username = get_username()
+    user_name = get_username()
     avatar_url = get_avatar()
-    user_bio = '年度大会员'
-    owner_articles = get_owner_articles(owner_id=None, user_name=username) or []
-    user_follow = 72
-    follower = 265
-    # 确保 render_template 返回正确对象
+    user_bio = get_userBio(user_id) or "这人很懒，什么也没留下"
+    owner_articles = get_owner_articles(owner_id=None, user_name=user_name) or []
+    user_follow = get_following_count(user_id=user_id) or 0
+    follower = get_follower_count(user_id=user_id) or 0
     return render_template('Profile.html', url_for=url_for, avatar_url=avatar_url,
-                           userStatus=bool(user_id), username=username, userBio=user_bio,
+                           userStatus=bool(user_id), username=user_name, userBio=user_bio,
                            following=user_follow, follower=follower,
+                           target_id=user_id, user_id=user_id,
                            Articles=owner_articles)
+
+
+def get_userBio(user_id):
+    UserInfo = cache.get(f"{user_id}_userInfo") or get_profiles(user_id=user_id, user_name=None)
+
+    if UserInfo is None:
+        # 处理未找到用户信息的情况
+        return "用户信息未找到", 404
+    cache.set(f'{user_id}_userInfo', UserInfo)
+    Bio = UserInfo[5] if len(UserInfo) > 5 and UserInfo[5] else "这人很懒，什么也没留下"
+
+    return Bio
 
 
 @app.route('/setting/profiles', methods=['GET', 'POST'])
@@ -264,18 +278,18 @@ def setting_profiles(user_id):
         # 处理未找到用户信息的情况
         return "用户信息未找到", 404
 
-    cache.set(f'{user_id}_userInfo', UserInfo)
+    cache.set(f'{user_id}_userInfo', UserInfo, timeout=3600)
 
     # 确保索引存在
     avatar_url = UserInfo[5] if len(UserInfo) > 5 and UserInfo[5] else app.config['AVATAR_SERVER']
     Bio = UserInfo[5] if len(UserInfo) > 5 and UserInfo[5] else "这人很懒，什么也没留下"
-    username = UserInfo[1] if len(UserInfo) > 1 else "匿名用户"
+    user_name = UserInfo[1] if len(UserInfo) > 1 else "匿名用户"
 
     return render_template(
         'setting.html',
         avatar_url=avatar_url,
         userStatus=bool(user_id),
-        username=username,
+        username=user_name,
         Bio=Bio
     )
 
@@ -669,8 +683,8 @@ def forbid_submit(user_id):
 @app.route('/newArticle', methods=['GET', 'POST'])
 @jwt_required
 def new_article(user_id):
-    username = get_username()
-    if not username:
+    user_name = get_username()
+    if not user_name:
         error(message='请先登录', status_code=401)
     if request.method == 'GET':
         if forbid_submit(user_id):
@@ -690,7 +704,7 @@ def new_article(user_id):
             return error(*error_message)
 
         file_name = os.path.splitext(file.filename)[0]
-        if set_article_info(file_name, username):
+        if set_article_info(file_name, user_name):
             message = '上传成功。但请您检查错误以及编辑。'
             logging.info(f"Article info successfully saved for {file_name} by user:{user_id}.")
             cache.set(f'forbid_{user_id}', True, timeout=600)
@@ -702,11 +716,11 @@ def new_article(user_id):
         return render_template('postNewArticle.html', message=message)
 
 
-@app.route('/Admin_upload', methods=['GET', 'POST'])
+@app.route('/Admin_upload', methods=['POST'])
 @admin_required
 def upload_file1(user_id):
     app.logger.info(f'{user_id} : Try Upload file')
-    return zy_upload_file()
+    return admin_upload_file(app.config['UPLOAD_LIMIT'])
 
 
 @cache.cached(timeout=14400)
@@ -723,11 +737,11 @@ def static_from_root():
 def markdown_editor(article):
     if article == 'default':
         return error(404, status_code=404)
-    username = get_username()
+    user_name = get_username()
     auth = False
 
-    if username is not None:
-        auth = auth_articles(article, username)
+    if user_name is not None:
+        auth = auth_articles(article, user_name)
 
     if auth:
         aid, tags = get_tags_by_article(article)
@@ -737,7 +751,7 @@ def markdown_editor(article):
             article_surl = api_shortlink(article_url)
             # 渲染编辑页面并将转换后的HTML传递到模板中
             return render_template('editor.html', edit_html=edit_html, aid=aid, articleName=article,
-                                   tags=tags,article_surl=article_surl)
+                                   tags=tags, article_surl=article_surl)
         elif request.method == 'POST':
             content = request.json['content']
             return zy_save_edit(aid, content, article)
@@ -820,11 +834,11 @@ def hidden_article():
     if article is None:
         return jsonify({'message': '404'}), 404
 
-    username = get_username()
-    if username is None:
+    user_name = get_username()
+    if user_name is None:
         return jsonify({'deal': 'noAuth'})
 
-    if not auth_articles(article, username):
+    if not auth_articles(article, user_name):
         return jsonify({'deal': 'noAuth'})
 
     # 防抖机制：限制时间内对相同文章的请求
@@ -857,40 +871,40 @@ def hidden_article():
 def media(user_id):
     media_type = request.args.get('type', default='img')
     page = request.args.get('page', default=1, type=int)
-    username = get_username()
+    user_name = get_username()
     if request.method == 'GET':
         preference = request.cookies.get('preference')
         template_choose = 'Media.html'
         if preference == 'V2':
             template_choose = 'Media_V2.html'
         if not media_type or media_type == 'img':
-            imgs, has_next_page, has_previous_page = get_all_img(username, page=page, per_page=20)
+            imgs, has_next_page, has_previous_page = get_all_img(user_name, page=page, per_page=20)
 
             return render_template(template_choose, imgs=imgs, title='Media', url_for=url_for,
                                    has_next_page=has_next_page,
-                                   has_previous_page=has_previous_page, current_page=page, userid=username,
+                                   has_previous_page=has_previous_page, current_page=page, userid=user_name,
                                    domain=domain)
         if media_type == 'video':
-            videos, has_next_page, has_previous_page = get_all_video(username, page=page)
+            videos, has_next_page, has_previous_page = get_all_video(user_name, page=page)
 
             return render_template(template_choose, videos=videos, title='Media', url_for=url_for,
                                    has_next_page=has_next_page,
-                                   has_previous_page=has_previous_page, current_page=page, userid=username,
+                                   has_previous_page=has_previous_page, current_page=page, userid=user_name,
                                    domain=domain)
 
         if media_type == 'xmind':
-            xminds, has_next_page, has_previous_page = get_all_xmind(username, page=page)
+            xminds, has_next_page, has_previous_page = get_all_xmind(user_name, page=page)
 
             return render_template(template_choose, xminds=xminds, title='Media', url_for=url_for,
                                    has_next_page=has_next_page,
-                                   has_previous_page=has_previous_page, current_page=page, userid=username,
+                                   has_previous_page=has_previous_page, current_page=page, userid=user_name,
                                    domain=domain)
     elif request.method == 'POST':
         img_name = request.json.get('img_name')
         if not img_name:
             return error(message='缺少图像名称', status_code=400)
 
-        image = get_image_path(username, img_name)
+        image = get_image_path(user_name, img_name)
         if not image:
             return error(message='未找到图像', status_code=404)
 
@@ -913,14 +927,14 @@ def get_image_path(username, img_name):
 @app.route('/upload_file', methods=['POST'])
 @jwt_required
 def upload_user_path(user_id):
-    username = get_username()
+    user_name = get_username()
 
-    if not username:
+    if not user_name:
         return jsonify({'message': 'failed, user not authenticated'}), 403
 
     try:
         allowed_types = app.config['ALLOWED_EXTENSIONS']
-        user_dir = os.path.join(app.config['USER_BASE_PATH'], username)  # 用户文件存储目录
+        user_dir = os.path.join(app.config['USER_BASE_PATH'], user_name)  # 用户文件存储目录
         os.makedirs(user_dir, exist_ok=True)  # 如果目录不存在则创建
 
         file_records = []  # 用于存储文件记录的列表
@@ -964,7 +978,7 @@ def upload_user_path(user_id):
                     else:
                         # 文件路径不存在，添加新的记录
                         file_records.append((userid, newfile_path, file_type, datetime.now(), datetime.now()))  # 添加文件记录
-                        app.logger.info(f'User: {username}, Uploaded file: {newfile_name}')  # 记录上传日志
+                        app.logger.info(f'User: {user_name}, Uploaded file: {newfile_name}')  # 记录上传日志
 
                 # 如果有文件记录，则插入数据库
                 if file_records:
@@ -1095,7 +1109,7 @@ def favicon():
     return send_file('../static/favicon.ico', mimetype='image/png')
 
 
-@cache.cached(timeout=300, key_prefix='short_link')
+@cache.cached(timeout=24 * 3600, key_prefix='short_link')
 @app.route('/s/<short_url>', methods=['GET', 'POST'])
 def redirect_to_long_url_route(short_url):
     if len(short_url) != 6:
@@ -1115,13 +1129,13 @@ def redirect_to_long_url_route(short_url):
 def api_shortlink(long_url):
     if not long_url.startswith('https://') and not long_url.startswith('http://'):
         return 'error'
-    username = title
-    short_url = create_special_url(long_url, username)
+    user_name = title
+    short_url = create_special_url(long_url, user_name)
     article_surl = domain + 's/' + short_url
     return article_surl
 
 
-@cache.cached(timeout=1200)
+@cache.cached(timeout=3 * 3600, key_prefix='aid')
 @app.route('/<article_id>.html', methods=['GET', 'POST'])
 def id_find_article(article_id):
     if not re.match(r'^\d{1,4}$', article_id):
@@ -1156,16 +1170,13 @@ def id_find_article(article_id):
         db.close()
 
 
-@cache.cached(timeout=1200)
+@cache.cached(timeout=3 * 3600, key_prefix='article_img')
 @app.route('/blog/<article_name>/images/<image_name>', methods=['GET'])
-def sys_out_article_img(article_name, image_name):
+def article_img(article_name, image_name):
     author, author_uid = get_blog_author(article_name)
-
     if author is None:
         author = 'test'
-
     articles_img_dir = os.path.join(base_dir, 'media', str(author))
-    # app.logger.info(f"author: {author}的媒体{image_name}被调用")
     return send_from_directory(articles_img_dir, image_name)
 
 
@@ -1275,7 +1286,7 @@ def following(user_id):
 
 
 @app.route('/api/follow', methods=['GET', 'POST'])
-@jwt_required
+@user_id_required
 def follow_user(user_id):
     follow_id = request.args.get('fid')
 
@@ -1290,7 +1301,8 @@ def follow_user(user_id):
         db = get_database_connection()
         try:
             with db.cursor() as cursor:
-                cursor.execute("SELECT `subscribe_to_id` FROM `subscriptions` WHERE `subscriber_id` = %s", (user_id,))
+                cursor.execute("SELECT `subscribe_to_id` FROM `subscriptions` WHERE `subscriber_id` = %s",
+                               (int(user_id),))
                 user_followed = [row[0] for row in cursor.fetchall()]  # 获取所有关注ID
                 cache.set(f'{user_id}_followed', user_followed)  # 更新缓存
         except Exception as e:
@@ -1308,7 +1320,7 @@ def follow_user(user_id):
         with db.cursor() as cursor:
             # 进行关注操作
             insert_query = "INSERT INTO `subscriptions` (`subscriber_id`, `subscribe_to_id`, `subscribe_type`) VALUES (%s, %s, 'User')"
-            cursor.execute(insert_query, (user_id, follow_id))
+            cursor.execute(insert_query, (int(user_id), int(follow_id)))
             db.commit()
 
             user_followed.append(follow_id)  # 更新列表
@@ -1324,61 +1336,38 @@ def follow_user(user_id):
 
 
 @app.route('/api/unfollow', methods=['GET', 'POST'])
-@jwt_required
+@user_id_required
 def unfollow_user(user_id):
     unfollow_id = request.args.get('fid')
-
     if not user_id or not unfollow_id:
-        return jsonify({'unfollow_code': 'failed', 'message': '用户ID或取关ID不能为空'})
-
-    # 首次尝试从缓存中读取用户的关注列表
-    user_followed = cache.get(f'{user_id}_followed')
-
-    # 如果缓存为空，则从数据库中获取所有关注并缓存
-    if user_followed is None:
-        db = get_database_connection()
-        try:
-            with db.cursor() as cursor:
-                cursor.execute("SELECT `subscribe_to_id` FROM `subscriptions` WHERE `subscriber_id` = %s", (user_id,))
-                user_followed = [row[0] for row in cursor.fetchall()]  # 获取所有关注ID
-                cache.set(f'{user_id}_followed', user_followed)  # 更新缓存
-        except Exception as e:
-            print(f"Exception occurred when loading from DB: {e}")
-            return jsonify({'unfollow_code': 'failed', 'message': "error"})
-        finally:
-            db.close()
-
-    # 检查是否已经关注
-    if unfollow_id not in user_followed:
-        return jsonify({'unfollow_code': 'success', 'message': '未关注，无需取关'})
+        return jsonify({'unfollow_code': 'failed', 'message': '操作无效'})
 
     db = get_database_connection()
     try:
         with db.cursor() as cursor:
             # 进行取关操作
-            delete_query = "DELETE FROM `subscriptions` WHERE `subscriber_id` = %s AND `subscribe_to_id` = %s"
+            delete_query = "DELETE FROM `subscriptions` WHERE `subscriber_id` = %s AND `subscribe_to_id` = %s AND `subscribe_type` = 'User';"
             cursor.execute(delete_query, (user_id, unfollow_id))
             db.commit()
-
-            user_followed.remove(unfollow_id)  # 更新列表
-            cache.set(f'{user_id}_followed', user_followed)  # 更新缓存
+            cache.set(f'{user_id}_followed', None)
             return jsonify({'unfollow_code': 'success', 'message': '成功取关'})
 
     except Exception as e:
-        print(f"Exception occurred: {e}")
+        print(f"Exception occurred during unfollow: {e}, user_id: {user_id}, unfollow_id: {unfollow_id}")
         return jsonify({'unfollow_code': 'failed', 'message': "error"})
-
     finally:
         db.close()
 
 
 @app.route('/like', methods=['GET', 'POST'])
-@jwt_required
+@user_id_required
 def like(user_id):
     aid = request.args.get('aid')
     if request.method == 'POST':
         if not aid:
             return jsonify({'like_code': 'failed', 'message': "error"})
+        if user_id == 0:
+            return jsonify({'like_code': 'failed', 'message': "请登录后操作"})
         user_liked = cache.get(f'{user_id}_liked')
         if user_liked is None:
             user_liked = []
@@ -1551,29 +1540,27 @@ def export(user_id):
     return jsonify(result)
 
 
-@app.route('/@<username>', methods=['GET', 'POST'])
-def user_center(username):
-    # 正则表达式，限制用户名的格式 (只允许字母和数字)
-    if not re.match(r'^[a-zA-Z0-9]+$', username):
+@app.route('/@<user_name>', methods=['GET', 'POST'])
+@user_id_required
+def user_center(user_id, user_name):
+    if not re.match(r'^[a-zA-Z0-9]+$', user_name):
         return error("Invalid username", 400)
 
-    user_dir = Path(base_dir) / 'media' / username
+    user_dir = Path(base_dir) / 'media' / user_name
     if not os.path.exists(user_dir):
         return error("Invalid username", 400)
 
-    spm = request.args.get('spm')
-    if spm:
-        return diy_space(page=username)
-    userBio = '年度大会员'
-    owner_articles = get_owner_articles(owner_id=None, user_name=username) or []
+    target_id = get_user_id(user_name)
+    userBio = get_userBio(user_id=target_id)
+    canFollowed = 1
+    if user_id != 0 and target_id != 0:
+        canFollowed = getCanFollowd(user_id, target_id)
+    owner_articles = get_owner_articles(owner_id=None, user_name=user_name) or []
     noti_host, noti_port = zy_noti_conf()
-
-    following = 72
-    follower = 265
     return render_template('Profile.html', url_for=url_for, avatar_url=get_avatar(),
-                           userStatus=bool(username), username=username, userBio=userBio,
-                           following=following, follower=follower,
-                           Articles=owner_articles, notiHost=noti_host, notiPort=noti_port)
+                           userStatus=bool(user_name), username=user_name, userBio=userBio,
+                           target_id=target_id, user_id=user_id,
+                           Articles=owner_articles, canFollowed=canFollowed, notiHost=noti_host, notiPort=noti_port)
 
 
 def diy_space(page):
@@ -1631,7 +1618,7 @@ def get_guestbook():
             print(f"An error occurred during the database operation: {e}")
 
         finally:
-            db.close()  # 确保数据库连接被关闭
+            db.close()
             return result
 
     except Exception as e:  # 捕获所有异常，而不是仅 FileNotFoundError
@@ -1688,25 +1675,6 @@ def read_user_notification():
 def changelog():
     updates = parse_update_file('update.txt')
     return render_template('changelog.html', updates=updates)
-
-
-def parse_update_file(filename):
-    updates = []
-    with open(filename, 'r', encoding='utf-8') as file:
-        content = file.read()
-
-    # 使用正则表达式提取版本信息
-    pattern = re.compile(r"版本 (.+?)\s+发布日期:(.+?)\s+-*\n((?:-.*(?:\n|$))*)", re.MULTILINE)
-    matches = pattern.findall(content)
-
-    for match in matches:
-        version_info = {
-            'version': match[0].strip(),
-            'date': match[1].strip(),
-            'updates': [update.strip() for update in match[2].strip().splitlines() if update.strip()]
-        }
-        updates.append(version_info)
-    return updates
 
 
 @app.route('/img/<username>/thumbs/<img>', methods=['GET', 'POST'])
@@ -1959,7 +1927,7 @@ def article_passwd(aid):
         db.close()
 
 
-@cache.cached(timeout=600, key_prefix='md5')
+@cache.cached(timeout=600, key_prefix='gen_md5')
 def gen_md5(text):
     # 创建MD5哈希对象
     md5_hash = hashlib.md5()
@@ -2011,6 +1979,7 @@ def api_comment(user_id):
         return jsonify({"message": "评论内容不能为空"}), 400
 
     userIP = get_client_ip(request) or ''
+    maskedIP = ''
     if userIP:
         maskedIP = mask_ip(userIP)
 
@@ -2074,8 +2043,8 @@ def comment(user_id):
 @app.route('/api/delete/<filename>', methods=['GET', 'delete'])
 @jwt_required
 def api_delete(user_id, filename):
-    username = get_username()
-    file_path = os.path.join('media', username, filename)
+    user_name = get_username()
+    file_path = os.path.join('media', user_name, filename)
     auth = auth_files(file_path, user_id)
     if auth:
         if os.path.exists(file_path):
