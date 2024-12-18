@@ -733,10 +733,11 @@ def markdown_editor(article):
         aid, tags = get_tags_by_article(article)
         if request.method == 'GET':
             edit_html = zy_edit_article(article, max_line=app.config['MAX_LINE'])
-
+            article_url = domain + 'blog/' + article
+            article_surl = api_shortlink(article_url)
             # 渲染编辑页面并将转换后的HTML传递到模板中
             return render_template('editor.html', edit_html=edit_html, aid=aid, articleName=article,
-                                   tags=tags)
+                                   tags=tags,article_surl=article_surl)
         elif request.method == 'POST':
             content = request.json['content']
             return zy_save_edit(aid, content, article)
@@ -2065,7 +2066,7 @@ def comment(user_id):
     if not aid:
         pass
     comments = get_comments(aid)
-    template = env.get_template('test.html')
+    template = env.get_template('Comment.html')
     rendered = template.render(aid=aid, user_id=user_id, username=get_username(), comments=comments)
     return rendered
 

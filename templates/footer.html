@@ -4,7 +4,7 @@
     <footer class="bg-transparent mt-8 py-6">
         <div class="container mx-auto px-4 py-4 text-center">
             <p class="text-gray-600">
-                <span class="tooltip" data-tooltip="公众号信息"><a onclick="copyAndAlert()">公众号</a></span> |
+                <span class="tooltip" data-tooltip="公众号信息"><a onclick="copyAndAlert('公众号信息')">公众号</a></span> |
                 <span class="tooltip" data-tooltip="关于我们的信息">关于我们</span> |
                 <span class="tooltip" data-tooltip="用户协议信息">用户协议</span>
             </p>
@@ -14,10 +14,9 @@
 
     <div class="top-bar">
         <script>
-            function copyAndAlert() {
-                const text = "奇客舒";
+            function copyAndAlert(text) {
                 navigator.clipboard.writeText(text).then(function () {
-                    alert("已复制到剪切板，可在微信内搜索该公众号");
+                    alert("已复制");
                 }).catch(function (error) {
                     alert("复制失败：" + error);
                 });

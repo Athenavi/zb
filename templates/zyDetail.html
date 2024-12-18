@@ -12,15 +12,12 @@
 </head>
 <body>
 <div id="app">🏃‍🏃‍🏃‍💨加载中...</div>
+<div class="comments-header">
+    <a href="/@{{ author }}?id={{ authorUID }}" target="_blank">{{ author }}</a>
+    <button onclick="liked(`{{ aid }}`)" class="like-button">👍</button>
+</div>
 <div id='comments_zone' style="display: none;">
-    <div class="comments-header">
-        {% for Tag in article_tags %}
-            <a href="/?tag={{ Tag }}">{{ Tag }}</a>{% if not loop.last %}, {% endif %}
-        {% endfor %}
-        本文作者：<a href="/@{{ author }}?id={{ authorUID }}" target="_blank">{{ author }}</a>
-        <button onclick="liked(`{{ aid }}`)" class="like-button">❤️</button>
-    </div>
-    <iframe src="/Comment?aid={{ aid }}" style="width: 88%;height: 660px;"></iframe>
+    <iframe src="/Comment?aid={{ aid }}" style="width: 100%;height: 660px;"></iframe>
     <button id="hide_comments" onclick="hideComments()" style="display: none;">↖️收起评论区</button>
 </div>
 
@@ -73,7 +70,7 @@
             copyYear: '2022',
             privacy: false,
             terms: false,
-            cookies: false,
+            cookies: true,
             customStyle: false
         },
     };
