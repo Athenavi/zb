@@ -2023,9 +2023,15 @@ def comment(user_id):
     aid = request.args.get('aid')
     if not aid:
         pass
-    comments = get_comments(aid)
+    page = request.args.get('page', default=1, type=int)
+
+    if page <= 0:
+        page = 1
+
+    comments, has_next_page, has_previous_page = get_comments(aid, page=page, per_page=30)
     template = env.get_template('Comment.html')
-    rendered = template.render(aid=aid, user_id=user_id, username=get_username(), comments=comments)
+    rendered = template.render(aid=aid, user_id=user_id, username=get_username(), comments=comments,
+                               has_next_page=has_next_page, has_previous_page=has_previous_page, current_page=page)
     return rendered
 
 

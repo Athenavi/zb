@@ -123,6 +123,26 @@
         </div>
     {% endfor %}
 </div>
+<nav aria-label="Page navigation example" class="my-4">
+    <ul class="flex justify-center space-x-2">
+        {% if has_previous_page %}
+            <li>
+                <a class="page-link bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                   href="/Comment?page={{ current_page-1 }}&aid={{ aid }}">
+                    &laquo; 上一页
+                </a>
+            </li>
+        {% endif %}
+        {% if has_next_page %}
+            <li>
+                <a class="page-link bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                   href="/Comment?page={{ current_page+1 }}&aid={{ aid }}">
+                    下一页 &raquo;
+                </a>
+            </li>
+        {% endif %}
+    </ul>
+</nav>
 <script>
     // 插入表情符号
     function insertEmoji(emoji) {
@@ -142,7 +162,7 @@
         const token = localStorage.getItem('jwtToken');
 
         if (!articleId || !commentContent) {
-            document.getElementById('message').innerText = "所有字段都是必填的。";
+            document.getElementById('message').innerText = "当你提交评论时若多次出现此提示，则当前文章不可评论";
             return;
         }
 
