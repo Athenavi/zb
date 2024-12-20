@@ -20,3 +20,4 @@ opencv-python==4.10.0.84
 mysql-connector-python==9.1.0
 mysql~=0.0.3
 gunicorn==23.0.0
+user_agents==2.2.0

@@ -42,7 +42,7 @@ from src.utils import admin_upload_file, get_client_ip, \
     authenticate_refresh_token, handle_file_upload, is_allowed_file, is_valid_domain_with_slash, \
     get_all_img, get_all_video, get_all_xmind, get_list_intersection, generate_thumbs, generate_video_thumb, \
     get_username, admin_required, jwt_required, finger_required, theme_safe_check, mask_ip, parse_update_file, \
-    user_id_required
+    user_id_required, user_agent_info
 
 global_encoding = 'utf-8'
 
@@ -1972,6 +1972,7 @@ def api_comment(user_id):
         maskedIP = mask_ip(userIP)
 
     userAgent = request.headers.get('User-Agent') or ''
+    userAgent = user_agent_info(userAgent)
 
     cache.set(f"CommentLock_{user_id}", aid, timeout=30)
     result = comment_add(aid, user_id, new_comment, maskedIP, userAgent)
@@ -2054,6 +2055,79 @@ def get_friends_link(type=0):
     if type == 1:
         return friends_links
     return render_template('guestbook.html', avatar_url=avatar_url, link_list=friends_links)
+
+
+@app.route('/api/report', methods=['POST'])
+@user_id_required
+def api_report(user_id):
+    try:
+        report_id = int(request.json.get('report-id'))
+        report_type = request.json.get('report-type') or ''
+        report_reason = request.json.get('report-reason') or ''
+        reason = report_type + report_reason
+    except (TypeError, ValueError):
+        return jsonify({"message": "Invalid Report ID"}), 400
+
+    if report_id == cache.get(f"reportLock{report_id}_{user_id}"):
+        return jsonify({"message": "操作过于频繁"}), 400
+
+    result = report_add(user_id, "Comment", report_id, reason)
+
+    if result:
+        cache.set(f"reportLock{report_id}_{user_id}", report_id, timeout=3600)
+        return jsonify({'report-id': report_id, 'info': '举报已记录'}), 201
+    else:
+        return jsonify({"message": "评论失败"}), 500
+
+
+def report_add(user_id, reported_type, reported_id, reason):
+    db = get_database_connection()
+    try:
+        with db.cursor() as cursor:
+            query = "INSERT INTO `reports` (`reported_by`, `content_type`, `content_id`,`reason`) VALUES (%s, %s, %s,%s);"
+            cursor.execute(query, (int(user_id), reported_type, reported_id, reason))
+            db.commit()
+            return True
+    except Exception as e:
+        print(f'Error: {e}')
+        return False
+    finally:
+        db.close()
+
+
+@app.route('/api/comment', methods=['delete'])
+@user_id_required
+def api_comment_delete(user_id):
+    try:
+        comment_id = int(request.json.get('comment_id'))
+    except (TypeError, ValueError):
+        return jsonify({"message": "Invalid Comment ID"}), 400
+
+    if comment_id == cache.get(f"deleteCommentLock_{user_id}"):
+        return jsonify({"message": "操作过于频繁"}), 400
+
+    result = comment_del(user_id, comment_id)
+
+    if result:
+        cache.set(f"deleteCommentLock_{user_id}", comment_id, timeout=30)
+        return jsonify({"message": "删除成功"}), 201
+    else:
+        return jsonify({"message": "操作失败"}), 500
+
+
+def comment_del(user_id, comment_id):
+    db = get_database_connection()
+    try:
+        with db.cursor() as cursor:
+            query = "DELETE FROM `comments` WHERE `id` = %s AND `user_id` = %s;"
+            cursor.execute(query, (int(comment_id), int(user_id)))
+            db.commit()
+            return True
+    except Exception as e:
+        print(f'Error: {e}')
+        return False
+    finally:
+        db.close()
 
 
 @app.route('/travel', methods=['GET'])

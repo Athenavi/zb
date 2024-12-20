@@ -56,9 +56,9 @@ def admin_dashboard(method, dash_info):
     else:
         # print(dashInfo)
         display_list = get_all_themes()
-        current_display = session.get('display', 'default')
+        #current_display = session.get('display', 'default')
         return render_template('dashboard.html', displayList=display_list,
-                               currentDisplay=current_display, dashInfo=dash_info)
+                               dashInfo=dash_info)
 
 
 def get_all_themes():
