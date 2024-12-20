@@ -16,6 +16,7 @@
 <div class="container mx-auto my-8">
     <div class="bg-white p-6 rounded-lg shadow-lg">
         <div class="mb-4">
+            <span onclick="copyAndAlert('{{ article_surl }}')">{{ article_surl }}（copy）</span>
             <label for="tagInput" class="block text-gray-700 text-sm font-bold mb-2">标签（用逗号分隔）：</label>
             <input type="text" id="tagInput"
                    value="{% for tag in tags %}{{ tag }}{% if not loop.last %}, {% endif %}{% endfor %}"

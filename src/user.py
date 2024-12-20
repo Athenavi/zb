@@ -38,7 +38,7 @@ def zyadmin(key, method):
         db = get_database_connection()
         cursor = db.cursor()
         try:
-            query = "SHOW TABLE STATUS WHERE Name IN ('articles', 'users', 'comments','media','events')"
+            query = "SHOW TABLE STATUS WHERE Name IN ('articles', 'users', 'comments','media','events');"
             cursor.execute(query)
             dash_info = cursor.fetchall()
             return admin_dashboard(method, dash_info), 200
@@ -56,9 +56,9 @@ def admin_dashboard(method, dash_info):
     else:
         # print(dashInfo)
         display_list = get_all_themes()
-        current_display = session.get('display', 'default')
+        #current_display = session.get('display', 'default')
         return render_template('dashboard.html', displayList=display_list,
-                               currentDisplay=current_display, dashInfo=dash_info)
+                               dashInfo=dash_info)
 
 
 def get_all_themes():
@@ -121,7 +121,10 @@ def get_owner_articles(owner_id=None, user_name=None):
 
             if owner_id:
                 query = """
-                SELECT a.Title FROM articles AS a JOIN users AS u ON a.Author = u.username WHERE u.id = %s and a.`Status` != 'Deleted';
+                SELECT a.Title
+                FROM articles AS a 
+                JOIN users AS u ON a.Author = u.username
+                WHERE u.id = %s and a.`Status` != 'Deleted';
                 """
                 cursor.execute(query, (owner_id,))
                 articles.extend(result[0] for result in cursor.fetchall())
@@ -166,3 +169,84 @@ def get_profiles(user_id=None, user_name=None):
         db.close()
 
     return info_list
+
+
+def get_following_count(user_id, subscribe_type='User'):
+    db = get_database_connection()
+    count = 0
+    try:
+        with db.cursor() as cursor:
+            if subscribe_type == 'User':
+                query = "SELECT COUNT(*) FROM subscriptions WHERE `subscriber_id` = %s AND `subscribe_type` = 'User';"
+                cursor.execute(query, (int(user_id),))
+            else:
+                query = ("SELECT COUNT(*) FROM subscriptions WHERE `subscriber_id` = %s AND `subscribe_type` = "
+                         "'Category';")
+                cursor.execute(query, (int(user_id),))
+
+            # 读取查询结果
+            count = cursor.fetchone()[0]
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        db.close()
+
+    return count
+
+
+def get_follower_count(user_id, subscribe_type='User'):
+    db = get_database_connection()
+    count = 0
+    try:
+        with db.cursor() as cursor:
+            if subscribe_type == 'User':
+                query = "SELECT COUNT(*) FROM subscriptions WHERE `subscribe_to_id` = %s AND `subscribe_type` = 'User';"
+                cursor.execute(query, (int(user_id),))
+            else:
+                query = ("SELECT COUNT(*) FROM subscriptions WHERE `subscribe_to_id` = %s AND `subscribe_type` = "
+                         "'Category';")
+                cursor.execute(query, (int(user_id),))
+
+            count = cursor.fetchone()[0]
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        db.close()
+
+    return count
+
+
+def get_can_followed(user_id, target_id):
+    db = get_database_connection()
+    can_follow = 1
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT COUNT(*) FROM `subscriptions` WHERE `subscriber_id` = %s AND `subscribe_to_id` = %s;"
+            cursor.execute(query, (int(user_id), int(target_id)))
+            count = cursor.fetchone()[0]
+            if count:
+                can_follow = 0
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        db.close()
+
+    return can_follow
+
+
+def get_user_id(user_name):
+    db = get_database_connection()
+    user_id = 0
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT `id` FROM `users` WHERE `username` = %s;"
+            cursor.execute(query, (user_name,))
+            user_id = cursor.fetchone()[0]
+            if user_id:
+                return user_id
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        db.close()
+
+    return user_id

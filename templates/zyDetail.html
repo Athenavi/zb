@@ -12,29 +12,12 @@
 </head>
 <body>
 <div id="app">🏃‍🏃‍🏃‍💨加载中...</div>
-
+<div class="comments-header">
+    <a href="/@{{ author }}?id={{ authorUID }}" target="_blank">{{ author }}</a>
+    <button onclick="liked(`{{ aid }}`)" class="like-button">👍</button>
+</div>
 <div id='comments_zone' style="display: none;">
-    <div class="comments-header">
-        本文最近更新日期:{{ blogDate }}
-        {{ beian }}
-        <br/>
-        与本文有关的标签:
-        {% for Tag in article_tags %}
-            <a href="/?tag={{ Tag }}">{{ Tag }}</a>{% if not loop.last %}, {% endif %}
-        {% endfor %}
-    </div>
-    <div class="comments-author">
-        本文作者：<a href="/@{{ author }}?id={{ authorUID }}" target="_blank">{{ author }}</a>
-    </div>
-    <button onclick="liked(`{{ aid }}`)" class="like-button">❤️</button>
-    <div id="tcomment"></div>
-    <script src="https://cdn.jsdelivr.net/npm/twikoo@1.6.39/dist/twikoo.all.min.js"></script>
-    <script>
-        twikoo.init({
-            envId: 'http://twikoo.7trees.cn/',
-            el: '#tcomment'
-        });
-    </script>
+    <iframe src="/Comment?aid={{ aid }}" style="width: 100%;height: 660px;"></iframe>
     <button id="hide_comments" onclick="hideComments()" style="display: none;">↖️收起评论区</button>
 </div>
 
@@ -67,7 +50,6 @@
     window.$docsify = {
         auto2top: true,
         name: '{{ articleName }}',
-        nameLink: '/',
         executeScript: true,
         mergeNavbar: true,
         loadNavbar: '../api/_navbar.md',
@@ -82,16 +64,13 @@
             color: 'rgb(90,90,90)',
             language: 'chinese'
         },
-        topBanner: {
-            content: '{{ article_Surl }}',
-        },
         autoFooter: {
             name: '{{ title }}',
             url: '{{ domain }}',
             copyYear: '2022',
             privacy: false,
             terms: false,
-            cookies: false,
+            cookies: true,
             customStyle: false
         },
     };
@@ -115,10 +94,7 @@
 <link rel="stylesheet" href="/static/js/docsify-xmind.js"/>
 
 <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/docsify-top-banner-plugin@latest/dist/style.css"/>
-
-<script src="/static/js/top-banner.js"></script>
 <script src="/static/js/docsify-sidebarfooter.js"></script>
-<script src="//cdn.jsdelivr.net/gh/jerryc127/butterfly_cdn@2.1.0/js/click_heart.js"></script>
 <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
 
 <style>
@@ -139,11 +115,6 @@
     .comments-header {
         font-size: 22px;
         margin-bottom: 15px;
-    }
-
-    .comments-author {
-        font-size: 18px;
-        margin-bottom: 10px;
     }
 
     .like-button {
