@@ -29,6 +29,27 @@
             background-color: rgba(0, 0, 0, 0.5);
             z-index: 999;
         }
+
+        .comment-wrapper {
+            margin-bottom: 10px;
+        }
+
+        .comment {
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .comment:hover {
+            background-color: #f7f7f7;
+        }
+
+        .replies {
+            margin-left: 20px; /* 用于嵌套评论的缩进 */
+        }
+
+        .hidden {
+            display: none;
+        }
     </style>
 </head>
 <body class="bg-gray-100 font-sans p-6">
@@ -78,6 +99,9 @@
             }
         }
     </script>
+    <div id="replayId" style="display: none;" data-hidden="0"></div>
+    <div id="replayTips" class="bg-green-700" style="display: none;"></div>
+    <button id="resetButton" class="hover:bg-red-700" style="display: none;" onclick="resetDataHidden()">取消</button>
     <div class="mt-2 flex space-x-2">
         <button class="text-xl" onclick="insertEmoji('😊')">😊</button>
         <button class="text-xl" onclick="insertEmoji('😂')">😂</button>
@@ -98,29 +122,77 @@
         {% set user = c[2] %}
         {% set comment = c[3] | fromjson %}
         {% set date_time = c[4] %}
+        {% set p_pid = comment['pid'] | int %}
+        {% set comment_id = c[0] | int %}
+        {% if p_pid == 0 %}
 
-        <div class="bg-white p-4 rounded-lg shadow-md flex">
-            <img src="https://api.7trees.cn/avatar?{{ user }}" alt="Avatar" class="w-10 h-10 rounded-full mr-4">
-            <div class="flex-1">
-                <div class="font-semibold text-gray-700">匿名
-                    <div class="text-sm text-gray-500">{{ date_time }}</div>
+            <div class="comment-wrapper">
+                <div class="bg-white p-4 rounded-lg shadow-md flex comment" onclick="toggleReplies('{{ comment_id }}')">
+                    <img src="https://api.7trees.cn/avatar?{{ user }}" alt="Avatar" class="w-10 h-10 rounded-full mr-4">
+                    <div class="flex-1">
+                        <div class="font-semibold text-gray-700">匿名
+                            <div class="text-sm text-gray-500">{{ date_time }}</div>
+                        </div>
+                        <div class="text-gray-800 mb-1">{{ comment['content'] | e }}</div>
+                        <div class="text-sm text-gray-500 flex items-center">
+                            <span class="mr-2"><i class="fas fa-desktop"></i></span>
+                            <span class="mr-2 ua">{{ comment['ua'] if comment['ua'] else 'N/A' }}</span>
+                            <span class="mr-2"><i
+                                    class="fas fa-globe"></i> {{ comment['ip'] if comment['ip'] else 'N/A' }}</span>
+                        </div>
+                        <span class="mr-2" onclick="updateReplyId('{{ comment_id }}','{{ comment['content'] | e }}')"
+                              aria-valuetext="回复"><i class="fa-brands fa-replyd"></i></span>
+                        {% if user == user_id %}
+                            <span class="mr-2" onclick="deleteThisComment('{{ comment_id }}', this)"
+                                  aria-valuetext="删除"><i
+                                    class="fa-solid fa-trash"></i></span>
+                        {% endif %}
+                        <span class="mr-2" onclick="showReportModal('{{ comment_id }}', '{{ comment['content'] }}')"
+                              aria-valuetext="举报" data-hidden="{{ comment_id }}">
+                            <i class="fa-solid fa-circle-exclamation"></i>
+                        </span>
+                    </div>
                 </div>
-                <div class="text-gray-800 mb-1">{{ comment['content'] | e }}</div>
-                <div class="text-sm text-gray-500 flex items-center">
-                    <span class="mr-2"><i class="fas fa-desktop"></i></span>
-                    <span class="mr-2 ua">{{ comment['ua'] if comment['ua'] else 'N/A' }}</span>
-                    <span class="mr-2"><i
-                            class="fas fa-globe"></i> {{ comment['ip'] if comment['ip'] else 'N/A' }}</span>
+
+                <div class="replies hidden" id="replies-{{ comment_id }}">
+                    {% for c in comments %}
+                        {% set user = c[2] %}
+                        {% set comment = c[3] | fromjson %}
+                        {% set date_time = c[4] %}
+                        {% set child_pid = comment['pid'] | int %}
+                        {% set child_comment_id = c[0] | int %}
+                        {% if child_pid == comment_id %}
+
+                            <div class="bg-white p-4 rounded-lg shadow-md flex comment">
+                                <img src="https://api.7trees.cn/avatar?{{ user }}" alt="Avatar"
+                                     class="w-10 h-10 rounded-full mr-4">
+                                <div class="flex-1">
+                                    <div class="font-semibold text-gray-700">匿名
+                                        <div class="text-sm text-gray-500">{{ date_time }}</div>
+                                    </div>
+                                    <div class="text-gray-800 mb-1">{{ comment['content'] | e }}</div>
+                                    <div class="text-sm text-gray-500 flex items-center">
+                                        <span class="mr-2"><i class="fas fa-desktop"></i></span>
+                                        <span class="mr-2 ua">{{ comment['ua'] if comment['ua'] else 'N/A' }}</span>
+                                        <span class="mr-2"><i
+                                                class="fas fa-globe"></i> {{ comment['ip'] if comment['ip'] else 'N/A' }}</span>
+                                    </div>
+                                    {% if user == user_id %}
+                                        <span class="mr-2" onclick="deleteThisComment('{{ c[0] }}', this)"
+                                              aria-valuetext="删除">
+                                            <i class="fa-solid fa-trash"></i></span>
+                                    {% endif %}
+                                    <span class="mr-2"
+                                          onclick="showReportModal('{{ c[0] }}', '{{ comment['content'] }}')"
+                                          aria-valuetext="举报" data-hidden="{{ c[0] }}">
+                                        <i class="fa-solid fa-circle-exclamation"></i></span>
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
                 </div>
-                {% if user == user_id %}
-                    <span class="mr-2" onclick="deleteThisComment('{{ c[0] }}', this)" aria-valuetext="删除"><i
-                            class="fa-solid fa-trash"></i></span>
-                {% endif %}
-                <span class="mr-2" onclick="showReportModal('{{ c[0] }}', '{{ comment['content'] }}')"
-                      aria-valuetext="举报" data-hidden="{{ c[0] }}"><i class="fa-solid fa-circle-exclamation"></i>
-</span>
             </div>
-        </div>
+        {% endif %}
     {% endfor %}
 </div>
 <nav aria-label="Page navigation example" class="my-4">
@@ -144,6 +216,60 @@
     </ul>
 </nav>
 <script>
+    function checkDataHidden() {
+        const replayDiv = document.getElementById('replayId');
+        const resetButton = document.getElementById('resetButton');
+        const currentValue = replayDiv.getAttribute('data-hidden');
+        const replayTips = document.getElementById('replayTips');
+        if (currentValue !== "0") {
+            resetButton.style.display = 'block';
+            replayTips.style.display = 'block';
+        } else {
+            resetButton.style.display = 'none'; // 隐藏按钮
+            replayTips.style.display = 'none';
+        }
+    }
+
+    function resetDataHidden() {
+        const replayDiv = document.getElementById('replayId');
+        const replayTips = document.getElementById('replayTips');
+        replayDiv.setAttribute('data-hidden', '0');
+        console.log('Data-hidden reset to 0');
+        replayTips.innerHTML = ``;
+
+        // 每次重置后检查按钮的显示状态
+        checkDataHidden();
+    }
+
+    function getReplyId() {
+        const replayDiv = document.getElementById('replayId');
+        const hiddenValue = replayDiv.getAttribute('data-hidden');
+        console.log('Current data-hidden value:', hiddenValue);
+        return hiddenValue;
+    }
+
+    function updateReplyId(commentId, RepliedContent) {
+        // 获取 div 元素
+        const replayDiv = document.getElementById('replayId');
+        const replayTips = document.getElementById('replayTips');
+        replayDiv.setAttribute('data-hidden', commentId);
+        replayTips.innerHTML = `reply:  ${RepliedContent}`;
+
+        // 打印 commentId 和新的 data-hidden 值
+        console.log('Comment ID:', commentId);
+        console.log('New data-hidden value:', replayDiv.getAttribute('data-hidden'));
+        checkDataHidden()
+    }
+
+    function toggleReplies(commentId) {
+        const replies = document.getElementById('replies-' + commentId);
+        if (replies.classList.contains('hidden')) {
+            replies.classList.remove('hidden');
+        } else {
+            replies.classList.add('hidden');
+        }
+    }
+
     // 插入表情符号
     function insertEmoji(emoji) {
         const commentBox = document.getElementById('comment');
@@ -160,6 +286,7 @@
         const articleId = getParameterByName('aid');
         const commentContent = document.getElementById('comment').value;
         const token = localStorage.getItem('jwtToken');
+        const replayId = getReplyId()
 
         if (!articleId || !commentContent) {
             document.getElementById('message').innerText = "当你提交评论时若多次出现此提示，则当前文章不可评论";
@@ -175,7 +302,8 @@
                 },
                 body: JSON.stringify({
                     aid: articleId,
-                    'new-comment': commentContent
+                    'new-comment': commentContent,
+                    'pid': replayId
                 })
             });
 
@@ -225,6 +353,7 @@
         if (!results[2]) return 0;
         return decodeURIComponent(results[2].replace(/\+/g, " "));
     }
+
 
     // 显示举报模态框
     function showReportModal(commentId, commentContent) {

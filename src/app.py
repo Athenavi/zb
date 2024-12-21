@@ -1956,6 +1956,7 @@ def api_article_pw(user_id):
 def api_comment(user_id):
     try:
         aid = int(request.json.get('aid'))
+        pid = int(request.json.get('pid')) or 0
     except (TypeError, ValueError):
         return jsonify({"message": "Invalid Article ID"}), 400
 
@@ -1975,7 +1976,7 @@ def api_comment(user_id):
     userAgent = user_agent_info(userAgent)
 
     cache.set(f"CommentLock_{user_id}", aid, timeout=30)
-    result = comment_add(aid, user_id, new_comment, maskedIP, userAgent)
+    result = comment_add(aid, user_id, pid, new_comment, maskedIP, userAgent)
 
     if result:
         return jsonify({'aid': aid, 'changed': True}), 201
@@ -1983,8 +1984,8 @@ def api_comment(user_id):
         return jsonify({"message": "评论失败"}), 500
 
 
-def comment_add(aid, user_id, comment_content, ip, ua):
-    c_json = {'content': comment_content, 'ip': ip, 'ua': ua}
+def comment_add(aid, user_id, pid, comment_content, ip, ua):
+    c_json = {'content': comment_content, 'pid': pid, 'ip': ip, 'ua': ua}
     comment_json = json.dumps(c_json)
     db = get_database_connection()
     try:
