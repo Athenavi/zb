@@ -1,0 +1,36 @@
+{% extends 'dashboard-base.html' %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-5">管理短链接</h1>
+<div class="overflow-x-auto custom-scrollbar" style="max-height: 86vh; overflow-y: auto;">
+    <table class="min-w-full table-light" style="table-layout: fixed;">
+        <thead class="bg-gray-200">
+            <tr>
+                <th class="py-2 px-4 border">短链接ID</th>
+                <th class="py-2 px-4 border">长链接</th>
+                <th class="py-2 px-4 border">短链接</th>
+                <th class="py-2 px-4 border">创建时间</th>
+                <th class="py-2 px-4 border">创建者用户名</th>
+                <th class="py-2 px-4 border">操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for url in urls %}
+            <tr class="border-b hover:bg-gray-100">
+                <td class="py-2 px-4">{{ url['id'] }}</td>
+                <td class="py-2 px-4" style="max-width: 300px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">
+                    {{ url['long_url'] }}
+                </td>
+                <td class="py-2 px-4">{{ url['short_url'] }}</td>
+                <td class="py-2 px-4">{{ url['created_at'] }}</td>
+                <td class="py-2 px-4">{{ url['username'] }}</td>
+                <td class="py-2 px-4">
+                    <a href="#" class="text-blue-500 hover:underline">编辑</a> |
+                    <a href="#" class="text-red-500 hover:underline">删除</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

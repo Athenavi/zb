@@ -32,11 +32,11 @@ from src.BlogDeal import get_article_names, get_article_content, clear_html_form
     zy_edit_article, get_subscriber_ids, get_unique_tags, get_articles_by_tag, \
     get_tags_by_article, set_article_info, write_tags_to_database, set_article_visibility, auth_by_id, \
     article_change_pw, get_file_summary, get_comments, auth_files
-from src.database import get_database_connection
+from src.database import get_database_connection, get_db_connection
 from src.links import create_special_url, redirect_to_long_url
 from src.notification import get_sys_notice, read_notification, send_change_mail
-from src.user import zyadmin, error, get_owner_articles, zy_general_conf, get_profiles, get_following_count, \
-    get_follower_count, get_can_followed, get_user_id
+from src.user import error, get_owner_articles, zy_general_conf, get_profiles, get_following_count, \
+    get_follower_count, get_can_followed, get_user_id, get_all_themes
 from src.utils import admin_upload_file, get_client_ip, \
     zy_noti_conf, generate_jwt, secret_key, authenticate_jwt, \
     authenticate_refresh_token, handle_file_upload, is_allowed_file, is_valid_domain_with_slash, \
@@ -625,16 +625,6 @@ def confirm_password(user_id):
 def change_password(user_id):
     ip = get_client_ip(request)
     return zy_change_password(user_id, ip)
-
-
-@app.route('/admin/<key>', methods=['GET', 'POST'])
-@admin_required
-def admin(user_id, key):
-    method = 'GET'
-    if request.method == 'POST':
-        method = 'POST'
-    app.logger.info(f'{user_id} : open dashboard with key :{key}')
-    return zyadmin(key, method)
 
 
 @app.route('/admin/changeTheme', methods=['POST'])
@@ -2001,20 +1991,6 @@ def comment_add(aid, user_id, pid, comment_content, ip, ua):
         db.close()
 
 
-def json_filter(value):
-    """将 JSON 字符串解析为 Python 对象"""
-    if not isinstance(value, str):
-        print(f"Unexpected type for value: {type(value)}. Expected a string.")
-        return None
-
-    try:
-        result = json.loads(value)
-        return result
-    except (ValueError, TypeError) as e:
-        print(f"Error parsing JSON: {e}, Value: {value}")
-        return None
-
-
 @app.route("/Comment")
 @jwt_required
 def comment(user_id):
@@ -2140,6 +2116,125 @@ def comment_del(user_id, comment_id):
 @app.route('/travel', methods=['GET'])
 def travel():
     return '此接口暂时弃用'
+
+
+@app.route('/dashboard/articles')
+@admin_required
+def m_articles(user_id):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    cursor.execute('SELECT * FROM articles')  # 从数据库获取文章列表
+    articles = cursor.fetchall()
+    cursor.close()
+    connection.close()
+    return render_template('M-articles.html', articles=articles)
+
+
+@app.route('/dashboard')
+@app.route('/dashboard/overview')
+@admin_required
+def m_overview(user_id):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    cursor.execute("SHOW TABLE STATUS WHERE Name IN ('articles', 'users', 'comments','media','events');")
+    dash_info = cursor.fetchall()
+    cursor.close()
+    connection.close()
+    return render_template('M-overview.html', dashInfo=dash_info)
+
+
+@app.route('/dashboard/users')
+@admin_required
+def m_users(user_id):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    cursor.execute('SELECT * FROM users')  # 从数据库获取用户列表
+    users = cursor.fetchall()
+    cursor.close()
+    connection.close()
+    return render_template('M-users.html', users=users)
+
+
+@app.route('/dashboard/comments')
+@admin_required
+def m_comments(user_id):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    cursor.execute('SELECT * FROM comments')
+    comments = cursor.fetchall()
+    cursor.close()
+    connection.close()
+
+    return render_template('M-comments.html', comments=comments)
+
+
+@app.template_filter('fromjson')
+def json_filter(value):
+    """将 JSON 字符串解析为 Python 对象"""
+    if not isinstance(value, str):
+        print(f"Unexpected type for value: {type(value)}. Expected a string.")
+        return None
+
+    try:
+        result = json.loads(value)
+        return result
+    except (ValueError, TypeError) as e:
+        print(f"Error parsing JSON: {e}, Value: {value}")
+        return None
+
+
+@app.route('/dashboard/media')
+@admin_required
+def m_media(user_id):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    cursor.execute('SELECT * FROM media')  # 从数据库获取媒体列表
+    media_items = cursor.fetchall()
+    cursor.close()
+    connection.close()
+    return render_template('M-media.html', media_items=media_items)
+
+
+@app.route('/dashboard/notifications')
+@admin_required
+def m_notifications(user_id):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    cursor.execute('SELECT * FROM notifications')  # 从数据库获取通知列表
+    notifications = cursor.fetchall()
+    cursor.close()
+    connection.close()
+    return render_template('M-notifcations.html', notifications=notifications)
+
+
+@app.route('/dashboard/reports')
+@admin_required
+def m_reports(user_id):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    cursor.execute('SELECT * FROM reports')  # 从数据库获取举报列表
+    reports = cursor.fetchall()
+    cursor.close()
+    connection.close()
+    return render_template('M-reports.html', reports=reports)
+
+
+@app.route('/dashboard/urls')
+@admin_required
+def m_urls(user_id):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    cursor.execute('SELECT * FROM urls')  # 从数据库获取短链接列表
+    urls = cursor.fetchall()
+    cursor.close()
+    connection.close()
+    return render_template('M-urls.html', urls=urls)
+
+
+@app.route('/dashboard/display')
+@admin_required
+def m_display(user_id):
+    return render_template('M-display.html', displayList=get_all_themes())
 
 
 @app.errorhandler(404)

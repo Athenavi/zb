@@ -1,8 +1,7 @@
-import logging
 import os
 from configparser import ConfigParser
 
-from flask import session, render_template
+from flask import render_template
 
 from src.database import get_database_connection
 
@@ -31,34 +30,6 @@ def zy_general_conf():
 
 def error(message, status_code):
     return render_template('inform.html', error=message, status_code=status_code), status_code
-
-
-def zyadmin(key, method):
-    if key == door_key:
-        db = get_database_connection()
-        cursor = db.cursor()
-        try:
-            query = "SHOW TABLE STATUS WHERE Name IN ('articles', 'users', 'comments','media','events');"
-            cursor.execute(query)
-            dash_info = cursor.fetchall()
-            return admin_dashboard(method, dash_info), 200
-        except Exception as e:
-            logging.error(f"Error logging in: {e}")
-            return error("未知错误", 500)
-        finally:
-            cursor.close()
-            db.close()
-
-
-def admin_dashboard(method, dash_info):
-    if method != 'GET':
-        return None
-    else:
-        # print(dashInfo)
-        display_list = get_all_themes()
-        #current_display = session.get('display', 'default')
-        return render_template('dashboard.html', displayList=display_list,
-                               dashInfo=dash_info)
 
 
 def get_all_themes():

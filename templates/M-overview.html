@@ -1,0 +1,34 @@
+{% extends 'dashboard-base.html' %}
+
+{% block content %}
+    <div id="dashboard" class="content">
+        <h1 class="text-3xl font-bold text-gray-800 mb-8">仪表盘</h1>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="shadow-lg rounded-lg p-6 transition-transform transform hover:scale-105"
+                 ondblclick="window.location.href = '/dashboard/articles';">
+                <h2 class="font-semibold text-lg">总文章数</h2>
+                <p class="text-4xl text-blue-600">{{ dashInfo[0]['Rows'] }}</p>
+            </div>
+            <div class="shadow-lg rounded-lg p-6 transition-transform transform hover:scale-105"
+                 ondblclick="window.location.href = '/dashboard/comments';">
+                <h2 class="font-semibold text-lg">评论</h2>
+                <p class="text-4xl text-blue-600">{{ dashInfo[1]['Rows'] }}</p>
+            </div>
+            <div class="shadow-lg rounded-lg p-6 transition-transform transform hover:scale-105"
+                 ondblclick="alert('没有指向的内容');">
+                <h2 class="font-semibold text-lg">事件总数</h2>
+                <p class="text-4xl text-blue-600">{{ dashInfo[2]['Rows'] }}</p>
+            </div>
+            <div class="shadow-lg rounded-lg p-6 transition-transform transform hover:scale-105"
+                 ondblclick="window.location.href = '/dashboard/media';">
+                <h2 class="font-semibold text-lg">媒体</h2>
+                <p class="text-4xl text-blue-600">{{ dashInfo[3]['Rows'] }}</p>
+            </div>
+            <div class="shadow-lg rounded-lg p-6 transition-transform transform hover:scale-105"
+                 ondblclick="window.location.href = '/dashboard/users';">
+                <h2 class="font-semibold text-lg">用户数</h2>
+                <p class="text-4xl text-blue-600">{{ dashInfo[4]['Rows'] }}</p>
+            </div>
+        </div>
+    </div>
+{% endblock %}
