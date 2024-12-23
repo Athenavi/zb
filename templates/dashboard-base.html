@@ -105,53 +105,85 @@
             scrollbar-width: thin; /* 在 Firefox 中设置为细的滚动条 */
             scrollbar-color: rgba(0, 0, 0, 0.2) transparent; /* 滚动条颜色 */
         }
+
+
+        #editModal {
+            display: none; /* 默认隐藏 */
+            position: fixed; /* 定位为固定 */
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5); /* 半透明背景 */
+            justify-content: center; /* 水平居中 */
+            align-items: center; /* 垂直居中 */
+            z-index: 1000; /* 确保在最上层 */
+        }
+
+        .modal-content {
+            color: #c08b30;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
     </style>
 </head>
 <body id="body" class="light">
 <div class="flex">
     <aside class="w-full md:w-64 bg-gradient-to-r from-blue-600 to-blue-400 shadow-lg md:h-screen">
         <div class="p-6">
-            <h2 class="text-3xl text-white font-bold">管理面板</h2>
+            <h2 class="text-3xl text-white font-bold">管理面板
+                <button id="theme-toggle" class="text-xl">
+                    <i id="toggle-icon" class="fas fa-sun"></i>
+                </button>
+            </h2>
         </div>
         <nav>
             <ul>
                 <li class="hover:bg-blue-300">
                     <a href="{{ url_for('m_overview') }}"
-                       class="text-white block py-4 px-6 transition duration-300">仪表盘</a>
+                       class="text-white block py-4 px-6 transition duration-300"><i
+                            class="fa-solid fa-gauge-high"></i>&nbsp;仪表盘</a>
                 </li>
                 <li class="hover:bg-blue-300">
                     <a href="{{ url_for('m_articles') }}"
-                       class="text-white block py-4 px-6 transition duration-300">文章管理</a>
+                       class="text-white block py-4 px-6 transition duration-300"><i
+                            class="fa-brands fa-markdown"></i>&nbsp;文章管理</a>
                 </li>
                 <li class="hover:bg-blue-300">
                     <a href="{{ url_for('m_users') }}"
-                       class="text-white block py-4 px-6 transition duration-300">用户管理</a>
+                       class="text-white block py-4 px-6 transition duration-300"><i
+                            class="fa-solid fa-users"></i>&nbsp;用户管理</a>
                 </li>
                 <li class="hover:bg-blue-300">
                     <a href="{{ url_for('m_comments') }}"
-                       class="text-white block py-4 px-6 transition duration-300">评论管理</a>
+                       class="text-white block py-4 px-6 transition duration-300"><i
+                            class="fa-regular fa-comments"></i>&nbsp;评论管理</a>
                 </li>
                 <li class="hover:bg-blue-300">
                     <a href="{{ url_for('m_media') }}"
-                       class="text-white block py-4 px-6 transition duration-300">媒体管理</a>
+                       class="text-white block py-4 px-6 transition duration-300"><i
+                            class="fa-solid fa-photo-film"></i>&nbsp;媒体管理</a>
                 </li>
                 <li class="hover:bg-blue-300">
-                    <a href="{{ url_for('m_notifications') }}" class="text-white block py-4 px-6 transition duration-300">通知管理</a>
+                    <a href="{{ url_for('m_notifications') }}"
+                       class="text-white block py-4 px-6 transition duration-300"><i
+                            class="fa-regular fa-envelope-open"></i>&nbsp;通知管理</a>
                 </li>
                 <li class="hover:bg-blue-300">
                     <a href="{{ url_for('m_reports') }}"
-                       class="text-white block py-4 px-6 transition duration-300">举报管理</a>
+                       class="text-white block py-4 px-6 transition duration-300"><i
+                            class="fa-regular fa-rectangle-list"></i>&nbsp;举报管理</a>
                 </li>
                 <li class="hover:bg-blue-300">
                     <a href="{{ url_for('m_urls') }}"
-                       class="text-white block py-4 px-6 transition duration-300">链接管理</a>
+                       class="text-white block py-4 px-6 transition duration-300"><i
+                            class="fa-solid fa-link"></i>&nbsp;链接管理</a>
                 </li>
                 <li class="hover:bg-blue-300">
                     <a href="{{ url_for('m_display') }}"
-                       class="text-white block py-4 px-6 transition duration-300">主题与外观 </a>
-                    <button id="theme-toggle" class="text-xl">
-                        <i id="toggle-icon" class="fas fa-sun"></i>
-                    </button>
+                       class="text-white block py-4 px-6 transition duration-300"><i
+                            class="fa-solid fa-shirt"></i>&nbsp;主题外观</a>
                 </li>
             </ul>
         </nav>
@@ -198,4 +230,9 @@
     toggleSidebarButton.addEventListener('click', () => {
         sidebar.classList.toggle('-translate-x-full');
     });
+
+
+    function closeEditModal() {
+        document.getElementById('editModal').style.display = 'none';
+    }
 </script>

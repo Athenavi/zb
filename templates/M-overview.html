@@ -15,7 +15,7 @@
                 <p class="text-4xl text-blue-600">{{ dashInfo[1]['Rows'] }}</p>
             </div>
             <div class="shadow-lg rounded-lg p-6 transition-transform transform hover:scale-105"
-                 ondblclick="alert('没有指向的内容');">
+                 id="Menu-event">
                 <h2 class="font-semibold text-lg">事件总数</h2>
                 <p class="text-4xl text-blue-600">{{ dashInfo[2]['Rows'] }}</p>
             </div>
@@ -30,5 +30,58 @@
                 <p class="text-4xl text-blue-600">{{ dashInfo[4]['Rows'] }}</p>
             </div>
         </div>
+        <h1 class="text-2xl font-bold mb-5" id="event-panel">events</h1>
+        <div class="overflow-x-auto">
+            <table class="min-w-full table-light">
+                <thead class="bg-gray-200">
+                <tr>
+                    <th class="py-2 px-4 border">ID</th>
+                    <th class="py-2 px-4 border">标题</th>
+                    <th class="py-2 px-4 border">描述</th>
+                    <th class="py-2 px-4 border">日期</th>
+                    <th class="py-2 px-4 border">操作日期</th>
+                    <th class="py-2 px-4 border">操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for event in events %}
+                    <tr class="border-b hover:bg-gray-100">
+                        <td class="py-2 px-4">{{ event['id'] }}</td>
+                        <td class="py-2 px-4">{{ event['title'] }}</td>
+                        <td class="py-2 px-4">{{ event['description'] }}</td>
+                        <td class="py-2 px-4">{{ event['event_date'] }}</td>
+                        <td class="py-2 px-4">{{ event['created_at'] }}</td>
+                        <td class="py-2 px-4">
+                            <a href="#" class="text-blue-500 hover:underline">编辑</a> |
+                            <a href="#" class="text-red-500 hover:underline">删除</a>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
     </div>
+    <script>
+        // 获取元素
+        const divElement = document.getElementById('Menu-event');
+        const h1Element = document.getElementById('event-panel');
+
+        // 添加双击事件监听器
+        divElement.ondblclick = function () {
+            // 获取两个元素的位置
+            const divRect = divElement.getBoundingClientRect();
+            const h1Rect = h1Element.getBoundingClientRect();
+
+            // 计算高度距离
+            const distance = h1Rect.bottom - divRect.top;
+
+            // 滚动页面
+            window.scrollBy({
+                top: distance, // 向下滚动的距离
+                left: 0,
+                behavior: 'smooth' // 平滑滚动
+            });
+        };
+    </script>
 {% endblock %}
