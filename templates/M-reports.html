@@ -35,7 +35,7 @@
     </div>
     <script>
         function deleteReports(ReportsId) {
-            if (confirm("您确定要移除这条通知吗？")) {
+            if (confirm("您确定要移除这条举报信息吗？")) {
                 fetch(`/dashboard/reports?rid=${ReportsId}`, {
                     method: 'DELETE',
                 })

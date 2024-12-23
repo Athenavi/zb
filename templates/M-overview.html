@@ -52,8 +52,8 @@
                         <td class="py-2 px-4">{{ event['event_date'] }}</td>
                         <td class="py-2 px-4">{{ event['created_at'] }}</td>
                         <td class="py-2 px-4">
-                            <a href="#" class="text-blue-500 hover:underline">编辑</a> |
-                            <a href="#" class="text-red-500 hover:underline">删除</a>
+                            <a href="#" class="text-red-500 hover:underline"
+                               onclick="deleteEvent({{ event['id'] }})">删除</a>
                         </td>
                     </tr>
                 {% endfor %}
@@ -83,5 +83,26 @@
                 behavior: 'smooth' // 平滑滚动
             });
         };
+
+        function deleteEvent(EventId) {
+            if (confirm("您确定要移除这条活动吗？")) {
+                fetch(`/dashboard/overview?id=${EventId}`, {
+                    method: 'DELETE',
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('网络响应不正常');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        alert(data.message);
+                        location.reload();
+                    })
+                    .catch(error => {
+                        alert("删除失败: " + error.message);
+                    });
+            }
+        }
     </script>
 {% endblock %}
