@@ -2369,6 +2369,46 @@ def m_media_delete(user_id):
         return jsonify({"message": "操作失败", "error": str(e)}), 500
 
 
+@app.route('/dashboard/notifications', methods=['DELETE'])
+@admin_required
+def m_notifications_delete(user_id):
+    nid = int(request.args.get('nid'))
+    if not nid:
+        return jsonify({"message": "操作失败"}), 400
+
+    try:
+        with get_db_connection() as connection:
+            with connection.cursor(dictionary=True) as cursor:
+                query = "DELETE FROM `notifications` WHERE `id` = %s;"
+                cursor.execute(query, (nid,))
+                connection.commit()
+
+        return jsonify({"message": "操作成功"}), 200
+
+    except Exception as e:
+        return jsonify({"message": "操作失败", "error": str(e)}), 500
+
+
+@app.route('/dashboard/reports', methods=['DELETE'])
+@admin_required
+def m_reports_delete(user_id):
+    rid = int(request.args.get('rid'))
+    if not rid:
+        return jsonify({"message": "操作失败"}), 400
+
+    try:
+        with get_db_connection() as connection:
+            with connection.cursor(dictionary=True) as cursor:
+                query = "DELETE FROM `reports` WHERE `id` = %s;"
+                cursor.execute(query, (rid,))
+                connection.commit()
+
+        return jsonify({"message": "操作成功"}), 200
+
+    except Exception as e:
+        return jsonify({"message": "操作失败", "error": str(e)}), 500
+
+
 @app.errorhandler(404)
 def page_not_found(error_message):
     app.logger.error(error_message)
