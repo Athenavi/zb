@@ -32,11 +32,11 @@ from src.BlogDeal import get_article_names, get_article_content, clear_html_form
     zy_edit_article, get_subscriber_ids, get_unique_tags, get_articles_by_tag, \
     get_tags_by_article, set_article_info, write_tags_to_database, set_article_visibility, auth_by_id, \
     article_change_pw, get_file_summary, get_comments, auth_files
-from src.database import get_database_connection
+from src.database import get_database_connection, get_db_connection
 from src.links import create_special_url, redirect_to_long_url
 from src.notification import get_sys_notice, read_notification, send_change_mail
-from src.user import zyadmin, error, get_owner_articles, zy_general_conf, get_profiles, get_following_count, \
-    get_follower_count, get_can_followed, get_user_id
+from src.user import error, get_owner_articles, zy_general_conf, get_profiles, get_following_count, \
+    get_follower_count, get_can_followed, get_user_id, get_all_themes
 from src.utils import admin_upload_file, get_client_ip, \
     zy_noti_conf, generate_jwt, secret_key, authenticate_jwt, \
     authenticate_refresh_token, handle_file_upload, is_allowed_file, is_valid_domain_with_slash, \
@@ -627,16 +627,6 @@ def change_password(user_id):
     return zy_change_password(user_id, ip)
 
 
-@app.route('/admin/<key>', methods=['GET', 'POST'])
-@admin_required
-def admin(user_id, key):
-    method = 'GET'
-    if request.method == 'POST':
-        method = 'POST'
-    app.logger.info(f'{user_id} : open dashboard with key :{key}')
-    return zyadmin(key, method)
-
-
 @app.route('/admin/changeTheme', methods=['POST'])
 @admin_required
 def change_display(user_id):
@@ -912,8 +902,12 @@ def media(user_id):
         return image
 
 
+@app.route('/media/<username>/<img_name>')
 @app.route('/zyImg/<username>/<img_name>')
 def get_image_path(username, img_name):
+    preview = request.args.get('preview')
+    if preview:
+        return api_img(username, img_name)
     try:
         img_dir = Path(base_dir) / 'media' / username / img_name
         with open(img_dir, 'rb') as f:
@@ -1956,6 +1950,7 @@ def api_article_pw(user_id):
 def api_comment(user_id):
     try:
         aid = int(request.json.get('aid'))
+        pid = int(request.json.get('pid')) or 0
     except (TypeError, ValueError):
         return jsonify({"message": "Invalid Article ID"}), 400
 
@@ -1975,7 +1970,7 @@ def api_comment(user_id):
     userAgent = user_agent_info(userAgent)
 
     cache.set(f"CommentLock_{user_id}", aid, timeout=30)
-    result = comment_add(aid, user_id, new_comment, maskedIP, userAgent)
+    result = comment_add(aid, user_id, pid, new_comment, maskedIP, userAgent)
 
     if result:
         return jsonify({'aid': aid, 'changed': True}), 201
@@ -1983,8 +1978,8 @@ def api_comment(user_id):
         return jsonify({"message": "评论失败"}), 500
 
 
-def comment_add(aid, user_id, comment_content, ip, ua):
-    c_json = {'content': comment_content, 'ip': ip, 'ua': ua}
+def comment_add(aid, user_id, pid, comment_content, ip, ua):
+    c_json = {'content': comment_content, 'pid': pid, 'ip': ip, 'ua': ua}
     comment_json = json.dumps(c_json)
     db = get_database_connection()
     try:
@@ -2000,20 +1995,6 @@ def comment_add(aid, user_id, comment_content, ip, ua):
         db.close()
 
 
-def json_filter(value):
-    """将 JSON 字符串解析为 Python 对象"""
-    if not isinstance(value, str):
-        print(f"Unexpected type for value: {type(value)}. Expected a string.")
-        return None
-
-    try:
-        result = json.loads(value)
-        return result
-    except (ValueError, TypeError) as e:
-        print(f"Error parsing JSON: {e}, Value: {value}")
-        return None
-
-
 @app.route("/Comment")
 @jwt_required
 def comment(user_id):
@@ -2023,9 +2004,15 @@ def comment(user_id):
     aid = request.args.get('aid')
     if not aid:
         pass
-    comments = get_comments(aid)
+    page = request.args.get('page', default=1, type=int)
+
+    if page <= 0:
+        page = 1
+
+    comments, has_next_page, has_previous_page = get_comments(aid, page=page, per_page=30)
     template = env.get_template('Comment.html')
-    rendered = template.render(aid=aid, user_id=user_id, username=get_username(), comments=comments)
+    rendered = template.render(aid=aid, user_id=user_id, username=get_username(), comments=comments,
+                               has_next_page=has_next_page, has_previous_page=has_previous_page, current_page=page)
     return rendered
 
 
@@ -2133,6 +2120,333 @@ def comment_del(user_id, comment_id):
 @app.route('/travel', methods=['GET'])
 def travel():
     return '此接口暂时弃用'
+
+
+@app.route('/dashboard/articles', methods=['GET'])
+@admin_required
+def m_articles(user_id):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    cursor.execute('SELECT * FROM articles')  # 从数据库获取文章列表
+    articles = cursor.fetchall()
+    cursor.close()
+    connection.close()
+    return render_template('M-articles.html', articles=articles)
+
+
+@app.route('/dashboard', methods=['GET'])
+@app.route('/dashboard/overview', methods=['GET'])
+@admin_required
+def m_overview(user_id):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    cursor.execute("SHOW TABLE STATUS WHERE Name IN ('articles', 'users', 'comments','media','events');")
+    dash_info = cursor.fetchall()
+    cursor.execute('SELECT * FROM events')
+    events = cursor.fetchall()
+    cursor.close()
+    connection.close()
+    return render_template('M-overview.html', dashInfo=dash_info, events=events)
+
+
+@app.route('/dashboard/users', methods=['GET'])
+@admin_required
+def m_users(user_id):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    cursor.execute('SELECT * FROM users')  # 从数据库获取用户列表
+    users = cursor.fetchall()
+    cursor.close()
+    connection.close()
+    return render_template('M-users.html', users=users)
+
+
+@app.route('/dashboard/comments', methods=['GET'])
+@admin_required
+def m_comments(user_id):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    cursor.execute('SELECT * FROM comments')
+    comments = cursor.fetchall()
+    cursor.close()
+    connection.close()
+
+    return render_template('M-comments.html', comments=comments)
+
+
+@app.template_filter('fromjson')
+def json_filter(value):
+    """将 JSON 字符串解析为 Python 对象"""
+    if not isinstance(value, str):
+        print(f"Unexpected type for value: {type(value)}. Expected a string.")
+        return None
+
+    try:
+        result = json.loads(value)
+        return result
+    except (ValueError, TypeError) as e:
+        print(f"Error parsing JSON: {e}, Value: {value}")
+        return None
+
+
+@app.route('/dashboard/media', methods=['GET'])
+@admin_required
+def m_media(user_id):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    cursor.execute('SELECT * FROM media')  # 从数据库获取媒体列表
+    media_items = cursor.fetchall()
+    cursor.close()
+    connection.close()
+    return render_template('M-media.html', media_items=media_items, domain=domain)
+
+
+@app.route('/dashboard/notifications', methods=['GET'])
+@admin_required
+def m_notifications(user_id):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    cursor.execute('SELECT * FROM notifications')  # 从数据库获取通知列表
+    notifications = cursor.fetchall()
+    cursor.close()
+    connection.close()
+    return render_template('M-notifcations.html', notifications=notifications)
+
+
+@app.route('/dashboard/reports', methods=['GET'])
+@admin_required
+def m_reports(user_id):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    cursor.execute('SELECT * FROM reports')  # 从数据库获取举报列表
+    reports = cursor.fetchall()
+    cursor.close()
+    connection.close()
+    return render_template('M-reports.html', reports=reports)
+
+
+@app.route('/dashboard/urls', methods=['GET'])
+@admin_required
+def m_urls(user_id):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    cursor.execute('SELECT * FROM urls')  # 从数据库获取短链接列表
+    urls = cursor.fetchall()
+    cursor.close()
+    connection.close()
+    return render_template('M-urls.html', urls=urls)
+
+
+@app.route('/dashboard/display', methods=['GET'])
+@admin_required
+def m_display(user_id):
+    return render_template('M-display.html', displayList=get_all_themes())
+
+
+@app.route('/dashboard/articles', methods=['DELETE'])
+@admin_required
+def m_articles_delete(user_id):
+    aid = request.args.get('aid')
+    if not aid:
+        return jsonify({"message": "操作失败"}), 400
+
+    try:
+        with get_db_connection() as connection:
+            with connection.cursor(dictionary=True) as cursor:
+                query = "DELETE FROM `articles` WHERE `articles`.`ArticleID` = %s;"
+                cursor.execute(query, (int(aid),))
+                connection.commit()
+
+        return jsonify({"message": "操作成功"}), 200
+
+    except Exception as e:
+        return jsonify({"message": "操作失败", "error": str(e)}), 500
+
+
+@app.route('/dashboard/articles', methods=['PUT'])
+@admin_required
+def m_articles_edit(user_id):
+    data = request.get_json()
+    article_id = data.get('ArticleID')
+    article_title = data.get('Title')
+    article_status = data.get('Status')
+    if not article_id or not article_title:
+        return jsonify({"message": "操作失败"}), 400
+
+    try:
+        with get_db_connection() as connection:
+            with connection.cursor(dictionary=True) as cursor:
+                query = "UPDATE `articles` SET `Title` = %s,`Status`= %s WHERE `ArticleID` = %s;"
+                cursor.execute(query, (article_title, article_status, int(article_id)))
+                connection.commit()
+
+        return jsonify({"message": "操作成功"}), 200
+
+    except Exception as e:
+        return jsonify({"message": "操作失败", "error": str(e)}), 500
+
+
+@app.route('/dashboard/users', methods=['DELETE'])
+@admin_required
+def m_users_delete(user_id):
+    uid = int(request.args.get('uid'))
+    if not uid or uid == 1:
+        return jsonify({"message": "操作失败"}), 400
+
+    try:
+        with get_db_connection() as connection:
+            with connection.cursor(dictionary=True) as cursor:
+                query = "DELETE FROM `users` WHERE `id` = %s;"
+                cursor.execute(query, (uid,))
+                connection.commit()
+
+        return jsonify({"message": "操作成功"}), 200
+
+    except Exception as e:
+        return jsonify({"message": "操作失败", "error": str(e)}), 500
+
+
+@app.route('/dashboard/users', methods=['PUT'])
+@admin_required
+def m_users_edit(user_id):
+    data = request.get_json()
+    u_id = data.get('UId')
+    user_name = data.get('UName')
+    user_role = data.get('URole')
+    if not u_id or not user_name:
+        return jsonify({"message": "操作失败"}), 400
+
+    try:
+        with get_db_connection() as connection:
+            with connection.cursor(dictionary=True) as cursor:
+                query = "UPDATE `users` SET `username` = %s,`role`= %s WHERE `id` = %s;"
+                cursor.execute(query, (user_name, user_role, int(u_id)))
+                connection.commit()
+
+        return jsonify({"message": "操作成功"}), 200
+
+    except Exception as e:
+        return jsonify({"message": "操作失败", "error": str(e)}), 500
+
+
+@app.route('/dashboard/comments', methods=['DELETE'])
+@admin_required
+def m_comments_delete(user_id):
+    cid = int(request.args.get('cid'))
+    if not cid:
+        return jsonify({"message": "操作失败"}), 400
+
+    try:
+        with get_db_connection() as connection:
+            with connection.cursor(dictionary=True) as cursor:
+                query = "DELETE FROM `comments` WHERE `id` = %s;"
+                cursor.execute(query, (cid,))
+                connection.commit()
+
+        return jsonify({"message": "操作成功"}), 200
+
+    except Exception as e:
+        return jsonify({"message": "操作失败", "error": str(e)}), 500
+
+
+@app.route('/dashboard/media', methods=['DELETE'])
+@admin_required
+def m_media_delete(user_id):
+    file_id = int(request.args.get('file-id'))
+    if not file_id:
+        return jsonify({"message": "操作失败"}), 400
+
+    try:
+        with get_db_connection() as connection:
+            with connection.cursor(dictionary=True) as cursor:
+                query = "DELETE FROM `media` WHERE `id` = %s;"
+                cursor.execute(query, (file_id,))
+                connection.commit()
+
+        return jsonify({"message": "操作成功"}), 200
+
+    except Exception as e:
+        return jsonify({"message": "操作失败", "error": str(e)}), 500
+
+
+@app.route('/dashboard/notifications', methods=['DELETE'])
+@admin_required
+def m_notifications_delete(user_id):
+    nid = int(request.args.get('nid'))
+    if not nid:
+        return jsonify({"message": "操作失败"}), 400
+
+    try:
+        with get_db_connection() as connection:
+            with connection.cursor(dictionary=True) as cursor:
+                query = "DELETE FROM `notifications` WHERE `id` = %s;"
+                cursor.execute(query, (nid,))
+                connection.commit()
+
+        return jsonify({"message": "操作成功"}), 200
+
+    except Exception as e:
+        return jsonify({"message": "操作失败", "error": str(e)}), 500
+
+
+@app.route('/dashboard/reports', methods=['DELETE'])
+@admin_required
+def m_reports_delete(user_id):
+    rid = int(request.args.get('rid'))
+    if not rid:
+        return jsonify({"message": "操作失败"}), 400
+
+    try:
+        with get_db_connection() as connection:
+            with connection.cursor(dictionary=True) as cursor:
+                query = "DELETE FROM `reports` WHERE `id` = %s;"
+                cursor.execute(query, (rid,))
+                connection.commit()
+
+        return jsonify({"message": "操作成功"}), 200
+
+    except Exception as e:
+        return jsonify({"message": "操作失败", "error": str(e)}), 500
+
+
+@app.route('/dashboard/overview', methods=['DELETE'])
+@admin_required
+def m_overview_delete(user_id):
+    event_id = int(request.args.get('id'))
+    if not id:
+        return jsonify({"message": "操作失败"}), 400
+
+    try:
+        with get_db_connection() as connection:
+            with connection.cursor(dictionary=True) as cursor:
+                query = "DELETE FROM `events` WHERE `id` = %s;"
+                cursor.execute(query, (event_id,))
+                connection.commit()
+
+        return jsonify({"message": "操作成功"}), 200
+
+    except Exception as e:
+        return jsonify({"message": "操作失败", "error": str(e)}), 500
+
+
+@app.route('/dashboard/urls', methods=['DELETE'])
+@admin_required
+def m_urls_delete(user_id):
+    url_id = int(request.args.get('id'))
+    if not id:
+        return jsonify({"message": "操作失败"}), 400
+
+    try:
+        with get_db_connection() as connection:
+            with connection.cursor(dictionary=True) as cursor:
+                query = "DELETE FROM `urls` WHERE `id` = %s;"
+                cursor.execute(query, (url_id,))
+                connection.commit()
+
+        return jsonify({"message": "操作成功"}), 200
+
+    except Exception as e:
+        return jsonify({"message": "操作失败", "error": str(e)}), 500
 
 
 @app.errorhandler(404)

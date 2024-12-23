@@ -4,6 +4,10 @@ import os
 import mysql.connector
 
 
+def get_db_connection():
+    return get_database_connection()
+
+
 def get_database_connection():
     db_host = os.environ.get('db_host', '').strip("'")
     db_port = int(os.environ.get('db_port', '3306').strip("'"))
