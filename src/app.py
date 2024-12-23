@@ -902,8 +902,12 @@ def media(user_id):
         return image
 
 
+@app.route('/media/<username>/<img_name>')
 @app.route('/zyImg/<username>/<img_name>')
 def get_image_path(username, img_name):
+    preview = request.args.get('preview')
+    if preview:
+        return api_img(username, img_name)
     try:
         img_dir = Path(base_dir) / 'media' / username / img_name
         with open(img_dir, 'rb') as f:
@@ -2194,7 +2198,7 @@ def m_media(user_id):
     media_items = cursor.fetchall()
     cursor.close()
     connection.close()
-    return render_template('M-media.html', media_items=media_items)
+    return render_template('M-media.html', media_items=media_items, domain=domain)
 
 
 @app.route('/dashboard/notifications', methods=['GET'])
@@ -2317,6 +2321,46 @@ def m_users_edit(user_id):
             with connection.cursor(dictionary=True) as cursor:
                 query = "UPDATE `users` SET `username` = %s,`role`= %s WHERE `id` = %s;"
                 cursor.execute(query, (user_name, user_role, int(u_id)))
+                connection.commit()
+
+        return jsonify({"message": "操作成功"}), 200
+
+    except Exception as e:
+        return jsonify({"message": "操作失败", "error": str(e)}), 500
+
+
+@app.route('/dashboard/comments', methods=['DELETE'])
+@admin_required
+def m_comments_delete(user_id):
+    cid = int(request.args.get('cid'))
+    if not cid:
+        return jsonify({"message": "操作失败"}), 400
+
+    try:
+        with get_db_connection() as connection:
+            with connection.cursor(dictionary=True) as cursor:
+                query = "DELETE FROM `comments` WHERE `id` = %s;"
+                cursor.execute(query, (cid,))
+                connection.commit()
+
+        return jsonify({"message": "操作成功"}), 200
+
+    except Exception as e:
+        return jsonify({"message": "操作失败", "error": str(e)}), 500
+
+
+@app.route('/dashboard/media', methods=['DELETE'])
+@admin_required
+def m_media_delete(user_id):
+    file_id = int(request.args.get('file-id'))
+    if not file_id:
+        return jsonify({"message": "操作失败"}), 400
+
+    try:
+        with get_db_connection() as connection:
+            with connection.cursor(dictionary=True) as cursor:
+                query = "DELETE FROM `media` WHERE `id` = %s;"
+                cursor.execute(query, (file_id,))
                 connection.commit()
 
         return jsonify({"message": "操作成功"}), 200
