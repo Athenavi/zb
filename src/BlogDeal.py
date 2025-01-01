@@ -355,17 +355,16 @@ def set_article_info(a_title, username):
     try:
         with db.cursor() as cursor:
             # 获取当前年份
-            current_year = datetime.now().year  # 直接使用 datetime 类
+            current_year = datetime.datetime.now().year
 
-            # 插入或更新文章信息，tags 写入当前年份
+            # 插入或更新文章信息，标签写入当前年份
             query = """
             INSERT INTO articles (Title, Author, tags) 
             VALUES (%s, %s, %s) 
             ON DUPLICATE KEY UPDATE Author = %s, tags = %s;
             """
 
-            print(
-                f"Executing SQL: {query} with parameters: {(a_title, username, current_year, username, current_year)}")
+            print(f"Executing SQL: {query} with parameters: ({a_title}, {username}, {current_year}, {username}, {current_year})")
             cursor.execute(query, (a_title, username, current_year, username, current_year))
 
             # 记录事件信息
@@ -381,7 +380,7 @@ def set_article_info(a_title, username):
 
     except Exception as e:
         print(f"An error occurred during database operation: {e}")
-        # 事务回滚
+        # 回滚事务
         db.rollback()
         return False  # 表示操作失败
 
