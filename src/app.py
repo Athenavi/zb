@@ -214,8 +214,12 @@ def search(user_id):
 def sys_out_file(article_name):
     if article_name.startswith("tempPrev_"):
         parts = article_name[:-3].rsplit('_', 1)
-        if len(parts) == 2:
-            author, file_name = parts
+        if len(parts) != 2:
+            # 如果 parts 长度不等于 2，直接返回错误
+            return error(message="无效的文章名称", status_code=400)
+
+        # 如果 parts 长度等于 2，继续处理
+        author, file_name = parts
         author = get_username()
         prev = f"""
         ```xmind preview

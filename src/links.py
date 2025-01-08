@@ -1,3 +1,5 @@
+from pymysql.err import DatabaseError
+
 from src.database import get_database_connection
 from src.utils import generate_short_url
 
@@ -43,7 +45,8 @@ def redirect_to_long_url(short_url):
             return long_url
         else:
             return None
-    except Exception:
+    except (ValueError, DatabaseError) as e:
+        print(f"An error occurred: {e}")
         return None
     finally:
         cursor.close()

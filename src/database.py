@@ -50,7 +50,8 @@ def test_database_connection():
 
 
 def check_db():
-    global cursor, db
+    cursor = None
+    db = None
     try:
         db = get_database_connection()
         cursor = db.cursor()
