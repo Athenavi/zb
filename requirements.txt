@@ -12,7 +12,13 @@ waitress~=3.0.1
 Flask-Caching==2.1.0
 flask_socketio==5.4.1
 PyJWT==2.10.1
-pillow==11.0.0
+pillow==11.1.0
+opencv-python==4.5.5.62
+mysql-connector-python==8.0.28
+mysql~=0.0.3
+gunicorn==20.1.0
+user-agents==2.2.0
+pymysql==1.1.1
 packaging~=24.1
 qrcode~=8.0
 pillow==11.0.0

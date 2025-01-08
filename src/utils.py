@@ -16,6 +16,7 @@ import jwt
 from PIL import Image
 from flask import request, jsonify, redirect, url_for, render_template
 from packaging.version import Version
+from user_agents import parse
 from werkzeug.utils import secure_filename
 
 from src.user import error, zy_general_conf
@@ -498,12 +499,6 @@ def parse_update_file(filename):
         }
         updates.append(version_info)
     return updates
-
-
-
-
-
-from user_agents import parse
 
 
 def user_agent_info(user_agent):

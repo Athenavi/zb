@@ -3,9 +3,10 @@ import datetime
 import html
 import os
 import re
-import urllib
+import urllib.parse
 
 import markdown
+from pymysql import DatabaseError
 
 from src.database import get_database_connection
 from src.user import error
@@ -330,7 +331,7 @@ def get_tags_by_article(article_name):
     aid = 0
 
     try:
-        query = "SELECT ArticleID,Tags FROM articles WHERE Title = %s"
+        query = "SELECT ArticleID, Tags FROM articles WHERE Title = %s"
         cursor.execute(query, (article_name,))
 
         result = cursor.fetchone()
@@ -341,7 +342,13 @@ def get_tags_by_article(article_name):
                 tags_list = tags_str.split(';')
                 unique_tags = list(set(tags_list))
 
-    except Exception:
+    except DatabaseError as db_err:  # 处理特定的数据库错误
+        # 记录数据库错误
+        print(f"数据库错误: {db_err}")
+        return aid, []
+    except Exception as e:  # 捕获其他异常
+        # 记录其他错误
+        print(f"发生了一个错误: {e}")
         return aid, []
     finally:
         cursor.close()
@@ -355,9 +362,9 @@ def set_article_info(a_title, username):
     try:
         with db.cursor() as cursor:
             # 获取当前年份
-            current_year = datetime.now().year  # 直接使用 datetime 类
+            current_year = datetime.datetime.now().year
 
-            # 插入或更新文章信息，tags 写入当前年份
+            # 插入或更新文章信息，标签写入当前年份
             query = """
             INSERT INTO articles (Title, Author, tags) 
             VALUES (%s, %s, %s) 
@@ -365,7 +372,7 @@ def set_article_info(a_title, username):
             """
 
             print(
-                f"Executing SQL: {query} with parameters: {(a_title, username, current_year, username, current_year)}")
+                f"Executing SQL: {query} with parameters: ({a_title}, {username}, {current_year}, {username}, {current_year})")
             cursor.execute(query, (a_title, username, current_year, username, current_year))
 
             # 记录事件信息
@@ -381,7 +388,7 @@ def set_article_info(a_title, username):
 
     except Exception as e:
         print(f"An error occurred during database operation: {e}")
-        # 事务回滚
+        # 回滚事务
         db.rollback()
         return False  # 表示操作失败
 
@@ -428,8 +435,9 @@ def set_article_visibility(article, hide=True):
             if result is None:
                 # 如果文章不存在，根据 hide 参数来设置 Hidden 状态
                 hidden_status = 1 if hide else 0
-                query = "INSERT INTO articles (Title, Author, Hidden) VALUES (%s, 'test', %s)"
-                cursor.execute(query, (article, hidden_status))
+                tags_value = str(datetime.datetime.now().year)
+                query = "INSERT INTO articles (Title, Author, Hidden, Tags) VALUES (%s, 'test', %s, %s)"
+                cursor.execute(query, (article, hidden_status, tags_value))
             else:
                 current_hidden_status = result[0]
                 if hide and current_hidden_status == 0:
@@ -537,6 +545,7 @@ def get_comments(aid, page=1, per_page=30):
         db.close()
 
     return comments, has_next_page, has_previous_page
+
 
 def auth_files(file_path, user_id):
     db = get_database_connection()
