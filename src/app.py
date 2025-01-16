@@ -1659,9 +1659,7 @@ def read_user_notification():
 
 @app.route('/changelog')
 def changelog():
-    updates = parse_update_file('update.txt')
-    return render_template('changelog.html', updates=updates)
-
+    return redirect('https://github.com/Athenavi/zb/blob/main/articles/changelog.md')
 
 @app.route('/img/<username>/thumbs/<img>', methods=['GET', 'POST'])
 def api_img(username, img):
