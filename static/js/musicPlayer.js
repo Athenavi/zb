@@ -8,6 +8,7 @@ $.ajax({
     type: "GET",
     url: "/static/music/music.json",
     dataType: "json",
+    credentials: 'include',
     success: function (data) {
         musicList = data;
         render(musicList[currentIndex]);

@@ -41,8 +41,8 @@ from src.utils import admin_upload_file, get_client_ip, \
     zy_noti_conf, generate_jwt, secret_key, authenticate_jwt, \
     authenticate_refresh_token, handle_file_upload, is_allowed_file, is_valid_domain_with_slash, \
     get_all_img, get_all_video, get_all_xmind, get_list_intersection, generate_thumbs, generate_video_thumb, \
-    get_username, admin_required, jwt_required, finger_required, theme_safe_check, mask_ip, parse_update_file, \
-    user_id_required, user_agent_info
+    get_username, admin_required, jwt_required, finger_required, theme_safe_check, mask_ip, user_id_required, \
+    user_agent_info
 
 global_encoding = 'utf-8'
 
@@ -1661,6 +1661,7 @@ def read_user_notification():
 def changelog():
     return redirect('https://github.com/Athenavi/zb/blob/main/articles/changelog.md')
 
+
 @app.route('/img/<username>/thumbs/<img>', methods=['GET', 'POST'])
 def api_img(username, img):
     if request.method == 'GET':
@@ -2449,6 +2450,15 @@ def m_urls_delete(user_id):
 
     except Exception as e:
         return jsonify({"message": "操作失败", "error": str(e)}), 500
+
+
+@app.route('/static/music/music.json', methods=['GET'])
+@user_id_required
+def music_json(user_id):
+    if not user_id:
+        return send_from_directory(app.static_folder, 'music/music.json')
+    else:
+        return send_from_directory(app.static_folder, 'music/music1.json')
 
 
 @app.errorhandler(404)

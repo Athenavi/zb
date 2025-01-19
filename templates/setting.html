@@ -3,134 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <title>用户个人资料设置</title>
-    <style>
-        body {
-            background-color: #f8f9fa;
-        }
-
-        .container {
-            margin-top: 30px;
-            display: flex;
-        }
-
-        .menu {
-            width: 250px;
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
-
-        .menu a {
-            display: block;
-            padding: 10px;
-            color: #333;
-            text-decoration: none;
-            margin-bottom: 10px;
-            border-radius: 5px;
-        }
-
-        .menu a:hover {
-            background-color: #e9ecef;
-        }
-
-        .content {
-            flex: 1;
-            margin-left: 20px;
-            padding: 20px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
-
-        h2 {
-            margin-bottom: 20px;
-        }
-
-        .iframe-container {
-            position: relative;
-            width: 100%;
-            padding-top: 56.25%; /* 16:9 aspect ratio */
-            overflow: hidden;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
-
-        .iframe-container iframe {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            border: 0;
-            border-radius: 8px;
-        }
-    </style>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="{{ theme }}">
-<div class="container">
-    <div class="menu">
-        <h5><a href="/profile">↩️</a></h5><br>
-        <h4>设置</h4>
-        <a href="#" onclick="showSection('profile')">个人资料</a>
-        <a href="#" onclick="showSection('newArticle')">上传文章</a>
-        <a href="#" onclick="showSection('personalization')">个性化</a>
-        <a href="#" onclick="showSection('privacy')">隐私</a>
-        <a href="#" onclick="showSection('change-pass')">修改密码</a>
-        <a onclick="fun_logout()">注销</a>　
+<body class="bg-gray-100 flex flex-col min-h-screen">
+<div class="container mx-auto px-4 py-8 flex flex-col md:flex-row">
+    <div class="w-full md:w-1/4 bg-white rounded-lg shadow-lg p-6 mb-4 md:mb-0">
+        <h5><a href="/profile" class="text-blue-500 hover:underline">↩️</a></h5>
+        <h4 class="text-xl font-semibold mt-4">设置</h4>
+        <a href="#" onclick="showSection('profile')" class="block py-2 px-4 mt-4 text-gray-700 hover:bg-gray-100 rounded">个人资料</a>
+        <a href="#" onclick="showSection('newArticle')" class="block py-2 px-4 text-gray-700 hover:bg-gray-100 rounded">上传文章</a>
+        <a href="#" onclick="showSection('personalization')" class="block py-2 px-4 text-gray-700 hover:bg-gray-100 rounded">个性化</a>
+        <a href="#" onclick="showSection('privacy')" class="block py-2 px-4 text-gray-700 hover:bg-gray-100 rounded">隐私</a>
+        <a href="#" onclick="showSection('change-pass')" class="block py-2 px-4 text-gray-700 hover:bg-gray-100 rounded">修改密码</a>
+        <a onclick="fun_logout()" class="block py-2 px-4 text-red-500 hover:bg-gray-100 rounded">注销</a>
     </div>
 
-    <div class="content">
+    <div class="w-full md:w-3/4 md:ml-4 bg-white rounded-lg shadow-lg p-6">
         <div id="profile" class="section">
-            <h2>个人资料</h2>
-            <img src="{{ avatar_url }}" style="height: 105px;border-radius: 50%" alt=""
-                 ondblclick="avatarInfo()"/>
-            <form>
-                <div class="mb-3">
-                    <label for="username" class="form-label"></label>
-                    <input type="text" class="form-control" id="username" placeholder="{{ username }}" required>
+            <h2 class="text-2xl font-bold mb-6">个人资料</h2>
+            <img src="{{ avatar_url }}" alt="" class="h-28 w-28 rounded-full mx-auto cursor-pointer" ondblclick="avatarInfo()"/>
+            <form class="mt-6 space-y-4">
+                <div>
+                    <label for="username" class="block text-gray-700"></label>
+                    <input type="text" class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" id="username" placeholder="{{ username }}" required>
                 </div>
-                <div class="mb-3">
-                    <label for="email" class="form-label"></label>
-                    <input type="email" class="form-control" id="email" placeholder="电子邮件" required>
+                <div>
+                    <label for="email" class="block text-gray-700"></label>
+                    <input type="email" class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" id="email" placeholder="电子邮件" required>
                 </div>
-                <div class="mb-3">
-                    <label for="bio" class="form-label"></label>
-                    <textarea class="form-control" id="bio" rows="3" placeholder="{{ Bio }}"></textarea>
+                <div>
+                    <label for="bio" class="block text-gray-700"></label>
+                    <textarea class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" id="bio" rows="3" placeholder="{{ Bio }}"></textarea>
                 </div>
-                <button type="submit" class="btn btn-primary">保存更改</button>
+                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">保存更改</button>
             </form>
         </div>
-        <div id="newArticle" class="section" style="display: none;">
-            <h2>上传文章</h2>
-            <div class="iframe-container">
-                <iframe src="/newArticle" frameborder="0" allowfullscreen></iframe>
+        <div id="newArticle" class="section hidden">
+            <h2 class="text-2xl font-bold mb-6">上传文章</h2>
+            <div class="w-full h-0 relative pb-56 overflow-hidden rounded-lg shadow-lg">
+                <iframe src="/newArticle" class="absolute inset-0 w-full h-full border-0 rounded-lg" frameborder="0" allowfullscreen></iframe>
             </div>
         </div>
-        <div id="personalization" class="section" style="display: none;">
-            <h2>个性化设置</h2>
-            <p>在这里进行您的个性化偏好设置。</p>
+        <div id="personalization" class="section hidden">
+            <h2 class="text-2xl font-bold mb-6">个性化设置</h2>
+            <p class="text-gray-700">在这里进行您的个性化偏好设置。</p>
             <!-- 个性化设置内容 -->
         </div>
-        <div id="privacy" class="section" style="display: none;">
-            <h2>隐私设置</h2>
-            <p>在这里管理您的隐私设置。</p>
+        <div id="privacy" class="section hidden">
+            <h2 class="text-2xl font-bold mb-6">隐私设置</h2>
+            <p class="text-gray-700">在这里管理您的隐私设置。</p>
             <!-- 隐私设置内容 -->
         </div>
-        <div id="change-pass" class="section" style="display: none;">
-            <h2>密码设置</h2>
-            <p>在这里修改您的密码设置。(新密码长度不小于6位)</p>
-            <div class="iframe-container">
-                <iframe src="/change-password" frameborder="0" allowfullscreen></iframe>
+        <div id="change-pass" class="section hidden">
+            <h2 class="text-2xl font-bold mb-6">密码设置</h2>
+            <p class="text-gray-700">在这里修改您的密码设置。(新密码长度不小于6位)</p>
+            <div class="w-full h-0 relative pb-56 overflow-hidden rounded-lg shadow-lg">
+                <iframe src="/change-password" class="absolute inset-0 w-full h-full border-0 rounded-lg" frameborder="0" allowfullscreen></iframe>
             </div>
         </div>
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.min.js"></script>
 <script>
     function avatarInfo() {
         alert('如何修改我的头像？ \n此功能暂未实现')
@@ -138,20 +72,16 @@
 
     function fun_logout() {
         const confirmed = confirm("确定要注销吗？");
-        // 如果确认，则跳转到指定的 URL
         if (confirmed) {
             window.location.href = "/logout";
         }
     }
 
-
     function showSection(section) {
-        // 隐藏所有部分
         document.querySelectorAll('.section').forEach(function (el) {
-            el.style.display = 'none';
+            el.classList.add('hidden');
         });
-        // 显示选定部分
-        document.getElementById(section).style.display = 'block';
+        document.getElementById(section).classList.remove('hidden');
     }
 </script>
 </body>
