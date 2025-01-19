@@ -10,6 +10,7 @@ import random
 import re
 import time
 import urllib.parse
+import uuid
 import xml.etree.ElementTree as ElementTree
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -54,6 +55,7 @@ app.config['SESSION_COOKIE_NAME'] = 'zb_session'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=4)
 app.config['USER_BASE_PATH'] = 'media'
 app.config['TEMP_FOLDER'] = 'temp/upload'
+app.config['AVATAR_PATH'] = 'avatar'
 # 定义随机头像服务器
 app.config['AVATAR_SERVER'] = "https://api.7trees.cn/avatar"
 # 定义允许上传的文件类型/文件大小
@@ -240,17 +242,11 @@ def sys_out_file(article_name):
     return send_from_directory(articles_dir, article_name)
 
 
-@cache.memoize(600)
-def get_avatar():
-    avatar = app.config['AVATAR_SERVER']
-    return avatar
-
-
 @app.route('/profile', methods=['GET', 'POST'])
 @jwt_required
 def profile(user_id):
     user_name = get_username()
-    avatar_url = get_avatar()
+    avatar_url = get_avatar(user_id)
     user_bio = get_user_bio(user_id) or "这人很懒，什么也没留下"
     owner_articles = get_owner_articles(owner_id=None, user_name=user_name) or []
     user_follow = get_following_count(user_id=user_id) or 0
@@ -269,8 +265,7 @@ def get_user_bio(user_id):
         # 处理未找到用户信息的情况
         return "用户信息未找到", 404
     cache.set(f'{user_id}_userInfo', UserInfo)
-    Bio = UserInfo[5] if len(UserInfo) > 5 and UserInfo[5] else "这人很懒，什么也没留下"
-
+    Bio = UserInfo[6] if len(UserInfo) > 6 and UserInfo[6] else "这人很懒，什么也没留下"
     return Bio
 
 
@@ -1556,7 +1551,7 @@ def user_center(user_id, user_name):
         canFollowed = get_can_followed(user_id, target_id)
     owner_articles = get_owner_articles(owner_id=None, user_name=user_name) or []
     noti_host, noti_port = zy_noti_conf()
-    return render_template('Profile.html', url_for=url_for, avatar_url=get_avatar(),
+    return render_template('Profile.html', url_for=url_for, avatar_url=get_avatar(user_id),
                            userStatus=bool(user_name), username=user_name, userBio=userBio,
                            target_id=target_id, user_id=user_id,
                            Articles=owner_articles, canFollowed=canFollowed, notiHost=noti_host, notiPort=noti_port)
@@ -1579,7 +1574,7 @@ def diy_space(page):
 @finger_required
 def guestbook(user_id):
     username = get_username()
-    avatar_url = get_avatar()
+    avatar_url = get_avatar(user_id)
     message_list = get_guestbook() or []
     user_finger = request.cookies.get('finger')
     if request.method == 'POST':
@@ -1811,7 +1806,7 @@ def api_wx_content(article):
 
 @app.route('/api/wx/guestbook', methods=['GET', 'POST'])
 def api_wx_guestbook():
-    avatar_url = get_avatar()
+    avatar_url = get_avatar(user_id=random.randint(10, 50))
     message_list = get_guestbook() or []
     response_data = {
         'avatar_url': avatar_url,
@@ -2036,7 +2031,7 @@ def api_delete(user_id, filename):
 
 @app.route('/links')
 def get_friends_link(type=0):
-    avatar_url = get_avatar()
+    avatar_url = get_avatar(random.randint(10, 50))
     friends_links = {
         '本站地址': domain,
         'GitHub': "https://github.com/Athenavi",
@@ -2455,6 +2450,13 @@ def m_urls_delete(user_id):
 @app.route('/static/music/music.json', methods=['GET'])
 @user_id_required
 def music_json(user_id):
+    referrer = request.referrer
+    if referrer and "@" in referrer:
+        username_from_referrer = referrer.split('@')[-1]
+        user_dir = os.path.join(app.config['USER_BASE_PATH'], username_from_referrer)
+        # 确保 user_dir 是字符串类型
+        user_dir = base_dir + '\\' + str(user_dir)
+        return send_from_directory(user_dir, 'music.json')
     if not user_id:
         return send_from_directory(app.static_folder, 'music/music.json')
     else:
@@ -2501,6 +2503,79 @@ def music_json_change(user_id):
         json.dump(json_data, file, ensure_ascii=False, indent=4)
 
     return jsonify({'message': 'success'}), 200
+
+
+@app.route('/setting/profiles', methods=['PUT'])
+@user_id_required
+def change_profiles(user_id):
+    change_type = request.args.get('change_type')
+    if not change_type:
+        return jsonify({'error': 'Change type is required'}), 400
+    if change_type not in ['avatar', 'username', 'email', 'password']:
+        return jsonify({'error': 'Invalid change type'}), 400
+
+    if change_type == 'avatar':
+        if 'avatar' not in request.files:
+            return jsonify({'error': 'Avatar is required'}), 400
+        avatar_file = request.files['avatar']
+        if avatar_file.filename == '':
+            return jsonify({'error': 'No selected file'}), 400
+
+        # 生成UUID
+        avatar_uuid = uuid.uuid4()
+        save_path = Path(app.config['AVATAR_PATH']) / f'{avatar_uuid}.webp'
+
+        # 确保目录存在
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # 使用with语句保存文件
+        with save_path.open('wb') as avatar_path:
+            avatar_file.save(avatar_path)
+            db_save_avatar(user_id, str(avatar_uuid))
+
+        return jsonify({'message': 'Avatar updated successfully', 'avatar_id': str(avatar_uuid)}), 200
+
+
+def db_save_avatar(user_id, avatar_uuid):
+    db = None
+    try:
+        db = get_database_connection()
+        with db.cursor() as cursor:
+            query = "UPDATE users SET profile_picture = %s WHERE id = %s"
+            cursor.execute(query, (avatar_uuid, user_id))
+            db.commit()
+    except Exception as e:
+        app.logger.error(f"Error saving avatar: {e}")
+    finally:
+        if db is not None:
+            db.close()
+
+
+@cache.memoize(30)
+def get_avatar(user_id):
+    avatar = app.config['AVATAR_SERVER']  # 默认头像服务器地址
+    if user_id:
+        db = None
+        try:
+            db = get_database_connection()
+            with db.cursor() as cursor:
+                query = "select profile_picture from users where id = %s"
+                cursor.execute(query, (int(user_id),))
+                result = cursor.fetchone()
+                if result:
+                    avatar = f"{domain}api/avatar/{result[0]}.webp"
+                    return avatar
+        except Exception as e:
+            app.logger.error(f"Error getting avatar: {e}")
+        finally:
+            if db is not None:
+                db.close()  # 确保数据库连接在最后被关闭
+    return avatar
+
+
+@app.route('/api/avatar/<avatar_uuid>.webp', methods=['GET'])
+def get_avatar_image(avatar_uuid):
+    return send_file(f'{base_dir}/{app.config['AVATAR_PATH']}/{avatar_uuid}.webp', mimetype='image/webp')
 
 
 @app.errorhandler(404)
