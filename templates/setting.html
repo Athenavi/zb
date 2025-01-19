@@ -11,45 +11,77 @@
     <div class="w-full md:w-1/4 bg-white rounded-lg shadow-lg p-6 mb-4 md:mb-0">
         <h5><a href="/profile" class="text-blue-500 hover:underline">↩️</a></h5>
         <h4 class="text-xl font-semibold mt-4">设置</h4>
-        <a href="#" onclick="showSection('profile')" class="block py-2 px-4 mt-4 text-gray-700 hover:bg-gray-100 rounded">个人资料</a>
+        <a href="#" onclick="showSection('profile')"
+           class="block py-2 px-4 mt-4 text-gray-700 hover:bg-gray-100 rounded">个人资料</a>
         <a href="#" onclick="showSection('newArticle')" class="block py-2 px-4 text-gray-700 hover:bg-gray-100 rounded">上传文章</a>
-        <a href="#" onclick="showSection('personalization')" class="block py-2 px-4 text-gray-700 hover:bg-gray-100 rounded">个性化</a>
-        <a href="#" onclick="showSection('privacy')" class="block py-2 px-4 text-gray-700 hover:bg-gray-100 rounded">隐私</a>
-        <a href="#" onclick="showSection('change-pass')" class="block py-2 px-4 text-gray-700 hover:bg-gray-100 rounded">修改密码</a>
+        <a href="#" onclick="showSection('personalization')"
+           class="block py-2 px-4 text-gray-700 hover:bg-gray-100 rounded">个性化</a>
+        <a href="#" onclick="showSection('privacy')"
+           class="block py-2 px-4 text-gray-700 hover:bg-gray-100 rounded">隐私</a>
+        <a href="#" onclick="showSection('change-pass')"
+           class="block py-2 px-4 text-gray-700 hover:bg-gray-100 rounded">修改密码</a>
         <a onclick="fun_logout()" class="block py-2 px-4 text-red-500 hover:bg-gray-100 rounded">注销</a>
     </div>
 
     <div class="w-full md:w-3/4 md:ml-4 bg-white rounded-lg shadow-lg p-6">
         <div id="profile" class="section">
             <h2 class="text-2xl font-bold mb-6">个人资料</h2>
-            <img src="{{ avatar_url }}" alt="" class="h-28 w-28 rounded-full mx-auto cursor-pointer" ondblclick="avatarInfo()"/>
+            <img src="{{ avatar_url }}" alt="" class="h-28 w-28 rounded-full mx-auto cursor-pointer"
+                 ondblclick="avatarInfo()"/>
             <form class="mt-6 space-y-4">
                 <div>
                     <label for="username" class="block text-gray-700"></label>
-                    <input type="text" class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" id="username" placeholder="{{ username }}" required>
+                    <input type="text"
+                           class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           id="username" placeholder="{{ username }}" required>
                 </div>
                 <div>
                     <label for="email" class="block text-gray-700"></label>
-                    <input type="email" class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" id="email" placeholder="电子邮件" required>
+                    <input type="email"
+                           class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           id="email" placeholder="电子邮件" required>
                 </div>
                 <div>
                     <label for="bio" class="block text-gray-700"></label>
-                    <textarea class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" id="bio" rows="3" placeholder="{{ Bio }}"></textarea>
+                    <textarea
+                            class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            id="bio" rows="3" placeholder="{{ Bio }}"></textarea>
                 </div>
-                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">保存更改</button>
+                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">保存更改
+                </button>
             </form>
         </div>
         <div id="newArticle" class="section hidden">
             <h2 class="text-2xl font-bold mb-6">上传文章</h2>
             <div class="w-full h-0 relative pb-56 overflow-hidden rounded-lg shadow-lg">
-                <iframe src="/newArticle" class="absolute inset-0 w-full h-full border-0 rounded-lg" frameborder="0" allowfullscreen></iframe>
+                <iframe src="/newArticle" class="absolute inset-0 w-full h-full border-0 rounded-lg" frameborder="0"
+                        allowfullscreen></iframe>
             </div>
         </div>
         <div id="personalization" class="section hidden">
             <h2 class="text-2xl font-bold mb-6">个性化设置</h2>
             <p class="text-gray-700">在这里进行您的个性化偏好设置。</p>
-            <!-- 个性化设置内容 -->
+            <form id="uploadForm" class="mt-6 space-y-4" onsubmit="return uploadMusicJson()">
+                <div>
+                    <label for="musicJson" class="block text-gray-700">上传音乐JSON文件</label>
+                    <input type="file"
+                           class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           id="musicJson" name="musicJson" accept=".json" onchange="loadMusicJson(this.files)">
+                </div>
+                <div>
+                    <label for="editor" class="block text-gray-700">编辑音乐JSON数据</label>
+                    <textarea id="editor"
+                              class="w-full h-64 px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="在此编辑音乐JSON数据" required></textarea>
+                </div>
+                <button type="button" onclick="loadMusicJson(document.getElementById('musicJson').files)"
+                        class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">解析文件
+                </button>
+                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">上传文件
+                </button>
+            </form>
         </div>
+
         <div id="privacy" class="section hidden">
             <h2 class="text-2xl font-bold mb-6">隐私设置</h2>
             <p class="text-gray-700">在这里管理您的隐私设置。</p>
@@ -59,7 +91,8 @@
             <h2 class="text-2xl font-bold mb-6">密码设置</h2>
             <p class="text-gray-700">在这里修改您的密码设置。(新密码长度不小于6位)</p>
             <div class="w-full h-0 relative pb-56 overflow-hidden rounded-lg shadow-lg">
-                <iframe src="/change-password" class="absolute inset-0 w-full h-full border-0 rounded-lg" frameborder="0" allowfullscreen></iframe>
+                <iframe src="/change-password" class="absolute inset-0 w-full h-full border-0 rounded-lg"
+                        frameborder="0" allowfullscreen></iframe>
             </div>
         </div>
     </div>
@@ -82,6 +115,61 @@
             el.classList.add('hidden');
         });
         document.getElementById(section).classList.remove('hidden');
+    }
+</script>
+<script>
+    async function loadMusicJson(files) {
+        if (files.length === 0) {
+            alert('请选择一个文件。');
+            return;
+        }
+
+        const file = files[0];
+        const reader = new FileReader();
+
+        reader.onload = function (e) {
+            const content = e.target.result;
+            try {
+                const json_data = JSON.parse(content);
+                document.getElementById('editor').value = JSON.stringify(json_data, null, 4);
+            } catch (error) {
+                alert('无法解析JSON文件，请确保文件格式正确。');
+            }
+        };
+
+        reader.readAsText(file);
+    }
+
+    async function uploadMusicJson() {
+        const editorContent = document.getElementById('editor').value;
+        try {
+            const json_data = JSON.parse(editorContent);
+            // 检查JSON数据格式是否正确
+            if (!Array.isArray(json_data)) {
+                alert('JSON数据应为音乐轨道列表。');
+                return false;
+            }
+
+            const response = await fetch('/static/music/music.json', {
+                method: 'PUT',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(json_data)
+            });
+
+            const result = await response.json();
+            if (response.ok) {
+                alert(result.message);
+            } else {
+                alert(result.error);
+            }
+        } catch (error) {
+            alert('无法解析JSON数据，请确保数据格式正确。');
+        }
+
+        return false;
     }
 </script>
 </body>

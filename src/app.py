@@ -2458,7 +2458,49 @@ def music_json(user_id):
     if not user_id:
         return send_from_directory(app.static_folder, 'music/music.json')
     else:
-        return send_from_directory(app.static_folder, 'music/music1.json')
+        user_name = get_username()
+        user_dir = os.path.join(app.config['USER_BASE_PATH'], user_name)
+        # 确保 user_dir 是字符串类型
+        user_dir = base_dir + '\\' + str(user_dir)
+        return send_from_directory(user_dir, 'music.json')
+
+
+@app.route('/static/music/music.json', methods=['PUT'])
+@user_id_required
+def music_json_change(user_id):
+    if not user_id:
+        return jsonify({'error': 'User ID is required'}), 503
+
+    json_data = request.get_json()
+    if json_data is None:
+        return jsonify({'error': 'Invalid JSON data'}), 400
+
+    # 检查JSON数据格式是否正确
+    if not isinstance(json_data, list):
+        return jsonify({'error': 'JSON data should be a list of music tracks'}), 400
+
+    for track in json_data:
+        # 检查每个track是否包含必要的键
+        required_keys = {'name', 'audio_url', 'singer', 'album', 'cover', 'time'}
+        if not required_keys.issubset(track.keys()):
+            return jsonify({
+                'error': 'Each track should have "name", "audio_url", "singer", "album", "cover", and "time" keys'}), 400
+
+    user_name = get_username()
+    user_dir = os.path.join(app.config['USER_BASE_PATH'], user_name)
+
+    # 确保 user_dir 存在
+    if not os.path.exists(user_dir):
+        os.makedirs(user_dir)
+
+    # 构建保存路径
+    save_path = os.path.join(str(user_dir), 'music.json')
+
+    # 保存JSON数据
+    with open(save_path, 'w', encoding='utf-8') as file:
+        json.dump(json_data, file, ensure_ascii=False, indent=4)
+
+    return jsonify({'message': 'success'}), 200
 
 
 @app.errorhandler(404)
