@@ -75,7 +75,7 @@ $ sudo chmod 777 ./temp/access.log && sudo chmod 777 ./temp/error.log
 $ gunicorn --workers 4 --threads 2 --bind 0.0.0.0:9421 --timeout 60 --access-logfile ./temp/access.log --error-logfile ./temp/error.log --daemon src.app:app
 ```
 1. 在浏览器中访问 `http://localhost:9421`，即可进入 zyBLOG。
-2. 默认管理员账号 'test' 默认密码 '123456'
+2. 管理后台 (/dashboard) 默认账号 'test' 默认密码 '123456'
 
 ## 无法运行？
 

@@ -39,7 +39,7 @@ from src.notification import get_sys_notice, read_notification, send_change_mail
 from src.user import error, get_owner_articles, zy_general_conf, get_profiles, get_following_count, \
     get_follower_count, get_can_followed, get_user_id, get_all_themes
 from src.utils import admin_upload_file, get_client_ip, \
-    zy_noti_conf, generate_jwt, secret_key, authenticate_jwt, \
+    generate_jwt, secret_key, authenticate_jwt, \
     authenticate_refresh_token, handle_file_upload, is_allowed_file, is_valid_domain_with_slash, \
     get_all_img, get_all_video, get_all_xmind, get_list_intersection, generate_thumbs, generate_video_thumb, \
     get_username, admin_required, jwt_required, finger_required, theme_safe_check, mask_ip, user_id_required, \
@@ -295,6 +295,47 @@ def setting_profiles(user_id):
 
 
 # 主页
+def get_home_data(page, tag):
+    if page <= 0:
+        page = 1
+
+    articles, has_next_page, has_previous_page = get_a_list(chanel=2, page=page)
+
+    if not articles:
+        app.logger.warning('没有找到任何文章！')
+        return None, None, None, None, None, None  # 添加 None 用于 tags
+
+    notice = ''
+    try:
+        notice = get_sys_notice(0)
+    except Exception as e:
+        app.logger.error(f'读取通知文件出错: {e}')
+
+    tags = []
+    try:
+        tags = get_unique_tags()
+    except Exception as e:
+        app.logger.error(f'获取标签出错: {e}')
+
+    if tag != 'None':
+        tag_articles = get_articles_by_tag(tag)
+        if tag_articles:
+            articles = get_list_intersection(articles, tag_articles)
+        else:
+            app.logger.warning(f'没有找到标签: {tag} 下的文章！')
+
+    info_list = get_article_info(articles)
+    summary_list = get_summary(articles)
+    compressed_list = list(zip(articles, summary_list, info_list))
+
+    if not info_list:
+        app.logger.warning('获取文章信息失败，返回错误提示')
+        return None, None, None, None, None, None  # 添加 None 用于 tags
+
+    friends_links = get_friends_link(type=1)
+    return compressed_list, notice, has_next_page, has_previous_page, friends_links, tags
+
+
 @app.route('/', methods=['GET', 'POST'])
 def home():
     if not is_valid_domain_with_slash(domain):
@@ -303,31 +344,26 @@ def home():
     if request.method == 'GET':
         page = request.args.get('page', default=1, type=int)
         tag = request.args.get('tag', default='None')
-        display = get_current_theme()
+        wx_api = request.args.get('wxAPI', default=False, type=bool)
 
-        if page <= 0:
-            page = 1
+        (compressed_list, notice, has_next_page, has_previous_page, friends_links, tags) = get_home_data(page, tag)
 
-        home_cache = f'page_content:{display}:{page}:{tag}'
+        if wx_api:
+            response_data = {
+                'articles': compressed_list,
+                'notice': notice,
+                'has_next_page': has_next_page,
+                'has_previous_page': has_previous_page,
+                'current_page': page,
+                'tags': tags,  # 使用正确的 tags
+                'tag': tag,
+                'friends_links': friends_links
+            }
 
-        # 尝试从缓存中获取页面内容
-        content = cache.get(home_cache)
-        if content:
-            resp = make_response(content)
-            resp.headers['Cache-Control'] = 'public, max-age=600'
-            app.logger.info(f'缓存命中，页面: {page}, 标签: {tag}')
-            return resp
-        else:
-            app.logger.info(f'缓存未命中，准备生成新内容，页面: {page}, 标签: {tag}')
+            return jsonify(response_data)
 
-        # 获取文章内容
-        articles, has_next_page, has_previous_page = get_a_list(chanel=2, page=page)
-
-        if not articles:
-            app.logger.warning('没有找到任何文章！')
+        if compressed_list is None:
             return error(message="没有找到任何文章", status_code=404)
-
-        # 模版配置
         template_display = get_current_theme()
         template_path = f'templates/theme/{template_display}/index.html'
         if os.path.exists(template_path):
@@ -335,56 +371,36 @@ def home():
         else:
             template = app.jinja_env.get_template('zyIndex.html')
 
-        notice = ''
-        try:
-            notice = get_sys_notice(0)
-        except Exception as e:
-            app.logger.error(f'读取通知文件出错: {e}')
-
-        tags = []
-        try:
-            tags = get_unique_tags()
-        except Exception as e:
-            app.logger.error(f'获取标签出错: {e}')
-
-        if tag != 'None':
-            tag_articles = get_articles_by_tag(tag)
-            if tag_articles:
-                articles = get_list_intersection(articles, tag_articles)
-            else:
-                app.logger.warning(f'没有找到标签: {tag} 下的文章！')
-
-        # 检查获取的文章是否为空
-        info_list = get_article_info(articles)
-        summary_list = get_summary(articles)
-        compressed_list = list(zip(articles, summary_list, info_list))
-
-        if not info_list:
-            app.logger.warning('获取文章信息失败，返回错误提示')
-            return error(message="没有找到任何文章", status_code=404)
-
-        friends_links = get_friends_link(type=1)
-
         # 渲染模板并存储渲染后的页面内容到缓存中
-        rendered_content = template.render(
-            articles_time_list=compressed_list,
-            url_for=url_for,
-            notice=notice,
-            has_next_page=has_next_page,
-            has_previous_page=has_previous_page,
-            current_page=page,
-            tags=tags,
-            tag=tag,
-            friends_links=friends_links
-        )
+        home_cache = f'page_content:{template_display}:{page}:{tag}'
+        content = cache.get(home_cache)
 
-        # 确保渲染的内容是字符串
-        if isinstance(rendered_content, str):
-            cache.set(home_cache, rendered_content, timeout=360)  # 设置为360秒
+        if content:
+            app.logger.info(f'缓存命中，页面: {page}, 标签: {tag}')
         else:
-            app.logger.error('渲染内容不是字符串，无法缓存。')
+            app.logger.info(f'缓存未命中，准备生成新内容，页面: {page}, 标签: {tag}')
+            rendered_content = template.render(
+                articles_time_list=compressed_list,
+                url_for=url_for,
+                notice=notice,
+                has_next_page=has_next_page,
+                has_previous_page=has_previous_page,
+                current_page=page,
+                tags=tags,
+                tag=tag,
+                friends_links=friends_links
+            )
 
-        resp = make_response(rendered_content)
+            # 确保渲染的内容是字符串
+            if isinstance(rendered_content, str):
+                cache.set(home_cache, rendered_content, timeout=360)  # 设置为360秒
+            else:
+                app.logger.error('渲染内容不是字符串，无法缓存。')
+
+            content = rendered_content
+
+        resp = make_response(content)
+        resp.headers['Cache-Control'] = 'public, max-age=600'
 
         if 'key' in request.cookies:
             visitor = request.cookies.get('key')
@@ -397,7 +413,7 @@ def home():
         return resp
 
     else:
-        return error("此方法无效", 500)
+        return error(message="此方法无效", status_code=500)
 
 
 @cache.cached(timeout=1800, key_prefix='article_info')
@@ -1313,7 +1329,8 @@ def follow_user(user_id):
     try:
         with db.cursor() as cursor:
             # 进行关注操作
-            insert_query = "INSERT INTO `subscriptions` (`subscriber_id`, `subscribe_to_id`, `subscribe_type`) VALUES (%s, %s, 'User')"
+            insert_query = ("INSERT INTO `subscriptions` (`subscriber_id`, `subscribe_to_id`, `subscribe_type`) VALUES "
+                            "(%s, %s, 'User')")
             cursor.execute(insert_query, (int(user_id), int(follow_id)))
             db.commit()
 
@@ -1340,7 +1357,8 @@ def unfollow_user(user_id):
     try:
         with db.cursor() as cursor:
             # 进行取关操作
-            delete_query = "DELETE FROM `subscriptions` WHERE `subscriber_id` = %s AND `subscribe_to_id` = %s AND `subscribe_type` = 'User';"
+            delete_query = ("DELETE FROM `subscriptions` WHERE `subscriber_id` = %s AND `subscribe_to_id` = %s AND "
+                            "`subscribe_type` = 'User';")
             cursor.execute(delete_query, (user_id, unfollow_id))
             db.commit()
             cache.set(f'{user_id}_followed', None)
@@ -1550,11 +1568,10 @@ def user_center(user_id, user_name):
     if user_id != 0 and target_id != 0:
         canFollowed = get_can_followed(user_id, target_id)
     owner_articles = get_owner_articles(owner_id=None, user_name=user_name) or []
-    noti_host, noti_port = zy_noti_conf()
-    return render_template('Profile.html', url_for=url_for, avatar_url=get_avatar(user_id),
+    return render_template('Profile.html', url_for=url_for, avatar_url=get_avatar(user_name, 'username'),
                            userStatus=bool(user_name), username=user_name, userBio=userBio,
                            target_id=target_id, user_id=user_id,
-                           Articles=owner_articles, canFollowed=canFollowed, notiHost=noti_host, notiPort=noti_port)
+                           Articles=owner_articles, canFollowed=canFollowed)
 
 
 def diy_space(page):
@@ -1625,7 +1642,8 @@ def upload_guestbook(content):
         db = get_database_connection()
         try:
             with db.cursor() as cursor:
-                query = "INSERT INTO `events` (`title`, `description`, `event_date`,`created_at`) VALUES ('guestbook',%s,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);"
+                query = ("INSERT INTO `events` (`title`, `description`, `event_date`,`created_at`) VALUES ("
+                         "'guestbook',%s,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);")
                 cursor.execute(query, (content,))
                 db.commit()
         except Exception as e:
@@ -1696,55 +1714,6 @@ def api_xmind(username, xmind):
         video_dir = Path(base_dir) / 'media' / username / xmind
         if os.path.isfile(video_dir):
             return send_file('../static/image/xmind.png', mimetype='image/jpeg')
-
-
-@app.route('/api/wx/home', methods=['GET'])
-def api_wx_home():
-    page = request.args.get('page', default=1, type=int)
-    tag = request.args.get('tag', default='None')
-
-    if page <= 0:
-        page = 1
-
-    articles, has_next_page, has_previous_page = get_a_list(chanel=2, page=page)
-    notice = ''
-    try:
-        notice = get_sys_notice(0)
-    except Exception as e:
-        app.logger.error(f'读取通知文件出错: {e}')
-
-    tags = []
-    try:
-        tags = get_unique_tags()
-    except Exception as e:
-        app.logger.error(f'获取标签出错: {e}')
-
-    if tag != 'None':
-        tag_articles = get_articles_by_tag(tag)
-        if tag_articles:
-            articles = get_list_intersection(articles, tag_articles)
-        else:
-            app.logger.warning(f'没有找到标签: {tag} 下的文章！')
-
-    # 获取文章信息和摘要
-    info_list = get_article_info(articles)
-    summary_list = get_summary(articles)
-    compressed_list = list(zip(articles, summary_list, info_list))
-
-    friends_links = get_friends_link(type=1)
-
-    response_data = {
-        'articles': compressed_list,
-        'notice': notice,
-        'has_next_page': has_next_page,
-        'has_previous_page': has_previous_page,
-        'current_page': page,
-        'tags': tags,
-        'tag': tag,
-        'friends_links': friends_links
-    }
-
-    return jsonify(response_data)
 
 
 @app.route('/api/wx/blog_detail/<article>', methods=['GET'])
@@ -2069,7 +2038,8 @@ def report_add(user_id, reported_type, reported_id, reason):
     db = get_database_connection()
     try:
         with db.cursor() as cursor:
-            query = "INSERT INTO `reports` (`reported_by`, `content_type`, `content_id`,`reason`) VALUES (%s, %s, %s,%s);"
+            query = ("INSERT INTO `reports` (`reported_by`, `content_type`, `content_id`,`reason`) VALUES (%s, %s, %s,"
+                     "%s);")
             cursor.execute(query, (int(user_id), reported_type, reported_id, reason))
             db.commit()
             return True
@@ -2208,7 +2178,7 @@ def m_notifications(user_id):
     notifications = cursor.fetchall()
     cursor.close()
     connection.close()
-    return render_template('M-notifcations.html', notifications=notifications)
+    return render_template('M-notifications.html', notifications=notifications)
 
 
 @app.route('/dashboard/reports', methods=['GET'])
@@ -2486,7 +2456,7 @@ def music_json_change(user_id):
         required_keys = {'name', 'audio_url', 'singer', 'album', 'cover', 'time'}
         if not required_keys.issubset(track.keys()):
             return jsonify({
-                'error': 'Each track should have "name", "audio_url", "singer", "album", "cover", and "time" keys'}), 400
+                'error': '需要包含的属性name, audio_url, singer, album, cover, time'}), 400
 
     user_name = get_username()
     user_dir = os.path.join(app.config['USER_BASE_PATH'], user_name)
@@ -2552,19 +2522,24 @@ def db_save_avatar(user_id, avatar_uuid):
 
 
 @cache.memoize(30)
-def get_avatar(user_id):
+def get_avatar(user_identifier, identifier_type='id'):
     avatar = app.config['AVATAR_SERVER']  # 默认头像服务器地址
-    if user_id:
+    if user_identifier:
         db = None
         try:
             db = get_database_connection()
             with db.cursor() as cursor:
-                query = "select profile_picture from users where id = %s"
-                cursor.execute(query, (int(user_id),))
+                if identifier_type == 'id':
+                    query = "select profile_picture from users where id = %s"
+                elif identifier_type == 'username':
+                    query = "select profile_picture from users where username = %s"
+                else:
+                    raise ValueError("identifier_type must be 'id' or 'username'")
+
+                cursor.execute(query, (user_identifier,))
                 result = cursor.fetchone()
                 if result:
                     avatar = f"{domain}api/avatar/{result[0]}.webp"
-                    return avatar
         except Exception as e:
             app.logger.error(f"Error getting avatar: {e}")
         finally:
