@@ -10,6 +10,7 @@ import random
 import re
 import time
 import urllib.parse
+import uuid
 import xml.etree.ElementTree as ElementTree
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -38,11 +39,11 @@ from src.notification import get_sys_notice, read_notification, send_change_mail
 from src.user import error, get_owner_articles, zy_general_conf, get_profiles, get_following_count, \
     get_follower_count, get_can_followed, get_user_id, get_all_themes
 from src.utils import admin_upload_file, get_client_ip, \
-    zy_noti_conf, generate_jwt, secret_key, authenticate_jwt, \
+    generate_jwt, secret_key, authenticate_jwt, \
     authenticate_refresh_token, handle_file_upload, is_allowed_file, is_valid_domain_with_slash, \
     get_all_img, get_all_video, get_all_xmind, get_list_intersection, generate_thumbs, generate_video_thumb, \
-    get_username, admin_required, jwt_required, finger_required, theme_safe_check, mask_ip, parse_update_file, \
-    user_id_required, user_agent_info
+    get_username, admin_required, jwt_required, finger_required, theme_safe_check, mask_ip, user_id_required, \
+    user_agent_info
 
 global_encoding = 'utf-8'
 
@@ -54,6 +55,7 @@ app.config['SESSION_COOKIE_NAME'] = 'zb_session'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=4)
 app.config['USER_BASE_PATH'] = 'media'
 app.config['TEMP_FOLDER'] = 'temp/upload'
+app.config['AVATAR_PATH'] = 'avatar'
 # 定义随机头像服务器
 app.config['AVATAR_SERVER'] = "https://api.7trees.cn/avatar"
 # 定义允许上传的文件类型/文件大小
@@ -240,17 +242,11 @@ def sys_out_file(article_name):
     return send_from_directory(articles_dir, article_name)
 
 
-@cache.memoize(600)
-def get_avatar():
-    avatar = app.config['AVATAR_SERVER']
-    return avatar
-
-
 @app.route('/profile', methods=['GET', 'POST'])
 @jwt_required
 def profile(user_id):
     user_name = get_username()
-    avatar_url = get_avatar()
+    avatar_url = get_avatar(user_id)
     user_bio = get_user_bio(user_id) or "这人很懒，什么也没留下"
     owner_articles = get_owner_articles(owner_id=None, user_name=user_name) or []
     user_follow = get_following_count(user_id=user_id) or 0
@@ -269,8 +265,7 @@ def get_user_bio(user_id):
         # 处理未找到用户信息的情况
         return "用户信息未找到", 404
     cache.set(f'{user_id}_userInfo', UserInfo)
-    Bio = UserInfo[5] if len(UserInfo) > 5 and UserInfo[5] else "这人很懒，什么也没留下"
-
+    Bio = UserInfo[6] if len(UserInfo) > 6 and UserInfo[6] else "这人很懒，什么也没留下"
     return Bio
 
 
@@ -300,6 +295,47 @@ def setting_profiles(user_id):
 
 
 # 主页
+def get_home_data(page, tag):
+    if page <= 0:
+        page = 1
+
+    articles, has_next_page, has_previous_page = get_a_list(chanel=2, page=page)
+
+    if not articles:
+        app.logger.warning('没有找到任何文章！')
+        return None, None, None, None, None, None  # 添加 None 用于 tags
+
+    notice = ''
+    try:
+        notice = get_sys_notice(0)
+    except Exception as e:
+        app.logger.error(f'读取通知文件出错: {e}')
+
+    tags = []
+    try:
+        tags = get_unique_tags()
+    except Exception as e:
+        app.logger.error(f'获取标签出错: {e}')
+
+    if tag != 'None':
+        tag_articles = get_articles_by_tag(tag)
+        if tag_articles:
+            articles = get_list_intersection(articles, tag_articles)
+        else:
+            app.logger.warning(f'没有找到标签: {tag} 下的文章！')
+
+    info_list = get_article_info(articles)
+    summary_list = get_summary(articles)
+    compressed_list = list(zip(articles, summary_list, info_list))
+
+    if not info_list:
+        app.logger.warning('获取文章信息失败，返回错误提示')
+        return None, None, None, None, None, None  # 添加 None 用于 tags
+
+    friends_links = get_friends_link()
+    return compressed_list, notice, has_next_page, has_previous_page, friends_links, tags
+
+
 @app.route('/', methods=['GET', 'POST'])
 def home():
     if not is_valid_domain_with_slash(domain):
@@ -308,31 +344,26 @@ def home():
     if request.method == 'GET':
         page = request.args.get('page', default=1, type=int)
         tag = request.args.get('tag', default='None')
-        display = get_current_theme()
+        wx_api = request.args.get('wxAPI', default=False, type=bool)
 
-        if page <= 0:
-            page = 1
+        (compressed_list, notice, has_next_page, has_previous_page, friends_links, tags) = get_home_data(page, tag)
 
-        home_cache = f'page_content:{display}:{page}:{tag}'
+        if wx_api:
+            response_data = {
+                'articles': compressed_list,
+                'notice': notice,
+                'has_next_page': has_next_page,
+                'has_previous_page': has_previous_page,
+                'current_page': page,
+                'tags': tags,  # 使用正确的 tags
+                'tag': tag,
+                'friends_links': friends_links
+            }
 
-        # 尝试从缓存中获取页面内容
-        content = cache.get(home_cache)
-        if content:
-            resp = make_response(content)
-            resp.headers['Cache-Control'] = 'public, max-age=600'
-            app.logger.info(f'缓存命中，页面: {page}, 标签: {tag}')
-            return resp
-        else:
-            app.logger.info(f'缓存未命中，准备生成新内容，页面: {page}, 标签: {tag}')
+            return jsonify(response_data)
 
-        # 获取文章内容
-        articles, has_next_page, has_previous_page = get_a_list(chanel=2, page=page)
-
-        if not articles:
-            app.logger.warning('没有找到任何文章！')
+        if compressed_list is None:
             return error(message="没有找到任何文章", status_code=404)
-
-        # 模版配置
         template_display = get_current_theme()
         template_path = f'templates/theme/{template_display}/index.html'
         if os.path.exists(template_path):
@@ -340,56 +371,36 @@ def home():
         else:
             template = app.jinja_env.get_template('zyIndex.html')
 
-        notice = ''
-        try:
-            notice = get_sys_notice(0)
-        except Exception as e:
-            app.logger.error(f'读取通知文件出错: {e}')
-
-        tags = []
-        try:
-            tags = get_unique_tags()
-        except Exception as e:
-            app.logger.error(f'获取标签出错: {e}')
-
-        if tag != 'None':
-            tag_articles = get_articles_by_tag(tag)
-            if tag_articles:
-                articles = get_list_intersection(articles, tag_articles)
-            else:
-                app.logger.warning(f'没有找到标签: {tag} 下的文章！')
-
-        # 检查获取的文章是否为空
-        info_list = get_article_info(articles)
-        summary_list = get_summary(articles)
-        compressed_list = list(zip(articles, summary_list, info_list))
-
-        if not info_list:
-            app.logger.warning('获取文章信息失败，返回错误提示')
-            return error(message="没有找到任何文章", status_code=404)
-
-        friends_links = get_friends_link(type=1)
-
         # 渲染模板并存储渲染后的页面内容到缓存中
-        rendered_content = template.render(
-            articles_time_list=compressed_list,
-            url_for=url_for,
-            notice=notice,
-            has_next_page=has_next_page,
-            has_previous_page=has_previous_page,
-            current_page=page,
-            tags=tags,
-            tag=tag,
-            friends_links=friends_links
-        )
+        home_cache = f'page_content:{template_display}:{page}:{tag}'
+        content = cache.get(home_cache)
 
-        # 确保渲染的内容是字符串
-        if isinstance(rendered_content, str):
-            cache.set(home_cache, rendered_content, timeout=360)  # 设置为360秒
+        if content:
+            app.logger.info(f'缓存命中，页面: {page}, 标签: {tag}')
         else:
-            app.logger.error('渲染内容不是字符串，无法缓存。')
+            app.logger.info(f'缓存未命中，准备生成新内容，页面: {page}, 标签: {tag}')
+            rendered_content = template.render(
+                articles_time_list=compressed_list,
+                url_for=url_for,
+                notice=notice,
+                has_next_page=has_next_page,
+                has_previous_page=has_previous_page,
+                current_page=page,
+                tags=tags,
+                tag=tag,
+                friends_links=friends_links
+            )
 
-        resp = make_response(rendered_content)
+            # 确保渲染的内容是字符串
+            if isinstance(rendered_content, str):
+                cache.set(home_cache, rendered_content, timeout=360)  # 设置为360秒
+            else:
+                app.logger.error('渲染内容不是字符串，无法缓存。')
+
+            content = rendered_content
+
+        resp = make_response(content)
+        resp.headers['Cache-Control'] = 'public, max-age=600'
 
         if 'key' in request.cookies:
             visitor = request.cookies.get('key')
@@ -402,7 +413,7 @@ def home():
         return resp
 
     else:
-        return error("此方法无效", 500)
+        return error(message="此方法无效", status_code=500)
 
 
 @cache.cached(timeout=1800, key_prefix='article_info')
@@ -1243,10 +1254,10 @@ def following(user_id):
 
     if request.method == 'GET':
 
-        userFllowed_key = f'subscriber_ids_uid:{user_id}'
+        userFollowed_key = f'subscriber_ids_uid:{user_id}'
 
         # 尝试从缓存中获取页面内容
-        content = cache.get(userFllowed_key)
+        content = cache.get(userFollowed_key)
         if content:
             # 设置浏览器缓存
             resp = make_response(content)
@@ -1276,7 +1287,7 @@ def following(user_id):
         )
 
         # 缓存渲染后的页面内容，并设置服务端缓存过期时间
-        cache.set(userFllowed_key, rendered_content, timeout=600)  # 服务端缓存10分钟
+        cache.set(userFollowed_key, rendered_content, timeout=600)  # 服务端缓存10分钟
         resp = make_response(rendered_content)
         return resp
 
@@ -1318,7 +1329,8 @@ def follow_user(user_id):
     try:
         with db.cursor() as cursor:
             # 进行关注操作
-            insert_query = "INSERT INTO `subscriptions` (`subscriber_id`, `subscribe_to_id`, `subscribe_type`) VALUES (%s, %s, 'User')"
+            insert_query = ("INSERT INTO `subscriptions` (`subscriber_id`, `subscribe_to_id`, `subscribe_type`) VALUES "
+                            "(%s, %s, 'User')")
             cursor.execute(insert_query, (int(user_id), int(follow_id)))
             db.commit()
 
@@ -1345,7 +1357,8 @@ def unfollow_user(user_id):
     try:
         with db.cursor() as cursor:
             # 进行取关操作
-            delete_query = "DELETE FROM `subscriptions` WHERE `subscriber_id` = %s AND `subscribe_to_id` = %s AND `subscribe_type` = 'User';"
+            delete_query = ("DELETE FROM `subscriptions` WHERE `subscriber_id` = %s AND `subscribe_to_id` = %s AND "
+                            "`subscribe_type` = 'User';")
             cursor.execute(delete_query, (user_id, unfollow_id))
             db.commit()
             cache.set(f'{user_id}_followed', None)
@@ -1555,11 +1568,10 @@ def user_center(user_id, user_name):
     if user_id != 0 and target_id != 0:
         canFollowed = get_can_followed(user_id, target_id)
     owner_articles = get_owner_articles(owner_id=None, user_name=user_name) or []
-    noti_host, noti_port = zy_noti_conf()
-    return render_template('Profile.html', url_for=url_for, avatar_url=get_avatar(),
+    return render_template('Profile.html', url_for=url_for, avatar_url=get_avatar(user_name, 'username'),
                            userStatus=bool(user_name), username=user_name, userBio=userBio,
                            target_id=target_id, user_id=user_id,
-                           Articles=owner_articles, canFollowed=canFollowed, notiHost=noti_host, notiPort=noti_port)
+                           Articles=owner_articles, canFollowed=canFollowed)
 
 
 def diy_space(page):
@@ -1579,7 +1591,7 @@ def diy_space(page):
 @finger_required
 def guestbook(user_id):
     username = get_username()
-    avatar_url = get_avatar()
+    avatar_url = get_avatar(user_id)
     message_list = get_guestbook() or []
     user_finger = request.cookies.get('finger')
     if request.method == 'POST':
@@ -1630,7 +1642,8 @@ def upload_guestbook(content):
         db = get_database_connection()
         try:
             with db.cursor() as cursor:
-                query = "INSERT INTO `events` (`title`, `description`, `event_date`,`created_at`) VALUES ('guestbook',%s,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);"
+                query = ("INSERT INTO `events` (`title`, `description`, `event_date`,`created_at`) VALUES ("
+                         "'guestbook',%s,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);")
                 cursor.execute(query, (content,))
                 db.commit()
         except Exception as e:
@@ -1659,8 +1672,7 @@ def read_user_notification():
 
 @app.route('/changelog')
 def changelog():
-    updates = parse_update_file('update.txt')
-    return render_template('changelog.html', updates=updates)
+    return redirect('https://github.com/Athenavi/zb/blob/main/articles/changelog.md')
 
 
 @app.route('/img/<username>/thumbs/<img>', methods=['GET', 'POST'])
@@ -1702,55 +1714,6 @@ def api_xmind(username, xmind):
         video_dir = Path(base_dir) / 'media' / username / xmind
         if os.path.isfile(video_dir):
             return send_file('../static/image/xmind.png', mimetype='image/jpeg')
-
-
-@app.route('/api/wx/home', methods=['GET'])
-def api_wx_home():
-    page = request.args.get('page', default=1, type=int)
-    tag = request.args.get('tag', default='None')
-
-    if page <= 0:
-        page = 1
-
-    articles, has_next_page, has_previous_page = get_a_list(chanel=2, page=page)
-    notice = ''
-    try:
-        notice = get_sys_notice(0)
-    except Exception as e:
-        app.logger.error(f'读取通知文件出错: {e}')
-
-    tags = []
-    try:
-        tags = get_unique_tags()
-    except Exception as e:
-        app.logger.error(f'获取标签出错: {e}')
-
-    if tag != 'None':
-        tag_articles = get_articles_by_tag(tag)
-        if tag_articles:
-            articles = get_list_intersection(articles, tag_articles)
-        else:
-            app.logger.warning(f'没有找到标签: {tag} 下的文章！')
-
-    # 获取文章信息和摘要
-    info_list = get_article_info(articles)
-    summary_list = get_summary(articles)
-    compressed_list = list(zip(articles, summary_list, info_list))
-
-    friends_links = get_friends_link(type=1)
-
-    response_data = {
-        'articles': compressed_list,
-        'notice': notice,
-        'has_next_page': has_next_page,
-        'has_previous_page': has_previous_page,
-        'current_page': page,
-        'tags': tags,
-        'tag': tag,
-        'friends_links': friends_links
-    }
-
-    return jsonify(response_data)
 
 
 @app.route('/api/wx/blog_detail/<article>', methods=['GET'])
@@ -1812,7 +1775,7 @@ def api_wx_content(article):
 
 @app.route('/api/wx/guestbook', methods=['GET', 'POST'])
 def api_wx_guestbook():
-    avatar_url = get_avatar()
+    avatar_url = get_avatar(user_id=random.randint(10, 50))
     message_list = get_guestbook() or []
     response_data = {
         'avatar_url': avatar_url,
@@ -1856,6 +1819,8 @@ def api_article_unlock(user_id):
         response_data['temp_url'] = temp_url
         return jsonify(response_data), 200
     else:
+        referrer = request.referrer
+        app.logger.error(f"{referrer} Failed access attempt {user_finger} :  {user_id}")
         return jsonify({"message": "Authentication failed"}), 401
 
 
@@ -1881,13 +1846,19 @@ def temp_view():
                     a_title = result[0]
 
                     content = api_wx_content(a_title)
-
-        except Exception:
-            return jsonify({f"message": "Database error"}, 500)
+        except ValueError as e:
+            app.logger.error(f"Value error: {e}")
+            return jsonify({"message": "Invalid ArticleID"}), 400
+        except Exception as e:
+            app.logger.error(f"Unexpected error: {e}")
+            return jsonify({"message": "Internal server error"}), 500
 
         finally:
             cursor.close()
             db.close()
+
+        referrer = request.referrer
+        app.logger.info(f"Request from {referrer} with finger {user_finger}")  # 记录请求信息
 
         return content
     else:
@@ -1905,7 +1876,11 @@ def article_passwd(aid):
             if result:
                 a_pass = result[0]
                 return a_pass
-    except Exception:
+    except ValueError as e:  # 处理aid转换为整数时可能出现的异常
+        app.logger.error(f"Value Error: {e}")
+        return None
+    except Exception as e:  # 捕获其他未预期的异常
+        app.logger.error(f"Unexpected Error: {e}")
         return None
 
     finally:
@@ -2036,16 +2011,13 @@ def api_delete(user_id, filename):
 
 
 @app.route('/links')
-def get_friends_link(type=0):
-    avatar_url = get_avatar()
+def get_friends_link():
     friends_links = {
         '本站地址': domain,
         'GitHub': "https://github.com/Athenavi",
         '博客园': "https://cnblogs.com/Athenavi/",
     }
-    if type == 1:
-        return friends_links
-    return render_template('guestbook.html', avatar_url=avatar_url, link_list=friends_links)
+    return friends_links
 
 
 @app.route('/api/report', methods=['POST'])
@@ -2075,7 +2047,8 @@ def report_add(user_id, reported_type, reported_id, reason):
     db = get_database_connection()
     try:
         with db.cursor() as cursor:
-            query = "INSERT INTO `reports` (`reported_by`, `content_type`, `content_id`,`reason`) VALUES (%s, %s, %s,%s);"
+            query = ("INSERT INTO `reports` (`reported_by`, `content_type`, `content_id`,`reason`) VALUES (%s, %s, %s,"
+                     "%s);")
             cursor.execute(query, (int(user_id), reported_type, reported_id, reason))
             db.commit()
             return True
@@ -2214,7 +2187,7 @@ def m_notifications(user_id):
     notifications = cursor.fetchall()
     cursor.close()
     connection.close()
-    return render_template('M-notifcations.html', notifications=notifications)
+    return render_template('M-notifications.html', notifications=notifications)
 
 
 @app.route('/dashboard/reports', methods=['GET'])
@@ -2265,6 +2238,9 @@ def m_articles_delete(user_id):
 
     except Exception as e:
         return jsonify({"message": "操作失败", "error": str(e)}), 500
+    finally:
+        referrer = request.referrer
+        app.logger.error(f"{referrer} delete {aid} by: {user_id}")
 
 
 @app.route('/dashboard/articles', methods=['PUT'])
@@ -2288,6 +2264,9 @@ def m_articles_edit(user_id):
 
     except Exception as e:
         return jsonify({"message": "操作失败", "error": str(e)}), 500
+    finally:
+        referrer = request.referrer
+        app.logger.info(f"{referrer} : modify article {article_id} by  {user_id}")
 
 
 @app.route('/dashboard/users', methods=['DELETE'])
@@ -2308,6 +2287,9 @@ def m_users_delete(user_id):
 
     except Exception as e:
         return jsonify({"message": "操作失败", "error": str(e)}), 500
+    finally:
+        referrer = request.referrer
+        app.logger.info(f"{referrer}: delete user {uid} by: {user_id}")
 
 
 @app.route('/dashboard/users', methods=['PUT'])
@@ -2331,6 +2313,9 @@ def m_users_edit(user_id):
 
     except Exception as e:
         return jsonify({"message": "操作失败", "error": str(e)}), 500
+    finally:
+        referrer = request.referrer
+        app.logger.info(f"{referrer} edit {u_id} to {user_role} by: {user_id}")
 
 
 @app.route('/dashboard/comments', methods=['DELETE'])
@@ -2351,6 +2336,9 @@ def m_comments_delete(user_id):
 
     except Exception as e:
         return jsonify({"message": "操作失败", "error": str(e)}), 500
+    finally:
+        referrer = request.referrer
+        app.logger.info(f"{referrer}: delete comment {cid} by: {user_id}")
 
 
 @app.route('/dashboard/media', methods=['DELETE'])
@@ -2371,6 +2359,9 @@ def m_media_delete(user_id):
 
     except Exception as e:
         return jsonify({"message": "操作失败", "error": str(e)}), 500
+    finally:
+        referrer = request.referrer
+        app.logger.info(f"{referrer}: delete file {file_id} by: {user_id}")
 
 
 @app.route('/dashboard/notifications', methods=['DELETE'])
@@ -2391,6 +2382,9 @@ def m_notifications_delete(user_id):
 
     except Exception as e:
         return jsonify({"message": "操作失败", "error": str(e)}), 500
+    finally:
+        referrer = request.referrer
+        app.logger.info(f"{referrer} delete notification {nid} by: {user_id}")
 
 
 @app.route('/dashboard/reports', methods=['DELETE'])
@@ -2411,6 +2405,9 @@ def m_reports_delete(user_id):
 
     except Exception as e:
         return jsonify({"message": "操作失败", "error": str(e)}), 500
+    finally:
+        referrer = request.referrer
+        app.logger.info(f"{referrer}: delete report {rid} by: {user_id}")
 
 
 @app.route('/dashboard/overview', methods=['DELETE'])
@@ -2431,6 +2428,9 @@ def m_overview_delete(user_id):
 
     except Exception as e:
         return jsonify({"message": "操作失败", "error": str(e)}), 500
+    finally:
+        referrer = request.referrer
+        app.logger.info(f"{referrer}: delete event {event_id} by: {user_id}")
 
 
 @app.route('/dashboard/urls', methods=['DELETE'])
@@ -2451,6 +2451,145 @@ def m_urls_delete(user_id):
 
     except Exception as e:
         return jsonify({"message": "操作失败", "error": str(e)}), 500
+    finally:
+        referrer = request.referrer
+        app.logger.info(f"{referrer}: {user_id}")
+
+
+@app.route('/static/music/music.json', methods=['GET'])
+@user_id_required
+def music_json(user_id):
+    referrer = request.referrer
+    if referrer and "@" in referrer:
+        username_from_referrer = referrer.split('@')[-1]
+        user_dir = os.path.join(app.config['USER_BASE_PATH'], username_from_referrer)
+        # 确保 user_dir 是字符串类型
+        user_dir = base_dir + '\\' + str(user_dir)
+        return send_from_directory(user_dir, 'music.json')
+    if not user_id:
+        return send_from_directory(app.static_folder, 'music/music.json')
+    else:
+        user_name = get_username()
+        user_dir = os.path.join(app.config['USER_BASE_PATH'], user_name)
+        # 确保 user_dir 是字符串类型
+        user_dir = base_dir + '\\' + str(user_dir)
+        return send_from_directory(user_dir, 'music.json')
+
+
+@app.route('/static/music/music.json', methods=['PUT'])
+@user_id_required
+def music_json_change(user_id):
+    if not user_id:
+        return jsonify({'error': 'User ID is required'}), 503
+
+    json_data = request.get_json()
+    if json_data is None:
+        return jsonify({'error': 'Invalid JSON data'}), 400
+
+    # 检查JSON数据格式是否正确
+    if not isinstance(json_data, list):
+        return jsonify({'error': 'JSON data should be a list of music tracks'}), 400
+
+    for track in json_data:
+        # 检查每个track是否包含必要的键
+        required_keys = {'name', 'audio_url', 'singer', 'album', 'cover', 'time'}
+        if not required_keys.issubset(track.keys()):
+            return jsonify({
+                'error': '需要包含的属性name, audio_url, singer, album, cover, time'}), 400
+
+    user_name = get_username()
+    user_dir = os.path.join(app.config['USER_BASE_PATH'], user_name)
+
+    # 确保 user_dir 存在
+    if not os.path.exists(user_dir):
+        os.makedirs(user_dir)
+
+    # 构建保存路径
+    save_path = os.path.join(str(user_dir), 'music.json')
+
+    # 保存JSON数据
+    with open(save_path, 'w', encoding='utf-8') as file:
+        json.dump(json_data, file, ensure_ascii=False, indent=4)
+
+    return jsonify({'message': 'success'}), 200
+
+
+@app.route('/setting/profiles', methods=['PUT'])
+@user_id_required
+def change_profiles(user_id):
+    change_type = request.args.get('change_type')
+    if not change_type:
+        return jsonify({'error': 'Change type is required'}), 400
+    if change_type not in ['avatar', 'username', 'email', 'password']:
+        return jsonify({'error': 'Invalid change type'}), 400
+
+    if change_type == 'avatar':
+        if 'avatar' not in request.files:
+            return jsonify({'error': 'Avatar is required'}), 400
+        avatar_file = request.files['avatar']
+        if avatar_file.filename == '':
+            return jsonify({'error': 'No selected file'}), 400
+
+        # 生成UUID
+        avatar_uuid = uuid.uuid4()
+        save_path = Path(app.config['AVATAR_PATH']) / f'{avatar_uuid}.webp'
+
+        # 确保目录存在
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # 使用with语句保存文件
+        with save_path.open('wb') as avatar_path:
+            avatar_file.save(avatar_path)
+            db_save_avatar(user_id, str(avatar_uuid))
+
+        return jsonify({'message': 'Avatar updated successfully', 'avatar_id': str(avatar_uuid)}), 200
+
+
+def db_save_avatar(user_id, avatar_uuid):
+    db = None
+    try:
+        db = get_database_connection()
+        with db.cursor() as cursor:
+            query = "UPDATE users SET profile_picture = %s WHERE id = %s"
+            cursor.execute(query, (avatar_uuid, user_id))
+            db.commit()
+    except Exception as e:
+        app.logger.error(f"Error saving avatar: {e} by user {user_id} avatar uuid: {avatar_uuid}")
+    finally:
+        if db is not None:
+            db.close()
+
+
+@cache.memoize(30)
+def get_avatar(user_identifier, identifier_type='id'):
+    avatar = app.config['AVATAR_SERVER']  # 默认头像服务器地址
+    if user_identifier:
+        db = None
+        try:
+            db = get_database_connection()
+            with db.cursor() as cursor:
+                if identifier_type == 'id':
+                    query = "select profile_picture from users where id = %s"
+                elif identifier_type == 'username':
+                    query = "select profile_picture from users where username = %s"
+                else:
+                    raise ValueError("identifier_type must be 'id' or 'username'")
+
+                cursor.execute(query, (user_identifier,))
+                result = cursor.fetchone()
+                if result:
+                    avatar = f"{domain}api/avatar/{result[0]}.webp"
+        except Exception as e:
+            app.logger.error(f"Error getting avatar: {e}")
+        finally:
+            if db is not None:
+                db.close()  # 确保数据库连接在最后被关闭
+    return avatar
+
+
+@app.route('/api/avatar/<avatar_uuid>.webp', methods=['GET'])
+def get_avatar_image(avatar_uuid):
+    return send_file(f'{base_dir}/{app.config['AVATAR_PATH']}/{avatar_uuid}.webp', mimetype='image/webp')
 
 
 @app.errorhandler(404)

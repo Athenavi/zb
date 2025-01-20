@@ -9,7 +9,7 @@
 > 如果您觉得 `zyblog`对您有所帮助，或者您喜欢我们的项目，请在 GitHub 上给我们一个 ⭐️。您的支持是我们持续改进和增加新功能的动力！感谢您的支持！
 
 - **更新日志**
-    - [更新详情](./update.txt)
+    - [更新详情](./articles/changelog.md)
     - [旧版](https://github.com/Athenavi/zyBLOG)
 
 ## 预览
@@ -75,7 +75,7 @@ $ sudo chmod 777 ./temp/access.log && sudo chmod 777 ./temp/error.log
 $ gunicorn --workers 4 --threads 2 --bind 0.0.0.0:9421 --timeout 60 --access-logfile ./temp/access.log --error-logfile ./temp/error.log --daemon src.app:app
 ```
 1. 在浏览器中访问 `http://localhost:9421`，即可进入 zyBLOG。
-2. 默认管理员账号 'test' 默认密码 '123456'
+2. 管理后台 (/dashboard) 默认账号 'test' 默认密码 '123456'
 
 ## 无法运行？
 
