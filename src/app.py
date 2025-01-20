@@ -332,7 +332,7 @@ def get_home_data(page, tag):
         app.logger.warning('获取文章信息失败，返回错误提示')
         return None, None, None, None, None, None  # 添加 None 用于 tags
 
-    friends_links = get_friends_link(type=1)
+    friends_links = get_friends_link()
     return compressed_list, notice, has_next_page, has_previous_page, friends_links, tags
 
 
@@ -1254,10 +1254,10 @@ def following(user_id):
 
     if request.method == 'GET':
 
-        userFllowed_key = f'subscriber_ids_uid:{user_id}'
+        userFollowed_key = f'subscriber_ids_uid:{user_id}'
 
         # 尝试从缓存中获取页面内容
-        content = cache.get(userFllowed_key)
+        content = cache.get(userFollowed_key)
         if content:
             # 设置浏览器缓存
             resp = make_response(content)
@@ -1287,7 +1287,7 @@ def following(user_id):
         )
 
         # 缓存渲染后的页面内容，并设置服务端缓存过期时间
-        cache.set(userFllowed_key, rendered_content, timeout=600)  # 服务端缓存10分钟
+        cache.set(userFollowed_key, rendered_content, timeout=600)  # 服务端缓存10分钟
         resp = make_response(rendered_content)
         return resp
 
@@ -1819,6 +1819,8 @@ def api_article_unlock(user_id):
         response_data['temp_url'] = temp_url
         return jsonify(response_data), 200
     else:
+        referrer = request.referrer
+        app.logger.error(f"{referrer} Failed access attempt {user_finger} :  {user_id}")
         return jsonify({"message": "Authentication failed"}), 401
 
 
@@ -1844,13 +1846,19 @@ def temp_view():
                     a_title = result[0]
 
                     content = api_wx_content(a_title)
-
-        except Exception:
-            return jsonify({f"message": "Database error"}, 500)
+        except ValueError as e:
+            app.logger.error(f"Value error: {e}")
+            return jsonify({"message": "Invalid ArticleID"}), 400
+        except Exception as e:
+            app.logger.error(f"Unexpected error: {e}")
+            return jsonify({"message": "Internal server error"}), 500
 
         finally:
             cursor.close()
             db.close()
+
+        referrer = request.referrer
+        app.logger.info(f"Request from {referrer} with finger {user_finger}")  # 记录请求信息
 
         return content
     else:
@@ -1868,7 +1876,11 @@ def article_passwd(aid):
             if result:
                 a_pass = result[0]
                 return a_pass
-    except Exception:
+    except ValueError as e:  # 处理aid转换为整数时可能出现的异常
+        app.logger.error(f"Value Error: {e}")
+        return None
+    except Exception as e:  # 捕获其他未预期的异常
+        app.logger.error(f"Unexpected Error: {e}")
         return None
 
     finally:
@@ -1999,16 +2011,13 @@ def api_delete(user_id, filename):
 
 
 @app.route('/links')
-def get_friends_link(type=0):
-    avatar_url = get_avatar(random.randint(10, 50))
+def get_friends_link():
     friends_links = {
         '本站地址': domain,
         'GitHub': "https://github.com/Athenavi",
         '博客园': "https://cnblogs.com/Athenavi/",
     }
-    if type == 1:
-        return friends_links
-    return render_template('guestbook.html', avatar_url=avatar_url, link_list=friends_links)
+    return friends_links
 
 
 @app.route('/api/report', methods=['POST'])
@@ -2229,6 +2238,9 @@ def m_articles_delete(user_id):
 
     except Exception as e:
         return jsonify({"message": "操作失败", "error": str(e)}), 500
+    finally:
+        referrer = request.referrer
+        app.logger.error(f"{referrer} delete {aid} by: {user_id}")
 
 
 @app.route('/dashboard/articles', methods=['PUT'])
@@ -2252,6 +2264,9 @@ def m_articles_edit(user_id):
 
     except Exception as e:
         return jsonify({"message": "操作失败", "error": str(e)}), 500
+    finally:
+        referrer = request.referrer
+        app.logger.info(f"{referrer} : modify article {article_id} by  {user_id}")
 
 
 @app.route('/dashboard/users', methods=['DELETE'])
@@ -2272,6 +2287,9 @@ def m_users_delete(user_id):
 
     except Exception as e:
         return jsonify({"message": "操作失败", "error": str(e)}), 500
+    finally:
+        referrer = request.referrer
+        app.logger.info(f"{referrer}: delete user {uid} by: {user_id}")
 
 
 @app.route('/dashboard/users', methods=['PUT'])
@@ -2295,6 +2313,9 @@ def m_users_edit(user_id):
 
     except Exception as e:
         return jsonify({"message": "操作失败", "error": str(e)}), 500
+    finally:
+        referrer = request.referrer
+        app.logger.info(f"{referrer} edit {u_id} to {user_role} by: {user_id}")
 
 
 @app.route('/dashboard/comments', methods=['DELETE'])
@@ -2315,6 +2336,9 @@ def m_comments_delete(user_id):
 
     except Exception as e:
         return jsonify({"message": "操作失败", "error": str(e)}), 500
+    finally:
+        referrer = request.referrer
+        app.logger.info(f"{referrer}: delete comment {cid} by: {user_id}")
 
 
 @app.route('/dashboard/media', methods=['DELETE'])
@@ -2335,6 +2359,9 @@ def m_media_delete(user_id):
 
     except Exception as e:
         return jsonify({"message": "操作失败", "error": str(e)}), 500
+    finally:
+        referrer = request.referrer
+        app.logger.info(f"{referrer}: delete file {file_id} by: {user_id}")
 
 
 @app.route('/dashboard/notifications', methods=['DELETE'])
@@ -2355,6 +2382,9 @@ def m_notifications_delete(user_id):
 
     except Exception as e:
         return jsonify({"message": "操作失败", "error": str(e)}), 500
+    finally:
+        referrer = request.referrer
+        app.logger.info(f"{referrer} delete notification {nid} by: {user_id}")
 
 
 @app.route('/dashboard/reports', methods=['DELETE'])
@@ -2375,6 +2405,9 @@ def m_reports_delete(user_id):
 
     except Exception as e:
         return jsonify({"message": "操作失败", "error": str(e)}), 500
+    finally:
+        referrer = request.referrer
+        app.logger.info(f"{referrer}: delete report {rid} by: {user_id}")
 
 
 @app.route('/dashboard/overview', methods=['DELETE'])
@@ -2395,6 +2428,9 @@ def m_overview_delete(user_id):
 
     except Exception as e:
         return jsonify({"message": "操作失败", "error": str(e)}), 500
+    finally:
+        referrer = request.referrer
+        app.logger.info(f"{referrer}: delete event {event_id} by: {user_id}")
 
 
 @app.route('/dashboard/urls', methods=['DELETE'])
@@ -2415,6 +2451,9 @@ def m_urls_delete(user_id):
 
     except Exception as e:
         return jsonify({"message": "操作失败", "error": str(e)}), 500
+    finally:
+        referrer = request.referrer
+        app.logger.info(f"{referrer}: {user_id}")
 
 
 @app.route('/static/music/music.json', methods=['GET'])
@@ -2515,7 +2554,7 @@ def db_save_avatar(user_id, avatar_uuid):
             cursor.execute(query, (avatar_uuid, user_id))
             db.commit()
     except Exception as e:
-        app.logger.error(f"Error saving avatar: {e}")
+        app.logger.error(f"Error saving avatar: {e} by user {user_id} avatar uuid: {avatar_uuid}")
     finally:
         if db is not None:
             db.close()
