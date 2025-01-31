@@ -320,7 +320,7 @@
         // 判断是否过期
         if (currentTimeMillis > expireTimeMillis) {
             alert("当前二维码已失效,请重新扫码")
-            getQRCode()
+            await getQRCode()
             console.log("Token has expired.");
         } else {
             console.log("Token is still valid.");

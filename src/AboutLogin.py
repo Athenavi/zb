@@ -56,11 +56,9 @@ def zy_login(callback_route):
 
 def zy_register(ip):
     if request.method == 'POST':
-        username = bleach.clean(request.form['username'])  # 使用 bleach 进行 XSS 防范
-        password = bleach.clean(request.form['password'])
-        invite_code = bleach.clean(request.form['invite_code'])
-        print(f'user inviteCode: {invite_code}')
-
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        invite_code = request.form.get('invite_code', '').strip()
         db = get_database_connection()
         cursor = db.cursor()
 
@@ -80,7 +78,12 @@ def zy_register(ip):
             cursor.execute(insert_query, (username, hashed_password, ip))
             db.commit()
 
-            # 注册成功后，可以生成 JWT 令牌（可选）
+            # 标记邀请码
+            update_invite_code_query = ("INSERT INTO events (title, description, event_date) VALUES (%s, %s, "
+                                        "CURRENT_TIMESTAMP)")
+            cursor.execute(update_invite_code_query, (
+                'new user registered', f'username: {username}, register_ip: {ip}, invite_code: {invite_code}'))
+            db.commit()
             return render_template('inform.html', status_code='200', message=f"{username}注册成功！")
 
         except Exception as e:

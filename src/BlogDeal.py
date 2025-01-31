@@ -368,8 +368,10 @@ def set_article_info(a_title, username):
             query = """
             INSERT INTO articles (Title, Author, tags) 
             VALUES (%s, %s, %s) 
-            ON DUPLICATE KEY UPDATE Author = %s, tags = %s;
+            ON DUPLICATE KEY UPDATE Author = VALUES(Author), tags = VALUES(tags);
             """
+            cursor.execute(query, (a_title, username, current_year, username, current_year))
+
             # 记录事件信息
             event_log = ("INSERT INTO events (title, description, event_date, created_at) VALUES (%s, %s, "
                          "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);")
@@ -382,7 +384,7 @@ def set_article_info(a_title, username):
             return True  # 表示操作成功
 
     except Exception as e:
-        print(f"An error occurred during database operation: {e}")
+        print(f"数据库操作期间发生错误: {e}")
         # 回滚事务
         db.rollback()
         return False  # 表示操作失败
@@ -541,7 +543,7 @@ def get_comments(aid, page=1, per_page=30):
 
 def auth_files(file_path, user_id):
     db = get_database_connection()
-    Auth = False
+    auth = False
     print(file_path)
     try:
         with db.cursor() as cursor:
@@ -549,7 +551,7 @@ def auth_files(file_path, user_id):
             cursor.execute(query, (user_id, file_path,))
             result = cursor.fetchone()
             if result:
-                Auth = True
+                auth = True
 
     except Exception as e:
         print(f"An error occurred: {e}")
@@ -559,4 +561,4 @@ def auth_files(file_path, user_id):
         except NameError:
             pass
         db.close()
-        return Auth
+        return auth

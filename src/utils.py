@@ -147,7 +147,7 @@ def generate_short_url():
 
 
 def allowed_file(filename):
-    ALLOWED_EXTENSIONS = {
+    allowed_extensions = {
         'txt': 5 * 1024 * 1024,  # 5MB
         'jpg': 10 * 1024 * 1024,  # 10MB
         'png': 10 * 1024 * 1024,  # 10MB
@@ -155,7 +155,7 @@ def allowed_file(filename):
         'zip': 10 * 1024 * 1024,  # 10MB
 
     }
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions
 
 
 def admin_upload_file(size_limit):
