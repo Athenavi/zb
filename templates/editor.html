@@ -114,16 +114,28 @@
     hiddenLinks.forEach(link => {
         link.addEventListener('click', event => {
             event.preventDefault();
+
+            // 获取文章标题
             const article = link.getAttribute('data-article');
+            if (!article) {
+                alert('缺少文章标题');
+                return;
+            }
+
             const requestBody = JSON.stringify({article});
 
             if (confirm('您正在尝试对文章进行一个操作，是否继续？')) {
                 fetch('/api/hidden/article', {
-                    method: 'POST',
+                    method: 'PUT',
                     headers: {'Content-Type': 'application/json'},
                     body: requestBody
                 })
-                    .then(response => response.json())
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('网络响应不正常');
+                        }
+                        return response.json();
+                    })
                     .then(data => {
                         if (data.deal === 'hide') {
                             alert('文章已隐藏');

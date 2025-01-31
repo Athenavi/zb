@@ -833,7 +833,7 @@ def zy_save_edit(aid, content, a_name):
 last_request_time = {}
 
 
-@app.route('/api/hidden/article', methods=['POST'])
+@app.route('/api/hidden/article', methods=['PUT'])
 def hidden_article():
     article = request.json.get('article')
 
@@ -2024,7 +2024,6 @@ def api_delete(user_id, filename):
     else:
         app.logger.info(f'Delete error for {filename} by user {user_id}')
         return jsonify({'filename': filename, 'Deleted': False}), 503
-
 
 
 @app.route('/links')
