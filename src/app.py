@@ -833,7 +833,7 @@ def zy_save_edit(aid, content, a_name):
 last_request_time = {}
 
 
-@app.route('/hidden/article', methods=['POST'])
+@app.route('/api/hidden/article', methods=['POST'])
 def hidden_article():
     article = request.json.get('article')
 
@@ -1995,19 +1995,36 @@ def comment(user_id):
     return rendered
 
 
-@app.route('/api/delete/<filename>', methods=['GET', 'delete'])
+@app.route('/api/delete/<filename>', methods=['GET', 'DELETE'])
 @jwt_required
 def api_delete(user_id, filename):
     user_name = get_username()
+    arg_type = request.args.get('type')
+    if arg_type == 'article':
+        db = get_database_connection()
+        try:
+            with db.cursor() as cursor:
+                cursor.execute("DELETE FROM `articles` WHERE `Title` = %s AND `Author` = %s", (filename, user_name))
+                db.commit()
+                article_path = os.path.join(base_dir, 'articles', f"{filename}.md")
+                if os.path.exists(article_path):
+                    os.remove(article_path)
+                return jsonify({'Deleted': True}), 200
+        except Exception as e:
+            db.rollback()
+            app.logger.error(f"Error deleting article {filename}: {str(e)}")
+            return jsonify({'Deleted': False}), 500
+        finally:
+            db.close()
+
     file_path = os.path.join('media', user_name, filename)
-    auth = auth_files(file_path, user_id)
-    if auth:
-        if os.path.exists(file_path):
-            os.remove(file_path)
+    if auth_files(file_path, user_name):
+        os.remove(file_path) if os.path.exists(file_path) else None
         return jsonify({'filename': filename, 'Deleted': True}), 201
     else:
-        app.logger.info(f'{user_id} Delete: {filename} :error')
+        app.logger.info(f'Delete error for {filename} by user {user_id}')
         return jsonify({'filename': filename, 'Deleted': False}), 503
+
 
 
 @app.route('/links')
@@ -2105,7 +2122,7 @@ def m_articles(user_id):
     try:
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
-        cursor.execute('SELECT * FROM articles WHERE author_id = %s', (user_id,))  # 假设需要根据 user_id 获取文章列表
+        cursor.execute('SELECT * FROM articles')
         articles = cursor.fetchall()
         cursor.close()
         connection.close()
