@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+
+<head>
+    <title>编辑文章</title>
+    <meta name="referrer" content="no-referrer"/>
+    <script src="https://cdn.staticfile.org/jquery/3.6.0/jquery.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script type="text/javascript" src="/static/ueditorPlus/ueditor.config.js"></script>
+    <script type="text/javascript" src="/static/ueditorPlus/ueditor.all.js"></script>
+</head>
+
+<body>
+<!--导航栏-->
+{% from 'header.html' import zytopbar %}
+{{ zytopbar() }}
+
+<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <header class="mb-6">
+        <h1 id="txtTitle" class="text-4xl font-bold text-gray-900">{{ articleName }}</h1>
+        <span class="text-gray-500">{{ article_surl }}</span>
+    </header>
+
+    <!-- 文章标签 -->
+    <section class="mb-6">
+        <label for="tagInput" class="block text-sm font-medium text-gray-700">标签（用逗号分隔）</label>
+        <div class="flex items-center">
+                <textarea class="mt-1 block flex-grow shadow-sm sm:text-sm border-gray-300 rounded-md" id="tagInput"
+                          rows="1">{% for tag in tags %}{{ tag }}{% if not loop.last %},
+                {% endif %}{% endfor %}</textarea>
+            <button id="saveTags" type="button"
+                    class="mt-1 ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                保存标签
+            </button>
+        </div>
+    </section>
+
+    <!-- 文章简介 -->
+    <section class="mb-6">
+        <label for="txtExcerpt" class="block text-sm font-medium text-gray-700">文章简介</label>
+        <textarea class="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" id="txtExcerpt"
+                  rows="3">{{ articleExcerpt }}</textarea>
+    </section>
+
+    <!-- 文章内容 -->
+    <section class="mb-6">
+        <label for="editor" class="block text-sm font-medium text-gray-700">文章内容</label>
+        <script id="txtContent" type="text/plain" style="height:600px;">{{ edit_html | safe }}</script>
+    </section>
+
+    <!-- 封面及状态 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div>
+            <label for="upLoadCoverImg" class="block text-sm font-medium text-gray-700">文章封面</label>
+            <input type="file" class="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                   id="upLoadCoverImg">
+            <div id="coverImg" class="mt-2">
+                {% if coverImage %}
+                    <img src="{{ coverImage }}" alt="文章封面" class="max-w-full h-auto" style="max-height:185px;"
+                         id="coverImage">
+                {% else %}
+                    <img src="" alt="文章封面" class="max-w-full h-auto" style="max-height:185px;" id="coverImage">
+                {% endif %}
+            </div>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700">文章状态</label>
+            <div class="flex flex-col">
+                <label class="flex items-center">
+                    <input class="form-check-input" type="radio" name="rStatus" value="Draft"
+                           {% if articleStatus == 'Draft' %}checked{% endif %}>
+                    <span class="ml-2 text-gray-700">草稿编辑</span>
+                </label>
+                <label class="flex items-center">
+                    <input class="form-check-input" type="radio" name="rStatus" value="Published"
+                           {% if articleStatus == 'Published' %}checked{% endif %}>
+                    <span class="ml-2 text-green-700">发布可见</span>
+                </label>
+                <label class="flex items-center">
+                    <input class="form-check-input" type="radio" name="rStatus" value="Deleted"
+                           {% if articleStatus == 'Deleted' %}checked{% endif %}>
+                    <span class="ml-2 text-red-700">永久删除</span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- 保存按钮 -->
+    <div class="text-center">
+        <button id="save-button" type="button"
+                class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            保存更改
+        </button>
+    </div>
+</main>
+
+<script>
+    var ue = UE.getEditor('txtContent', {
+        initialFrameHeight: 400,
+        maximumWords: 50000,
+        serverUrl: '/api/ueditor/{{ user_name }}',
+    });
+
+    document.getElementById("saveTags").addEventListener("click", function () {
+        var tagsInput = document.getElementById("tagInput").value;
+        fetch('/edit/{{ articleName }}', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({tags: tagsInput}),
+            credentials: 'include'
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.show_edit === 'success') {
+                    alert('文章保存成功');
+                } else {
+                    alert('文章保存失败');
+                }
+            })
+            .catch(error => console.error('保存失败:', error));
+    });
+
+    document.getElementById("save-button").addEventListener("click", function () {
+        var title = `{{ articleName }}`;
+        var content = UE.getEditor('txtContent').getContent();
+        var excerpt = document.getElementById("txtExcerpt").value;
+        var status = document.querySelector('input[name="rStatus"]:checked').value;
+
+        // 使用 confirm 对话框来确认删除操作
+        if (status === 'Deleted' && !confirm('您正在尝试删除文章，是否继续？')) {
+            return;
+        }
+
+        var formData = new FormData();
+        formData.append('title', title);
+        formData.append('content', content);
+        formData.append('excerpt', excerpt);
+        formData.append('status', status);
+
+        var coverImgInput = document.getElementById('upLoadCoverImg');
+        if (coverImgInput.files.length > 0) {
+            formData.append('coverImage', coverImgInput.files[0]);
+        }
+
+        fetch('/api/edit/{{ aid }}', {
+            method: 'POST',
+            body: formData,
+            credentials: 'include'
+        })
+            .then(response => response.json())
+            .then(data => {
+                // 根据服务器返回的 data.show_edit_code 值来提示用户
+                if (data.show_edit_code === 'success') {
+                    alert('文章保存成功');
+                } else {
+                    alert('文章保存失败');
+                }
+            })
+            .catch(error => console.error('保存失败:', error));
+    });
+
+    document.getElementById('upLoadCoverImg').addEventListener('change', function (event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                document.getElementById('coverImage').src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+</script>
+</body>
+
+</html>

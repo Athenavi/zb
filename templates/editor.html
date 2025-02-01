@@ -114,16 +114,28 @@
     hiddenLinks.forEach(link => {
         link.addEventListener('click', event => {
             event.preventDefault();
+
+            // 获取文章标题
             const article = link.getAttribute('data-article');
+            if (!article) {
+                alert('缺少文章标题');
+                return;
+            }
+
             const requestBody = JSON.stringify({article});
 
             if (confirm('您正在尝试对文章进行一个操作，是否继续？')) {
-                fetch('/hidden/article', {
-                    method: 'POST',
+                fetch('/api/hidden/article', {
+                    method: 'PUT',
                     headers: {'Content-Type': 'application/json'},
                     body: requestBody
                 })
-                    .then(response => response.json())
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('网络响应不正常');
+                        }
+                        return response.json();
+                    })
                     .then(data => {
                         if (data.deal === 'hide') {
                             alert('文章已隐藏');
@@ -147,24 +159,31 @@
     const deleteLinks = document.querySelectorAll('a.delete121');
 
     deleteLinks.forEach(link => {
-        link.addEventListener('click', event => {
+        link.addEventListener('click', async event => {
             event.preventDefault();
-            const article = link.getAttribute('data-article');
+            const articleId = link.getAttribute('data-article');
+
+            // 数据验证
+            if (!articleId) {
+                alert('无法找到文章ID，删除操作失败！');
+                return;
+            }
 
             if (confirm('您正在尝试永久删除该文章！！！是否继续？')) {
-                if (confirm('再次确认呢？是否继续？')) {
-                    fetch(`/delete/${article}`, {method: 'POST'})
-                        .then(response => {
-                            if (response.ok) {
-                                alert('文章删除成功！');
-                                location.reload();
-                            } else {
-                                alert('文章删除失败！');
-                            }
-                        })
-                        .catch(error => {
-                            alert('请求出错：' + error);
-                        });
+                if (confirm('再次确认是否删除？')) {
+                    try {
+                        const response = await fetch(`/api/delete/${articleId}?type=article`, {method: 'DELETE'});
+
+                        if (response.ok) {
+                            alert('文章删除成功！');
+                            location.reload();
+                        } else {
+                            const responseData = await response.json();
+                            alert(`文章删除失败！原因：${responseData.message || '未知错误'}`);
+                        }
+                    } catch (error) {
+                        alert('请求出错：' + error.message);
+                    }
                 }
             }
         });

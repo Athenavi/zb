@@ -32,7 +32,7 @@ from src.BlogDeal import get_article_names, get_article_content, clear_html_form
     get_blog_author, read_hidden_articles, auth_articles, get_file_date, \
     zy_edit_article, get_subscriber_ids, get_unique_tags, get_articles_by_tag, \
     get_tags_by_article, set_article_info, write_tags_to_database, set_article_visibility, auth_by_id, \
-    article_change_pw, get_file_summary, get_comments, auth_files
+    article_change_pw, get_file_summary, get_comments, auth_files, get_more_info, article_save_change
 from src.database import get_database_connection, get_db_connection
 from src.links import create_special_url, redirect_to_long_url
 from src.notification import get_sys_notice, read_notification, send_change_mail
@@ -259,38 +259,38 @@ def profile(user_id):
 
 
 def get_user_bio(user_id):
-    UserInfo = cache.get(f"{user_id}_userInfo") or get_profiles(user_id=user_id, user_name=None)
+    user_info = cache.get(f"{user_id}_userInfo") or get_profiles(user_id=user_id, user_name=None)
 
-    if UserInfo is None:
+    if user_info is None:
         # 处理未找到用户信息的情况
         return "用户信息未找到", 404
-    cache.set(f'{user_id}_userInfo', UserInfo)
-    Bio = UserInfo[6] if len(UserInfo) > 6 and UserInfo[6] else "这人很懒，什么也没留下"
-    return Bio
+    cache.set(f'{user_id}_userInfo', user_info)
+    bio = user_info[6] if len(user_info) > 6 and user_info[6] else "这人很懒，什么也没留下"
+    return bio
 
 
 @app.route('/setting/profiles', methods=['GET', 'POST'])
 @finger_required
 def setting_profiles(user_id):
-    UserInfo = cache.get(f"{user_id}_userInfo") or get_profiles(user_id=user_id, user_name=None)
+    user_info = cache.get(f"{user_id}_userInfo") or get_profiles(user_id=user_id, user_name=None)
 
-    if UserInfo is None:
+    if user_info is None:
         # 处理未找到用户信息的情况
         return "用户信息未找到", 404
 
-    cache.set(f'{user_id}_userInfo', UserInfo, timeout=3600)
+    cache.set(f'{user_id}_userInfo', user_info, timeout=3600)
 
     # 确保索引存在
-    avatar_url = UserInfo[5] if len(UserInfo) > 5 and UserInfo[5] else app.config['AVATAR_SERVER']
-    Bio = UserInfo[5] if len(UserInfo) > 5 and UserInfo[5] else "这人很懒，什么也没留下"
-    user_name = UserInfo[1] if len(UserInfo) > 1 else "匿名用户"
+    avatar_url = user_info[5] if len(user_info) > 5 and user_info[5] else app.config['AVATAR_SERVER']
+    bio = user_info[5] if len(user_info) > 5 and user_info[5] else "这人很懒，什么也没留下"
+    user_name = user_info[1] if len(user_info) > 1 else "匿名用户"
 
     return render_template(
         'setting.html',
         avatar_url=avatar_url,
         userStatus=bool(user_id),
         username=user_name,
-        Bio=Bio
+        Bio=bio
     )
 
 
@@ -421,24 +421,24 @@ def get_article_info(articles):
     articles_info = []
     for a_title in articles:
         try:
-            articleInfo = ''
+            article_info = ''
             db = get_database_connection()
 
             try:
-                articleInfo += get_file_date(a_title)
-                articleInfo += ';'
+                article_info += get_file_date(a_title)
+                article_info += ';'
                 with db.cursor() as cursor:
                     query = "SELECT * FROM articles WHERE Title = %s"
                     cursor.execute(query, (a_title,))
                     result = cursor.fetchone()
                     if result:
-                        articleInfo += result[2]
-                        articleInfo += ";"
-                        articleInfo += str(result[5])
-                        articleInfo += ";"
-                        articleInfo += str(result[6])
+                        article_info += result[2]
+                        article_info += ";"
+                        article_info += str(result[5])
+                        article_info += ";"
+                        article_info += str(result[6])
                     else:
-                        articleInfo += '官方;0;0'
+                        article_info += '官方;0;0'
             except Exception as e:
                 print(f"An error occurred: {e}")
             finally:
@@ -448,7 +448,7 @@ def get_article_info(articles):
                     pass
                 db.close()
 
-            articles_info.append(articleInfo)
+            articles_info.append(article_info)
         except FileNotFoundError:
             articles_info.append('点赞：0 评论：0')
     return articles_info
@@ -750,6 +750,8 @@ def markdown_editor(article):
         auth = auth_articles(article, user_name)
 
     if auth:
+        if request.args.get('editor') == 'ueditor':
+            return ueditor_plus_edit(article, user_name)
         aid, tags = get_tags_by_article(article)
         if request.method == 'GET':
             edit_html = zy_edit_article(article, max_line=app.config['MAX_LINE'])
@@ -765,7 +767,6 @@ def markdown_editor(article):
             tags_input = request.get_json().get('tags')
             return zy_save_tags(aid, tags_input)
         else:
-            # 渲染编辑页面
             return render_template('editor.html')
 
     else:
@@ -798,6 +799,11 @@ def zy_save_tags(aid, tags_input):
 
 
 def zy_save_edit(aid, content, a_name):
+    if content is None:
+        raise ValueError("Content cannot be None")
+    if a_name is None or a_name.strip() == "":
+        raise ValueError("Article name cannot be None or empty")
+
     save_directory = 'articles/'
 
     # 计算内容的哈希值
@@ -808,16 +814,16 @@ def zy_save_edit(aid, content, a_name):
 
     # 检查内容是否与上一次提交相同
     if current_content_hash == previous_content_hash:
-        return jsonify({'show_edit_code': 'success'})
+        return {'show_edit_code': 'success'}
 
     # 更新缓存中的哈希值
     cache.set(f"{aid}_lasted_hash", current_content_hash, timeout=28800)
 
-    # 将文章名转换为字节字符串
-    article_name_bytes = a_name.encode('utf-8')
+    # 将文章名转换为安全的文件名
+    filename = secure_filename(a_name) + ".md"
 
     # 将字节字符串和目录拼接为文件路径
-    file_path = os.path.join(save_directory, article_name_bytes.decode('utf-8') + ".md")
+    file_path = os.path.join(save_directory, filename)
 
     # 检查保存目录是否存在，如果不存在则创建它
     if not os.path.exists(save_directory):
@@ -827,13 +833,13 @@ def zy_save_edit(aid, content, a_name):
     with open(file_path, 'w', encoding='utf-8') as file:
         file.write(content)
 
-    return jsonify({'show_edit_code': 'success'})
+    return {'show_edit_code': 'success'}
 
 
 last_request_time = {}
 
 
-@app.route('/hidden/article', methods=['POST'])
+@app.route('/api/hidden/article', methods=['PUT'])
 def hidden_article():
     article = request.json.get('article')
 
@@ -908,11 +914,11 @@ def media(user_id):
     elif request.method == 'POST':
         img_name = request.json.get('img_name')
         if not img_name:
-            return error(message='缺少图像名称', status_code=400)
+            return error(message=f'缺少图像名称 with POST method in media_{user_id}', status_code=400)
 
         image = get_image_path(user_name, img_name)
         if not image:
-            return error(message='未找到图像', status_code=404)
+            return error(message=f'未找到图像in media_{user_id}', status_code=404)
 
         return image
 
@@ -1254,10 +1260,10 @@ def following(user_id):
 
     if request.method == 'GET':
 
-        userFollowed_key = f'subscriber_ids_uid:{user_id}'
+        user_followed_key = f'subscriber_ids_uid:{user_id}'
 
         # 尝试从缓存中获取页面内容
-        content = cache.get(userFollowed_key)
+        content = cache.get(user_followed_key)
         if content:
             # 设置浏览器缓存
             resp = make_response(content)
@@ -1287,7 +1293,7 @@ def following(user_id):
         )
 
         # 缓存渲染后的页面内容，并设置服务端缓存过期时间
-        cache.set(userFollowed_key, rendered_content, timeout=600)  # 服务端缓存10分钟
+        cache.set(user_followed_key, rendered_content, timeout=600)  # 服务端缓存10分钟
         resp = make_response(rendered_content)
         return resp
 
@@ -1459,9 +1465,9 @@ def qrlogin():
 @app.route("/checkQRLogin")
 def check_qr_login():
     token = request.args.get('token')
-    cache_QR_token = cache.get(f"QR-token_{token}")
-    if cache_QR_token:
-        expire_at = cache_QR_token['expire_at']
+    cache_qr_token = cache.get(f"QR-token_{token}")
+    if cache_qr_token:
+        expire_at = cache_qr_token['expire_at']
         if int(expire_at) > int(time.time()):
             return success_scan()
         else:
@@ -1473,11 +1479,11 @@ def check_qr_login():
 def success_scan():
     # 扫码成功调用此接口
     token = request.args.get('token')
-    cache_QR_allowed = cache.get(f"QR-allow_{token}")
-    if token and cache_QR_allowed:
-        token_expire = cache_QR_allowed['expire_at']
+    cache_qr_allowed = cache.get(f"QR-allow_{token}")
+    if token and cache_qr_allowed:
+        token_expire = cache_qr_allowed['expire_at']
         if int(token_expire) > int(time.time()):
-            return jsonify(cache_QR_allowed)
+            return jsonify(cache_qr_allowed)
     else:
         token_json = {'status': 'failed'}
         return jsonify(token_json)
@@ -1491,8 +1497,8 @@ def phone_scan():
     phone_token = request.cookies.get('jwt')
     refresh_token = request.cookies.get('refresh_token')
     if token:
-        cache_QR_token = cache.get(f"QR-token_{token}")
-        if cache_QR_token:
+        cache_qr_token = cache.get(f"QR-token_{token}")
+        if cache_qr_token:
             ct = str(int(time.time()))
             token_expire = str(int(time.time() + 30))
             page_json = {'status': 'success', 'created_at': ct, 'expire_at': token_expire}
@@ -1510,8 +1516,8 @@ def phone_scan():
 @app.route('/api/devices', methods=['GET'])
 @finger_required
 def get_devices(user_id):
-    cachedFinger = cache.get(f'fingerprint_{user_id}') or []
-    return jsonify(cachedFinger), 200
+    cached_finger = cache.get(f'fingerprint_{user_id}') or []
+    return jsonify(cached_finger), 200
 
 
 @app.route('/finger', methods=['GET', 'POST'])
@@ -1521,10 +1527,10 @@ def finger(user_id):
         data = request.json
         chrome_fingerprint = data.get('fingerprint')
         if user_id and chrome_fingerprint:
-            cachedFinger = cache.get(f'fingerprint_{user_id}') or []
-            if chrome_fingerprint not in cachedFinger:
-                cachedFinger.append(chrome_fingerprint)
-                cache.set(f'fingerprint_{user_id}', cachedFinger)
+            cached_finger = cache.get(f'fingerprint_{user_id}') or []
+            if chrome_fingerprint not in cached_finger:
+                cached_finger.append(chrome_fingerprint)
+                cache.set(f'fingerprint_{user_id}', cached_finger)
                 return jsonify({"msg": "Fingerprint saved successfully"}), 200
             return jsonify({"msg": "Fingerprint Auth"}), 200
         return jsonify({"msg": "Failed to save fingerprint"}), 400
@@ -1537,15 +1543,15 @@ def finger(user_id):
 def export(user_id):
     key = request.cookies.get('key')
     cached_ip = cache.get(key)
-    cachedFinger = cache.get(f'fingerprint_{user_id}')
-    UserInfo = cache.get(f'{user_id}_userInfo')
+    cached_finger = cache.get(f'fingerprint_{user_id}')
+    user_info = cache.get(f'{user_id}_userInfo')
     user_followed = cache.get(f'{user_id}_followed')
     user_liked = cache.get(f'{user_id}_liked')
     result = {
         'key': key,
         'ip': cached_ip,
-        'cachedFinger': cachedFinger,
-        'UserInfo': UserInfo,
+        'cachedFinger': cached_finger,
+        'UserInfo': user_info,
         'user_followed': user_followed,
         'user_liked': user_liked,
     }
@@ -1563,15 +1569,15 @@ def user_center(user_id, user_name):
         return error("Invalid username", 400)
 
     target_id = get_user_id(user_name)
-    userBio = get_user_bio(user_id=target_id)
-    canFollowed = 1
+    user_bio = get_user_bio(user_id=target_id)
+    can_followed = 1
     if user_id != 0 and target_id != 0:
-        canFollowed = get_can_followed(user_id, target_id)
+        can_followed = get_can_followed(user_id, target_id)
     owner_articles = get_owner_articles(owner_id=None, user_name=user_name) or []
     return render_template('Profile.html', url_for=url_for, avatar_url=get_avatar(user_name, 'username'),
-                           userStatus=bool(user_name), username=user_name, userBio=userBio,
+                           userStatus=bool(user_name), username=user_name, userBio=user_bio,
                            target_id=target_id, user_id=user_id,
-                           Articles=owner_articles, canFollowed=canFollowed)
+                           Articles=owner_articles, canFollowed=can_followed)
 
 
 def diy_space(page):
@@ -1666,8 +1672,8 @@ def user_notification(user_id):
 
 @app.route('/api/notice/read')
 def read_user_notification():
-    readContent = read_notification()
-    return jsonify(readContent), 200
+    read_content = read_notification()
+    return jsonify(read_content), 200
 
 
 @app.route('/changelog')
@@ -1940,16 +1946,16 @@ def api_comment(user_id):
     if not new_comment:
         return jsonify({"message": "评论内容不能为空"}), 400
 
-    userIP = get_client_ip(request) or ''
-    maskedIP = ''
-    if userIP:
-        maskedIP = mask_ip(userIP)
+    user_ip = get_client_ip(request) or ''
+    masked_ip = ''
+    if user_ip:
+        masked_ip = mask_ip(user_ip)
 
-    userAgent = request.headers.get('User-Agent') or ''
-    userAgent = user_agent_info(userAgent)
+    user_agent = request.headers.get('User-Agent') or ''
+    user_agent = user_agent_info(user_agent)
 
     cache.set(f"CommentLock_{user_id}", aid, timeout=30)
-    result = comment_add(aid, user_id, pid, new_comment, maskedIP, userAgent)
+    result = comment_add(aid, user_id, pid, new_comment, masked_ip, user_agent)
 
     if result:
         return jsonify({'aid': aid, 'changed': True}), 201
@@ -1995,18 +2001,34 @@ def comment(user_id):
     return rendered
 
 
-@app.route('/api/delete/<filename>', methods=['GET', 'delete'])
+@app.route('/api/delete/<filename>', methods=['GET', 'DELETE'])
 @jwt_required
 def api_delete(user_id, filename):
     user_name = get_username()
+    arg_type = request.args.get('type')
+    if arg_type == 'article':
+        db = get_database_connection()
+        try:
+            with db.cursor() as cursor:
+                cursor.execute("DELETE FROM `articles` WHERE `Title` = %s AND `Author` = %s", (filename, user_name))
+                db.commit()
+                article_path = os.path.join(base_dir, 'articles', f"{filename}.md")
+                if os.path.exists(article_path):
+                    os.remove(article_path)
+                return jsonify({'Deleted': True}), 200
+        except Exception as e:
+            db.rollback()
+            app.logger.error(f"Error deleting article {filename}: {str(e)}")
+            return jsonify({'Deleted': False}), 500
+        finally:
+            db.close()
+
     file_path = os.path.join('media', user_name, filename)
-    auth = auth_files(file_path, user_id)
-    if auth:
-        if os.path.exists(file_path):
-            os.remove(file_path)
+    if auth_files(file_path, user_name):
+        os.remove(file_path) if os.path.exists(file_path) else None
         return jsonify({'filename': filename, 'Deleted': True}), 201
     else:
-        app.logger.info(f'{user_id} Delete: {filename} :error')
+        app.logger.info(f'Delete error for {filename} by user {user_id}')
         return jsonify({'filename': filename, 'Deleted': False}), 503
 
 
@@ -2102,53 +2124,76 @@ def travel():
 @app.route('/dashboard/articles', methods=['GET'])
 @admin_required
 def m_articles(user_id):
-    connection = get_db_connection()
-    cursor = connection.cursor(dictionary=True)
-    cursor.execute('SELECT * FROM articles')  # 从数据库获取文章列表
-    articles = cursor.fetchall()
-    cursor.close()
-    connection.close()
-    return render_template('M-articles.html', articles=articles)
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute('SELECT * FROM articles')
+        articles = cursor.fetchall()
+        cursor.close()
+        connection.close()
+        return render_template('M-articles.html', articles=articles)
+    except Exception as e:
+        # 记录错误日志
+        app.logger.error(f"Error fetching articles by user {user_id}: {str(e)}")
+        # 返回错误信息或重定向到错误页面
+        return error(message=f"获取文章时出错: {str(e)}", status_code=500), 500
 
 
 @app.route('/dashboard', methods=['GET'])
 @app.route('/dashboard/overview', methods=['GET'])
 @admin_required
 def m_overview(user_id):
-    connection = get_db_connection()
-    cursor = connection.cursor(dictionary=True)
-    cursor.execute("SHOW TABLE STATUS WHERE Name IN ('articles', 'users', 'comments','media','events');")
-    dash_info = cursor.fetchall()
-    cursor.execute('SELECT * FROM events')
-    events = cursor.fetchall()
-    cursor.close()
-    connection.close()
-    return render_template('M-overview.html', dashInfo=dash_info, events=events)
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute("SHOW TABLE STATUS WHERE Name IN ('articles', 'users', 'comments','media','events');")
+        dash_info = cursor.fetchall()
+        cursor.execute('SELECT * FROM events')
+        events = cursor.fetchall()
+        cursor.close()
+        connection.close()
+        return render_template('M-overview.html', dashInfo=dash_info, events=events)
+    except Exception as e:
+        # 记录错误日志
+        app.logger.error(f"Error fetching overview by user {user_id}: {str(e)}")
+        # 返回错误信息或重定向到错误页面
+        return error(message=f"获取Overview时出错: {str(e)}", status_code=500), 500
 
 
 @app.route('/dashboard/users', methods=['GET'])
 @admin_required
 def m_users(user_id):
-    connection = get_db_connection()
-    cursor = connection.cursor(dictionary=True)
-    cursor.execute('SELECT * FROM users')  # 从数据库获取用户列表
-    users = cursor.fetchall()
-    cursor.close()
-    connection.close()
-    return render_template('M-users.html', users=users)
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute('SELECT * FROM users')  # 从数据库获取用户列表
+        users = cursor.fetchall()
+        cursor.close()
+        connection.close()
+        return render_template('M-users.html', users=users)
+    except Exception as e:
+        # 记录错误日志
+        app.logger.error(f"Error fetching users by user {user_id}: {str(e)}")
+        # 返回错误信息或重定向到错误页面
+        return error(message=f"获取用户时出错: {str(e)}", status_code=500), 500
 
 
 @app.route('/dashboard/comments', methods=['GET'])
 @admin_required
 def m_comments(user_id):
-    connection = get_db_connection()
-    cursor = connection.cursor(dictionary=True)
-    cursor.execute('SELECT * FROM comments')
-    comments = cursor.fetchall()
-    cursor.close()
-    connection.close()
-
-    return render_template('M-comments.html', comments=comments)
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute('SELECT * FROM comments')
+        comments = cursor.fetchall()
+        cursor.close()
+        connection.close()
+        return render_template('M-comments.html', comments=comments)
+    except Exception as e:
+        # 记录错误日志
+        app.logger.error(f"Error fetching comments by user {user_id}: {str(e)}")
+        # 返回错误信息或重定向到错误页面
+        return error(message=f"获取文章时出错: {str(e)}", status_code=500), 500
 
 
 @app.template_filter('fromjson')
@@ -2169,55 +2214,79 @@ def json_filter(value):
 @app.route('/dashboard/media', methods=['GET'])
 @admin_required
 def m_media(user_id):
-    connection = get_db_connection()
-    cursor = connection.cursor(dictionary=True)
-    cursor.execute('SELECT * FROM media')  # 从数据库获取媒体列表
-    media_items = cursor.fetchall()
-    cursor.close()
-    connection.close()
-    return render_template('M-media.html', media_items=media_items, domain=domain)
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute('SELECT * FROM media')  # 从数据库获取媒体列表
+        media_items = cursor.fetchall()
+        cursor.close()
+        connection.close()
+        return render_template('M-media.html', media_items=media_items, domain=domain)
+    except Exception as e:
+        # 记录错误日志
+        app.logger.error(f"An error occurred while user-{user_id} was retrieving media : {str(e)}")
+        # 返回错误信息或重定向到错误页面
+        return error(message=f"获取媒体时出错: {str(e)}", status_code=500), 500
 
 
 @app.route('/dashboard/notifications', methods=['GET'])
 @admin_required
 def m_notifications(user_id):
-    connection = get_db_connection()
-    cursor = connection.cursor(dictionary=True)
-    cursor.execute('SELECT * FROM notifications')  # 从数据库获取通知列表
-    notifications = cursor.fetchall()
-    cursor.close()
-    connection.close()
-    return render_template('M-notifications.html', notifications=notifications)
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute('SELECT * FROM notifications')  # 从数据库获取通知列表
+        notifications = cursor.fetchall()
+        cursor.close()
+        connection.close()
+        return render_template('M-notifications.html', notifications=notifications)
+    except Exception as e:
+        # 记录错误日志
+        app.logger.error(f"An error occurred while user-{user_id} was getting notifications : {str(e)}")
+        # 返回错误信息或重定向到错误页面
+        return error(message=f"获取文章时出错: {str(e)}", status_code=500), 500
 
 
 @app.route('/dashboard/reports', methods=['GET'])
 @admin_required
 def m_reports(user_id):
-    connection = get_db_connection()
-    cursor = connection.cursor(dictionary=True)
-    cursor.execute('SELECT * FROM reports')  # 从数据库获取举报列表
-    reports = cursor.fetchall()
-    cursor.close()
-    connection.close()
-    return render_template('M-reports.html', reports=reports)
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute('SELECT * FROM reports')  # 从数据库获取举报列表
+        reports = cursor.fetchall()
+        cursor.close()
+        connection.close()
+        return render_template('M-reports.html', reports=reports)
+    except Exception as e:
+        # 记录错误日志
+        app.logger.error(f"An error occurred while user-{user_id} was getting reports : {str(e)}")
+        # 返回错误信息或重定向到错误页面
+        return error(message=f"获取举报信息时出错: {str(e)}", status_code=500), 500
 
 
 @app.route('/dashboard/urls', methods=['GET'])
 @admin_required
 def m_urls(user_id):
-    connection = get_db_connection()
-    cursor = connection.cursor(dictionary=True)
-    cursor.execute('SELECT * FROM urls')  # 从数据库获取短链接列表
-    urls = cursor.fetchall()
-    cursor.close()
-    connection.close()
-    return render_template('M-urls.html', urls=urls)
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute('SELECT * FROM urls')  # 从数据库获取短链接列表
+        urls = cursor.fetchall()
+        cursor.close()
+        connection.close()
+        return render_template('M-urls.html', urls=urls)
+    except Exception as e:
+        # 记录错误日志
+        app.logger.error(f"An error occurred while user-{user_id} was getting urls : {str(e)}")
+        # 返回错误信息或重定向到错误页面
+        return error(message=f"获取短链接时出错: {str(e)}", status_code=500), 500
 
 
 @app.route('/dashboard/display', methods=['GET'])
 @admin_required
 def m_display(user_id):
-    return render_template('M-display.html', displayList=get_all_themes())
+    return render_template('M-display.html', displayList=get_all_themes(), user_id=user_id)
 
 
 @app.route('/dashboard/articles', methods=['DELETE'])
@@ -2590,6 +2659,159 @@ def get_avatar(user_identifier, identifier_type='id'):
 @app.route('/api/avatar/<avatar_uuid>.webp', methods=['GET'])
 def get_avatar_image(avatar_uuid):
     return send_file(f'{base_dir}/{app.config['AVATAR_PATH']}/{avatar_uuid}.webp', mimetype='image/webp')
+
+
+def ueditor_plus_edit(article, user_name):
+    aid, tags = get_tags_by_article(article)
+    all_info = get_more_info(aid)
+    edit_html = zy_edit_article(article, max_line=app.config['MAX_LINE'])
+    article_url = domain + 'blog/' + article
+    article_surl = api_shortlink(article_url)
+    # 渲染编辑页面并将转换后的HTML传递到模板中
+    return render_template('ueditor-plus.html',
+                           edit_html=edit_html, aid=aid, articleName=article,
+                           tags=tags, article_surl=article_surl,
+                           user_name=user_name, coverImage=all_info[8],
+                           articleExcerpt=all_info[10], articleStatus=all_info[7])
+
+
+def save_user_file(file, filename, user_name):
+    # 确保上传文件的文件名是安全的
+    filename = secure_filename(filename)
+
+    # 构造保存路径
+    save_path = os.path.join(app.config['USER_BASE_PATH'], user_name, filename)
+
+    # 确保用户的上传目录存在，如果不存在则创建
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+    # 检查文件类型并保存
+    if isinstance(file, io.BytesIO):
+        # 如果是 BytesIO 对象，直接写入文件
+        with open(save_path, 'wb') as f:
+            f.write(file.getvalue())
+    else:
+        # 否则假设是 Flask 的 FileStorage 对象
+        file.save(save_path)
+
+    return str(save_path)
+
+
+@app.route('/api/ueditor/<user_name>', methods=['GET', 'POST'])
+def ueditor_plus_server(user_name):
+    # /ueditor-plus/_demo_server/handle.php
+    action = request.args.get('action', default=None)
+    upload_folder = app.config['USER_BASE_PATH'] + '/' + user_name
+    if action == 'showPost':
+        return jsonify(request.form)
+
+    elif action in ['image', 'video', 'voice', 'file', 'scrawl']:
+        file = request.files.get('file')
+        if file:
+            filename = secure_filename(file.filename)
+            save_path = save_user_file(file, filename, user_name)
+            return jsonify({
+                'state': 'SUCCESS',
+                'url': domain + save_path,
+                'title': filename,
+                'original': filename,
+            })
+        else:
+            return jsonify({'state': 'ERROR', 'message': f'No {action} uploaded'})
+
+    elif action == 'listImage':
+        list_images = [{'url': '/' + os.path.join(upload_folder, f),
+                        'mtime': int(os.path.getmtime(os.path.join(upload_folder, f)))} for f in
+                       os.listdir(upload_folder) if f.endswith(('.png', '.jpg', '.jpeg', '.gif'))]
+        result = {
+            "state": "SUCCESS",
+            "list": list_images,
+            "start": int(request.args.get('start', 0)),
+            "total": len(list_images)
+        }
+        return jsonify(result)
+
+    elif action == 'listFile':
+        list_files = [{'url': '/' + os.path.join(upload_folder, f),
+                       'mtime': int(os.path.getmtime(os.path.join(upload_folder, f)))} for f in
+                      os.listdir(upload_folder)]
+        result = {
+            "state": "SUCCESS",
+            "list": list_files,
+            "start": int(request.args.get('start', 0)),
+            "total": len(list_files)
+        }
+        return jsonify(result)
+
+    elif action == 'catch':
+        list_catch = []
+        source = request.form.getlist('source[]')
+        if not source:
+            return jsonify({'state': 'ERROR', 'message': 'No source URL provided'})
+        for img_url in source:
+            try:
+                filename = secure_filename(os.path.basename(img_url))
+                response = requests.get(img_url)
+                response.raise_for_status()
+                save_path = save_user_file(io.BytesIO(response.content), filename, user_name)
+                list_catch.append({
+                    'state': 'SUCCESS',
+                    'url': domain + save_path,
+                    'size': os.path.getsize(os.path.join(upload_folder, filename)),
+                    'title': filename,
+                    'original': filename,
+                    'source': img_url,
+                })
+            except Exception as e:
+                list_catch.append({
+                    'state': 'ERROR',
+                    'message': str(e),
+                    'source': img_url,
+                })
+        return jsonify({'state': 'SUCCESS', 'list': list_catch})
+
+    # 当 action 为 None 或其他未定义操作时，返回 ueditor_config
+    ueditor_config = cache.get(f"ueditor_config")
+    if ueditor_config is None:
+        config_path = os.path.join(base_dir, 'static', 'ueditorPlus', 'config.json')
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                ueditor_config = json.load(f)
+
+            cache.set(f"ueditor_config", ueditor_config, timeout=3600)
+        except FileNotFoundError:
+            return jsonify({'state': 'ERROR', 'message': 'Config file not found'})
+        except json.JSONDecodeError:
+            return jsonify({'state': 'ERROR', 'message': 'Invalid JSON format in config file'})
+    return jsonify(ueditor_config)
+
+
+@app.route('/api/edit/<int:aid>', methods=['POST', 'PUT'])
+def markdown_editor2(aid):
+    try:
+        a_name = request.form.get('title')
+        content = request.form.get('content') or ''
+        status = request.form.get('status') or 'Draft'
+        excerpt = request.form.get('excerpt') or ''
+        cover_image = request.files.get('coverImage') or None
+        cover_image_path = 'cover'
+        if cover_image:
+            filename = secure_filename(cover_image.filename)
+            cover_image_path = os.path.join('cover', filename)
+            os.makedirs(os.path.dirname(cover_image_path), exist_ok=True)
+            with open(cover_image_path, 'wb') as f:
+                cover_image.save(f)
+        if article_save_change(aid, excerpt, status, cover_image_path) and zy_save_edit(aid, content, a_name):
+            return jsonify({'show_edit_code': 'success'}), 200
+    except Exception as e:
+        app.logger.error(f"保存文章时出错: {e}")
+        return jsonify({'show_edit_code': 'failed'}), 500
+
+
+@app.route('/api/cover/<cover_img>', methods=['GET'])
+@app.route('/edit/cover/<cover_img>', methods=['GET'])
+def api_cover(cover_img):
+    return send_file(f'../cover/{cover_img}', mimetype='image/png')
 
 
 @app.errorhandler(404)

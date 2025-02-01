@@ -368,12 +368,9 @@ def set_article_info(a_title, username):
             query = """
             INSERT INTO articles (Title, Author, tags) 
             VALUES (%s, %s, %s) 
-            ON DUPLICATE KEY UPDATE Author = %s, tags = %s;
+            ON DUPLICATE KEY UPDATE Author = VALUES(Author), tags = VALUES(tags);
             """
-
-            print(
-                f"Executing SQL: {query} with parameters: ({a_title}, {username}, {current_year}, {username}, {current_year})")
-            cursor.execute(query, (a_title, username, current_year, username, current_year))
+            cursor.execute(query, (a_title, username, current_year))
 
             # 记录事件信息
             event_log = ("INSERT INTO events (title, description, event_date, created_at) VALUES (%s, %s, "
@@ -387,7 +384,7 @@ def set_article_info(a_title, username):
             return True  # 表示操作成功
 
     except Exception as e:
-        print(f"An error occurred during database operation: {e}")
+        print(f"数据库操作期间发生错误: {e}")
         # 回滚事务
         db.rollback()
         return False  # 表示操作失败
@@ -424,41 +421,38 @@ def write_tags_to_database(aid, tags_list):
 
 
 def set_article_visibility(article, hide=True):
+    if not isinstance(article, str):
+        raise ValueError("Article must be a string")
     db = get_database_connection()
+    cursor = db.cursor()
     try:
-        with db.cursor() as cursor:
+        with cursor:
             # 查询文章的当前状态
             query = "SELECT Hidden FROM articles WHERE Title = %s"
             cursor.execute(query, (article,))
             result = cursor.fetchone()
 
             if result is None:
-                # 如果文章不存在，根据 hide 参数来设置 Hidden 状态
+                # 如果文章不存在，则插入新记录
                 hidden_status = 1 if hide else 0
                 tags_value = str(datetime.datetime.now().year)
                 query = "INSERT INTO articles (Title, Author, Hidden, Tags) VALUES (%s, 'test', %s, %s)"
                 cursor.execute(query, (article, hidden_status, tags_value))
+                db.commit()
+                return hidden_status
             else:
                 current_hidden_status = result[0]
-                if hide and current_hidden_status == 0:
-                    query = "UPDATE articles SET Hidden = 1 WHERE Title = %s"
-                    cursor.execute(query, (article,))
-                elif not hide and current_hidden_status == 1:
-                    query = "UPDATE articles SET Hidden = 0 WHERE Title = %s"
-                    cursor.execute(query, (article,))
-
-            db.commit()
-
-            # 返回当前 hidden 状态
-            return current_hidden_status if result else False
+                if (hide and current_hidden_status == 0) or (not hide and current_hidden_status == 1):
+                    # 如果需要改变隐藏状态，则更新记录
+                    query = "UPDATE articles SET Hidden = %s WHERE Title = %s"
+                    cursor.execute(query, (1 if hide else 0, article))
+                    db.commit()
+                return current_hidden_status
     except Exception as e:
         print(f"An error occurred: {e}")
         return None
     finally:
-        try:
-            cursor.close()
-        except NameError:
-            pass
+        cursor.close()
         db.close()
 
 
@@ -549,7 +543,7 @@ def get_comments(aid, page=1, per_page=30):
 
 def auth_files(file_path, user_id):
     db = get_database_connection()
-    Auth = False
+    auth = False
     print(file_path)
     try:
         with db.cursor() as cursor:
@@ -557,7 +551,7 @@ def auth_files(file_path, user_id):
             cursor.execute(query, (user_id, file_path,))
             result = cursor.fetchone()
             if result:
-                Auth = True
+                auth = True
 
     except Exception as e:
         print(f"An error occurred: {e}")
@@ -567,4 +561,46 @@ def auth_files(file_path, user_id):
         except NameError:
             pass
         db.close()
-        return Auth
+        return auth
+
+
+def get_more_info(aid):
+    result = (None,) * 13
+    db = get_database_connection()
+    cursor = db.cursor()
+    try:
+        query = "SELECT * FROM articles WHERE ArticleID = %s"
+        cursor.execute(query, (int(aid),))
+        fetched_result = cursor.fetchone()
+        if fetched_result:
+            result = fetched_result
+    except DatabaseError as db_err:
+        print(f"数据库错误: {db_err}")
+    except Exception as e:
+        print(f"发生了一个错误: {e}")
+    finally:
+        cursor.close()
+        db.close()
+    return result
+
+
+def article_save_change(aid, excerpt, status, cover_image_path):
+    db = None
+    try:
+        db = get_database_connection()
+        with db.cursor() as cursor:
+            # 根据cover_image_path是否为None构建不同的查询
+            if cover_image_path is None:
+                query = "UPDATE `articles` SET `Status` = %s, `excerpt` = %s WHERE `ArticleID` = %s"
+                cursor.execute(query, (status, excerpt, aid))
+            else:
+                query = "UPDATE `articles` SET `Status` = %s, `CoverImage` = %s, `excerpt` = %s WHERE `ArticleID` = %s"
+                cursor.execute(query, (status, cover_image_path, excerpt, aid))
+            db.commit()
+            return {'show_edit_code': 'success'}
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return {'show_edit_code': 'failure', 'error': str(e)}
+    finally:
+        if db is not None:
+            db.close()
