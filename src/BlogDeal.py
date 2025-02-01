@@ -370,7 +370,7 @@ def set_article_info(a_title, username):
             VALUES (%s, %s, %s) 
             ON DUPLICATE KEY UPDATE Author = VALUES(Author), tags = VALUES(tags);
             """
-            cursor.execute(query, (a_title, username, current_year, username, current_year))
+            cursor.execute(query, (a_title, username, current_year))
 
             # 记录事件信息
             event_log = ("INSERT INTO events (title, description, event_date, created_at) VALUES (%s, %s, "
@@ -562,3 +562,45 @@ def auth_files(file_path, user_id):
             pass
         db.close()
         return auth
+
+
+def get_more_info(aid):
+    result = (None,) * 13
+    db = get_database_connection()
+    cursor = db.cursor()
+    try:
+        query = "SELECT * FROM articles WHERE ArticleID = %s"
+        cursor.execute(query, (int(aid),))
+        fetched_result = cursor.fetchone()
+        if fetched_result:
+            result = fetched_result
+    except DatabaseError as db_err:
+        print(f"数据库错误: {db_err}")
+    except Exception as e:
+        print(f"发生了一个错误: {e}")
+    finally:
+        cursor.close()
+        db.close()
+    return result
+
+
+def article_save_change(aid, excerpt, status, cover_image_path):
+    db = None
+    try:
+        db = get_database_connection()
+        with db.cursor() as cursor:
+            # 根据cover_image_path是否为None构建不同的查询
+            if cover_image_path is None:
+                query = "UPDATE `articles` SET `Status` = %s, `excerpt` = %s WHERE `ArticleID` = %s"
+                cursor.execute(query, (status, excerpt, aid))
+            else:
+                query = "UPDATE `articles` SET `Status` = %s, `CoverImage` = %s, `excerpt` = %s WHERE `ArticleID` = %s"
+                cursor.execute(query, (status, cover_image_path, excerpt, aid))
+            db.commit()
+            return {'show_edit_code': 'success'}
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return {'show_edit_code': 'failure', 'error': str(e)}
+    finally:
+        if db is not None:
+            db.close()
