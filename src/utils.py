@@ -251,9 +251,9 @@ def zy_mail_conf():
     return mail_host, mail_port, mail_user, mail_password
 
 
-def handle_file_upload(file, upload_folder):
+def handle_article_upload(file, upload_folder, allowed_size):
     # 验证文件格式和大小
-    if not file.filename.endswith('.md') or file.content_length > 10 * 1024 * 1024:
+    if not file.filename.endswith('.md') or file.content_length > allowed_size:
         return 'Invalid file format or file too large.', 400
 
     # 使用 pathlib 创建上传文件夹
@@ -517,3 +517,22 @@ def user_agent_info(user_agent):
         converted_ua = f"Tablet / {user_agent_parsed.device.family} / {user_agent_parsed.os.family}"
 
     return converted_ua
+
+
+def handle_article_delete(article_name, temp_folder):
+    # 确保 temp_folder 是 Path 对象
+    temp_folder = Path(temp_folder)
+
+    # 构建文件路径
+    draft_file_path = temp_folder / f"{article_name}.md"
+    published_file_path = Path('articles') / f"{article_name}.md"
+
+    # 删除草稿文件
+    if draft_file_path.is_file():
+        os.remove(draft_file_path)
+
+    # 删除已发布文件
+    if published_file_path.exists():
+        os.remove(published_file_path)
+
+    return True

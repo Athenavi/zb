@@ -173,7 +173,7 @@ def get_blog_author(title):
         db.close()
 
 
-def auth_articles(article_name, username):
+def auth_articles(article_name, user_name):
     db = get_database_connection()
 
     try:
@@ -182,7 +182,7 @@ def auth_articles(article_name, username):
             cursor.execute(query, (article_name,))
             result = cursor.fetchone()
 
-            if result and result[0] == username:
+            if result and result[0] == user_name:
                 return True
             else:
                 return False
@@ -197,13 +197,13 @@ def auth_articles(article_name, username):
         db.close()
 
 
-def auth_by_id(aid, username):
+def auth_by_id(aid, user_name):
     db = get_database_connection()
 
     try:
         with db.cursor() as cursor:
             query = "SELECT * FROM articles WHERE ArticleID = %s and Author = %s"
-            cursor.execute(query, (aid, username,))
+            cursor.execute(query, (aid, user_name,))
             result = cursor.fetchone()
             if result:
                 return True
