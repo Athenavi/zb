@@ -40,7 +40,7 @@ from src.user import error, get_owner_articles, zy_general_conf, get_profiles, g
     get_follower_count, get_can_followed, get_user_id, get_all_themes
 from src.utils import admin_upload_file, get_client_ip, \
     generate_jwt, secret_key, authenticate_jwt, \
-    authenticate_refresh_token, handle_article_upload, is_allowed_file, is_valid_domain_with_slash, \
+    authenticate_refresh_token, handle_article_upload, is_allowed_file, zb_safe_check, \
     get_all_img, get_all_video, get_all_xmind, generate_thumbs, generate_video_thumb, \
     get_username, admin_required, jwt_required, finger_required, theme_safe_check, mask_ip, user_id_required, \
     user_agent_info, handle_article_delete
@@ -83,7 +83,7 @@ app.logger.setLevel(logging.INFO)
 
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-domain, sitename, beian, sys_version, api_host, app_id, app_key = zy_general_conf()
+domain, sitename, beian, sys_version, api_host, app_id, app_key, DEFAULT_KEY = zy_general_conf()
 print("please check information")
 print("++++++++++==========================++++++++++")
 print(
@@ -337,8 +337,8 @@ def get_home_data(page, tag):
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
-    if not is_valid_domain_with_slash(domain):
-        return error(message="域名配置出错,您的程序将无法正常运行", status_code=503)
+    if not zb_safe_check(domain):
+        return error(message="域名配置出错,或者正在使用默认的 系统配置 将导致安全问题", status_code=503)
 
     if request.method == 'GET':
         page = request.args.get('page', default=1, type=int)
@@ -973,7 +973,7 @@ def jump():
 
 @app.route('/login/<provider>')
 def cc_login(provider):
-    if is_valid_domain_with_slash(api_host):
+    if zb_safe_check(api_host):
         pass
     else:
         return error(message="彩虹聚合登录API接口配置错误,您的程序无法使用第三方登录", status_code='503'), 503
@@ -2720,15 +2720,15 @@ def markdown_editor2(user_id, aid):
     try:
         content = request.form.get('content') or ''
         status = request.form.get('status') or 'Draft'
-        excerpt = request.form.get('excerpt') or ''
+        excerpt = request.form.get('excerpt')[:145] or ''
         cover_image = request.files.get('coverImage') or None
         cover_image_path = 'cover'
         if status == 'Deleted':
             if handle_article_delete(a_name, app.config['TEMP_FOLDER']):
                 return jsonify({'show_edit_code': 'deleted'}), 201
         if cover_image:
-            filename = secure_filename(cover_image.filename)
-            cover_image_path = os.path.join('cover', filename)
+            # 保存封面图片
+            cover_image_path = os.path.join('cover', f"{aid}.png")
             os.makedirs(os.path.dirname(cover_image_path), exist_ok=True)
             with open(cover_image_path, 'wb') as f:
                 cover_image.save(f)
@@ -2929,6 +2929,98 @@ def featured_page():
     return render_template('index.html', article_info=article_info, page=page, total_pages=total_pages,
                            SiteName=sitename,
                            tag_name='featured')
+
+
+def validate_api_key(api_key):
+    if api_key == DEFAULT_KEY:
+        return True
+    else:
+        return False
+
+
+@app.route('/upload/bulk', methods=['GET', 'POST'])
+@jwt_required
+def upload_bulk(user_id):
+    upload_locked = cache.get(f"upload_locked_{user_id}") or False
+    if request.method == 'POST':
+        if upload_locked:
+            return jsonify([{"filename": "无法上传", "status": "failed", "message": "上传已被锁定，请稍后再试"}]), 209
+
+        try:
+            api_key = request.form.get('API_KEY')
+            if not validate_api_key(api_key):
+                return jsonify([{"filename": "无法上传", "status": "failed", "message": "API_KEY 错误"}]), 403
+
+            user_name = get_username()
+            files = request.files.getlist('files')
+
+            # Check if the number of files exceeds the limit
+            if len(files) > 50:
+                return jsonify([{"filename": "无法上传", "status": "failed", "message": "最多只能上传50个文件"}]), 400
+
+            upload_result = []
+            for file in files:
+                cache.set(f"upload_locked_{user_id}", True, timeout=30)
+                current_file_result = {"filename": file.filename, "status": "", "message": ""}
+
+                # 使用 secure_filename 处理文件名
+                secure_name = secure_filename(file.filename)
+
+                # 直接使用原始文件名
+                original_name = file.filename
+
+                if not original_name.endswith(('.md')) or original_name.startswith('_') or file.content_length > \
+                        app.config['UPLOAD_LIMIT']:
+                    current_file_result["status"] = "failed"
+                    current_file_result["message"] = "文件类型或名称不受支持或文件大小超过限制"
+                    upload_result.append(current_file_result)
+                    continue
+
+                # 确保文件路径支持中文字符
+                file_path = os.path.join("articles", original_name)
+
+                # 自动重命名文件
+                if os.path.exists(file_path):
+                    current_file_result["status"] = "failed"
+                    current_file_result["message"] = "存在同名文件！！！"
+                    upload_result.append(current_file_result)
+                    continue
+
+                # 保存文件
+                file.save(file_path)
+                if save_bulk_article_db(original_name, Author=user_name):
+                    current_file_result["status"] = "success"
+                    current_file_result["message"] = "上传成功"
+                else:
+                    current_file_result["status"] = "failed"
+                    current_file_result["message"] = "数据库保存失败"
+                upload_result.append(current_file_result)
+
+            return jsonify({'upload_result': upload_result})
+
+        except Exception as e:
+            app.logger.error(f"Error in file upload: {e}")
+            return jsonify({'message': 'failed', 'error': str(e)}), 500
+
+    return render_template('upload.html', upload_locked=upload_locked)
+
+
+def save_bulk_article_db(filename, Author):
+    title = filename.split('.')[0]
+    tags = datetime.now().year
+    db = get_db_connection()
+    try:
+        with db.cursor() as cursor:
+            cursor.execute("INSERT INTO articles (Title, Author, Status, tags) VALUES (%s, %s, %s, %s)",
+                           (title, Author, 'Draft', tags))
+        db.commit()
+        return True
+    except Exception as e:
+        app.logger.error(f"Error in saving to database: {e}")
+        return False
+    finally:
+        if db:
+            db.close()
 
 
 @app.errorhandler(404)

@@ -287,9 +287,10 @@ def check_exist(cache_file):
                 return jsonify(cache_data)
 
 
-def is_valid_domain_with_slash(url):
+def zb_safe_check(url):
+    if DEFAULT_KEY == '237':
+        return False
     pattern = r"^(https?://)?([a-zA-Z0-9-]+\.)*[a-zA-Z]{2,}(\/)$"
-
     if re.match(pattern, url):
         return True
     else:
@@ -433,7 +434,7 @@ def generate_video_thumb(video_path, thumb_path, time=1):
     cap.release()
 
 
-domain, title, beian, sys_version, api_host, app_id, app_key = zy_general_conf()
+domain, title, beian, sys_version, api_host, app_id, app_key, DEFAULT_KEY = zy_general_conf()
 
 
 def theme_safe_check(theme_id, channel=1):
