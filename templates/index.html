@@ -25,9 +25,13 @@
                 {% set Views = article[3] %}{% set Likes = article[4] %}{% set Comments = article[5] %}{% set CoverImage = article[6] %}
                 {% set Excerpt = article[8] %}{% set tags = article[10] %}
                 <div class="bg-white rounded-lg shadow-md overflow-hidden">
-                    <img src="https://api.7trees.cn/img" alt="{{ Title }}" class="w-full h-48 object-cover">
+                    {% if CoverImage %}
+                        <img src="/api/{{ CoverImage }}" alt="{{ Title }}" class="w-full h-48 object-cover">
+                    {% else %}
+                        <img src="https://api.7trees.cn/img" alt="{{ Title }}" class="w-full h-48 object-cover">
+                    {% endif %}
                     <div class="p-4">
-                        <a href="/article/{{ ArticleID }}">
+                        <a href="/blog/{{ Title }}">
                             <h2 class="text-xl font-semibold">{{ Title }}</h2></a>
                         <p class="text-gray-600 mt-2">
                             <strong>作者:</strong> {{ Author }} |
