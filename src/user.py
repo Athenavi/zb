@@ -11,8 +11,6 @@ try:
 except UnicodeDecodeError:
     config.read('config.ini', encoding='gbk')
 
-door_key = config.get('admin', 'key').strip("'")
-
 
 def zy_general_conf():
     sys_config = ConfigParser()
@@ -24,8 +22,9 @@ def zy_general_conf():
     api_host = config.get('general', 'api_host', fallback='error').strip("'")
     app_id = config.get('general', 'app_id', fallback='error').strip("'")
     app_key = config.get('general', 'app_key', fallback='error').strip("'")
+    DEFAULT_KEY = config.get('admin', 'key').strip("'")
 
-    return domain, title, beian, version, api_host, app_id, app_key
+    return domain, title, beian, version, api_host, app_id, app_key, DEFAULT_KEY
 
 
 def error(message, status_code):

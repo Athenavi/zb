@@ -9,14 +9,9 @@
     <meta name="author" content="">
     <title>{{ title }}</title>
     <link rel="shortcut icon" type="image/ico" href="/favicon.ico">
-    <link href="https://cdn.bootcdn.net/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
-    <link href="https://cdn.bootcdn.net/ajax/libs/normalize/8.0.1/normalize.css" rel="stylesheet">
-    <script src="https://cdn.bootcdn.net/ajax/libs/jquery/3.7.1/jquery.js"></script>
+    <script src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.bootcdn.net/ajax/libs/jquery-mousewheel/3.1.9/jquery.mousewheel.js"></script>
-    <script src="https://cdn.bootcdn.net/ajax/libs/fancybox/3.5.7/jquery.fancybox.js"></script>
-    <link href="https://cdn.bootcdn.net/ajax/libs/fancybox/3.5.7/jquery.fancybox.css" rel="stylesheet">
-    <script src="/static/js/media-fancybox.js" type="text/javascript"></script>
-    <link rel="stylesheet" href="/static/css/dropzone.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.5.7/jquery.fancybox.js"></script>
     <style>
         body {
             background: url(/static/image/day.jpg) no-repeat center/cover;
@@ -74,11 +69,36 @@
                 margin-bottom: 30px;
             }
         }
+
+        #preferenceDiv {
+            display: none; /* 初始隐藏 */
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #f9f9f9;
+            border: 1px solid #ccc;
+            padding: 20px;
+            z-index: 1000;
+        }
+
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
     </style>
+    <script src="/static/js/media-fancybox.js" type="text/javascript"></script>
+    <link rel="stylesheet" href="/static/css/dropzone.css">
 </head>
-
+<!-- 弹出框 -->
+<div id="overlay"></div>
 <body class="bg-gray-100">
-
 <div class="container mx-auto p-6">
     <header class="bg-white rounded-lg shadow mb-6 p-4">
         <h1 class="text-2xl font-bold"><a href="/">🏠</a>媒体文件</h1>
@@ -211,31 +231,6 @@
 <script src="/static/js/prewXmind.js"></script>
 </body>
 </html>
-<div id="overlay"></div>
-<style>
-    #preferenceDiv {
-        display: none; /* 初始隐藏 */
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background-color: #f9f9f9;
-        border: 1px solid #ccc;
-        padding: 20px;
-        z-index: 1000;
-    }
-
-    #overlay {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.5);
-        z-index: 999;
-    }
-</style>
 <div id="preferenceDiv">
     <p>请选择您的媒体页面偏好：</p>
     <button class="btn btn-primary" onclick="setPreference('V1')">旧版(7天内不再提醒)</button>
@@ -275,3 +270,6 @@
         document.getElementById("video-popup").style.display = "block";
     }
 </script>
+<link href="https://cdn.bootcdn.net/ajax/libs/fancybox/3.5.7/jquery.fancybox.css" rel="stylesheet">
+<link href="https://cdn.bootcdn.net/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+<link href="https://cdn.bootcdn.net/ajax/libs/normalize/8.0.1/normalize.css" rel="stylesheet">

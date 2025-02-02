@@ -251,9 +251,9 @@ def zy_mail_conf():
     return mail_host, mail_port, mail_user, mail_password
 
 
-def handle_file_upload(file, upload_folder):
+def handle_article_upload(file, upload_folder, allowed_size):
     # 验证文件格式和大小
-    if not file.filename.endswith('.md') or file.content_length > 10 * 1024 * 1024:
+    if not file.filename.endswith('.md') or file.content_length > allowed_size:
         return 'Invalid file format or file too large.', 400
 
     # 使用 pathlib 创建上传文件夹
@@ -287,9 +287,10 @@ def check_exist(cache_file):
                 return jsonify(cache_data)
 
 
-def is_valid_domain_with_slash(url):
+def zb_safe_check(url):
+    if DEFAULT_KEY == '237':
+        return False
     pattern = r"^(https?://)?([a-zA-Z0-9-]+\.)*[a-zA-Z]{2,}(\/)$"
-
     if re.match(pattern, url):
         return True
     else:
@@ -433,7 +434,7 @@ def generate_video_thumb(video_path, thumb_path, time=1):
     cap.release()
 
 
-domain, title, beian, sys_version, api_host, app_id, app_key = zy_general_conf()
+domain, title, beian, sys_version, api_host, app_id, app_key, DEFAULT_KEY = zy_general_conf()
 
 
 def theme_safe_check(theme_id, channel=1):
@@ -517,3 +518,22 @@ def user_agent_info(user_agent):
         converted_ua = f"Tablet / {user_agent_parsed.device.family} / {user_agent_parsed.os.family}"
 
     return converted_ua
+
+
+def handle_article_delete(article_name, temp_folder):
+    # 确保 temp_folder 是 Path 对象
+    temp_folder = Path(temp_folder)
+
+    # 构建文件路径
+    draft_file_path = temp_folder / f"{article_name}.md"
+    published_file_path = Path('articles') / f"{article_name}.md"
+
+    # 删除草稿文件
+    if draft_file_path.is_file():
+        os.remove(draft_file_path)
+
+    # 删除已发布文件
+    if published_file_path.exists():
+        os.remove(published_file_path)
+
+    return True

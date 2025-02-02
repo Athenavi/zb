@@ -40,10 +40,10 @@ from src.user import error, get_owner_articles, zy_general_conf, get_profiles, g
     get_follower_count, get_can_followed, get_user_id, get_all_themes
 from src.utils import admin_upload_file, get_client_ip, \
     generate_jwt, secret_key, authenticate_jwt, \
-    authenticate_refresh_token, handle_file_upload, is_allowed_file, is_valid_domain_with_slash, \
-    get_all_img, get_all_video, get_all_xmind, get_list_intersection, generate_thumbs, generate_video_thumb, \
+    authenticate_refresh_token, handle_article_upload, is_allowed_file, zb_safe_check, \
+    get_all_img, get_all_video, get_all_xmind, generate_thumbs, generate_video_thumb, \
     get_username, admin_required, jwt_required, finger_required, theme_safe_check, mask_ip, user_id_required, \
-    user_agent_info
+    user_agent_info, handle_article_delete
 
 global_encoding = 'utf-8'
 
@@ -62,7 +62,7 @@ app.config['AVATAR_SERVER'] = "https://api.7trees.cn/avatar"
 app.config['ALLOWED_EXTENSIONS'] = {'.jpg', '.png', '.webp', '.jfif', '.pjpeg', '.jpeg', '.pjp', '.mp4', '.xmind'}
 app.config['UPLOAD_LIMIT'] = 60 * 1024 * 1024
 # 定义文件最大可编辑的行数
-app.config['MAX_LINE'] = 360
+app.config['MAX_LINE'] = 1000
 # 定义rss和站点地图的缓存时间（单位:s）
 app.config['MAX_CACHE_TIMESTAMP'] = 7200
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)  # 添加 ProxyFix 中间件
@@ -83,11 +83,11 @@ app.logger.setLevel(logging.INFO)
 
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-domain, title, beian, sys_version, api_host, app_id, app_key = zy_general_conf()
+domain, sitename, beian, sys_version, api_host, app_id, app_key, DEFAULT_KEY = zy_general_conf()
 print("please check information")
 print("++++++++++==========================++++++++++")
 print(
-    f'\n domain: {domain} \n title: {title} \n beian: {beian} \n Version: {sys_version} \n 三方登录api: {api_host} \n')
+    f'\n domain: {domain} \n title: {sitename} \n beian: {beian} \n Version: {sys_version} \n 三方登录api: {api_host} \n')
 print("++++++++++==========================++++++++++")
 
 
@@ -95,7 +95,7 @@ print("++++++++++==========================++++++++++")
 def inject_variables():
     return dict(
         beian=beian,
-        title=title,
+        title=sitename,
         username=get_username,
         domain=domain
     )
@@ -320,7 +320,7 @@ def get_home_data(page, tag):
     if tag != 'None':
         tag_articles = get_articles_by_tag(tag)
         if tag_articles:
-            articles = get_list_intersection(articles, tag_articles)
+            articles = tag_articles
         else:
             app.logger.warning(f'没有找到标签: {tag} 下的文章！')
 
@@ -329,8 +329,7 @@ def get_home_data(page, tag):
     compressed_list = list(zip(articles, summary_list, info_list))
 
     if not info_list:
-        app.logger.warning('获取文章信息失败，返回错误提示')
-        return None, None, None, None, None, None  # 添加 None 用于 tags
+        return error(message="没有找到任何文章", status_code=404)
 
     friends_links = get_friends_link()
     return compressed_list, notice, has_next_page, has_previous_page, friends_links, tags
@@ -338,8 +337,8 @@ def get_home_data(page, tag):
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
-    if not is_valid_domain_with_slash(domain):
-        return error(message="域名配置出错,您的程序将无法正常运行", status_code=503)
+    if not zb_safe_check(domain):
+        return error(message="域名配置出错,或者正在使用默认的 系统配置 将导致安全问题", status_code=503)
 
     if request.method == 'GET':
         page = request.args.get('page', default=1, type=int)
@@ -592,9 +591,9 @@ def generate_rss():
     xml_data = '<?xml version="1.0" encoding="UTF-8"?>\n'
     xml_data += '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">\n'
     xml_data += '<channel>\n'
-    xml_data += '<title>' + title + 'RSS Feed </title>\n'
+    xml_data += '<title>' + sitename + 'RSS Feed </title>\n'
     xml_data += '<link>' + domain + '</link>\n'
-    xml_data += '<description>' + title + 'RSS Feed</description>\n'
+    xml_data += '<description>' + sitename + 'RSS Feed</description>\n'
     xml_data += '<language>en-us</language>\n'
     xml_data += '<lastBuildDate>' + datetime.now().strftime("%a, %d %b %Y %H:%M:%S %z") + '</lastBuildDate>\n'
     xml_data += '<atom:link href="' + domain + 'rss" rel="self" type="application/rss+xml" />\n'
@@ -704,7 +703,7 @@ def new_article(user_id):
         file = request.files['file']
 
         logging.info(f"User {user_id} attempting to upload: {file.filename}")
-        error_message = handle_file_upload(file, app.config['TEMP_FOLDER'])
+        error_message = handle_article_upload(file, app.config['TEMP_FOLDER'], app.config['UPLOAD_LIMIT'])
         if error_message:
             logging.error(f"File upload error: {error_message[0]}")
             return error(*error_message)
@@ -740,7 +739,8 @@ def static_from_root():
 
 
 @app.route('/edit/<article>', methods=['GET', 'POST', 'PUT'])
-def markdown_editor(article):
+@jwt_required
+def markdown_editor(user_id, article):
     if article == 'default':
         return error(404, status_code=404)
     user_name = get_username()
@@ -751,7 +751,7 @@ def markdown_editor(article):
 
     if auth:
         if request.args.get('editor') == 'ueditor':
-            return ueditor_plus_edit(article, user_name)
+            return ueditor_plus_edit(user_id, article, user_name)
         aid, tags = get_tags_by_article(article)
         if request.method == 'GET':
             edit_html = zy_edit_article(article, max_line=app.config['MAX_LINE'])
@@ -923,14 +923,14 @@ def media(user_id):
         return image
 
 
-@app.route('/media/<username>/<img_name>')
-@app.route('/zyImg/<username>/<img_name>')
-def get_image_path(username, img_name):
+@app.route('/media/<user_name>/<img_name>')
+@app.route('/zyImg/<user_name>/<img_name>')
+def get_image_path(user_name, img_name):
     preview = request.args.get('preview')
     if preview:
-        return api_img(username, img_name)
+        return api_img(user_name, img_name)
     try:
-        img_dir = Path(base_dir) / 'media' / username / img_name
+        img_dir = Path(base_dir) / 'media' / user_name / img_name
         with open(img_dir, 'rb') as f:
             img_data = f.read()
         # 使用 BytesIO 包装图像数据
@@ -944,83 +944,19 @@ def get_image_path(username, img_name):
 @jwt_required
 def upload_user_path(user_id):
     user_name = get_username()
-
-    if not user_name:
-        return jsonify({'message': 'failed, user not authenticated'}), 403
-
-    try:
-        allowed_types = app.config['ALLOWED_EXTENSIONS']
-        user_dir = os.path.join(app.config['USER_BASE_PATH'], user_name)  # 用户文件存储目录
-        os.makedirs(user_dir, exist_ok=True)  # 如果目录不存在则创建
-
-        file_records = []  # 用于存储文件记录的列表
-        with get_database_connection() as db:  # 使用上下文管理器获取数据库连接
-            with db.cursor() as cursor:  # 使用上下文管理器获取数据库游标
-                userid = user_id
-                # 处理每个上传的文件
-                for f in request.files.getlist('file'):
-                    if not is_allowed_file(f.filename, allowed_types):  # 检查文件类型
-                        continue
-
-                    if f.content_length > app.config['UPLOAD_LIMIT']:
-                        return jsonify({'message': f'File size exceeds the limit of {app.config['UPLOAD_LIMIT']}'}), 413
-
-                        # 确保文件名安全并确保是字符串类型
-                    newfile_name = secure_filename(str(f.filename))
-                    user_dir = str(user_dir)
-
-                    # 生成新文件路径并保存文件
-                    newfile_path = os.path.join(user_dir, newfile_name)
-                    f.save(newfile_path)  # 保存文件
-
-                    # 确定文件类型
-                    file_type = (
-                        'image' if f.filename.lower().endswith(
-                            ('.jpg', '.jpeg', '.png', '.webp', '.jfif', '.pjpeg', '.pjp')
-                        ) else 'video' if f.filename.lower().endswith('.mp4')
-                        else 'document'
-                    )
-
-                    # 查询是否存在相同的文件路径
-                    cursor.execute("SELECT `id` FROM `media` WHERE `file_path`=%s", (newfile_path,))
-                    existing_record = cursor.fetchone()
-
-                    if existing_record:
-                        # 更新已存在文件的 updated_at
-                        cursor.execute(
-                            "UPDATE `media` SET `updated_at`=%s WHERE `id`=%s",
-                            (datetime.now(), existing_record[0])
-                        )
-                    else:
-                        # 文件路径不存在，添加新的记录
-                        file_records.append((userid, newfile_path, file_type, datetime.now(), datetime.now()))  # 添加文件记录
-                        app.logger.info(f'User: {user_name}, Uploaded file: {newfile_name}')  # 记录上传日志
-
-                # 如果有文件记录，则插入数据库
-                if file_records:
-                    insert_query = ("INSERT INTO `media` (`user_id`, `file_path`, `file_type`, `created_at`, "
-                                    "`updated_at`) VALUES (%s, %s, %s, %s, %s)")
-                    cursor.executemany(insert_query, file_records)  # 批量插入文件记录
-
-            db.commit()  # 提交数据库事务
-
-        return jsonify({'message': 'success'}), 200  # 返回成功响应
-
-    except Exception as e:
-        app.logger.error(f"Error in file upload: {e}")  # 记录错误日志
-        return jsonify({'message': 'failed', 'error': str(e)}), 500
+    handle_user_upload(user_name=user_name, user_id=user_id)
 
 
-@app.route('/zyVideo/<username>/<video_name>')
-def start_video(username, video_name):
+@app.route('/zyVideo/<user_name>/<video_name>')
+def start_video(user_name, video_name):
     try:
         # 使用 pathlib.Path 处理路径
-        video_dir = Path(base_dir) / 'media' / username
+        video_dir = Path(base_dir) / 'media' / user_name
         video_path = video_dir / video_name
 
         # 检查文件是否存在
         if not video_path.exists():
-            return f"Video {video_name} not found for user {username}.", 404
+            return f"Video {video_name} not found for user {user_name}.", 404
 
         # 使用 send_file 发送视频文件
         return send_file(video_path, mimetype='video/mp4', as_attachment=False, conditional=True)
@@ -1037,7 +973,7 @@ def jump():
 
 @app.route('/login/<provider>')
 def cc_login(provider):
-    if is_valid_domain_with_slash(api_host):
+    if zb_safe_check(api_host):
         pass
     else:
         return error(message="彩虹聚合登录API接口配置错误,您的程序无法使用第三方登录", status_code='503'), 503
@@ -1090,7 +1026,7 @@ def get_theme_detail(theme_id):
     if theme_id == 'default':
         theme_properties = {
             'id': theme_id,
-            'author': title,
+            'author': sitename,
             'title': "恢复系统默认",
             'authorWebsite': domain,
             'version': sys_version,
@@ -1145,7 +1081,7 @@ def redirect_to_long_url_route(short_url):
 def api_shortlink(long_url):
     if not long_url.startswith('https://') and not long_url.startswith('http://'):
         return 'error'
-    user_name = title
+    user_name = sitename
     short_url = create_special_url(long_url, user_name)
     article_surl = domain + 's/' + short_url
     return article_surl
@@ -1596,13 +1532,13 @@ def diy_space(page):
 @app.route('/guestbook', methods=['GET', 'POST'])
 @finger_required
 def guestbook(user_id):
-    username = get_username()
+    user_name = get_username()
     avatar_url = get_avatar(user_id)
     message_list = get_guestbook() or []
     user_finger = request.cookies.get('finger')
     if request.method == 'POST':
         data = request.get_json()
-        nickname = data.get('nickname') or username
+        nickname = data.get('nickname') or user_name
         message = data.get('message')
         content = f'"{nickname}":"{message}"'
 
@@ -1614,7 +1550,7 @@ def guestbook(user_id):
         cache.set(f"guestbook_{user_finger}", True, timeout=180)
         return jsonify({'status': 'success', 'message_list': message_list}), 201
 
-    return render_template('guestbook.html', avatar_url=avatar_url, username=username, message_list=message_list)
+    return render_template('guestbook.html', avatar_url=avatar_url, username=user_name, message_list=message_list)
 
 
 def get_guestbook():
@@ -1681,43 +1617,43 @@ def changelog():
     return redirect('https://github.com/Athenavi/zb/blob/main/articles/changelog.md')
 
 
-@app.route('/img/<username>/thumbs/<img>', methods=['GET', 'POST'])
-def api_img(username, img):
+@app.route('/img/<user_name>/thumbs/<img>', methods=['GET', 'POST'])
+def api_img(user_name, img):
     if request.method == 'GET':
-        img_dir = Path(base_dir) / 'media' / username / img
-        img_thumbs = Path(base_dir) / 'media' / username / 'thumbs' / img
+        img_dir = Path(base_dir) / 'media' / user_name / img
+        img_thumbs = Path(base_dir) / 'media' / user_name / 'thumbs' / img
         if os.path.isfile(img_dir) and os.path.isfile(img_thumbs):
             return send_file(img_thumbs, mimetype='image/jpeg')
         if os.path.isfile(img_dir) and not os.path.isfile(img_thumbs):
             # 使用线程池异步执行 gen_thumbs 函数
             with concurrent.futures.ThreadPoolExecutor() as executor:
-                thumbs_path = os.path.join(base_dir, 'media', username, 'thumbs')
+                thumbs_path = os.path.join(base_dir, 'media', user_name, 'thumbs')
                 if not os.path.exists(thumbs_path):
                     os.makedirs(thumbs_path)
                 executor.submit(generate_thumbs(img_dir, img_thumbs))
             return send_file('../static/favicon.ico', mimetype='image/png')
 
 
-@app.route('/video/<username>/thumbs/<video>.png', methods=['GET', 'POST'])
-def api_video(username, video):
+@app.route('/video/<user_name>/thumbs/<video>.png', methods=['GET', 'POST'])
+def api_video(user_name, video):
     if request.method == 'GET':
-        video_dir = Path(base_dir) / 'media' / username / video
-        video_thumbs = Path(base_dir) / 'media' / username / 'thumbs' / f"V-thumbs_{video}.png"
+        video_dir = Path(base_dir) / 'media' / user_name / video
+        video_thumbs = Path(base_dir) / 'media' / user_name / 'thumbs' / f"V-thumbs_{video}.png"
         if os.path.isfile(video_dir) and os.path.isfile(video_thumbs):
             return send_file(video_thumbs, mimetype='image/jpeg')
         if os.path.isfile(video_dir) and not os.path.isfile(video_thumbs):
             with concurrent.futures.ThreadPoolExecutor() as executor:
-                thumbs_path = os.path.join(base_dir, 'media', username, 'thumbs')
+                thumbs_path = os.path.join(base_dir, 'media', user_name, 'thumbs')
                 if not os.path.exists(thumbs_path):
                     os.makedirs(thumbs_path)
                 executor.submit(generate_video_thumb(video_dir, video_thumbs))
             return send_file('../static/favicon.ico', mimetype='image/png')
 
 
-@app.route('/xmind/<username>/thumbs/<xmind>.png', methods=['GET', 'POST'])
-def api_xmind(username, xmind):
+@app.route('/xmind/<user_name>/thumbs/<xmind>.png', methods=['GET', 'POST'])
+def api_xmind(user_name, xmind):
     if request.method == 'GET':
-        video_dir = Path(base_dir) / 'media' / username / xmind
+        video_dir = Path(base_dir) / 'media' / user_name / xmind
         if os.path.isfile(video_dir):
             return send_file('../static/image/xmind.png', mimetype='image/jpeg')
 
@@ -1920,7 +1856,7 @@ def api_article_pw(user_id):
     if len(new_password) != 4:
         return jsonify({"message": "无效的密码"}), 400
 
-    auth = auth_by_id(aid, username=get_username())
+    auth = auth_by_id(aid, user_name=get_username())
 
     if auth:
         cache.set(f"PWLock_{user_id}", aid, timeout=30)
@@ -1996,7 +1932,7 @@ def comment(user_id):
 
     comments, has_next_page, has_previous_page = get_comments(aid, page=page, per_page=30)
     template = env.get_template('Comment.html')
-    rendered = template.render(aid=aid, user_id=user_id, username=get_username(), comments=comments,
+    rendered = template.render(aid=aid, user_id=user_id, comments=comments,
                                has_next_page=has_next_page, has_previous_page=has_previous_page, current_page=page)
     return rendered
 
@@ -2661,7 +2597,7 @@ def get_avatar_image(avatar_uuid):
     return send_file(f'{base_dir}/{app.config['AVATAR_PATH']}/{avatar_uuid}.webp', mimetype='image/webp')
 
 
-def ueditor_plus_edit(article, user_name):
+def ueditor_plus_edit(user_id, article, user_name):
     aid, tags = get_tags_by_article(article)
     all_info = get_more_info(aid)
     edit_html = zy_edit_article(article, max_line=app.config['MAX_LINE'])
@@ -2669,50 +2605,35 @@ def ueditor_plus_edit(article, user_name):
     article_surl = api_shortlink(article_url)
     # 渲染编辑页面并将转换后的HTML传递到模板中
     return render_template('ueditor-plus.html',
+                           user_id=user_id,
                            edit_html=edit_html, aid=aid, articleName=article,
                            tags=tags, article_surl=article_surl,
                            user_name=user_name, coverImage=all_info[8],
                            articleExcerpt=all_info[10], articleStatus=all_info[7])
 
 
-def save_user_file(file, filename, user_name):
-    # 确保上传文件的文件名是安全的
-    filename = secure_filename(filename)
-
-    # 构造保存路径
-    save_path = os.path.join(app.config['USER_BASE_PATH'], user_name, filename)
-
-    # 确保用户的上传目录存在，如果不存在则创建
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-
-    # 检查文件类型并保存
-    if isinstance(file, io.BytesIO):
-        # 如果是 BytesIO 对象，直接写入文件
-        with open(save_path, 'wb') as f:
-            f.write(file.getvalue())
-    else:
-        # 否则假设是 Flask 的 FileStorage 对象
-        file.save(save_path)
-
-    return str(save_path)
-
-
-@app.route('/api/ueditor/<user_name>', methods=['GET', 'POST'])
-def ueditor_plus_server(user_name):
+@app.route('/api/ueditor', methods=['GET', 'POST'])
+@jwt_required
+def ueditor_plus_server(user_id):
     # /ueditor-plus/_demo_server/handle.php
+    aid = request.args.get('aid')
+    user_name = request.args.get('user_name')
+    if not aid or not user_name:
+        return jsonify({'state': 'ERROR', 'message': '参数不完整'}), 400
     action = request.args.get('action', default=None)
     upload_folder = app.config['USER_BASE_PATH'] + '/' + user_name
+    if os.path.exists(upload_folder) is False:
+        return jsonify({'state': 'ERROR', 'message': '请先前往媒体管理页面上传文件'}), 400
     if action == 'showPost':
         return jsonify(request.form)
-
     elif action in ['image', 'video', 'voice', 'file', 'scrawl']:
         file = request.files.get('file')
         if file:
             filename = secure_filename(file.filename)
-            save_path = save_user_file(file, filename, user_name)
+            outer_url = get_outer_url(user_name, user_id, filename)
             return jsonify({
                 'state': 'SUCCESS',
-                'url': domain + save_path,
+                'url': outer_url,
                 'title': filename,
                 'original': filename,
             })
@@ -2753,10 +2674,10 @@ def ueditor_plus_server(user_name):
                 filename = secure_filename(os.path.basename(img_url))
                 response = requests.get(img_url)
                 response.raise_for_status()
-                save_path = save_user_file(io.BytesIO(response.content), filename, user_name)
+                outer_url = get_outer_url(user_name, user_id, filename)
                 list_catch.append({
                     'state': 'SUCCESS',
-                    'url': domain + save_path,
+                    'url': outer_url,
                     'size': os.path.getsize(os.path.join(upload_folder, filename)),
                     'title': filename,
                     'original': filename,
@@ -2787,24 +2708,34 @@ def ueditor_plus_server(user_name):
 
 
 @app.route('/api/edit/<int:aid>', methods=['POST', 'PUT'])
-def markdown_editor2(aid):
+@jwt_required
+def markdown_editor2(user_id, aid):
+    a_name = request.form.get('title') or None
+    user_name = get_username()
+    if not user_name or not a_name:
+        return jsonify({'show_edit_code': 'failed'}), 500
+    auth = auth_articles(article_name=a_name, user_name=user_name)
+    if auth is False:
+        return jsonify({'show_edit_code': 'failed'}), 403
     try:
-        a_name = request.form.get('title')
         content = request.form.get('content') or ''
         status = request.form.get('status') or 'Draft'
-        excerpt = request.form.get('excerpt') or ''
+        excerpt = request.form.get('excerpt')[:145] or ''
         cover_image = request.files.get('coverImage') or None
         cover_image_path = 'cover'
+        if status == 'Deleted':
+            if handle_article_delete(a_name, app.config['TEMP_FOLDER']):
+                return jsonify({'show_edit_code': 'deleted'}), 201
         if cover_image:
-            filename = secure_filename(cover_image.filename)
-            cover_image_path = os.path.join('cover', filename)
+            # 保存封面图片
+            cover_image_path = os.path.join('cover', f"{aid}.png")
             os.makedirs(os.path.dirname(cover_image_path), exist_ok=True)
             with open(cover_image_path, 'wb') as f:
                 cover_image.save(f)
         if article_save_change(aid, excerpt, status, cover_image_path) and zy_save_edit(aid, content, a_name):
             return jsonify({'show_edit_code': 'success'}), 200
     except Exception as e:
-        app.logger.error(f"保存文章时出错: {e}")
+        app.logger.error(f"保存文章 article id: {aid} 时出错: {e} by user {user_id} ")
         return jsonify({'show_edit_code': 'failed'}), 500
 
 
@@ -2812,6 +2743,280 @@ def markdown_editor2(aid):
 @app.route('/edit/cover/<cover_img>', methods=['GET'])
 def api_cover(cover_img):
     return send_file(f'../cover/{cover_img}', mimetype='image/png')
+
+
+def handle_user_upload(user_name, user_id):
+    if not user_name:
+        return jsonify({'message': 'failed, user not authenticated'}), 403
+    try:
+        allowed_types = app.config['ALLOWED_EXTENSIONS']
+        user_dir = os.path.join(app.config['USER_BASE_PATH'], user_name)  # 用户文件存储目录
+        os.makedirs(user_dir, exist_ok=True)  # 如果目录不存在则创建
+        file_records = []  # 用于存储文件记录的列表
+        with get_database_connection() as db:  # 使用上下文管理器获取数据库连接
+            with db.cursor() as cursor:  # 使用上下文管理器获取数据库游标
+                # 处理每个上传的文件
+                for f in request.files.getlist('file'):
+                    if not is_allowed_file(f.filename, allowed_types):  # 检查文件类型
+                        continue
+
+                    if f.content_length > app.config['UPLOAD_LIMIT']:
+                        return jsonify({'message': f'File size exceeds the limit of {app.config["UPLOAD_LIMIT"]}'}), 413
+
+                    # 确保文件名安全并确保是字符串类型
+                    newfile_name = secure_filename(str(f.filename))
+                    user_dir = str(user_dir)
+
+                    # 生成新文件路径并保存文件
+                    newfile_path = os.path.join(user_dir, newfile_name)
+                    old_thumb_path = os.path.join(user_dir, 'thumbs', newfile_name)
+
+                    if isinstance(f, io.BytesIO):
+                        # 如果是 BytesIO 对象，直接写入文件
+                        with open(newfile_path, 'wb') as file:
+                            file.write(f.getvalue())
+                    else:
+                        f.save(newfile_path)
+
+                    if os.path.isfile(old_thumb_path):
+                        os.remove(old_thumb_path)
+
+                    # 确定文件类型
+                    file_type = (
+                        'image' if f.filename.lower().endswith(
+                            ('.jpg', '.jpeg', '.png', '.webp', '.jfif', '.pjpeg', '.pjp')
+                        ) else 'video' if f.filename.lower().endswith('.mp4')
+                        else 'document'
+                    )
+
+                    # 查询是否存在相同的文件路径
+                    cursor.execute("SELECT `id` FROM `media` WHERE `file_path`=%s", (newfile_path,))
+                    existing_record = cursor.fetchone()
+
+                    if existing_record:
+                        # 更新已存在文件的 updated_at
+                        cursor.execute(
+                            "UPDATE `media` SET `updated_at`=%s WHERE `id`=%s",
+                            (datetime.now(), existing_record[0])
+                        )
+                    else:
+                        # 文件路径不存在，添加新的记录
+                        file_records.append(
+                            (user_id, newfile_path, file_type, datetime.now(), datetime.now()))  # 添加文件记录
+                        app.logger.info(f'User: {user_name}, Uploaded file: {newfile_name}')  # 记录上传日志
+
+                # 如果有文件记录，则插入数据库
+                if file_records:
+                    insert_query = ("INSERT INTO `media` (`user_id`, `file_path`, `file_type`, `created_at`, "
+                                    "`updated_at`) VALUES (%s, %s, %s, %s, %s)")
+                    cursor.executemany(insert_query, file_records)  # 批量插入文件记录
+
+            db.commit()  # 提交数据库事务
+
+        return jsonify({'message': 'success'}), 200  # 返回成功响应
+
+    except Exception as e:
+        app.logger.error(f"Error in file upload: {e}")  # 记录错误日志
+        return jsonify({'message': 'failed', 'error': str(e)}), 500
+
+
+def get_outer_url(user_name, user_id, filename):
+    if handle_user_upload(user_name, user_id):
+        return domain + 'media/' + user_name + '/' + filename
+
+
+def fetch_articles(query, params):
+    db = get_db_connection()
+    article_info = []
+    total_articles = 0
+    try:
+        with db.cursor() as cursor:
+            cursor.execute(query, params)
+            article_info = cursor.fetchall()
+
+            # 调试输出
+            print("Fetched articles:", article_info)
+
+            cursor.execute("SELECT COUNT(*) FROM `articles` WHERE `Hidden`=0 AND `Status`='Published'")
+            total_articles = cursor.fetchone()[0]
+
+    except Exception as e:
+        app.logger.error(f"Error getting articles: {e}")
+        raise
+
+    finally:
+        if db is not None:
+            db.close()
+
+    return article_info, total_articles
+
+
+@app.route('/index.html', methods=['GET'])
+def index_html():
+    page = request.args.get('page', 1, type=int)
+    page_size = 45
+    offset = (page - 1) * page_size
+
+    query = """
+        SELECT ArticleID, Title, Author, Views, Likes, Comments, CoverImage, ArticleType, excerpt, is_featured, tags
+        FROM `articles`
+        WHERE `Hidden`=0 AND `Status`='Published'
+        ORDER BY `ArticleID` DESC
+        LIMIT %s OFFSET %s
+    """
+
+    try:
+        article_info, total_articles = fetch_articles(query, (page_size, offset))
+        total_pages = (total_articles + page_size - 1) // page_size
+
+    except Exception:
+        return error("An error occurred while fetching articles.", status_code=500)
+
+    return render_template('index.html', article_info=article_info, page=page, total_pages=total_pages,
+                           SiteName=sitename)
+
+
+@app.route('/tag/<tag_name>', methods=['GET'])
+def tag_page(tag_name):
+    if len(tag_name.encode('utf-8')) > 10:
+        return error("Tag 名称不能超过 10 字节。", status_code=400)
+
+    page = request.args.get('page', 1, type=int)
+    page_size = 45
+    offset = (page - 1) * page_size
+
+    query = """
+        SELECT ArticleID, Title, Author, Views, Likes, Comments, CoverImage, ArticleType, excerpt, is_featured, tags
+        FROM `articles`
+        WHERE `Hidden`=0 AND `Status`='Published' AND `tags` LIKE %s
+        ORDER BY `ArticleID` DESC
+        LIMIT %s OFFSET %s
+    """
+
+    try:
+        article_info, total_articles = fetch_articles(query, ('%' + tag_name + '%', page_size, offset))
+        total_pages = (total_articles + page_size - 1) // page_size
+
+    except Exception:
+        return error("获取文章时发生错误。", status_code=500)
+
+    return render_template('index.html', article_info=article_info, page=page, total_pages=total_pages,
+                           SiteName=sitename,
+                           tag_name=tag_name)
+
+
+@app.route('/featured', methods=['GET'])
+def featured_page():
+    page = request.args.get('page', 1, type=int)
+    page_size = 45
+    offset = (page - 1) * page_size
+
+    query = """
+         SELECT ArticleID, Title, Author, Views, Likes, Comments, CoverImage, ArticleType, excerpt, is_featured, tags
+         FROM `articles`
+         WHERE `Hidden`=0 AND `Status`='Published' AND `is_featured`=1
+         ORDER BY `ArticleID` DESC
+         LIMIT %s OFFSET %s
+     """
+
+    try:
+        article_info, total_articles = fetch_articles(query, (page_size, offset))
+        total_pages = (total_articles + page_size - 1) // page_size
+
+    except Exception:
+        return error("获取文章时发生错误。", status_code=500)
+
+    return render_template('index.html', article_info=article_info, page=page, total_pages=total_pages,
+                           SiteName=sitename,
+                           tag_name='featured')
+
+
+def validate_api_key(api_key):
+    if api_key == DEFAULT_KEY:
+        return True
+    else:
+        return False
+
+
+@app.route('/upload/bulk', methods=['GET', 'POST'])
+@jwt_required
+def upload_bulk(user_id):
+    upload_locked = cache.get(f"upload_locked_{user_id}") or False
+    if request.method == 'POST':
+        if upload_locked:
+            return jsonify([{"filename": "无法上传", "status": "failed", "message": "上传已被锁定，请稍后再试"}]), 209
+
+        try:
+            api_key = request.form.get('API_KEY')
+            if not validate_api_key(api_key):
+                return jsonify([{"filename": "无法上传", "status": "failed", "message": "API_KEY 错误"}]), 403
+
+            user_name = get_username()
+            files = request.files.getlist('files')
+
+            # Check if the number of files exceeds the limit
+            if len(files) > 50:
+                return jsonify([{"filename": "无法上传", "status": "failed", "message": "最多只能上传50个文件"}]), 400
+
+            upload_result = []
+            for file in files:
+                cache.set(f"upload_locked_{user_id}", True, timeout=30)
+                current_file_result = {"filename": file.filename, "status": "", "message": ""}
+                # 直接使用原始文件名
+                original_name = file.filename
+
+                if not original_name.endswith('.md') or original_name.startswith('_') or file.content_length > \
+                        app.config['UPLOAD_LIMIT']:
+                    current_file_result["status"] = "failed"
+                    current_file_result["message"] = "文件类型或名称不受支持或文件大小超过限制"
+                    upload_result.append(current_file_result)
+                    continue
+
+                # 确保文件路径支持中文字符
+                file_path = os.path.join("articles", original_name)
+
+                # 自动重命名文件
+                if os.path.exists(file_path):
+                    current_file_result["status"] = "failed"
+                    current_file_result["message"] = "存在同名文件！！！"
+                    upload_result.append(current_file_result)
+                    continue
+
+                # 保存文件
+                file.save(file_path)
+                if save_bulk_article_db(original_name, author=user_name):
+                    current_file_result["status"] = "success"
+                    current_file_result["message"] = "上传成功"
+                else:
+                    current_file_result["status"] = "failed"
+                    current_file_result["message"] = "数据库保存失败"
+                upload_result.append(current_file_result)
+
+            return jsonify({'upload_result': upload_result})
+
+        except Exception as e:
+            app.logger.error(f"Error in file upload: {e}")
+            return jsonify({'message': 'failed', 'error': str(e)}), 500
+
+    return render_template('upload.html', upload_locked=upload_locked)
+
+
+def save_bulk_article_db(filename, author):
+    title = filename.split('.')[0]
+    tags = datetime.now().year
+    db = get_db_connection()
+    try:
+        with db.cursor() as cursor:
+            cursor.execute("INSERT INTO articles (Title, Author, Status, tags) VALUES (%s, %s, %s, %s)",
+                           (title, author, 'Draft', tags))
+        db.commit()
+        return True
+    except Exception as e:
+        app.logger.error(f"Error in saving to database: {e}")
+        return False
+    finally:
+        if db:
+            db.close()
 
 
 @app.errorhandler(404)
