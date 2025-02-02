@@ -307,9 +307,8 @@ def get_articles_by_tag(tag_name):
     tag_articles = []
 
     try:
-        query = "SELECT Title FROM articles WHERE Tags LIKE %s"
+        query = "SELECT Title FROM articles WHERE hidden = 0 AND `Status` = 'Published' AND`Tags` LIKE %s"
         cursor.execute(query, ('%' + tag_name + '%',))
-
         results = cursor.fetchall()
         for result in results:
             tag_articles.append(result[0])

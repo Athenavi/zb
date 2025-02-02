@@ -41,7 +41,7 @@ from src.user import error, get_owner_articles, zy_general_conf, get_profiles, g
 from src.utils import admin_upload_file, get_client_ip, \
     generate_jwt, secret_key, authenticate_jwt, \
     authenticate_refresh_token, handle_article_upload, is_allowed_file, is_valid_domain_with_slash, \
-    get_all_img, get_all_video, get_all_xmind, get_list_intersection, generate_thumbs, generate_video_thumb, \
+    get_all_img, get_all_video, get_all_xmind, generate_thumbs, generate_video_thumb, \
     get_username, admin_required, jwt_required, finger_required, theme_safe_check, mask_ip, user_id_required, \
     user_agent_info, handle_article_delete
 
@@ -83,11 +83,11 @@ app.logger.setLevel(logging.INFO)
 
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-domain, title, beian, sys_version, api_host, app_id, app_key = zy_general_conf()
+domain, sitename, beian, sys_version, api_host, app_id, app_key = zy_general_conf()
 print("please check information")
 print("++++++++++==========================++++++++++")
 print(
-    f'\n domain: {domain} \n title: {title} \n beian: {beian} \n Version: {sys_version} \n 三方登录api: {api_host} \n')
+    f'\n domain: {domain} \n title: {sitename} \n beian: {beian} \n Version: {sys_version} \n 三方登录api: {api_host} \n')
 print("++++++++++==========================++++++++++")
 
 
@@ -95,7 +95,7 @@ print("++++++++++==========================++++++++++")
 def inject_variables():
     return dict(
         beian=beian,
-        title=title,
+        title=sitename,
         username=get_username,
         domain=domain
     )
@@ -320,7 +320,7 @@ def get_home_data(page, tag):
     if tag != 'None':
         tag_articles = get_articles_by_tag(tag)
         if tag_articles:
-            articles = get_list_intersection(articles, tag_articles)
+            articles = tag_articles
         else:
             app.logger.warning(f'没有找到标签: {tag} 下的文章！')
 
@@ -329,8 +329,7 @@ def get_home_data(page, tag):
     compressed_list = list(zip(articles, summary_list, info_list))
 
     if not info_list:
-        app.logger.warning('获取文章信息失败，返回错误提示')
-        return None, None, None, None, None, None  # 添加 None 用于 tags
+        return error(message="没有找到任何文章", status_code=404)
 
     friends_links = get_friends_link()
     return compressed_list, notice, has_next_page, has_previous_page, friends_links, tags
@@ -592,9 +591,9 @@ def generate_rss():
     xml_data = '<?xml version="1.0" encoding="UTF-8"?>\n'
     xml_data += '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">\n'
     xml_data += '<channel>\n'
-    xml_data += '<title>' + title + 'RSS Feed </title>\n'
+    xml_data += '<title>' + sitename + 'RSS Feed </title>\n'
     xml_data += '<link>' + domain + '</link>\n'
-    xml_data += '<description>' + title + 'RSS Feed</description>\n'
+    xml_data += '<description>' + sitename + 'RSS Feed</description>\n'
     xml_data += '<language>en-us</language>\n'
     xml_data += '<lastBuildDate>' + datetime.now().strftime("%a, %d %b %Y %H:%M:%S %z") + '</lastBuildDate>\n'
     xml_data += '<atom:link href="' + domain + 'rss" rel="self" type="application/rss+xml" />\n'
@@ -1027,7 +1026,7 @@ def get_theme_detail(theme_id):
     if theme_id == 'default':
         theme_properties = {
             'id': theme_id,
-            'author': title,
+            'author': sitename,
             'title': "恢复系统默认",
             'authorWebsite': domain,
             'version': sys_version,
@@ -1082,7 +1081,7 @@ def redirect_to_long_url_route(short_url):
 def api_shortlink(long_url):
     if not long_url.startswith('https://') and not long_url.startswith('http://'):
         return 'error'
-    user_name = title
+    user_name = sitename
     short_url = create_special_url(long_url, user_name)
     article_surl = domain + 's/' + short_url
     return article_surl
@@ -2824,6 +2823,112 @@ def handle_user_upload(user_name, user_id):
 def get_outer_url(user_name, user_id, filename):
     if handle_user_upload(user_name, user_id):
         return domain + 'media/' + user_name + '/' + filename
+
+
+def fetch_articles(query, params):
+    db = get_db_connection()
+    article_info = []
+    total_articles = 0
+    try:
+        with db.cursor() as cursor:
+            cursor.execute(query, params)
+            article_info = cursor.fetchall()
+
+            # 调试输出
+            print("Fetched articles:", article_info)
+
+            cursor.execute("SELECT COUNT(*) FROM `articles` WHERE `Hidden`=0 AND `Status`='Published'")
+            total_articles = cursor.fetchone()[0]
+
+    except Exception as e:
+        app.logger.error(f"Error getting articles: {e}")
+        raise
+
+    finally:
+        if db is not None:
+            db.close()
+
+    return article_info, total_articles
+
+
+@app.route('/index.html', methods=['GET'])
+def index_html():
+    page = request.args.get('page', 1, type=int)
+    page_size = 45
+    offset = (page - 1) * page_size
+
+    query = """
+        SELECT ArticleID, Title, Author, Views, Likes, Comments, CoverImage, ArticleType, excerpt, is_featured, tags
+        FROM `articles`
+        WHERE `Hidden`=0 AND `Status`='Published'
+        ORDER BY `ArticleID` DESC
+        LIMIT %s OFFSET %s
+    """
+
+    try:
+        article_info, total_articles = fetch_articles(query, (page_size, offset))
+        total_pages = (total_articles + page_size - 1) // page_size
+
+    except Exception:
+        return error("An error occurred while fetching articles.", status_code=500)
+
+    return render_template('index.html', article_info=article_info, page=page, total_pages=total_pages,
+                           SiteName=sitename)
+
+
+@app.route('/tag/<tag_name>', methods=['GET'])
+def tag_page(tag_name):
+    if len(tag_name.encode('utf-8')) > 10:
+        return error("Tag 名称不能超过 10 字节。", status_code=400)
+
+    page = request.args.get('page', 1, type=int)
+    page_size = 45
+    offset = (page - 1) * page_size
+
+    query = """
+        SELECT ArticleID, Title, Author, Views, Likes, Comments, CoverImage, ArticleType, excerpt, is_featured, tags
+        FROM `articles`
+        WHERE `Hidden`=0 AND `Status`='Published' AND `tags` LIKE %s
+        ORDER BY `ArticleID` DESC
+        LIMIT %s OFFSET %s
+    """
+
+    try:
+        article_info, total_articles = fetch_articles(query, ('%' + tag_name + '%', page_size, offset))
+        total_pages = (total_articles + page_size - 1) // page_size
+
+    except Exception:
+        return error("获取文章时发生错误。", status_code=500)
+
+    return render_template('index.html', article_info=article_info, page=page, total_pages=total_pages,
+                           SiteName=sitename,
+                           tag_name=tag_name)
+
+
+@app.route('/featured', methods=['GET'])
+def featured_page():
+    page = request.args.get('page', 1, type=int)
+    page_size = 45
+    offset = (page - 1) * page_size
+
+    query = """
+         SELECT ArticleID, Title, Author, Views, Likes, Comments, CoverImage, ArticleType, excerpt, is_featured, tags
+         FROM `articles`
+         WHERE `Hidden`=0 AND `Status`='Published' AND `is_featured`=1
+         ORDER BY `ArticleID` DESC
+         LIMIT %s OFFSET %s
+     """
+
+    try:
+        article_info, total_articles = fetch_articles(query, (page_size, offset))
+        total_pages = (total_articles + page_size - 1) // page_size
+
+    except Exception:
+        return error("获取文章时发生错误。", status_code=500)
+
+    return render_template('index.html', article_info=article_info, page=page, total_pages=total_pages,
+                           SiteName=sitename,
+                           tag_name='featured')
 
 
 @app.errorhandler(404)
