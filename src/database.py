@@ -2,6 +2,7 @@ import configparser
 import os
 
 import mysql.connector
+from mysql.connector import pooling
 
 
 def get_db_connection():
@@ -9,35 +10,45 @@ def get_db_connection():
 
 
 def get_database_connection():
-    db_host = os.environ.get('db_host', '').strip("'")
-    db_port = int(os.environ.get('db_port', '3306').strip("'"))
-    db_name = os.environ.get('db_name', '').strip("'")
-    db_user = os.environ.get('db_user', '').strip("'")
-    db_password = os.environ.get('db_password', '').strip("'")
+    global db_pool  # 确保可以在函数内使用全局变量db_pool
 
-    if not all([db_host, db_port, db_name, db_user, db_password]):
-        config = configparser.ConfigParser()
-        try:
-            config.read('config.ini', encoding='utf-8')
-        except UnicodeDecodeError:
-            config.read('config.ini', encoding='gbk')
+    # 如果连接池尚未初始化，则初始化之
+    if db_pool is None:
+        print('initializing database pool...')
+        db_host = os.environ.get('db_host', '').strip("'")
+        db_port = int(os.environ.get('db_port', '3306').strip("'"))
+        db_name = os.environ.get('db_name', '').strip("'")
+        db_user = os.environ.get('db_user', '').strip("'")
+        db_password = os.environ.get('db_password', '').strip("'")
 
-        db_config = dict(config.items('database'))
+        if not all([db_host, db_port, db_name, db_user, db_password]):
+            config = configparser.ConfigParser()
+            try:
+                config.read('config.ini', encoding='utf-8')
+            except UnicodeDecodeError:
+                config.read('config.ini', encoding='gbk')
 
-        db_host = db_config.get('host', '').strip("'")
-        db_port = int(db_config.get('port', '').strip("'"))
-        db_name = db_config.get('database', '').strip("'")
-        db_user = db_config.get('user', '').strip("'")
-        db_password = db_config.get('password', '').strip("'")
+            db_config = dict(config.items('database'))
 
-    zy_db = mysql.connector.connect(
-        host=db_host,
-        port=db_port,
-        user=db_user,
-        password=db_password,
-        database=db_name
-    )
-    return zy_db
+            db_host = db_config.get('host', '').strip("'")
+            db_port = int(db_config.get('port', '').strip("'"))
+            db_name = db_config.get('database', '').strip("'")
+            db_user = db_config.get('user', '').strip("'")
+            db_password = db_config.get('password', '').strip("'")
+
+        db_pool = pooling.MySQLConnectionPool(
+            pool_name="zb_pool",
+            pool_size=16,
+            host=db_host,
+            port=db_port,
+            user=db_user,
+            password=db_password,
+            database=db_name,
+            pool_reset_session=True
+        )
+
+    # 从连接池获取连接
+    return db_pool.get_connection()
 
 
 def test_database_connection():
@@ -74,7 +85,12 @@ def check_db():
 
     finally:
         # 关闭数据库连接
-        cursor.close()
-        db.close()
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
 
     return len(result)
+
+
+db_pool = None  # 初始化全局变量db_pool
