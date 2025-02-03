@@ -707,9 +707,9 @@ def markdown_editor(user_id, article):
         auth = auth_articles(article, user_name)
 
     if auth:
-        if request.args.get('editor') == 'ueditor':
-            return ueditor_plus_edit(user_id, article, user_name)
         aid, tags = get_tags_by_article(article)
+        if request.args.get('editor') == 'ueditor':
+            return ueditor_plus_edit(user_id, aid, user_name)
         if request.method == 'GET':
             edit_html = zy_edit_article(article, max_line=app.config['MAX_LINE'])
             article_url = domain + 'blog/' + article
@@ -2557,19 +2557,15 @@ def get_avatar_image(avatar_uuid):
     return send_file(f'{base_dir}/{app.config['AVATAR_PATH']}/{avatar_uuid}.webp', mimetype='image/webp')
 
 
-def ueditor_plus_edit(user_id, article, user_name):
-    aid, tags = get_tags_by_article(article)
+def ueditor_plus_edit(user_id, aid, user_name):
     all_info = get_more_info(aid)
-    edit_html = zy_edit_article(article, max_line=app.config['MAX_LINE'])
-    article_url = domain + 'blog/' + article
+    edit_html = zy_edit_article(all_info[1], max_line=app.config['MAX_LINE'])
+    article_url = domain + 'blog/' + all_info[1]
     article_surl = api_shortlink(article_url)
     # 渲染编辑页面并将转换后的HTML传递到模板中
     return render_template('ueditor-plus.html',
-                           user_id=user_id,
-                           edit_html=edit_html, aid=aid, articleName=article,
-                           tags=tags, article_surl=article_surl,
-                           user_name=user_name, coverImage=all_info[8],
-                           articleExcerpt=all_info[10], articleStatus=all_info[7])
+                           user_id=user_id, article_surl=article_surl, user_name=user_name,
+                           edit_html=edit_html, all_info=all_info)
 
 
 @app.route('/api/ueditor', methods=['GET', 'POST'])
@@ -2681,6 +2677,7 @@ def markdown_editor2(user_id, aid):
         content = request.form.get('content') or ''
         status = request.form.get('status') or 'Draft'
         excerpt = request.form.get('excerpt')[:145] or ''
+        hidden_status = request.form.get('hiddenStatus') or 0
         cover_image = request.files.get('coverImage') or None
         cover_image_path = 'cover'
         if status == 'Deleted':
@@ -2692,7 +2689,9 @@ def markdown_editor2(user_id, aid):
             os.makedirs(os.path.dirname(cover_image_path), exist_ok=True)
             with open(cover_image_path, 'wb') as f:
                 cover_image.save(f)
-        if article_save_change(aid, excerpt, status, cover_image_path) and zy_save_edit(aid, content, a_name):
+        if article_save_change(aid, int(hidden_status), status, cover_image_path, excerpt) and zy_save_edit(aid,
+                                                                                                            content,
+                                                                                                            a_name):
             return jsonify({'show_edit_code': 'success'}), 200
     except Exception as e:
         app.logger.error(f"保存文章 article id: {aid} 时出错: {e} by user {user_id} ")
@@ -2957,8 +2956,8 @@ def upload_bulk(user_id):
         except Exception as e:
             app.logger.error(f"Error in file upload: {e}")
             return jsonify({'message': 'failed', 'error': str(e)}), 500
-    tipMessage = f"请不要上传超过 {app.config['UPLOAD_LIMIT'] / (1024 * 1024)}MB 的文件"
-    return render_template('upload.html', upload_locked=upload_locked, message=tipMessage)
+    tip_message = f"请不要上传超过 {app.config['UPLOAD_LIMIT'] / (1024 * 1024)}MB 的文件"
+    return render_template('upload.html', upload_locked=upload_locked, message=tip_message)
 
 
 def save_bulk_article_db(filename, author):
@@ -3010,8 +3009,8 @@ def new_article(user_id):
             cache.set(f'upload_locked_{user_id}', True, timeout=120)
             logging.error("Failed to update article information in the database.")
             return jsonify({'message': message, 'upload_locked': True, 'Lock_countdown': 120}), 200
-    tipMessage = f"请不要上传超过 {app.config['UPLOAD_LIMIT'] / (1024 * 1024)}MB 的文件"
-    return render_template('upload.html', message=tipMessage, upload_locked=upload_locked)
+    tip_message = f"请不要上传超过 {app.config['UPLOAD_LIMIT'] / (1024 * 1024)}MB 的文件"
+    return render_template('upload.html', message=tip_message, upload_locked=upload_locked)
 
 
 @app.errorhandler(404)

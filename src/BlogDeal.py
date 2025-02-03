@@ -559,18 +559,18 @@ def get_more_info(aid):
     return result
 
 
-def article_save_change(aid, excerpt, status, cover_image_path):
+def article_save_change(aid, hidden, status, cover_image_path, excerpt):
     db = None
     try:
         db = get_database_connection()
         with db.cursor() as cursor:
             # 根据cover_image_path是否为None构建不同的查询
             if cover_image_path is None:
-                query = "UPDATE `articles` SET `Status` = %s, `excerpt` = %s WHERE `ArticleID` = %s"
-                cursor.execute(query, (status, excerpt, aid))
+                query = "UPDATE `articles` SET `Hidden` = %s, `Status` = %s, `excerpt` = %s WHERE `ArticleID` = %s"
+                cursor.execute(query, (int(hidden), status, excerpt, aid))
             else:
-                query = "UPDATE `articles` SET `Status` = %s, `CoverImage` = %s, `excerpt` = %s WHERE `ArticleID` = %s"
-                cursor.execute(query, (status, cover_image_path, excerpt, aid))
+                query = "UPDATE `articles` SET hidden = %s, `Status` = %s, `CoverImage` = %s, `excerpt` = %s WHERE `ArticleID` = %s"
+                cursor.execute(query, (int(hidden), status, cover_image_path, excerpt, aid))
             db.commit()
             return {'show_edit_code': 'success'}
     except Exception as e:
