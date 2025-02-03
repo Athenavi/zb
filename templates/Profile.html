@@ -10,6 +10,8 @@
     <title>{{ title }} | zyBLOG</title>
     <!-- Tailwind CSS -->
     <link href="/static/css/tailwind.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="/static/css/idcard.css" rel="stylesheet">
 </head>
 
 <body class="bg-gray-100">
@@ -21,49 +23,43 @@
         <div class="w-full md:w-8/12 bg-white rounded-lg shadow-lg p-6">
             {% if userStatus %}
                 <div class="flex items-center mb-4">
-                    <div class="flex-shrink-0">
-                        <img src="{{ avatar_url }}" alt="avatar" class="w-16 h-16 rounded-full">
-                    </div>
-                    <div class="ml-4">
-                        <h2 class="text-xl font-bold">{{ username }}</h2>
-                        <p class="text-gray-600">{{ userBio }}</p>
-                        <div class="flex space-x-4 mt-2">
-                            <div class="text-center">
-                                <h3 class="text-lg font-semibold">
-                                    {% if Articles %}
+                    <div class="id-card">
+                        <div class="imgBx">
+                            <img src="{{ avatar_url }}" alt="avatar" class="w-16 h-16">
+                        </div>
+                        <div class="id-content">
+                            <div class="id-details">
+                                <h2>{{ username }}<br><span>{{ userBio }}</span></h2>
+                                <div class="id-data">
+                                    <h3>{% if Articles %}
                                         {{ Articles|length }}
                                     {% else %}
                                         0
                                     {% endif %}<br>
-                                    <span class="text-gray-500">Posts</span>
-                                </h3>
+                                        <span>  Posts  </span>
+                                    </h3>
+                                    {% if follower >= 0 %}
+                                        <h3>{{ follower }}<br>
+                                            <span>Followers</span>
+                                        </h3>
+                                    {% endif %}
+                                    {% if following >= 0 %}
+                                        <h3>{{ following }}<br>
+                                            <span>Following</span>
+                                        </h3>
+                                    {% endif %}
+                                </div>
+                                <div class="id-actionBtn">
+                                    {% if canFollowed == 1 %}
+                                        <button onclick="followed()" id="follow-btn">Follow
+                                        </button>
+                                    {% else %}
+                                        <button onclick="unfollowed()" id="unfollow-btn">取消关注
+                                        </button>
+                                    {% endif %}
+                                    <button>Message</button>
+                                </div>
                             </div>
-                            {% if follower %}
-                                <div class="text-center">
-                                    <h3 class="text-lg font-semibold">{{ follower }}<br>
-                                        <span class="text-gray-500">Followers</span>
-                                    </h3>
-                                </div>
-                            {% endif %}
-                            {% if following %}
-                                <div class="text-center">
-                                    <h3 class="text-lg font-semibold">{{ following }}<br>
-                                        <span class="text-gray-500">Following</span>
-                                    </h3>
-                                </div>
-                            {% endif %}
-                        </div>
-                        <div class="mt-4 flex space-x-2">
-                            {% if canFollowed == 1 %}
-                                <button onclick="followed()" id="follow-btn"
-                                        class="bg-blue-500 text-white px-4 py-2 rounded">Follow
-                                </button>
-                            {% else %}
-                                <button onclick="unfollowed()" id="unfollow-btn"
-                                        class="bg-red-500 text-white px-4 py-2 rounded">取消关注
-                                </button>
-                            {% endif %}
-                            <button class="bg-gray-300 text-gray-800 px-4 py-2 rounded">Message</button>
                         </div>
                     </div>
                 </div>
@@ -96,10 +92,10 @@
             </div>
         </div>
     </div>
+    <!-- Footer -->
+    {% from 'footer.html' import SimpleFooter %}
+    {{ SimpleFooter(SiteName,beian) }}
 </div>
-<!-- Footer -->
-{% from 'footer.html' import SimpleFooter %}
-{{ SimpleFooter(SiteName,beian) }}
 </body>
 </html>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/3.1.3/socket.io.min.js"></script>
