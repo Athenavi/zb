@@ -175,48 +175,29 @@ def get_blog_author(title):
 
 def auth_articles(article_name, user_name):
     db = get_database_connection()
-
     try:
         with db.cursor() as cursor:
-            query = "SELECT Author FROM articles WHERE Title = %s"
-            cursor.execute(query, (article_name,))
-            result = cursor.fetchone()
-
-            if result and result[0] == user_name:
-                return True
-            else:
-                return False
+            query = "SELECT 1 FROM articles WHERE Title = %s AND Author = %s"
+            cursor.execute(query, (article_name, user_name))
+            return cursor.fetchone() is not None
     except Exception as e:
         print(f"An error occurred: {e}")
         return False
     finally:
-        try:
-            cursor.close()
-        except NameError:
-            pass
         db.close()
 
 
 def auth_by_id(aid, user_name):
     db = get_database_connection()
-
     try:
         with db.cursor() as cursor:
-            query = "SELECT * FROM articles WHERE ArticleID = %s and Author = %s"
-            cursor.execute(query, (aid, user_name,))
-            result = cursor.fetchone()
-            if result:
-                return True
-            else:
-                return False
+            query = "SELECT 1 FROM articles WHERE ArticleID = %s AND Author = %s"
+            cursor.execute(query, (aid, user_name))
+            return cursor.fetchone() is not None
     except Exception as e:
         print(f"An error occurred: {e}")
         return False
     finally:
-        try:
-            cursor.close()
-        except NameError:
-            pass
         db.close()
 
 
@@ -360,34 +341,29 @@ def set_article_info(a_title, username):
     db = get_database_connection()
     try:
         with db.cursor() as cursor:
-            # 获取当前年份
             current_year = datetime.datetime.now().year
 
-            # 插入或更新文章信息，标签写入当前年份
-            query = """
-            INSERT INTO articles (Title, Author, tags) 
-            VALUES (%s, %s, %s) 
-            ON DUPLICATE KEY UPDATE Author = VALUES(Author), tags = VALUES(tags);
-            """
-            cursor.execute(query, (a_title, username, current_year))
+            # 插入或更新文章信息
+            cursor.execute("""
+                INSERT INTO articles (Title, Author, tags) 
+                VALUES (%s, %s, %s) 
+                ON DUPLICATE KEY UPDATE Author = VALUES(Author), tags = VALUES(tags);
+            """, (a_title, username, current_year))
 
             # 记录事件信息
-            event_log = ("INSERT INTO events (title, description, event_date, created_at) VALUES (%s, %s, "
-                         "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);")
-            event_title = 'article update'
-            event_description = f'{username} updated {a_title}'
-            cursor.execute(event_log, (event_title, event_description))
+            cursor.execute("""
+                INSERT INTO events (title, description, event_date, created_at) 
+                VALUES (%s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+            """, ('article update', f'{username} updated {a_title}'))
 
             # 提交事务
             db.commit()
-            return True  # 表示操作成功
+            return True
 
     except Exception as e:
         print(f"数据库操作期间发生错误: {e}")
-        # 回滚事务
         db.rollback()
-        return False  # 表示操作失败
-
+        return False
     finally:
         db.close()
 

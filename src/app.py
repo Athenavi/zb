@@ -731,6 +731,9 @@ def markdown_editor(user_id, article):
 
 
 def zy_save_tags(aid, tags_input):
+    if not isinstance(tags_input, str):
+        return jsonify({'show_edit': 'error', 'message': '标签输入不是字符串'})
+
     # 将中文逗号转换为英文逗号
     tags_input = tags_input.replace("，", ",")
 
@@ -751,7 +754,7 @@ def zy_save_tags(aid, tags_input):
     cache.set(f"{aid}:tag_hash", current_tag_hash, timeout=28800)
 
     # 写入更新后的标签到数据库
-    write_tags_to_database(tags_list, aid)
+    write_tags_to_database(aid, tags_list)
     return jsonify({'show_edit': "success"})
 
 
