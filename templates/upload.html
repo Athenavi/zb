@@ -3,11 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>批量文件上传</title>
+    <title>文件上传</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="bg-gray-100">
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
 <div class="container mx-auto mt-10 p-5 bg-white rounded shadow-md">
+    <h1 class="text-2xl font-bold mb-5 text-center">上传新文章(Markdown)</h1>
+    <form id="uploadForm" action="/new" method="POST" enctype="multipart/form-data"
+          class="flex p-6 bg-gray-100 rounded-lg shadow-md">
+        <div class="flex-1 mr-4 p-4 bg-white rounded-lg shadow-sm">
+            <ul>
+                <li>严禁钓鱼网站链接的以及包含广告垃圾或病毒的文件</li>
+                <li>请不要上传包含个人隐私信息的文件。</li>
+                <li class="mb-4 text-gray-600">{{ message | safe }}</li>
+            </ul>
+        </div>
+        <div class="flex-1 p-4 bg-white rounded-lg shadow-sm">
+            <input type="file" name="file" accept=".md" class="border border-gray-300 rounded p-2 mb-4 w-full" required>
+            <button id="uploadButton" type="submit"
+                    class="w-full bg-blue-500 text-white font-semibold py-2 rounded-md hover:bg-blue-600
+                {{ 'opacity-50 cursor-not-allowed' if upload_locked else '' }}"
+                    {{ 'disabled' if upload_locked else '' }}>
+                {{ '上传' }}
+            </button>
+            <span id="lockCountdown" class="ml-2 text-red-500"></span>
+        </div>
+    </form>
+    <br style="margin-bottom: 300px"/>
     <h1 class="text-2xl font-bold mb-5 text-center">批量文件上传</h1>
     <form id="uploadForm" action="{{ url_for('upload_bulk') }}" method="POST" enctype="multipart/form-data">
         <div class="mb-4">
@@ -25,7 +47,8 @@
                    onchange="checkFileCount(this)">
         </div>
         {% if upload_locked %}
-            <button type="submit" class="w-full bg-gray-500 text-white font-semibold py-2 rounded-md hover:bg-blue-600"
+            <button type="submit"
+                    class="w-full bg-gray-500 text-white font-semibold py-2 rounded-md hover:bg-blue-600"
                     disabled>
                 上传已被锁定，请稍后再试
             </button>
@@ -44,6 +67,60 @@
     </div>
 </div>
 
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const uploadForm = document.getElementById('uploadForm');
+
+        uploadForm.addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            const formData = new FormData(uploadForm);
+
+            fetch('/new', {
+                method: 'POST',
+                body: formData,
+                credentials: 'include',
+            })
+                .then(response => response.json())
+                .then(data => {
+                    const uploadLocked = data.upload_locked;
+                    const lockCountdown = data.Lock_countdown;
+
+                    const uploadButton = document.getElementById('uploadButton');
+                    const lockCountdownDisplay = document.getElementById('lockCountdown');
+
+                    if (uploadLocked) {
+                        uploadButton.classList.add('opacity-50', 'cursor-not-allowed');
+                        uploadButton.disabled = true;
+
+                        if (lockCountdown === -1) {
+                            lockCountdownDisplay.textContent = '上传被锁定，未知等待时间';
+                        } else {
+                            lockCountdownDisplay.textContent = `上传被锁定，等待时间：${lockCountdown}秒`;
+                            let countdown = lockCountdown;
+                            const countdownInterval = setInterval(() => {
+                                countdown--;
+                                lockCountdownDisplay.textContent = `上传被锁定，等待时间：${countdown}秒`;
+                                if (countdown <= 0) {
+                                    clearInterval(countdownInterval);
+                                    uploadButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                                    uploadButton.disabled = false;
+                                    lockCountdownDisplay.textContent = '';
+                                }
+                            }, 1000);
+                        }
+                    } else {
+                        alert(data.message);
+                        const successMessage = document.createElement('div');
+                        successMessage.className = 'mt-4 text-green-500';
+                        successMessage.innerHTML = data.message;
+                        uploadForm.appendChild(successMessage);
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        });
+    });
+</script>
 <script>
     function checkFileCount(input) {
         if (input.files.length > 50) {
