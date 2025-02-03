@@ -96,7 +96,7 @@ def inject_variables():
     return dict(
         beian=beian,
         title=sitename,
-        username=get_username,
+        username=get_username(),
         domain=domain
     )
 
@@ -240,22 +240,6 @@ def sys_out_file(article_name):
 
     articles_dir = os.path.join(base_dir, 'articles')
     return send_from_directory(articles_dir, article_name)
-
-
-@app.route('/profile', methods=['GET', 'POST'])
-@jwt_required
-def profile(user_id):
-    user_name = get_username()
-    avatar_url = get_avatar(user_id)
-    user_bio = get_user_bio(user_id) or "这人很懒，什么也没留下"
-    owner_articles = get_owner_articles(owner_id=None, user_name=user_name) or []
-    user_follow = get_following_count(user_id=user_id) or 0
-    follower = get_follower_count(user_id=user_id) or 0
-    return render_template('Profile.html', url_for=url_for, avatar_url=avatar_url,
-                           userStatus=bool(user_id), username=user_name, userBio=user_bio,
-                           following=user_follow, follower=follower,
-                           target_id=user_id, user_id=user_id,
-                           Articles=owner_articles)
 
 
 def get_user_bio(user_id):
@@ -845,31 +829,27 @@ def media(user_id):
     page = request.args.get('page', default=1, type=int)
     user_name = get_username()
     if request.method == 'GET':
-        preference = request.cookies.get('preference')
-        template_choose = 'Media.html'
-        if preference == 'V2':
-            template_choose = 'Media_V2.html'
         if not media_type or media_type == 'img':
             imgs, has_next_page, has_previous_page = get_all_img(user_name, page=page, per_page=20)
 
-            return render_template(template_choose, imgs=imgs, title='Media', url_for=url_for,
+            return render_template('Media_V2.html', imgs=imgs, title='Media', url_for=url_for,
                                    has_next_page=has_next_page,
-                                   has_previous_page=has_previous_page, current_page=page, userid=user_name,
+                                   has_previous_page=has_previous_page, current_page=page,
                                    domain=domain)
         if media_type == 'video':
             videos, has_next_page, has_previous_page = get_all_video(user_name, page=page)
 
-            return render_template(template_choose, videos=videos, title='Media', url_for=url_for,
+            return render_template('Media_V2.html', videos=videos, title='Media', url_for=url_for,
                                    has_next_page=has_next_page,
-                                   has_previous_page=has_previous_page, current_page=page, userid=user_name,
+                                   has_previous_page=has_previous_page, current_page=page,
                                    domain=domain)
 
         if media_type == 'xmind':
             xminds, has_next_page, has_previous_page = get_all_xmind(user_name, page=page)
 
-            return render_template(template_choose, xminds=xminds, title='Media', url_for=url_for,
+            return render_template('Media_V2.html', xminds=xminds, url_for=url_for,
                                    has_next_page=has_next_page,
-                                   has_previous_page=has_previous_page, current_page=page, userid=user_name,
+                                   has_previous_page=has_previous_page, current_page=page,
                                    domain=domain)
     elif request.method == 'POST':
         img_name = request.json.get('img_name')
@@ -2831,8 +2811,7 @@ def index_html():
     except Exception:
         return error("An error occurred while fetching articles.", status_code=500)
 
-    return render_template('index.html', article_info=article_info, page=page, total_pages=total_pages,
-                           SiteName=sitename)
+    return render_template('index.html', article_info=article_info, page=page, total_pages=total_pages)
 
 
 @app.route('/tag/<tag_name>', methods=['GET'])
@@ -2860,7 +2839,6 @@ def tag_page(tag_name):
         return error("获取文章时发生错误。", status_code=500)
 
     return render_template('index.html', article_info=article_info, page=page, total_pages=total_pages,
-                           SiteName=sitename,
                            tag_name=tag_name)
 
 
@@ -2886,7 +2864,6 @@ def featured_page():
         return error("获取文章时发生错误。", status_code=500)
 
     return render_template('index.html', article_info=article_info, page=page, total_pages=total_pages,
-                           SiteName=sitename,
                            tag_name='featured')
 
 
@@ -3011,6 +2988,21 @@ def new_article(user_id):
             return jsonify({'message': message, 'upload_locked': True, 'Lock_countdown': 120}), 200
     tip_message = f"请不要上传超过 {app.config['UPLOAD_LIMIT'] / (1024 * 1024)}MB 的文件"
     return render_template('upload.html', message=tip_message, upload_locked=upload_locked)
+
+
+@app.route('/profile', methods=['GET', 'POST'])
+@jwt_required
+def profile(user_id):
+    avatar_url = get_avatar(user_id)
+    user_bio = get_user_bio(user_id) or "这人很懒，什么也没留下"
+    owner_articles = get_owner_articles(owner_id=user_id, user_name=None) or []
+    user_follow = get_following_count(user_id=user_id) or 0
+    follower = get_follower_count(user_id=user_id) or 0
+    return render_template('Profile.html', url_for=url_for, avatar_url=avatar_url,
+                           userStatus=bool(user_id), userBio=user_bio,
+                           following=user_follow, follower=follower,
+                           target_id=user_id, user_id=user_id,
+                           Articles=owner_articles)
 
 
 @app.errorhandler(404)
