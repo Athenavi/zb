@@ -678,49 +678,6 @@ def change_display(user_id):
         return error("未知错误", 500), 500
 
 
-def forbid_submit(user_id):
-    if cache.get(f'forbid_{user_id}'):
-        return True
-    else:
-        return False
-
-
-@app.route('/newArticle', methods=['GET', 'POST'])
-@jwt_required
-def new_article(user_id):
-    user_name = get_username()
-    if not user_name:
-        error(message='请先登录', status_code=401)
-    if request.method == 'GET':
-        if forbid_submit(user_id):
-            return error('您完成了一次服务（无论成功与否），此服务短期内将变得不可达，请您10分钟之后再来', 503)
-        return render_template('postNewArticle.html')
-
-    elif request.method == 'POST':
-        if forbid_submit(user_id):
-            return error('距离您上次上传时间过短，请十分钟后重试', 503)
-
-        file = request.files['file']
-
-        logging.info(f"User {user_id} attempting to upload: {file.filename}")
-        error_message = handle_article_upload(file, app.config['TEMP_FOLDER'], app.config['UPLOAD_LIMIT'])
-        if error_message:
-            logging.error(f"File upload error: {error_message[0]}")
-            return error(*error_message)
-
-        file_name = os.path.splitext(file.filename)[0]
-        if set_article_info(file_name, user_name):
-            message = '上传成功。但请您检查错误以及编辑。'
-            logging.info(f"Article info successfully saved for {file_name} by user:{user_id}.")
-            cache.set(f'forbid_{user_id}', True, timeout=600)
-        else:
-            message = '上传成功，但文章信息未能更新，请重试。'
-            cache.set(f'forbid_{user_id}', True, timeout=600)
-            logging.error("Failed to update article information in the database.")
-
-        return render_template('postNewArticle.html', message=message)
-
-
 @app.route('/Admin_upload', methods=['POST'])
 @admin_required
 def upload_file1(user_id):
@@ -2997,8 +2954,8 @@ def upload_bulk(user_id):
         except Exception as e:
             app.logger.error(f"Error in file upload: {e}")
             return jsonify({'message': 'failed', 'error': str(e)}), 500
-
-    return render_template('upload.html', upload_locked=upload_locked)
+    tipMessage = f"请不要上传超过 {app.config['UPLOAD_LIMIT'] / (1024 * 1024)}MB 的文件"
+    return render_template('upload.html', upload_locked=upload_locked, message=tipMessage)
 
 
 def save_bulk_article_db(filename, author):
@@ -3017,6 +2974,41 @@ def save_bulk_article_db(filename, author):
     finally:
         if db:
             db.close()
+
+
+@app.route('/newArticle', methods=['GET', 'POST'])
+@app.route('/new', methods=['GET', 'POST'])
+@jwt_required
+def new_article(user_id):
+    upload_locked = cache.get(f"upload_locked_{user_id}") or False
+    if request.method == 'POST':
+        if upload_locked:
+            return jsonify(
+                {'message': '上传被锁定，请稍后再试。', 'upload_locked': upload_locked, 'Lock_countdown': -1}), 423
+
+        file = request.files.get('file')
+        if not file:
+            return jsonify({'message': '未提供文件。', 'upload_locked': upload_locked, 'Lock_countdown': 15}), 400
+
+        error_message = handle_article_upload(file, app.config['TEMP_FOLDER'], app.config['UPLOAD_LIMIT'])
+        if error_message:
+            logging.error(f"File upload error: {error_message[0]}")
+            return jsonify({'message': error_message[0], 'upload_locked': upload_locked, 'Lock_countdown': 300}), 400
+
+        file_name = os.path.splitext(file.filename)[0]
+
+        if set_article_info(file_name, username=get_username()):
+            message = f'上传成功。但请您前往编辑页面进行编辑:<a href="/edit/{file_name}" target="_blank">编辑</a>'
+            logging.info(f"Article info successfully saved for {file_name} by user:{user_id}.")
+            cache.set(f'upload_locked_{user_id}', True, timeout=300)
+            return jsonify({'message': message, 'upload_locked': True, 'Lock_countdown': 300}), 200
+        else:
+            message = f'上传中出现了问题，你可以检查是否可以编辑该文件。:<a href="/edit/{file_name}" target="_blank">编辑</a>'
+            cache.set(f'upload_locked_{user_id}', True, timeout=120)
+            logging.error("Failed to update article information in the database.")
+            return jsonify({'message': message, 'upload_locked': True, 'Lock_countdown': 120}), 200
+    tipMessage = f"请不要上传超过 {app.config['UPLOAD_LIMIT'] / (1024 * 1024)}MB 的文件"
+    return render_template('upload.html', message=tipMessage, upload_locked=upload_locked)
 
 
 @app.errorhandler(404)
