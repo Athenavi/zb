@@ -19,6 +19,7 @@ import jwt
 import markdown
 import qrcode
 import requests
+from PIL import Image
 from flask import Flask, render_template, redirect, request, url_for, Response, jsonify, send_file, \
     make_response, send_from_directory
 from flask_caching import Cache
@@ -43,7 +44,7 @@ from src.utils import admin_upload_file, get_client_ip, \
     authenticate_refresh_token, handle_article_upload, is_allowed_file, zb_safe_check, \
     get_all_img, get_all_video, get_all_xmind, generate_thumbs, generate_video_thumb, \
     get_username, admin_required, jwt_required, finger_required, theme_safe_check, mask_ip, user_id_required, \
-    user_agent_info, handle_article_delete
+    user_agent_info, handle_article_delete, handle_cover_resize
 
 global_encoding = 'utf-8'
 
@@ -2681,7 +2682,22 @@ def markdown_editor2(user_id, aid):
 @app.route('/api/cover/<cover_img>', methods=['GET'])
 @app.route('/edit/cover/<cover_img>', methods=['GET'])
 def api_cover(cover_img):
-    return send_file(f'../cover/{cover_img}', mimetype='image/png')
+    require_format = request.args.get('format') or False
+    if not require_format:
+        cache.set(f"cover_{cover_img}", None)
+        return send_file(f'../cover/{cover_img}', mimetype='image/png')
+    cached_cover = cache.get(f"cover_{cover_img}")
+    if cached_cover:
+        return send_file(io.BytesIO(cached_cover), mimetype='image/webp')
+    cover_path = f'cover/{cover_img}'
+    if os.path.isfile(cover_path):
+        with Image.open(cover_path) as img:
+            cover_data = handle_cover_resize(img, 480, 270)
+        cache.set(f"cover_{cover_img}", cover_data, timeout=28800)
+        return send_file(io.BytesIO(cover_data), mimetype='image/webp')
+    else:
+        print("File not found, returning default image")
+        return send_file('../static/image/dark.jpg', mimetype='image/png')
 
 
 def handle_user_upload(user_name, user_id):

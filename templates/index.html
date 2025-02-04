@@ -26,7 +26,8 @@
                 {% set Excerpt = article[8] %}{% set tags = article[10].split(';') %}
                 <div class="bg-white rounded-lg shadow-md overflow-hidden">
                     {% if CoverImage %}
-                        <img src="/api/{{ CoverImage }}" alt="{{ Title }}" class="w-full h-48 object-cover">
+                        <img src="/api/{{ CoverImage }}?format=webp" alt="{{ Title }}"
+                             class="w-full h-48 object-cover">
                     {% else %}
                         <img src="https://api.7trees.cn/img" alt="{{ Title }}" class="w-full h-48 object-cover">
                     {% endif %}
