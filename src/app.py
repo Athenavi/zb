@@ -508,111 +508,6 @@ def blog_detail(article):
         return error(message="页面不见了", status_code=404)
 
 
-@app.route('/sitemap.xml')
-@app.route('/sitemap')
-def generate_sitemap():
-    cache_dir = 'temp'
-    os.makedirs(cache_dir, exist_ok=True)
-
-    cache_file = os.path.join(cache_dir, 'sitemap.xml')
-
-    if os.path.exists(cache_file):
-        cache_timestamp = os.path.getmtime(cache_file)
-        if datetime.now().timestamp() - cache_timestamp <= app.config['MAX_CACHE_TIMESTAMP']:
-            with open(cache_file, 'r') as f:
-                cached_xml_data = f.read()
-            response = Response(cached_xml_data, mimetype='text/xml')
-            return response
-
-    markdown_files = get_a_list(chanel=1)
-
-    # 创建XML文件头
-    xml_data = '<?xml version="1.0" encoding="UTF-8"?>\n'
-    xml_data += '<?xml-stylesheet type="text/xsl" href="./static/sitemap.xsl"?>\n'
-    xml_data += '<urlset xmlns="https://www.sitemaps.org/schemas/sitemap/0.9/">\n'
-
-    for file in markdown_files:
-        article_url = domain + 'blog/' + file
-        date = get_file_date(file)
-        article_surl = api_shortlink(article_url)
-        # 创建url标签并包含链接
-        xml_data += '<url>\n'
-        xml_data += f'\t<loc>{article_surl}</loc>\n'
-        xml_data += f'\t<lastmod>{date}</lastmod>\n'  # 添加适当的标签
-        xml_data += '\t<changefreq>Monthly</changefreq>\n'  # 添加适当的标签
-        xml_data += '\t<priority>0.8</priority>\n'  # 添加适当的标签
-        xml_data += '</url>\n'
-
-    # 关闭urlset标签
-    xml_data += '</urlset>\n'
-
-    # 写入缓存文件
-    with open(cache_file, 'w') as f:
-        f.write(xml_data)
-
-    response = Response(xml_data, mimetype='text/xml')
-    return response
-
-
-@app.route('/feed')
-@app.route('/rss')
-def generate_rss():
-    cache_dir = 'temp'
-    os.makedirs(cache_dir, exist_ok=True)
-
-    cache_file = os.path.join(cache_dir, 'feed.xml')
-
-    if os.path.exists(cache_file):
-        cache_timestamp = os.path.getmtime(cache_file)
-        if datetime.now().timestamp() - cache_timestamp <= app.config['MAX_CACHE_TIMESTAMP']:
-            with open(cache_file, 'r', encoding=global_encoding, errors='ignore') as f:
-                cached_xml_data = f.read()
-            response = Response(cached_xml_data, mimetype='application/rss+xml')
-            return response
-
-    markdown_files = get_a_list(chanel=3, page=1)
-
-    # 创建XML文件头及其他信息...
-    xml_data = '<?xml version="1.0" encoding="UTF-8"?>\n'
-    xml_data += '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">\n'
-    xml_data += '<channel>\n'
-    xml_data += '<title>' + sitename + 'RSS Feed </title>\n'
-    xml_data += '<link>' + domain + '</link>\n'
-    xml_data += '<description>' + sitename + 'RSS Feed</description>\n'
-    xml_data += '<language>en-us</language>\n'
-    xml_data += '<lastBuildDate>' + datetime.now().strftime("%a, %d %b %Y %H:%M:%S %z") + '</lastBuildDate>\n'
-    xml_data += '<atom:link href="' + domain + 'rss" rel="self" type="application/rss+xml" />\n'
-
-    for file in markdown_files:
-        encoded_article_name = urllib.parse.quote(file)  # 对文件名进行编码处理
-        article_url = domain + 'blog/' + encoded_article_name
-        date = get_file_date(encoded_article_name)
-        content, *_ = get_article_content(file, 10)
-        describe = encoded_article_name
-
-        article_surl = api_shortlink(article_url)
-        # 创建item标签并包含内容
-        xml_data += '<item>\n'
-        xml_data += f'\t<title>{file}</title>\n'
-        xml_data += f'\t<link>{article_surl}</link>\n'
-        xml_data += f'\t<guid>{article_url}</guid>\n'
-        xml_data += f'\t<pubDate>{date}</pubDate>\n'
-        xml_data += f'\t<description>{describe}</description>\n'
-        xml_data += f'\t<content:encoded><![CDATA[{content}]]></content:encoded>'
-        xml_data += '</item>\n'
-
-    # 关闭channel和rss标签
-    xml_data += '</channel>\n'
-    xml_data += '</rss>\n'
-
-    # 写入缓存文件
-    with open(cache_file, 'w', encoding=global_encoding, errors='ignore') as f:
-        f.write(xml_data)
-
-    response = Response(xml_data, mimetype='application/rss+xml')
-    return response
-
-
 @app.route('/confirm-password', methods=['GET', 'POST'])
 @jwt_required
 def confirm_password(user_id):
@@ -3019,6 +2914,86 @@ def profile(user_id):
                            following=user_follow, follower=follower,
                            target_id=user_id, user_id=user_id,
                            Articles=owner_articles)
+
+
+@cache.memoize(app.config['MAX_CACHE_TIMESTAMP'])
+@app.route('/sitemap.xml')
+@app.route('/sitemap')
+def generate_sitemap():
+    db = None
+    try:
+        db = get_db_connection()
+        with db.cursor() as cursor:
+            query = """SELECT Title FROM `articles` WHERE `Hidden`=0 AND `Status`='Published' ORDER BY `ArticleID` DESC LIMIT 40"""
+            cursor.execute(query)
+            results = cursor.fetchall()
+            article_titles = [item[0] for item in results]
+            xml_data = '<?xml version="1.0" encoding="UTF-8"?>\n'
+            xml_data += '<urlset xmlns="https://www.sitemaps.org/schemas/sitemap/0.9/">\n'
+
+            # 遍历文章标题列表
+            for title in article_titles:
+                article_url = domain + 'blog/' + title
+                date = get_file_date(title)
+                article_surl = api_shortlink(article_url)
+                # 创建url标签并包含链接
+                xml_data += '<url>\n'
+                xml_data += f'\t<loc>{article_surl}</loc>\n'
+                xml_data += f'\t<lastmod>{date}</lastmod>\n'  # 添加适当的标签
+                xml_data += '\t<changefreq>Monthly</changefreq>\n'  # 添加适当的标签
+                xml_data += '\t<priority>0.8</priority>\n'  # 添加适当的标签
+                xml_data += '</url>\n'
+
+            # 关闭urlset标签
+            xml_data += '</urlset>\n'
+            response = Response(xml_data, mimetype='text/xml')
+            return response
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        if db is not None:
+            db.close()
+
+
+@cache.memoize(app.config['MAX_CACHE_TIMESTAMP'])
+@app.route('/feed')
+@app.route('/rss')
+def generate_rss():
+    markdown_files = get_a_list(chanel=3, page=1)
+    # 创建XML文件头及其他信息...
+    xml_data = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml_data += '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">\n'
+    xml_data += '<channel>\n'
+    xml_data += '<title>' + sitename + 'RSS Feed </title>\n'
+    xml_data += '<link>' + domain + '</link>\n'
+    xml_data += '<description>' + sitename + 'RSS Feed</description>\n'
+    xml_data += '<language>en-us</language>\n'
+    xml_data += '<lastBuildDate>' + datetime.now().strftime("%a, %d %b %Y %H:%M:%S %z") + '</lastBuildDate>\n'
+    xml_data += '<atom:link href="' + domain + 'rss" rel="self" type="application/rss+xml" />\n'
+
+    for file in markdown_files:
+        encoded_article_name = urllib.parse.quote(file)  # 对文件名进行编码处理
+        article_url = domain + 'blog/' + encoded_article_name
+        date = get_file_date(encoded_article_name)
+        content, *_ = get_article_content(file, 10)
+        describe = encoded_article_name
+
+        article_surl = api_shortlink(article_url)
+        # 创建item标签并包含内容
+        xml_data += '<item>\n'
+        xml_data += f'\t<title>{file}</title>\n'
+        xml_data += f'\t<link>{article_surl}</link>\n'
+        xml_data += f'\t<guid>{article_url}</guid>\n'
+        xml_data += f'\t<pubDate>{date}</pubDate>\n'
+        xml_data += f'\t<description>{describe}</description>\n'
+        xml_data += f'\t<content:encoded><![CDATA[{content}]]></content:encoded>'
+        xml_data += '</item>\n'
+
+    # 关闭channel和rss标签
+    xml_data += '</channel>\n'
+    xml_data += '</rss>\n'
+    response = Response(xml_data, mimetype='application/rss+xml')
+    return response
 
 
 @app.errorhandler(404)

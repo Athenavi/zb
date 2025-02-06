@@ -4,9 +4,6 @@ import os
 import mysql.connector
 from mysql.connector import pooling
 
-# 初始化全局变量db_pool
-db_pool = None
-
 
 def get_db_connection():
     global db_pool  # 确保可以在函数内使用全局变量db_pool
@@ -29,14 +26,11 @@ def get_db_connection():
 
             db_config = dict(config.items('database'))
 
-            if 'host' not in db_config or 'port' not in db_config or 'database' not in db_config or 'user' not in db_config or 'password' not in db_config:
-                raise ValueError("Configuration file is missing required database credentials.")
-
-            db_host = db_config['host'].strip("'")
-            db_port = int(db_config['port'].strip("'"))
-            db_name = db_config['database'].strip("'")
-            db_user = db_config['user'].strip("'")
-            db_password = db_config['password'].strip("'")
+            db_host = db_config.get('host', '').strip("'")
+            db_port = int(db_config.get('port', '').strip("'"))
+            db_name = db_config.get('database', '').strip("'")
+            db_user = db_config.get('user', '').strip("'")
+            db_password = db_config.get('password', '').strip("'")
 
         db_pool = pooling.MySQLConnectionPool(
             pool_name="zb_pool",
@@ -46,9 +40,7 @@ def get_db_connection():
             user=db_user,
             password=db_password,
             database=db_name,
-            pool_reset_session=True,
-            pool_timeout=30,  # 获取连接的超时时间
-            connection_timeout=10,  # 建立新连接的超时时间
+            pool_reset_session=True
         )
 
     # 从连接池获取连接
@@ -94,3 +86,6 @@ def check_db():
         # 关闭数据库连接
         if db:
             db.close()
+
+
+db_pool = None
