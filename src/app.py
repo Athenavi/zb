@@ -1539,9 +1539,11 @@ def api_wx_blog_detail(article):
         return generate_response_data()
 
 
-def api_wx_content(article):
-    articles_dir = os.path.join(base_dir, 'articles', article + ".md")
+def api_wx_content(article, auth_key):
     html_content = '<p>没有找到内容</p>'
+    if auth_key != DEFAULT_KEY:
+        return html_content
+    articles_dir = os.path.join(base_dir, 'articles', article + ".md")
     try:
         with open(articles_dir, 'r', encoding='utf-8') as file:
             content = file.read()
@@ -1623,7 +1625,7 @@ def temp_view():
                 if result:
                     a_title = result[0]
 
-                    content = api_wx_content(a_title)
+                    content = api_wx_content(a_title, DEFAULT_KEY)
         except ValueError as e:
             app.logger.error(f"Value error: {e}")
             return jsonify({"message": "Invalid ArticleID"}), 400
@@ -1636,7 +1638,7 @@ def temp_view():
             db.close()
 
         referrer = request.referrer
-        app.logger.info(f"Request from {referrer} with finger {user_finger}")  # 记录请求信息
+        app.logger.info(f"Request from {referrer} with finger {user_finger}")
 
         return content
     else:
