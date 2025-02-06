@@ -8,7 +8,7 @@ import urllib.parse
 import markdown
 from pymysql import DatabaseError
 
-from src.database import get_database_connection
+from src.database import get_db_connection
 from src.user import error
 
 
@@ -42,7 +42,7 @@ def get_article_names(per_page, page=1):
 
 
 def read_hidden_articles():
-    db = get_database_connection()
+    db = get_db_connection()
     hidden_articles = []
 
     try:
@@ -147,7 +147,7 @@ def clear_html_format(text):
 
 
 def get_blog_author(title):
-    db = get_database_connection()
+    db = get_db_connection()
 
     try:
         with db.cursor() as cursor:
@@ -174,7 +174,7 @@ def get_blog_author(title):
 
 
 def auth_articles(article_name, user_name):
-    db = get_database_connection()
+    db = get_db_connection()
     try:
         with db.cursor() as cursor:
             query = "SELECT 1 FROM articles WHERE Title = %s AND Author = %s"
@@ -188,7 +188,7 @@ def auth_articles(article_name, user_name):
 
 
 def auth_by_id(aid, user_name):
-    db = get_database_connection()
+    db = get_db_connection()
     try:
         with db.cursor() as cursor:
             query = "SELECT 1 FROM articles WHERE ArticleID = %s AND Author = %s"
@@ -223,7 +223,7 @@ def zy_edit_article(article, max_line):
 
 
 def get_subscriber_ids(uid):
-    db = get_database_connection()
+    db = get_db_connection()
     cursor = db.cursor()
 
     try:
@@ -255,7 +255,7 @@ def get_subscriber_ids(uid):
 
 
 def get_unique_tags():
-    db = get_database_connection()
+    db = get_db_connection()
     cursor = db.cursor()
     unique_tags = []
 
@@ -283,7 +283,7 @@ def get_unique_tags():
 
 
 def get_articles_by_tag(tag_name):
-    db = get_database_connection()
+    db = get_db_connection()
     cursor = db.cursor()
     tag_articles = []
 
@@ -305,7 +305,7 @@ def get_articles_by_tag(tag_name):
 
 
 def get_tags_by_article(article_name):
-    db = get_database_connection()
+    db = get_db_connection()
     cursor = db.cursor()
     unique_tags = []
     aid = 0
@@ -338,7 +338,7 @@ def get_tags_by_article(article_name):
 
 
 def set_article_info(a_title, username):
-    db = get_database_connection()
+    db = get_db_connection()
     try:
         with db.cursor() as cursor:
             current_year = datetime.datetime.now().year
@@ -365,13 +365,17 @@ def set_article_info(a_title, username):
         db.rollback()
         return False
     finally:
+        try:
+            cursor.close()
+        except NameError:
+            pass
         db.close()
 
 
 def write_tags_to_database(aid, tags_list):
     tags_str = ';'.join(tags_list)
 
-    db = get_database_connection()
+    db = get_db_connection()
     cursor = db.cursor()
 
     try:
@@ -398,7 +402,7 @@ def write_tags_to_database(aid, tags_list):
 def set_article_visibility(article, hide=True):
     if not isinstance(article, str):
         raise ValueError("Article must be a string")
-    db = get_database_connection()
+    db = get_db_connection()
     cursor = db.cursor()
     try:
         with cursor:
@@ -452,7 +456,7 @@ def get_file_date(file_path):
 
 
 def article_change_pw(aid, passwd):
-    db = get_database_connection()
+    db = get_db_connection()
     aid = int(aid)
     try:
         with db.cursor() as cursor:
@@ -493,7 +497,7 @@ def get_file_summary(a_title):
 
 def get_comments(aid, page=1, per_page=30):
     comments = []
-    db = get_database_connection()
+    db = get_db_connection()
     try:
         with db.cursor() as cursor:
             offset = (page - 1) * per_page
@@ -517,7 +521,7 @@ def get_comments(aid, page=1, per_page=30):
 
 
 def auth_files(file_path, user_id):
-    db = get_database_connection()
+    db = get_db_connection()
     auth = False
     print(file_path)
     try:
@@ -541,7 +545,7 @@ def auth_files(file_path, user_id):
 
 def get_more_info(aid):
     result = (None,) * 13
-    db = get_database_connection()
+    db = get_db_connection()
     cursor = db.cursor()
     try:
         query = "SELECT * FROM articles WHERE ArticleID = %s"
@@ -562,7 +566,7 @@ def get_more_info(aid):
 def article_save_change(aid, hidden, status, cover_image_path, excerpt):
     db = None
     try:
-        db = get_database_connection()
+        db = get_db_connection()
         with db.cursor() as cursor:
             # 根据cover_image_path是否为None构建不同的查询
             if cover_image_path is None:

@@ -7,7 +7,7 @@ import flask_socketio
 from flask import Flask, request, jsonify
 from flask_caching import Cache
 
-from src.database import get_database_connection
+from src.database import get_db_connection
 from src.utils import zy_noti_conf, authenticate_jwt, secret_key, zy_mail_conf
 
 noti = Flask(__name__, template_folder='../templates')
@@ -73,7 +73,7 @@ def get_sys_notice(user_id):
         return notices
 
     try:
-        with get_database_connection() as db:
+        with get_db_connection() as db:
             with db.cursor() as cursor:
                 # 查询用户ID及其未读通知
                 cursor.execute("""SELECT * FROM notifications WHERE user_id = %s;""", (user_id,))
@@ -107,7 +107,7 @@ def read_notification():
 
     is_notice_read = False
     try:
-        with get_database_connection() as db:
+        with get_db_connection() as db:
             with db.cursor() as cursor:
                 # 直接更新所读通知
                 cursor.execute("""UPDATE notifications SET is_read = 1 WHERE id = %s AND user_id = %s;""",

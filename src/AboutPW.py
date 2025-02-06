@@ -1,7 +1,7 @@
 import bcrypt
 from flask import session, flash, redirect, url_for, render_template, request
 
-from src.database import get_database_connection
+from src.database import get_db_connection
 
 
 def zy_change_password(user_id, ip):
@@ -12,7 +12,7 @@ def zy_change_password(user_id, ip):
         new_password = request.form.get('new_password')
         confirm_password = request.form.get('confirm_password')
         # 查询当前密码
-        db = get_database_connection()
+        db = get_db_connection()
         cursor = db.cursor()
         query = "SELECT password FROM users WHERE `id` = %s"
         cursor.execute(query, (user_id,))
@@ -50,7 +50,7 @@ def zy_confirm_password(user_id):
         password = request.form.get('password')
 
         # 验证密码是否正确
-        db = get_database_connection()
+        db = get_db_connection()
         cursor = db.cursor()
 
         query = "SELECT password FROM users WHERE `id` = %s"

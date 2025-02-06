@@ -34,7 +34,7 @@ from src.BlogDeal import get_article_names, get_article_content, clear_html_form
     zy_edit_article, get_subscriber_ids, get_unique_tags, get_articles_by_tag, \
     get_tags_by_article, set_article_info, write_tags_to_database, set_article_visibility, auth_by_id, \
     article_change_pw, get_file_summary, get_comments, auth_files, get_more_info, article_save_change
-from src.database import get_database_connection, get_db_connection
+from src.database import get_db_connection
 from src.links import create_special_url, redirect_to_long_url
 from src.notification import get_sys_notice, read_notification, send_change_mail
 from src.user import error, get_owner_articles, zy_general_conf, get_profiles, get_following_count, \
@@ -406,7 +406,7 @@ def get_article_info(articles):
     for a_title in articles:
         try:
             article_info = ''
-            db = get_database_connection()
+            db = get_db_connection()
 
             try:
                 article_info += get_file_date(a_title)
@@ -1036,7 +1036,7 @@ def id_find_article(article_id):
         return error(message='无效的文章', status_code=404)
 
     user_agent = request.headers.get('User-Agent')
-    db = get_database_connection()
+    db = get_db_connection()
     cursor = db.cursor()
     try:
         query = "SELECT long_url FROM urls WHERE id = %s"
@@ -1191,7 +1191,7 @@ def follow_user(user_id):
 
     # 如果缓存为空，则从数据库中获取所有关注并缓存
     if user_followed is None:
-        db = get_database_connection()
+        db = get_db_connection()
         try:
             with db.cursor() as cursor:
                 cursor.execute("SELECT `subscribe_to_id` FROM `subscriptions` WHERE `subscriber_id` = %s",
@@ -1208,7 +1208,7 @@ def follow_user(user_id):
     if follow_id in user_followed:
         return jsonify({'follow_code': 'success', 'message': '已关注'})
 
-    db = get_database_connection()
+    db = get_db_connection()
     try:
         with db.cursor() as cursor:
             # 进行关注操作
@@ -1236,7 +1236,7 @@ def unfollow_user(user_id):
     if not user_id or not unfollow_id:
         return jsonify({'unfollow_code': 'failed', 'message': '操作无效'})
 
-    db = get_database_connection()
+    db = get_db_connection()
     try:
         with db.cursor() as cursor:
             # 进行取关操作
@@ -1268,7 +1268,7 @@ def like(user_id):
             user_liked = []
         if aid in user_liked:
             return jsonify({'like_code': 'failed', 'message': "你已经点赞过了!!"})
-        db = get_database_connection()
+        db = get_db_connection()
         try:
             with db.cursor() as cursor:
                 rd_like = random.randint(3, 8)
@@ -1499,7 +1499,7 @@ def get_guestbook():
     if cached_guestbook:
         return cached_guestbook
     try:
-        db = get_database_connection()
+        db = get_db_connection()
 
         try:
             with db.cursor() as cursor:
@@ -1522,7 +1522,7 @@ def get_guestbook():
 
 def upload_guestbook(content):
     try:
-        db = get_database_connection()
+        db = get_db_connection()
         try:
             with db.cursor() as cursor:
                 query = ("INSERT INTO `events` (`title`, `description`, `event_date`,`created_at`) VALUES ("
@@ -1718,7 +1718,7 @@ def temp_view():
 
     if aid:
         content = '<p>无法加载文章内容</p>'
-        db = get_database_connection()
+        db = get_db_connection()
 
         try:
             with db.cursor() as cursor:
@@ -1750,7 +1750,7 @@ def temp_view():
 
 @cache.cached(timeout=600, key_prefix='article_passwd')
 def article_passwd(aid):
-    db = get_database_connection()
+    db = get_db_connection()
     try:
         with db.cursor() as cursor:
             query = "SELECT `pass` FROM article_pass WHERE aid = %s"
@@ -1843,7 +1843,7 @@ def api_comment(user_id):
 def comment_add(aid, user_id, pid, comment_content, ip, ua):
     c_json = {'content': comment_content, 'pid': pid, 'ip': ip, 'ua': ua}
     comment_json = json.dumps(c_json)
-    db = get_database_connection()
+    db = get_db_connection()
     try:
         with db.cursor() as cursor:
             query = "INSERT INTO `comments` (`article_id`, `user_id`, `content`) VALUES (%s, %s, %s);"
@@ -1884,7 +1884,7 @@ def api_delete(user_id, filename):
     user_name = get_username()
     arg_type = request.args.get('type')
     if arg_type == 'article':
-        db = get_database_connection()
+        db = get_db_connection()
         try:
             with db.cursor() as cursor:
                 cursor.execute("DELETE FROM `articles` WHERE `Title` = %s AND `Author` = %s", (filename, user_name))
@@ -1943,7 +1943,7 @@ def api_report(user_id):
 
 
 def report_add(user_id, reported_type, reported_id, reason):
-    db = get_database_connection()
+    db = get_db_connection()
     try:
         with db.cursor() as cursor:
             query = ("INSERT INTO `reports` (`reported_by`, `content_type`, `content_id`,`reason`) VALUES (%s, %s, %s,"
@@ -1979,7 +1979,7 @@ def api_comment_delete(user_id):
 
 
 def comment_del(user_id, comment_id):
-    db = get_database_connection()
+    db = get_db_connection()
     try:
         with db.cursor() as cursor:
             query = "DELETE FROM `comments` WHERE `id` = %s AND `user_id` = %s;"
@@ -2494,7 +2494,7 @@ def change_profiles(user_id):
 def db_save_avatar(user_id, avatar_uuid):
     db = None
     try:
-        db = get_database_connection()
+        db = get_db_connection()
         with db.cursor() as cursor:
             query = "UPDATE users SET profile_picture = %s WHERE id = %s"
             cursor.execute(query, (avatar_uuid, user_id))
@@ -2512,7 +2512,7 @@ def get_avatar(user_identifier, identifier_type='id'):
     if user_identifier:
         db = None
         try:
-            db = get_database_connection()
+            db = get_db_connection()
             with db.cursor() as cursor:
                 if identifier_type == 'id':
                     query = "select profile_picture from users where id = %s"
@@ -2708,7 +2708,7 @@ def handle_user_upload(user_name, user_id):
         user_dir = os.path.join(app.config['USER_BASE_PATH'], user_name)  # 用户文件存储目录
         os.makedirs(user_dir, exist_ok=True)  # 如果目录不存在则创建
         file_records = []  # 用于存储文件记录的列表
-        with get_database_connection() as db:  # 使用上下文管理器获取数据库连接
+        with get_db_connection() as db:  # 使用上下文管理器获取数据库连接
             with db.cursor() as cursor:  # 使用上下文管理器获取数据库游标
                 # 处理每个上传的文件
                 for f in request.files.getlist('file'):

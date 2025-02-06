@@ -4,12 +4,11 @@ import os
 import mysql.connector
 from mysql.connector import pooling
 
+# 初始化全局变量db_pool
+db_pool = None
+
 
 def get_db_connection():
-    return get_database_connection()
-
-
-def get_database_connection():
     global db_pool  # 确保可以在函数内使用全局变量db_pool
 
     # 如果连接池尚未初始化，则初始化之
@@ -30,11 +29,14 @@ def get_database_connection():
 
             db_config = dict(config.items('database'))
 
-            db_host = db_config.get('host', '').strip("'")
-            db_port = int(db_config.get('port', '').strip("'"))
-            db_name = db_config.get('database', '').strip("'")
-            db_user = db_config.get('user', '').strip("'")
-            db_password = db_config.get('password', '').strip("'")
+            if 'host' not in db_config or 'port' not in db_config or 'database' not in db_config or 'user' not in db_config or 'password' not in db_config:
+                raise ValueError("Configuration file is missing required database credentials.")
+
+            db_host = db_config['host'].strip("'")
+            db_port = int(db_config['port'].strip("'"))
+            db_name = db_config['database'].strip("'")
+            db_user = db_config['user'].strip("'")
+            db_password = db_config['password'].strip("'")
 
         db_pool = pooling.MySQLConnectionPool(
             pool_name="zb_pool",
@@ -44,7 +46,9 @@ def get_database_connection():
             user=db_user,
             password=db_password,
             database=db_name,
-            pool_reset_session=True
+            pool_reset_session=True,
+            pool_timeout=30,  # 获取连接的超时时间
+            connection_timeout=10,  # 建立新连接的超时时间
         )
 
     # 从连接池获取连接
@@ -53,7 +57,7 @@ def get_database_connection():
 
 def test_database_connection():
     try:
-        test_db = get_database_connection()
+        test_db = get_db_connection()
         test_db.close()
         print("Database connection is successful.")
     except mysql.connector.Error as err:
@@ -61,36 +65,32 @@ def test_database_connection():
 
 
 def check_db():
-    cursor = None
     db = None
     try:
-        db = get_database_connection()
-        cursor = db.cursor()
+        db = get_db_connection()
+        with db.cursor() as cursor:
+            # 执行查询
+            sql = "SHOW TABLES"  # 查询所有表的SQL语句
+            cursor.execute(sql)
+            result = cursor.fetchall()
 
-        # 执行查询
-        sql = "SHOW TABLES"  # 查询所有表的SQL语句
-        cursor.execute(sql)
-        result = cursor.fetchall()
+            # 检查查询结果
+            if result:
+                for row in result:
+                    print(row[0], end="/")
+                print(f"Total tables: {len(result)}")
+                print(f"----------------数据库表 预检测---------success")
+                return len(result)
+            else:
+                print("No tables found in the database.")
+                print(f"----------------数据库表丢失")
+                return 0
 
-        # 检查查询结果
-        if result:
-            for row in result:
-                print(row[0], end="/")
-            print(f"Total tables: {len(result)}")
-            print(f"----------------数据库表 预检测---------success")
-        else:
-            print("No tables found in the database.")
-            print(f"----------------数据库表丢失")
-            return 0
+    except mysql.connector.Error as err:
+        print(f"Database error: {err}")
+        return None
 
     finally:
         # 关闭数据库连接
-        if cursor:
-            cursor.close()
         if db:
             db.close()
-
-    return len(result)
-
-
-db_pool = None  # 初始化全局变量db_pool

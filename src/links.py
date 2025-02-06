@@ -1,12 +1,12 @@
 from pymysql.err import DatabaseError
 
-from src.database import get_database_connection
+from src.database import get_db_connection
 from src.utils import generate_short_url
 
 
 # 专属
 def create_special_url(long_url, username):
-    db = get_database_connection()
+    db = get_db_connection()
     cursor = db.cursor()
 
     try:
@@ -32,7 +32,7 @@ def create_special_url(long_url, username):
 
 
 def redirect_to_long_url(short_url):
-    db = get_database_connection()
+    db = get_db_connection()
     cursor = db.cursor()
 
     try:
@@ -54,7 +54,7 @@ def redirect_to_long_url(short_url):
 
 
 def delete_link(short_url):
-    db = get_database_connection()
+    db = get_db_connection()
     cursor = db.cursor()
 
     try:
@@ -71,7 +71,7 @@ def delete_link(short_url):
 
 
 def get_link_info(username):
-    db = get_database_connection()
+    db = get_db_connection()
     cursor = db.cursor()
 
     # 查询用户是否为管理员
