@@ -1,4 +1,5 @@
 import configparser
+import io
 import json
 import os
 import random
@@ -537,3 +538,11 @@ def handle_article_delete(article_name, temp_folder):
         os.remove(published_file_path)
 
     return True
+
+
+def handle_cover_resize(img, width, height):
+    img = img.resize((width, height), Image.LANCZOS)
+    img_byte_arr = io.BytesIO()
+    img.save(img_byte_arr, format='WEBP')
+    img_byte_arr.seek(0)
+    return img_byte_arr.getvalue()

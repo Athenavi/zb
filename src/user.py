@@ -3,7 +3,7 @@ from configparser import ConfigParser
 
 from flask import render_template
 
-from src.database import get_database_connection
+from src.database import get_db_connection
 
 config = ConfigParser()
 try:
@@ -22,9 +22,9 @@ def zy_general_conf():
     api_host = config.get('general', 'api_host', fallback='error').strip("'")
     app_id = config.get('general', 'app_id', fallback='error').strip("'")
     app_key = config.get('general', 'app_key', fallback='error').strip("'")
-    DEFAULT_KEY = config.get('admin', 'key').strip("'")
+    default_key = config.get('admin', 'key').strip("'")
 
-    return domain, title, beian, version, api_host, app_id, app_key, DEFAULT_KEY
+    return domain, title, beian, version, api_host, app_id, app_key, default_key
 
 
 def error(message, status_code):
@@ -58,7 +58,7 @@ def zy_delete_article(filename):
     db = None
     cursor = None
     try:
-        db = get_database_connection()
+        db = get_db_connection()
         with db.cursor() as cursor:
             query = "UPDATE `articles` SET `Status` = 'Deleted' WHERE `articles`.`Title` = %s;"
             cursor.execute(query, (filename,))  # 确保 filename 与数据库中存储的格式一致
@@ -79,7 +79,7 @@ def zy_delete_article(filename):
 
 
 def get_owner_articles(owner_id=None, user_name=None):
-    db = get_database_connection()
+    db = get_db_connection()
     articles = []
 
     try:
@@ -107,7 +107,7 @@ def get_owner_articles(owner_id=None, user_name=None):
 
 
 def get_profiles(user_id=None, user_name=None):
-    db = get_database_connection()
+    db = get_db_connection()
     info_list = []
 
     try:
@@ -142,7 +142,7 @@ def get_profiles(user_id=None, user_name=None):
 
 
 def get_following_count(user_id, subscribe_type='User'):
-    db = get_database_connection()
+    db = get_db_connection()
     count = 0
     try:
         with db.cursor() as cursor:
@@ -165,7 +165,7 @@ def get_following_count(user_id, subscribe_type='User'):
 
 
 def get_follower_count(user_id, subscribe_type='User'):
-    db = get_database_connection()
+    db = get_db_connection()
     count = 0
     try:
         with db.cursor() as cursor:
@@ -187,7 +187,7 @@ def get_follower_count(user_id, subscribe_type='User'):
 
 
 def get_can_followed(user_id, target_id):
-    db = get_database_connection()
+    db = get_db_connection()
     can_follow = 1
     try:
         with db.cursor() as cursor:
@@ -205,7 +205,7 @@ def get_can_followed(user_id, target_id):
 
 
 def get_user_id(user_name):
-    db = get_database_connection()
+    db = get_db_connection()
     user_id = 0
     try:
         with db.cursor() as cursor:

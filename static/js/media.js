@@ -21,7 +21,8 @@ function closeImage() {
 }
 
 function closeVideo() {
-    document.getElementById('video-popup').style.display = 'none';
+    document.getElementById("video-image").src = ""; // 清空视频源
+    document.getElementById("video-popup").classList.add("hidden"); // 隐藏弹窗
 }
 
 document.addEventListener('DOMContentLoaded', function () {

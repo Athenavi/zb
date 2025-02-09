@@ -6,10 +6,6 @@ from mysql.connector import pooling
 
 
 def get_db_connection():
-    return get_database_connection()
-
-
-def get_database_connection():
     global db_pool  # 确保可以在函数内使用全局变量db_pool
 
     # 如果连接池尚未初始化，则初始化之
@@ -53,7 +49,7 @@ def get_database_connection():
 
 def test_database_connection():
     try:
-        test_db = get_database_connection()
+        test_db = get_db_connection()
         test_db.close()
         print("Database connection is successful.")
     except mysql.connector.Error as err:
@@ -61,36 +57,35 @@ def test_database_connection():
 
 
 def check_db():
-    cursor = None
     db = None
     try:
-        db = get_database_connection()
-        cursor = db.cursor()
+        db = get_db_connection()
+        with db.cursor() as cursor:
+            # 执行查询
+            sql = "SHOW TABLES"  # 查询所有表的SQL语句
+            cursor.execute(sql)
+            result = cursor.fetchall()
 
-        # 执行查询
-        sql = "SHOW TABLES"  # 查询所有表的SQL语句
-        cursor.execute(sql)
-        result = cursor.fetchall()
+            # 检查查询结果
+            if result:
+                for row in result:
+                    print(row[0], end="/")
+                print(f"Total tables: {len(result)}")
+                print(f"----------------数据库表 预检测---------success")
+                return len(result)
+            else:
+                print("No tables found in the database.")
+                print(f"----------------数据库表丢失")
+                return 0
 
-        # 检查查询结果
-        if result:
-            for row in result:
-                print(row[0], end="/")
-            print(f"Total tables: {len(result)}")
-            print(f"----------------数据库表 预检测---------success")
-        else:
-            print("No tables found in the database.")
-            print(f"----------------数据库表丢失")
-            return 0
+    except mysql.connector.Error as err:
+        print(f"Database error: {err}")
+        return None
 
     finally:
         # 关闭数据库连接
-        if cursor:
-            cursor.close()
         if db:
             db.close()
 
-    return len(result)
 
-
-db_pool = None  # 初始化全局变量db_pool
+db_pool = None

@@ -19,6 +19,7 @@ import jwt
 import markdown
 import qrcode
 import requests
+from PIL import Image
 from flask import Flask, render_template, redirect, request, url_for, Response, jsonify, send_file, \
     make_response, send_from_directory
 from flask_caching import Cache
@@ -33,7 +34,7 @@ from src.BlogDeal import get_article_names, get_article_content, clear_html_form
     zy_edit_article, get_subscriber_ids, get_unique_tags, get_articles_by_tag, \
     get_tags_by_article, set_article_info, write_tags_to_database, set_article_visibility, auth_by_id, \
     article_change_pw, get_file_summary, get_comments, auth_files, get_more_info, article_save_change
-from src.database import get_database_connection, get_db_connection
+from src.database import get_db_connection
 from src.links import create_special_url, redirect_to_long_url
 from src.notification import get_sys_notice, read_notification, send_change_mail
 from src.user import error, get_owner_articles, zy_general_conf, get_profiles, get_following_count, \
@@ -43,7 +44,7 @@ from src.utils import admin_upload_file, get_client_ip, \
     authenticate_refresh_token, handle_article_upload, is_allowed_file, zb_safe_check, \
     get_all_img, get_all_video, get_all_xmind, generate_thumbs, generate_video_thumb, \
     get_username, admin_required, jwt_required, finger_required, theme_safe_check, mask_ip, user_id_required, \
-    user_agent_info, handle_article_delete
+    user_agent_info, handle_article_delete, handle_cover_resize
 
 global_encoding = 'utf-8'
 
@@ -96,7 +97,7 @@ def inject_variables():
     return dict(
         beian=beian,
         title=sitename,
-        username=get_username,
+        username=get_username(),
         domain=domain
     )
 
@@ -240,22 +241,6 @@ def sys_out_file(article_name):
 
     articles_dir = os.path.join(base_dir, 'articles')
     return send_from_directory(articles_dir, article_name)
-
-
-@app.route('/profile', methods=['GET', 'POST'])
-@jwt_required
-def profile(user_id):
-    user_name = get_username()
-    avatar_url = get_avatar(user_id)
-    user_bio = get_user_bio(user_id) or "这人很懒，什么也没留下"
-    owner_articles = get_owner_articles(owner_id=None, user_name=user_name) or []
-    user_follow = get_following_count(user_id=user_id) or 0
-    follower = get_follower_count(user_id=user_id) or 0
-    return render_template('Profile.html', url_for=url_for, avatar_url=avatar_url,
-                           userStatus=bool(user_id), username=user_name, userBio=user_bio,
-                           following=user_follow, follower=follower,
-                           target_id=user_id, user_id=user_id,
-                           Articles=owner_articles)
 
 
 def get_user_bio(user_id):
@@ -421,7 +406,7 @@ def get_article_info(articles):
     for a_title in articles:
         try:
             article_info = ''
-            db = get_database_connection()
+            db = get_db_connection()
 
             try:
                 article_info += get_file_date(a_title)
@@ -523,111 +508,6 @@ def blog_detail(article):
         return error(message="页面不见了", status_code=404)
 
 
-@app.route('/sitemap.xml')
-@app.route('/sitemap')
-def generate_sitemap():
-    cache_dir = 'temp'
-    os.makedirs(cache_dir, exist_ok=True)
-
-    cache_file = os.path.join(cache_dir, 'sitemap.xml')
-
-    if os.path.exists(cache_file):
-        cache_timestamp = os.path.getmtime(cache_file)
-        if datetime.now().timestamp() - cache_timestamp <= app.config['MAX_CACHE_TIMESTAMP']:
-            with open(cache_file, 'r') as f:
-                cached_xml_data = f.read()
-            response = Response(cached_xml_data, mimetype='text/xml')
-            return response
-
-    markdown_files = get_a_list(chanel=1)
-
-    # 创建XML文件头
-    xml_data = '<?xml version="1.0" encoding="UTF-8"?>\n'
-    xml_data += '<?xml-stylesheet type="text/xsl" href="./static/sitemap.xsl"?>\n'
-    xml_data += '<urlset xmlns="https://www.sitemaps.org/schemas/sitemap/0.9/">\n'
-
-    for file in markdown_files:
-        article_url = domain + 'blog/' + file
-        date = get_file_date(file)
-        article_surl = api_shortlink(article_url)
-        # 创建url标签并包含链接
-        xml_data += '<url>\n'
-        xml_data += f'\t<loc>{article_surl}</loc>\n'
-        xml_data += f'\t<lastmod>{date}</lastmod>\n'  # 添加适当的标签
-        xml_data += '\t<changefreq>Monthly</changefreq>\n'  # 添加适当的标签
-        xml_data += '\t<priority>0.8</priority>\n'  # 添加适当的标签
-        xml_data += '</url>\n'
-
-    # 关闭urlset标签
-    xml_data += '</urlset>\n'
-
-    # 写入缓存文件
-    with open(cache_file, 'w') as f:
-        f.write(xml_data)
-
-    response = Response(xml_data, mimetype='text/xml')
-    return response
-
-
-@app.route('/feed')
-@app.route('/rss')
-def generate_rss():
-    cache_dir = 'temp'
-    os.makedirs(cache_dir, exist_ok=True)
-
-    cache_file = os.path.join(cache_dir, 'feed.xml')
-
-    if os.path.exists(cache_file):
-        cache_timestamp = os.path.getmtime(cache_file)
-        if datetime.now().timestamp() - cache_timestamp <= app.config['MAX_CACHE_TIMESTAMP']:
-            with open(cache_file, 'r', encoding=global_encoding, errors='ignore') as f:
-                cached_xml_data = f.read()
-            response = Response(cached_xml_data, mimetype='application/rss+xml')
-            return response
-
-    markdown_files = get_a_list(chanel=3, page=1)
-
-    # 创建XML文件头及其他信息...
-    xml_data = '<?xml version="1.0" encoding="UTF-8"?>\n'
-    xml_data += '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">\n'
-    xml_data += '<channel>\n'
-    xml_data += '<title>' + sitename + 'RSS Feed </title>\n'
-    xml_data += '<link>' + domain + '</link>\n'
-    xml_data += '<description>' + sitename + 'RSS Feed</description>\n'
-    xml_data += '<language>en-us</language>\n'
-    xml_data += '<lastBuildDate>' + datetime.now().strftime("%a, %d %b %Y %H:%M:%S %z") + '</lastBuildDate>\n'
-    xml_data += '<atom:link href="' + domain + 'rss" rel="self" type="application/rss+xml" />\n'
-
-    for file in markdown_files:
-        encoded_article_name = urllib.parse.quote(file)  # 对文件名进行编码处理
-        article_url = domain + 'blog/' + encoded_article_name
-        date = get_file_date(encoded_article_name)
-        content, *_ = get_article_content(file, 10)
-        describe = encoded_article_name
-
-        article_surl = api_shortlink(article_url)
-        # 创建item标签并包含内容
-        xml_data += '<item>\n'
-        xml_data += f'\t<title>{file}</title>\n'
-        xml_data += f'\t<link>{article_surl}</link>\n'
-        xml_data += f'\t<guid>{article_url}</guid>\n'
-        xml_data += f'\t<pubDate>{date}</pubDate>\n'
-        xml_data += f'\t<description>{describe}</description>\n'
-        xml_data += f'\t<content:encoded><![CDATA[{content}]]></content:encoded>'
-        xml_data += '</item>\n'
-
-    # 关闭channel和rss标签
-    xml_data += '</channel>\n'
-    xml_data += '</rss>\n'
-
-    # 写入缓存文件
-    with open(cache_file, 'w', encoding=global_encoding, errors='ignore') as f:
-        f.write(xml_data)
-
-    response = Response(xml_data, mimetype='application/rss+xml')
-    return response
-
-
 @app.route('/confirm-password', methods=['GET', 'POST'])
 @jwt_required
 def confirm_password(user_id):
@@ -707,9 +587,9 @@ def markdown_editor(user_id, article):
         auth = auth_articles(article, user_name)
 
     if auth:
-        if request.args.get('editor') == 'ueditor':
-            return ueditor_plus_edit(user_id, article, user_name)
         aid, tags = get_tags_by_article(article)
+        if request.args.get('editor') == 'ueditor':
+            return ueditor_plus_edit(user_id, aid, user_name)
         if request.method == 'GET':
             edit_html = zy_edit_article(article, max_line=app.config['MAX_LINE'])
             article_url = domain + 'blog/' + article
@@ -731,6 +611,9 @@ def markdown_editor(user_id, article):
 
 
 def zy_save_tags(aid, tags_input):
+    if not isinstance(tags_input, str):
+        return jsonify({'show_edit': 'error', 'message': '标签输入不是字符串'})
+
     # 将中文逗号转换为英文逗号
     tags_input = tags_input.replace("，", ",")
 
@@ -751,7 +634,7 @@ def zy_save_tags(aid, tags_input):
     cache.set(f"{aid}:tag_hash", current_tag_hash, timeout=28800)
 
     # 写入更新后的标签到数据库
-    write_tags_to_database(tags_list, aid)
+    write_tags_to_database(aid, tags_list)
     return jsonify({'show_edit': "success"})
 
 
@@ -842,31 +725,27 @@ def media(user_id):
     page = request.args.get('page', default=1, type=int)
     user_name = get_username()
     if request.method == 'GET':
-        preference = request.cookies.get('preference')
-        template_choose = 'Media.html'
-        if preference == 'V2':
-            template_choose = 'Media_V2.html'
         if not media_type or media_type == 'img':
             imgs, has_next_page, has_previous_page = get_all_img(user_name, page=page, per_page=20)
 
-            return render_template(template_choose, imgs=imgs, title='Media', url_for=url_for,
+            return render_template('Media_V2.html', imgs=imgs, title='Media', url_for=url_for,
                                    has_next_page=has_next_page,
-                                   has_previous_page=has_previous_page, current_page=page, userid=user_name,
+                                   has_previous_page=has_previous_page, current_page=page,
                                    domain=domain)
         if media_type == 'video':
             videos, has_next_page, has_previous_page = get_all_video(user_name, page=page)
 
-            return render_template(template_choose, videos=videos, title='Media', url_for=url_for,
+            return render_template('Media_V2.html', videos=videos, title='Media', url_for=url_for,
                                    has_next_page=has_next_page,
-                                   has_previous_page=has_previous_page, current_page=page, userid=user_name,
+                                   has_previous_page=has_previous_page, current_page=page,
                                    domain=domain)
 
         if media_type == 'xmind':
             xminds, has_next_page, has_previous_page = get_all_xmind(user_name, page=page)
 
-            return render_template(template_choose, xminds=xminds, title='Media', url_for=url_for,
+            return render_template('Media_V2.html', xminds=xminds, url_for=url_for,
                                    has_next_page=has_next_page,
-                                   has_previous_page=has_previous_page, current_page=page, userid=user_name,
+                                   has_previous_page=has_previous_page, current_page=page,
                                    domain=domain)
     elif request.method == 'POST':
         img_name = request.json.get('img_name')
@@ -1052,7 +931,7 @@ def id_find_article(article_id):
         return error(message='无效的文章', status_code=404)
 
     user_agent = request.headers.get('User-Agent')
-    db = get_database_connection()
+    db = get_db_connection()
     cursor = db.cursor()
     try:
         query = "SELECT long_url FROM urls WHERE id = %s"
@@ -1207,7 +1086,7 @@ def follow_user(user_id):
 
     # 如果缓存为空，则从数据库中获取所有关注并缓存
     if user_followed is None:
-        db = get_database_connection()
+        db = get_db_connection()
         try:
             with db.cursor() as cursor:
                 cursor.execute("SELECT `subscribe_to_id` FROM `subscriptions` WHERE `subscriber_id` = %s",
@@ -1224,7 +1103,7 @@ def follow_user(user_id):
     if follow_id in user_followed:
         return jsonify({'follow_code': 'success', 'message': '已关注'})
 
-    db = get_database_connection()
+    db = get_db_connection()
     try:
         with db.cursor() as cursor:
             # 进行关注操作
@@ -1252,7 +1131,7 @@ def unfollow_user(user_id):
     if not user_id or not unfollow_id:
         return jsonify({'unfollow_code': 'failed', 'message': '操作无效'})
 
-    db = get_database_connection()
+    db = get_db_connection()
     try:
         with db.cursor() as cursor:
             # 进行取关操作
@@ -1284,7 +1163,7 @@ def like(user_id):
             user_liked = []
         if aid in user_liked:
             return jsonify({'like_code': 'failed', 'message': "你已经点赞过了!!"})
-        db = get_database_connection()
+        db = get_db_connection()
         try:
             with db.cursor() as cursor:
                 rd_like = random.randint(3, 8)
@@ -1515,7 +1394,7 @@ def get_guestbook():
     if cached_guestbook:
         return cached_guestbook
     try:
-        db = get_database_connection()
+        db = get_db_connection()
 
         try:
             with db.cursor() as cursor:
@@ -1538,7 +1417,7 @@ def get_guestbook():
 
 def upload_guestbook(content):
     try:
-        db = get_database_connection()
+        db = get_db_connection()
         try:
             with db.cursor() as cursor:
                 query = ("INSERT INTO `events` (`title`, `description`, `event_date`,`created_at`) VALUES ("
@@ -1617,6 +1496,8 @@ def api_xmind(user_name, xmind):
 
 @app.route('/api/wx/blog_detail/<article>', methods=['GET'])
 def api_wx_blog_detail(article):
+    visited_key = request.args.get('KEY')
+
     def generate_response_data(message="文章不存在"):
         return jsonify({
             'article_name': message,
@@ -1641,7 +1522,7 @@ def api_wx_blog_detail(article):
         article_surl = api_shortlink(article_url)
         author, author_uid = get_blog_author(article)
         update_date = get_file_date(article)
-        content = api_wx_content(article)
+        content = api_wx_content(article, auth_key=visited_key)
 
         response_data = {
             'article_name': article,
@@ -1660,9 +1541,11 @@ def api_wx_blog_detail(article):
         return generate_response_data()
 
 
-def api_wx_content(article):
-    articles_dir = os.path.join(base_dir, 'articles', article + ".md")
+def api_wx_content(article, auth_key):
     html_content = '<p>没有找到内容</p>'
+    if auth_key != DEFAULT_KEY:
+        return html_content
+    articles_dir = os.path.join(base_dir, 'articles', article + ".md")
     try:
         with open(articles_dir, 'r', encoding='utf-8') as file:
             content = file.read()
@@ -1734,7 +1617,7 @@ def temp_view():
 
     if aid:
         content = '<p>无法加载文章内容</p>'
-        db = get_database_connection()
+        db = get_db_connection()
 
         try:
             with db.cursor() as cursor:
@@ -1744,7 +1627,7 @@ def temp_view():
                 if result:
                     a_title = result[0]
 
-                    content = api_wx_content(a_title)
+                    content = api_wx_content(a_title, DEFAULT_KEY)
         except ValueError as e:
             app.logger.error(f"Value error: {e}")
             return jsonify({"message": "Invalid ArticleID"}), 400
@@ -1757,7 +1640,7 @@ def temp_view():
             db.close()
 
         referrer = request.referrer
-        app.logger.info(f"Request from {referrer} with finger {user_finger}")  # 记录请求信息
+        app.logger.info(f"Request from {referrer} with finger {user_finger}")
 
         return content
     else:
@@ -1766,7 +1649,7 @@ def temp_view():
 
 @cache.cached(timeout=600, key_prefix='article_passwd')
 def article_passwd(aid):
-    db = get_database_connection()
+    db = get_db_connection()
     try:
         with db.cursor() as cursor:
             query = "SELECT `pass` FROM article_pass WHERE aid = %s"
@@ -1859,7 +1742,7 @@ def api_comment(user_id):
 def comment_add(aid, user_id, pid, comment_content, ip, ua):
     c_json = {'content': comment_content, 'pid': pid, 'ip': ip, 'ua': ua}
     comment_json = json.dumps(c_json)
-    db = get_database_connection()
+    db = get_db_connection()
     try:
         with db.cursor() as cursor:
             query = "INSERT INTO `comments` (`article_id`, `user_id`, `content`) VALUES (%s, %s, %s);"
@@ -1900,7 +1783,7 @@ def api_delete(user_id, filename):
     user_name = get_username()
     arg_type = request.args.get('type')
     if arg_type == 'article':
-        db = get_database_connection()
+        db = get_db_connection()
         try:
             with db.cursor() as cursor:
                 cursor.execute("DELETE FROM `articles` WHERE `Title` = %s AND `Author` = %s", (filename, user_name))
@@ -1959,7 +1842,7 @@ def api_report(user_id):
 
 
 def report_add(user_id, reported_type, reported_id, reason):
-    db = get_database_connection()
+    db = get_db_connection()
     try:
         with db.cursor() as cursor:
             query = ("INSERT INTO `reports` (`reported_by`, `content_type`, `content_id`,`reason`) VALUES (%s, %s, %s,"
@@ -1995,7 +1878,7 @@ def api_comment_delete(user_id):
 
 
 def comment_del(user_id, comment_id):
-    db = get_database_connection()
+    db = get_db_connection()
     try:
         with db.cursor() as cursor:
             query = "DELETE FROM `comments` WHERE `id` = %s AND `user_id` = %s;"
@@ -2510,7 +2393,7 @@ def change_profiles(user_id):
 def db_save_avatar(user_id, avatar_uuid):
     db = None
     try:
-        db = get_database_connection()
+        db = get_db_connection()
         with db.cursor() as cursor:
             query = "UPDATE users SET profile_picture = %s WHERE id = %s"
             cursor.execute(query, (avatar_uuid, user_id))
@@ -2528,7 +2411,7 @@ def get_avatar(user_identifier, identifier_type='id'):
     if user_identifier:
         db = None
         try:
-            db = get_database_connection()
+            db = get_db_connection()
             with db.cursor() as cursor:
                 if identifier_type == 'id':
                     query = "select profile_picture from users where id = %s"
@@ -2554,19 +2437,15 @@ def get_avatar_image(avatar_uuid):
     return send_file(f'{base_dir}/{app.config['AVATAR_PATH']}/{avatar_uuid}.webp', mimetype='image/webp')
 
 
-def ueditor_plus_edit(user_id, article, user_name):
-    aid, tags = get_tags_by_article(article)
+def ueditor_plus_edit(user_id, aid, user_name):
     all_info = get_more_info(aid)
-    edit_html = zy_edit_article(article, max_line=app.config['MAX_LINE'])
-    article_url = domain + 'blog/' + article
+    edit_html = zy_edit_article(all_info[1], max_line=app.config['MAX_LINE'])
+    article_url = domain + 'blog/' + all_info[1]
     article_surl = api_shortlink(article_url)
     # 渲染编辑页面并将转换后的HTML传递到模板中
     return render_template('ueditor-plus.html',
-                           user_id=user_id,
-                           edit_html=edit_html, aid=aid, articleName=article,
-                           tags=tags, article_surl=article_surl,
-                           user_name=user_name, coverImage=all_info[8],
-                           articleExcerpt=all_info[10], articleStatus=all_info[7])
+                           user_id=user_id, article_surl=article_surl, user_name=user_name,
+                           edit_html=edit_html, all_info=all_info)
 
 
 @app.route('/api/ueditor', methods=['GET', 'POST'])
@@ -2678,6 +2557,7 @@ def markdown_editor2(user_id, aid):
         content = request.form.get('content') or ''
         status = request.form.get('status') or 'Draft'
         excerpt = request.form.get('excerpt')[:145] or ''
+        hidden_status = request.form.get('hiddenStatus') or 0
         cover_image = request.files.get('coverImage') or None
         cover_image_path = 'cover'
         if status == 'Deleted':
@@ -2689,7 +2569,9 @@ def markdown_editor2(user_id, aid):
             os.makedirs(os.path.dirname(cover_image_path), exist_ok=True)
             with open(cover_image_path, 'wb') as f:
                 cover_image.save(f)
-        if article_save_change(aid, excerpt, status, cover_image_path) and zy_save_edit(aid, content, a_name):
+        if article_save_change(aid, int(hidden_status), status, cover_image_path, excerpt) and zy_save_edit(aid,
+                                                                                                            content,
+                                                                                                            a_name):
             return jsonify({'show_edit_code': 'success'}), 200
     except Exception as e:
         app.logger.error(f"保存文章 article id: {aid} 时出错: {e} by user {user_id} ")
@@ -2699,7 +2581,22 @@ def markdown_editor2(user_id, aid):
 @app.route('/api/cover/<cover_img>', methods=['GET'])
 @app.route('/edit/cover/<cover_img>', methods=['GET'])
 def api_cover(cover_img):
-    return send_file(f'../cover/{cover_img}', mimetype='image/png')
+    require_format = request.args.get('format') or False
+    if not require_format:
+        cache.set(f"cover_{cover_img}", None)
+        return send_file(f'../cover/{cover_img}', mimetype='image/png')
+    cached_cover = cache.get(f"cover_{cover_img}")
+    if cached_cover:
+        return send_file(io.BytesIO(cached_cover), mimetype='image/webp')
+    cover_path = f'cover/{cover_img}'
+    if os.path.isfile(cover_path):
+        with Image.open(cover_path) as img:
+            cover_data = handle_cover_resize(img, 480, 270)
+        cache.set(f"cover_{cover_img}", cover_data, timeout=28800)
+        return send_file(io.BytesIO(cover_data), mimetype='image/webp')
+    else:
+        print("File not found, returning default image")
+        return send_file('../static/image/dark.jpg', mimetype='image/png')
 
 
 def handle_user_upload(user_name, user_id):
@@ -2710,7 +2607,7 @@ def handle_user_upload(user_name, user_id):
         user_dir = os.path.join(app.config['USER_BASE_PATH'], user_name)  # 用户文件存储目录
         os.makedirs(user_dir, exist_ok=True)  # 如果目录不存在则创建
         file_records = []  # 用于存储文件记录的列表
-        with get_database_connection() as db:  # 使用上下文管理器获取数据库连接
+        with get_db_connection() as db:  # 使用上下文管理器获取数据库连接
             with db.cursor() as cursor:  # 使用上下文管理器获取数据库游标
                 # 处理每个上传的文件
                 for f in request.files.getlist('file'):
@@ -2829,8 +2726,7 @@ def index_html():
     except Exception:
         return error("An error occurred while fetching articles.", status_code=500)
 
-    return render_template('index.html', article_info=article_info, page=page, total_pages=total_pages,
-                           SiteName=sitename)
+    return render_template('index.html', article_info=article_info, page=page, total_pages=total_pages)
 
 
 @app.route('/tag/<tag_name>', methods=['GET'])
@@ -2858,7 +2754,6 @@ def tag_page(tag_name):
         return error("获取文章时发生错误。", status_code=500)
 
     return render_template('index.html', article_info=article_info, page=page, total_pages=total_pages,
-                           SiteName=sitename,
                            tag_name=tag_name)
 
 
@@ -2884,7 +2779,6 @@ def featured_page():
         return error("获取文章时发生错误。", status_code=500)
 
     return render_template('index.html', article_info=article_info, page=page, total_pages=total_pages,
-                           SiteName=sitename,
                            tag_name='featured')
 
 
@@ -2954,8 +2848,8 @@ def upload_bulk(user_id):
         except Exception as e:
             app.logger.error(f"Error in file upload: {e}")
             return jsonify({'message': 'failed', 'error': str(e)}), 500
-    tipMessage = f"请不要上传超过 {app.config['UPLOAD_LIMIT'] / (1024 * 1024)}MB 的文件"
-    return render_template('upload.html', upload_locked=upload_locked, message=tipMessage)
+    tip_message = f"请不要上传超过 {app.config['UPLOAD_LIMIT'] / (1024 * 1024)}MB 的文件"
+    return render_template('upload.html', upload_locked=upload_locked, message=tip_message)
 
 
 def save_bulk_article_db(filename, author):
@@ -3007,8 +2901,103 @@ def new_article(user_id):
             cache.set(f'upload_locked_{user_id}', True, timeout=120)
             logging.error("Failed to update article information in the database.")
             return jsonify({'message': message, 'upload_locked': True, 'Lock_countdown': 120}), 200
-    tipMessage = f"请不要上传超过 {app.config['UPLOAD_LIMIT'] / (1024 * 1024)}MB 的文件"
-    return render_template('upload.html', message=tipMessage, upload_locked=upload_locked)
+    tip_message = f"请不要上传超过 {app.config['UPLOAD_LIMIT'] / (1024 * 1024)}MB 的文件"
+    return render_template('upload.html', message=tip_message, upload_locked=upload_locked)
+
+
+@app.route('/profile', methods=['GET', 'POST'])
+@jwt_required
+def profile(user_id):
+    avatar_url = get_avatar(user_id)
+    user_bio = get_user_bio(user_id) or "这人很懒，什么也没留下"
+    owner_articles = get_owner_articles(owner_id=user_id, user_name=None) or []
+    user_follow = get_following_count(user_id=user_id) or 0
+    follower = get_follower_count(user_id=user_id) or 0
+    return render_template('Profile.html', url_for=url_for, avatar_url=avatar_url,
+                           userStatus=bool(user_id), userBio=user_bio,
+                           following=user_follow, follower=follower,
+                           target_id=user_id, user_id=user_id,
+                           Articles=owner_articles)
+
+
+@cache.memoize(app.config['MAX_CACHE_TIMESTAMP'])
+@app.route('/sitemap.xml')
+@app.route('/sitemap')
+def generate_sitemap():
+    db = None
+    try:
+        db = get_db_connection()
+        with db.cursor() as cursor:
+            query = """SELECT Title FROM `articles` WHERE `Hidden`=0 AND `Status`='Published' ORDER BY `ArticleID` DESC LIMIT 40"""
+            cursor.execute(query)
+            results = cursor.fetchall()
+            article_titles = [item[0] for item in results]
+            xml_data = '<?xml version="1.0" encoding="UTF-8"?>\n'
+            xml_data += '<urlset xmlns="https://www.sitemaps.org/schemas/sitemap/0.9/">\n'
+
+            # 遍历文章标题列表
+            for title in article_titles:
+                article_url = domain + 'blog/' + title
+                date = get_file_date(title)
+                article_surl = api_shortlink(article_url)
+                # 创建url标签并包含链接
+                xml_data += '<url>\n'
+                xml_data += f'\t<loc>{article_surl}</loc>\n'
+                xml_data += f'\t<lastmod>{date}</lastmod>\n'  # 添加适当的标签
+                xml_data += '\t<changefreq>Monthly</changefreq>\n'  # 添加适当的标签
+                xml_data += '\t<priority>0.8</priority>\n'  # 添加适当的标签
+                xml_data += '</url>\n'
+
+            # 关闭urlset标签
+            xml_data += '</urlset>\n'
+            response = Response(xml_data, mimetype='text/xml')
+            return response
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        if db is not None:
+            db.close()
+
+
+@cache.memoize(app.config['MAX_CACHE_TIMESTAMP'])
+@app.route('/feed')
+@app.route('/rss')
+def generate_rss():
+    markdown_files = get_a_list(chanel=3, page=1)
+    # 创建XML文件头及其他信息...
+    xml_data = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml_data += '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">\n'
+    xml_data += '<channel>\n'
+    xml_data += '<title>' + sitename + 'RSS Feed </title>\n'
+    xml_data += '<link>' + domain + '</link>\n'
+    xml_data += '<description>' + sitename + 'RSS Feed</description>\n'
+    xml_data += '<language>en-us</language>\n'
+    xml_data += '<lastBuildDate>' + datetime.now().strftime("%a, %d %b %Y %H:%M:%S %z") + '</lastBuildDate>\n'
+    xml_data += '<atom:link href="' + domain + 'rss" rel="self" type="application/rss+xml" />\n'
+
+    for file in markdown_files:
+        encoded_article_name = urllib.parse.quote(file)  # 对文件名进行编码处理
+        article_url = domain + 'blog/' + encoded_article_name
+        date = get_file_date(encoded_article_name)
+        content, *_ = get_article_content(file, 10)
+        describe = encoded_article_name
+
+        article_surl = api_shortlink(article_url)
+        # 创建item标签并包含内容
+        xml_data += '<item>\n'
+        xml_data += f'\t<title>{file}</title>\n'
+        xml_data += f'\t<link>{article_surl}</link>\n'
+        xml_data += f'\t<guid>{article_url}</guid>\n'
+        xml_data += f'\t<pubDate>{date}</pubDate>\n'
+        xml_data += f'\t<description>{describe}</description>\n'
+        xml_data += f'\t<content:encoded><![CDATA[{content}]]></content:encoded>'
+        xml_data += '</item>\n'
+
+    # 关闭channel和rss标签
+    xml_data += '</channel>\n'
+    xml_data += '</rss>\n'
+    response = Response(xml_data, mimetype='application/rss+xml')
+    return response
 
 
 @app.errorhandler(404)

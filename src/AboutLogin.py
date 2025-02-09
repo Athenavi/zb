@@ -6,7 +6,7 @@ import bcrypt
 import bleach
 from flask import request, redirect, url_for, render_template, make_response
 
-from src.database import get_database_connection
+from src.database import get_db_connection
 from src.utils import generate_jwt, generate_refresh_token
 
 
@@ -17,7 +17,7 @@ def zy_login(callback_route):
     if input_value == 'guest@7trees.cn':
         return render_template('LoginRegister.html', error="宾客账户仅能使用用户名登录")
 
-    db = get_database_connection()
+    db = get_db_connection()
     cursor = db.cursor()
 
     try:
@@ -59,7 +59,7 @@ def zy_register(ip):
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
         invite_code = request.form.get('invite_code', '').strip()
-        db = get_database_connection()
+        db = get_db_connection()
         cursor = db.cursor()
 
         try:
@@ -100,7 +100,7 @@ def zy_register(ip):
 def zy_mail_login(user_email, ip):
     username = 'qks' + format(random.randint(1000, 9999))
     password = '123456'
-    db = get_database_connection()
+    db = get_db_connection()
     cursor = db.cursor()
 
     try:
