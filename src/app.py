@@ -322,13 +322,10 @@ def get_home_data(page, tag):
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
-    if not zb_safe_check(domain):
-        return error(message="域名配置出错,或者正在使用默认的 系统配置 将导致安全问题", status_code=503)
-
     if request.method == 'GET':
         page = request.args.get('page', default=1, type=int)
         tag = request.args.get('tag', default='None')
-        wx_api = request.args.get('wxAPI', default=False, type=bool)
+        wx_api = request.args.get('wxAPI', default='false').lower() == 'true'
 
         (compressed_list, notice, has_next_page, has_previous_page, friends_links, tags) = get_home_data(page, tag)
 
@@ -339,15 +336,15 @@ def home():
                 'has_next_page': has_next_page,
                 'has_previous_page': has_previous_page,
                 'current_page': page,
-                'tags': tags,  # 使用正确的 tags
+                'tags': tags,
                 'tag': tag,
                 'friends_links': friends_links
             }
-
             return jsonify(response_data)
 
         if compressed_list is None:
             return error(message="没有找到任何文章", status_code=404)
+
         template_display = get_current_theme()
         template_path = f'templates/theme/{template_display}/index.html'
         if os.path.exists(template_path):
@@ -355,7 +352,6 @@ def home():
         else:
             template = app.jinja_env.get_template('zyIndex.html')
 
-        # 渲染模板并存储渲染后的页面内容到缓存中
         home_cache = f'page_content:{template_display}:{page}:{tag}'
         content = cache.get(home_cache)
 
@@ -375,9 +371,8 @@ def home():
                 friends_links=friends_links
             )
 
-            # 确保渲染的内容是字符串
             if isinstance(rendered_content, str):
-                cache.set(home_cache, rendered_content, timeout=360)  # 设置为360秒
+                cache.set(home_cache, rendered_content, timeout=360)
             else:
                 app.logger.error('渲染内容不是字符串，无法缓存。')
 
@@ -397,7 +392,7 @@ def home():
         return resp
 
     else:
-        return error(message="此方法无效", status_code=500)
+        return error(message="此方法无效", status_code=405)
 
 
 @cache.cached(timeout=1800, key_prefix='article_info')
@@ -1638,11 +1633,9 @@ def temp_view():
         finally:
             cursor.close()
             db.close()
-
-        referrer = request.referrer
-        app.logger.info(f"Request from {referrer} with finger {user_finger}")
-
-        return content
+            referrer = request.referrer
+            app.logger.info(f"Request from {referrer} with finger {user_finger}")
+            return content
     else:
         return jsonify({"message": "Temporary URL expired or invalid"}), 404
 
@@ -1743,17 +1736,18 @@ def comment_add(aid, user_id, pid, comment_content, ip, ua):
     c_json = {'content': comment_content, 'pid': pid, 'ip': ip, 'ua': ua}
     comment_json = json.dumps(c_json)
     db = get_db_connection()
+    comment_added = False
     try:
         with db.cursor() as cursor:
             query = "INSERT INTO `comments` (`article_id`, `user_id`, `content`) VALUES (%s, %s, %s);"
             cursor.execute(query, (int(aid), int(user_id), comment_json))
             db.commit()
-            return True
+            comment_added = True
     except Exception as e:
         print(f'Error: {e}')
-        return False
     finally:
         db.close()
+        return comment_added
 
 
 @app.route("/Comment")
@@ -1842,6 +1836,7 @@ def api_report(user_id):
 
 
 def report_add(user_id, reported_type, reported_id, reason):
+    reported = False
     db = get_db_connection()
     try:
         with db.cursor() as cursor:
@@ -1849,12 +1844,12 @@ def report_add(user_id, reported_type, reported_id, reason):
                      "%s);")
             cursor.execute(query, (int(user_id), reported_type, reported_id, reason))
             db.commit()
-            return True
+            reported = True
     except Exception as e:
         print(f'Error: {e}')
-        return False
     finally:
         db.close()
+        return reported
 
 
 @app.route('/api/comment', methods=['delete'])
@@ -1879,17 +1874,18 @@ def api_comment_delete(user_id):
 
 def comment_del(user_id, comment_id):
     db = get_db_connection()
+    comment_deleted = False
     try:
         with db.cursor() as cursor:
             query = "DELETE FROM `comments` WHERE `id` = %s AND `user_id` = %s;"
             cursor.execute(query, (int(comment_id), int(user_id)))
             db.commit()
-            return True
+            comment_deleted = True
     except Exception as e:
         print(f'Error: {e}')
-        return False
     finally:
         db.close()
+        return comment_deleted
 
 
 @app.route('/travel', methods=['GET'])
@@ -2681,16 +2677,11 @@ def get_outer_url(user_name, user_id, filename):
 
 def fetch_articles(query, params):
     db = get_db_connection()
-    article_info = []
-    total_articles = 0
     try:
         with db.cursor() as cursor:
             cursor.execute(query, params)
             article_info = cursor.fetchall()
-
-            # 调试输出
-            print("Fetched articles:", article_info)
-
+            # 调试输出print("Fetched articles:", article_info)
             cursor.execute("SELECT COUNT(*) FROM `articles` WHERE `Hidden`=0 AND `Status`='Published'")
             total_articles = cursor.fetchone()[0]
 
@@ -2701,8 +2692,7 @@ def fetch_articles(query, params):
     finally:
         if db is not None:
             db.close()
-
-    return article_info, total_articles
+        return article_info, total_articles
 
 
 @app.route('/index.html', methods=['GET'])
@@ -2712,12 +2702,24 @@ def index_html():
     offset = (page - 1) * page_size
 
     query = """
-        SELECT ArticleID, Title, Author, Views, Likes, Comments, CoverImage, ArticleType, excerpt, is_featured, tags
-        FROM `articles`
-        WHERE `Hidden`=0 AND `Status`='Published'
-        ORDER BY `ArticleID` DESC
-        LIMIT %s OFFSET %s
-    """
+            SELECT ArticleID,
+                   Title,
+                   Author,
+                   Views,
+                   Likes,
+                   Comments,
+                   CoverImage,
+                   ArticleType,
+                   excerpt,
+                   is_featured,
+                   tags
+            FROM `articles`
+            WHERE `Hidden` = 0
+              AND `Status` = 'Published'
+            ORDER BY `ArticleID` DESC
+                LIMIT %s
+            OFFSET %s \
+            """
 
     try:
         article_info, total_articles = fetch_articles(query, (page_size, offset))
@@ -2739,12 +2741,25 @@ def tag_page(tag_name):
     offset = (page - 1) * page_size
 
     query = """
-        SELECT ArticleID, Title, Author, Views, Likes, Comments, CoverImage, ArticleType, excerpt, is_featured, tags
-        FROM `articles`
-        WHERE `Hidden`=0 AND `Status`='Published' AND `tags` LIKE %s
-        ORDER BY `ArticleID` DESC
-        LIMIT %s OFFSET %s
-    """
+            SELECT ArticleID,
+                   Title,
+                   Author,
+                   Views,
+                   Likes,
+                   Comments,
+                   CoverImage,
+                   ArticleType,
+                   excerpt,
+                   is_featured,
+                   tags
+            FROM `articles`
+            WHERE `Hidden` = 0
+              AND `Status` = 'Published'
+              AND `tags` LIKE %s
+            ORDER BY `ArticleID` DESC
+                LIMIT %s
+            OFFSET %s \
+            """
 
     try:
         article_info, total_articles = fetch_articles(query, ('%' + tag_name + '%', page_size, offset))
@@ -2764,12 +2779,25 @@ def featured_page():
     offset = (page - 1) * page_size
 
     query = """
-         SELECT ArticleID, Title, Author, Views, Likes, Comments, CoverImage, ArticleType, excerpt, is_featured, tags
-         FROM `articles`
-         WHERE `Hidden`=0 AND `Status`='Published' AND `is_featured`=1
-         ORDER BY `ArticleID` DESC
-         LIMIT %s OFFSET %s
-     """
+            SELECT ArticleID,
+                   Title,
+                   Author,
+                   Views,
+                   Likes,
+                   Comments,
+                   CoverImage,
+                   ArticleType,
+                   excerpt,
+                   is_featured,
+                   tags
+            FROM `articles`
+            WHERE `Hidden` = 0
+              AND `Status` = 'Published'
+              AND `is_featured` = 1
+            ORDER BY `ArticleID` DESC
+                LIMIT %s
+            OFFSET %s \
+            """
 
     try:
         article_info, total_articles = fetch_articles(query, (page_size, offset))
@@ -2928,7 +2956,11 @@ def generate_sitemap():
     try:
         db = get_db_connection()
         with db.cursor() as cursor:
-            query = """SELECT Title FROM `articles` WHERE `Hidden`=0 AND `Status`='Published' ORDER BY `ArticleID` DESC LIMIT 40"""
+            query = """SELECT Title
+                       FROM `articles`
+                       WHERE `Hidden` = 0
+                         AND `Status` = 'Published'
+                       ORDER BY `ArticleID` DESC LIMIT 40"""
             cursor.execute(query)
             results = cursor.fetchall()
             article_titles = [item[0] for item in results]
