@@ -1496,6 +1496,8 @@ def api_xmind(user_name, xmind):
 
 @app.route('/api/wx/blog_detail/<article>', methods=['GET'])
 def api_wx_blog_detail(article):
+    visited_key = request.args.get('KEY')
+
     def generate_response_data(message="文章不存在"):
         return jsonify({
             'article_name': message,
@@ -1520,7 +1522,7 @@ def api_wx_blog_detail(article):
         article_surl = api_shortlink(article_url)
         author, author_uid = get_blog_author(article)
         update_date = get_file_date(article)
-        content = api_wx_content(article)
+        content = api_wx_content(article, auth_key=visited_key)
 
         response_data = {
             'article_name': article,
