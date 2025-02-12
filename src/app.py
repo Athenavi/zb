@@ -36,7 +36,7 @@ from src.BlogDeal import get_article_names, get_article_content, clear_html_form
     article_change_pw, get_file_summary, get_comments, auth_files, get_more_info, article_save_change
 from src.database import get_db_connection
 from src.links import create_special_url, redirect_to_long_url
-from src.notification import get_sys_notice, read_notification, send_change_mail
+from src.notification import get_sys_notice, read_notification
 from src.user import error, get_owner_articles, zy_general_conf, get_profiles, get_following_count, \
     get_follower_count, get_can_followed, get_user_id, get_all_themes
 from src.utils import admin_upload_file, get_client_ip, \
@@ -1183,89 +1183,6 @@ def user_center(user_id, user_name):
                            Articles=owner_articles, canFollowed=can_followed)
 
 
-def diy_space(page):
-    template_path = os.path.join(base_dir, 'media', page, 'index.html')
-    print(template_path)
-    if os.path.exists(template_path):
-        with open(template_path, 'r', encoding=global_encoding) as file:
-            html_content = file.read()
-            resp = make_response(html_content)
-            visit_id = sys_version + format(random.randint(10000, 99999))
-            resp.set_cookie('visitID', 'zyBLOG' + visit_id, 7200)
-        return resp
-    return error(message="Not Found", status_code=404)
-
-
-@app.route('/guestbook', methods=['GET', 'POST'])
-@finger_required
-def guestbook(user_id):
-    user_name = get_username()
-    avatar_url = get_avatar(user_id)
-    message_list = get_guestbook() or []
-    user_finger = request.cookies.get('finger')
-    if request.method == 'POST':
-        data = request.get_json()
-        nickname = data.get('nickname') or user_name
-        message = data.get('message')
-        content = f'"{nickname}":"{message}"'
-
-        cached_user_guestbook = cache.get(f"guestbook_{user_finger}")
-        if cached_user_guestbook:
-            return jsonify({'status': 'failed', 'message_list': message_list}), 503
-        upload_guestbook(content)
-        cache.set(f"guestbook", None)
-        cache.set(f"guestbook_{user_finger}", True, timeout=180)
-        return jsonify({'status': 'success', 'message_list': message_list}), 201
-
-    return render_template('guestbook.html', avatar_url=avatar_url, username=user_name, message_list=message_list)
-
-
-def get_guestbook():
-    cached_guestbook = cache.get(f"guestbook")
-    if cached_guestbook:
-        return cached_guestbook
-    try:
-        db = get_db_connection()
-
-        try:
-            with db.cursor() as cursor:
-                query = "SELECT * FROM `events` WHERE Title = 'guestbook'"
-                cursor.execute(query)
-                result = cursor.fetchall()
-                if result:
-                    cache.set(f"guestbook", result)
-        except Exception as e:
-            print(f"An error occurred during the database operation: {e}")
-
-        finally:
-            db.close()
-            return result
-
-    except Exception as e:  # 捕获所有异常，而不是仅 FileNotFoundError
-        print(f"An error occurred while getting the database connection: {e}")
-        return None
-
-
-def upload_guestbook(content):
-    try:
-        db = get_db_connection()
-        try:
-            with db.cursor() as cursor:
-                query = ("INSERT INTO `events` (`title`, `description`, `event_date`,`created_at`) VALUES ("
-                         "'guestbook',%s,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);")
-                cursor.execute(query, (content,))
-                db.commit()
-        except Exception as e:
-            print(f"An error occurred during the database operation: {e}")
-
-        finally:
-            db.close()
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                executor.submit(send_change_mail(content, kind='guestbook'))
-    except Exception as e:
-        print(f"An error occurred while getting the database connection: {e}")
-
-
 @app.route('/api/notice', methods=['GET'])
 @jwt_required
 def user_notification(user_id):
@@ -1386,19 +1303,6 @@ def api_wx_content(article, auth_key):
         return html_content
 
 
-@app.route('/api/wx/guestbook', methods=['GET', 'POST'])
-def api_wx_guestbook():
-    avatar_url = get_avatar(user_id=random.randint(10, 50))
-    message_list = get_guestbook() or []
-    response_data = {
-        'avatar_url': avatar_url,
-        'username': "陌生人",
-        'message_list': message_list
-    }
-
-    return jsonify(response_data)
-
-
 # wxapi主页
 def get_home_data(page, tag):
     page = max(page, 1)  # 确保 page 至少为 1
@@ -1440,22 +1344,20 @@ def get_home_data(page, tag):
 def api_wx():
     page = request.args.get('page', default=1, type=int)
     tag = request.args.get('tag', default='None')
-    wx_api = request.args.get('wxAPI', default='false').lower() == 'true'
 
     (compressed_list, notice, has_next_page, has_previous_page, friends_links, tags) = get_home_data(page, tag)
 
-    if wx_api:
-        response_data = {
-            'articles': compressed_list,
-            'notice': notice,
-            'has_next_page': has_next_page,
-            'has_previous_page': has_previous_page,
-            'current_page': page,
-            'tags': tags,
-            'tag': tag,
-            'friends_links': friends_links
-        }
-        return jsonify(response_data)
+    response_data = {
+        'articles': compressed_list,
+        'notice': notice,
+        'has_next_page': has_next_page,
+        'has_previous_page': has_previous_page,
+        'current_page': page,
+        'tags': tags,
+        'tag': tag,
+        'friends_links': friends_links
+    }
+    return jsonify(response_data)
 
 
 @app.route('/api/article/unlock', methods=['GET', 'POST'])
