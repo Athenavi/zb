@@ -1161,28 +1161,6 @@ def export(user_id):
     return jsonify(result)
 
 
-@app.route('/@<user_name>', methods=['GET', 'POST'])
-@user_id_required
-def user_center(user_id, user_name):
-    if not re.match(r'^[a-zA-Z0-9]+$', user_name):
-        return error("Invalid username", 400)
-
-    user_dir = Path(base_dir) / 'media' / user_name
-    if not os.path.exists(user_dir):
-        return error("Invalid username", 400)
-
-    target_id = get_user_id(user_name)
-    user_bio = get_user_bio(user_id=target_id)
-    can_followed = 1
-    if user_id != 0 and target_id != 0:
-        can_followed = get_can_followed(user_id, target_id)
-    owner_articles = get_owner_articles(owner_id=None, user_name=user_name) or []
-    return render_template('Profile.html', url_for=url_for, avatar_url=get_avatar(user_name, 'username'),
-                           userStatus=bool(user_name), username=user_name, userBio=user_bio,
-                           target_id=target_id, user_id=user_id,
-                           Articles=owner_articles, canFollowed=can_followed)
-
-
 @app.route('/api/notice', methods=['GET'])
 @jwt_required
 def user_notification(user_id):
@@ -2740,7 +2718,7 @@ def profile(user_id):
     user_follow = get_following_count(user_id=user_id) or 0
     follower = get_follower_count(user_id=user_id) or 0
     return render_template('Profile.html', url_for=url_for, avatar_url=avatar_url,
-                           userStatus=bool(user_id), userBio=user_bio,
+                           userBio=user_bio,
                            following=user_follow, follower=follower,
                            target_id=user_id, user_id=user_id,
                            Articles=owner_articles)
@@ -2828,6 +2806,76 @@ def generate_rss():
     xml_data += '</rss>\n'
     response = Response(xml_data, mimetype='application/rss+xml')
     return response
+
+
+@app.route('/fans/follow')
+@jwt_required
+def fans_follow(user_id):
+    db = None
+    user_sub_info = []
+    try:
+        db = get_db_connection()
+        with db.cursor() as cursor:
+            query = "SELECT `subscribe_to_id` FROM `subscriptions` WHERE `subscriber_id` = %s and `subscribe_type` = 'User';"
+            cursor.execute(query, (int(user_id),))
+            user_sub = cursor.fetchall()
+            subscribe_ids = [sub[0] for sub in user_sub]
+            if subscribe_ids:
+                placeholders = ', '.join(['%s'] * len(subscribe_ids))
+                query = f"SELECT `id`, `username` FROM `users` WHERE `id` IN ({placeholders});"
+                cursor.execute(query, tuple(subscribe_ids))
+                user_sub_info = cursor.fetchall()
+    except Exception as e:
+        app.logger.error(f"An error occurred: {e}")
+    finally:
+        if db is not None:
+            db.close()
+        return render_template('fans.html', sub_info=user_sub_info, avatar_url=get_avatar(user_id),
+                               userBio=get_user_bio(user_id), page_title="我的关注")
+
+
+@app.route('/fans/fans')
+@jwt_required
+def fans_fans(user_id):
+    db = None
+    user_sub_info = []
+    try:
+        db = get_db_connection()
+        with db.cursor() as cursor:
+            query = "SELECT `subscriber_id` FROM `subscriptions` WHERE `subscribe_to_id` = %s and `subscribe_type` = 'User';"
+            cursor.execute(query, (int(user_id),))
+            user_sub = cursor.fetchall()
+            subscribe_ids = [sub[0] for sub in user_sub]
+            if subscribe_ids:
+                placeholders = ', '.join(['%s'] * len(subscribe_ids))
+                query = f"SELECT `id`, `username` FROM `users` WHERE `id` IN ({placeholders});"
+                cursor.execute(query, tuple(subscribe_ids))
+                user_sub_info = cursor.fetchall()
+    except Exception as e:
+        app.logger.error(f"An error occurred: {e}")
+    finally:
+        if db is not None:
+            db.close()
+        return render_template('fans.html', sub_info=user_sub_info, avatar_url=get_avatar(user_id),
+                               userBio=get_user_bio(user_id), page_title="粉丝")
+
+
+@app.route('/space/<target_id>', methods=['GET', 'POST'])
+@user_id_required
+def user_space(user_id, target_id):
+    user_bio = get_user_bio(user_id=target_id)
+    can_followed = 1
+    if user_id != 0 and target_id != 0:
+        can_followed = get_can_followed(user_id, target_id)
+    owner_articles = get_owner_articles(owner_id=target_id, user_name=None) or []
+    target_username = get_profiles(user_id=target_id, user_name=None)[1] or "佚名"
+    print(target_username)
+    return render_template('Profile.html', url_for=url_for, avatar_url=get_avatar(target_id, 'id'),
+                           userStatus=bool(user_id), username=target_username,
+                           userBio=user_bio, follower=get_follower_count(user_id=target_id, subscribe_type='User'),
+                           following=get_following_count(user_id=target_id, subscribe_type='User'),
+                           target_id=target_id, user_id=user_id,
+                           Articles=owner_articles, canFollowed=can_followed)
 
 
 @app.errorhandler(404)
