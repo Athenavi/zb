@@ -37,8 +37,8 @@ from src.BlogDeal import get_article_names, get_article_content, clear_html_form
 from src.database import get_db_connection
 from src.links import create_special_url, redirect_to_long_url
 from src.notification import get_sys_notice, read_notification
-from src.user import error, get_owner_articles, zy_general_conf, get_profiles, get_following_count, \
-    get_follower_count, get_can_followed, get_user_id, get_all_themes
+from src.user import error, get_owner_articles, zy_general_conf, get_following_count, \
+    get_follower_count, get_can_followed, get_all_themes
 from src.utils import admin_upload_file, get_client_ip, \
     generate_jwt, secret_key, authenticate_jwt, \
     authenticate_refresh_token, handle_article_upload, is_allowed_file, zb_safe_check, \
@@ -244,7 +244,7 @@ def sys_out_file(article_name):
 
 
 def get_user_bio(user_id):
-    user_info = cache.get(f"{user_id}_userInfo") or get_profiles(user_id=user_id, user_name=None)
+    user_info = cache.get(f"{user_id}_userInfo") or get_profiles(user_id=user_id)
 
     if user_info is None:
         # 处理未找到用户信息的情况
@@ -254,10 +254,41 @@ def get_user_bio(user_id):
     return bio
 
 
+def get_profiles(user_id):
+    cached_profiles = cache.get(f"userProfiles_{user_id}") or None
+    if cached_profiles:
+        return cached_profiles
+    db = get_db_connection()
+    info_list = []
+
+    try:
+        with db.cursor() as cursor:
+            if user_id:
+                query = "SELECT * FROM users WHERE `id` = %s;"
+                params = (user_id,)
+            else:
+                return info_list
+
+            cursor.execute(query, params)
+            info = cursor.fetchone()
+
+            if info:
+                info_list = list(info)
+                if len(info_list) > 2:
+                    del info_list[2]
+                    cache.set(f"userProfiles_{user_id}", info_list, timeout=300)
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        db.close()
+        return info_list
+
+
 @app.route('/setting/profiles', methods=['GET', 'POST'])
 @finger_required
 def setting_profiles(user_id):
-    user_info = cache.get(f"{user_id}_userInfo") or get_profiles(user_id=user_id, user_name=None)
+    user_info = cache.get(f"{user_id}_userInfo") or get_profiles(user_id=user_id)
 
     if user_info is None:
         # 处理未找到用户信息的情况
@@ -2856,7 +2887,7 @@ def user_space(user_id, target_id):
     if user_id != 0 and target_id != 0:
         can_followed = get_can_followed(user_id, target_id)
     owner_articles = get_owner_articles(owner_id=target_id, user_name=None) or []
-    target_username = get_profiles(user_id=target_id, user_name=None)[1] or "佚名"
+    target_username = get_profiles(user_id=target_id)[1] or "佚名"
     print(target_username)
     return render_template('Profile.html', url_for=url_for, avatar_url=get_avatar(target_id, 'id'),
                            username=target_username,

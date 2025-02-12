@@ -20,7 +20,6 @@
             <p class="text-gray-500">{{ userBio }}</p>
             <div class="flex space-x-4 mt-2">
                 <span class="bg-blue-500 text-white px-3 py-1 rounded-full">年度大会员</span>
-                <span class="bg-gray-200 text-gray-700 px-3 py-1 rounded-full">粉丝数 48</span>
             </div>
         </div>
     </div>
@@ -28,22 +27,26 @@
     <!-- 选项卡 -->
     <div class="mt-4">
         <ul class="flex space-x-4 border-b">
-            <li class="cursor-pointer py-2 px-4 hover:text-blue-500">主页</li>
+            <li class="cursor-pointer py-2 px-4 hover:text-blue-500"><a href="/profile">个人主页</a></li>
             <li class="cursor-pointer py-2 px-4 hover:text-blue-500">动态</li>
-            <li class="cursor-pointer py-2 px-4 hover:text-blue-500">投稿 0</li>
-            <li class="cursor-pointer py-2 px-4 hover:text-blue-500">合辑和列表 0</li>
+            <li class="cursor-pointer py-2 px-4 hover:text-blue-500">投稿</li>
+            <li class="cursor-pointer py-2 px-4 hover:text-blue-500">合辑和列表</li>
         </ul>
     </div>
 
     <!-- 我的关注 -->
     <div class="mt-6 bg-white shadow-md rounded-lg p-4">
-        <h2 class="text-lg font-bold">{{ page_title }}<p class="text-gray-600">{% if sub_info %}{{ sub_info|length }}{% else %}0{% endif %}</p></h2>
-        <button id="reverseButton" class="mt-4 bg-blue-500 text-white py-2 px-4 rounded">反向排列</button>
+        <h2 class="text-lg font-bold">{{ page_title }}
+            <p class="text-gray-600">
+                {% if sub_info %}{{ sub_info|length }}
+                    <button id="reverseButton" class="mt-4 bg-blue-500 text-white py-2 px-4 rounded">↕️
+                    </button>{% else %}0{% endif %}</p>
+        </h2>
         <div class="mt-4">
             <ul id="subList" class="mt-2">
                 {% for sub in sub_info %}
                     <li class="flex justify-between items-center py-2 border-b" data-id="{{ sub[0] }}">
-                        <span><a href="/@{{ sub[0] }}">{{ sub[1] }}</a></span>
+                        <span><a href="/space/{{ sub[0] }}">{{ sub[1] }}</a></span>
                         <span class="text-gray-500">用户</span>
                     </li>
                 {% else %}
@@ -64,7 +67,7 @@
     document.getElementById('reverseButton').addEventListener('click', function () {
         const list = document.getElementById('subList');
         const items = Array.from(list.children);
-        list.innerHTML = ''; // 清空当前列表
-        items.reverse().forEach(item => list.appendChild(item)); // 反向排列并添加回列表
+        list.innerHTML = '';
+        items.reverse().forEach(item => list.appendChild(item));
     });
 </script>
