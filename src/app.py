@@ -2224,7 +2224,7 @@ def get_avatar(user_identifier, identifier_type='id'):
 
                 cursor.execute(query, (user_identifier,))
                 result = cursor.fetchone()
-                if result:
+                if result[0]:
                     avatar = f"{domain}api/avatar/{result[0]}.webp"
         except Exception as e:
             app.logger.error(f"Error getting avatar: {e}")
@@ -2895,6 +2895,12 @@ def user_space(user_id, target_id):
                            following=get_following_count(user_id=target_id, subscribe_type='User'),
                            target_id=target_id, user_id=user_id,
                            Articles=owner_articles, canFollowed=can_followed)
+
+
+@app.route('/api/user/avatar', methods=['GET'])
+def api_user_avatar():
+    user_id = int(request.args.get('id')) or 0
+    return get_avatar(user_id, 'id')
 
 
 @app.errorhandler(404)
