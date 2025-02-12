@@ -2808,15 +2808,12 @@ def generate_rss():
     return response
 
 
-@app.route('/fans/follow')
-@jwt_required
-def fans_follow(user_id):
+def get_user_sub_info(query, user_id):
     db = None
     user_sub_info = []
     try:
         db = get_db_connection()
         with db.cursor() as cursor:
-            query = "SELECT `subscribe_to_id` FROM `subscriptions` WHERE `subscriber_id` = %s and `subscribe_type` = 'User';"
             cursor.execute(query, (int(user_id),))
             user_sub = cursor.fetchall()
             subscribe_ids = [sub[0] for sub in user_sub]
@@ -2830,34 +2827,25 @@ def fans_follow(user_id):
     finally:
         if db is not None:
             db.close()
-        return render_template('fans.html', sub_info=user_sub_info, avatar_url=get_avatar(user_id),
-                               userBio=get_user_bio(user_id), page_title="我的关注")
+    return user_sub_info
+
+
+@app.route('/fans/follow')
+@jwt_required
+def fans_follow(user_id):
+    query = "SELECT `subscribe_to_id` FROM `subscriptions` WHERE `subscriber_id` = %s and `subscribe_type` = 'User';"
+    user_sub_info = get_user_sub_info(query, user_id)
+    return render_template('fans.html', sub_info=user_sub_info, avatar_url=get_avatar(user_id),
+                           userBio=get_user_bio(user_id), page_title="我的关注")
 
 
 @app.route('/fans/fans')
 @jwt_required
 def fans_fans(user_id):
-    db = None
-    user_sub_info = []
-    try:
-        db = get_db_connection()
-        with db.cursor() as cursor:
-            query = "SELECT `subscriber_id` FROM `subscriptions` WHERE `subscribe_to_id` = %s and `subscribe_type` = 'User';"
-            cursor.execute(query, (int(user_id),))
-            user_sub = cursor.fetchall()
-            subscribe_ids = [sub[0] for sub in user_sub]
-            if subscribe_ids:
-                placeholders = ', '.join(['%s'] * len(subscribe_ids))
-                query = f"SELECT `id`, `username` FROM `users` WHERE `id` IN ({placeholders});"
-                cursor.execute(query, tuple(subscribe_ids))
-                user_sub_info = cursor.fetchall()
-    except Exception as e:
-        app.logger.error(f"An error occurred: {e}")
-    finally:
-        if db is not None:
-            db.close()
-        return render_template('fans.html', sub_info=user_sub_info, avatar_url=get_avatar(user_id),
-                               userBio=get_user_bio(user_id), page_title="粉丝")
+    query = "SELECT `subscriber_id` FROM `subscriptions` WHERE `subscribe_to_id` = %s and `subscribe_type` = 'User';"
+    user_sub_info = get_user_sub_info(query, user_id)
+    return render_template('fans.html', sub_info=user_sub_info, avatar_url=get_avatar(user_id),
+                           userBio=get_user_bio(user_id), page_title="粉丝")
 
 
 @app.route('/space/<target_id>', methods=['GET', 'POST'])
@@ -2871,7 +2859,7 @@ def user_space(user_id, target_id):
     target_username = get_profiles(user_id=target_id, user_name=None)[1] or "佚名"
     print(target_username)
     return render_template('Profile.html', url_for=url_for, avatar_url=get_avatar(target_id, 'id'),
-                           userStatus=bool(user_id), username=target_username,
+                           username=target_username,
                            userBio=user_bio, follower=get_follower_count(user_id=target_id, subscribe_type='User'),
                            following=get_following_count(user_id=target_id, subscribe_type='User'),
                            target_id=target_id, user_id=user_id,
