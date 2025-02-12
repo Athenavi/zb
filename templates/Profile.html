@@ -21,61 +21,53 @@
 <div class="container mx-auto mt-8 px-4">
     <div class="flex justify-center">
         <div class="w-full md:w-8/12 bg-white rounded-lg shadow-lg p-6">
-            {% if userStatus %}
-                <div class="flex items-center mb-4">
-                    <div class="id-card">
-                        <div class="imgBx">
-                            <img src="{{ avatar_url }}" alt="avatar" class="w-16 h-16">
-                        </div>
-                        <div class="id-content">
-                            <div class="id-details">
-                                <h2>{{ username }}<br><span>{{ userBio }}</span></h2>
-                                <div class="id-data">
-                                    <h3>{% if Articles %}
-                                        {{ Articles|length }}
-                                    {% else %}
-                                        0
-                                    {% endif %}<br>
-                                        <span>  Posts  </span>
+            <div class="flex items-center mb-4">
+                <div class="id-card">
+                    <div class="imgBx">
+                        <img src="{{ avatar_url }}" alt="avatar" class="w-16 h-16">
+                    </div>
+                    <div class="id-content">
+                        <div class="id-details">
+                            <h2>{{ username }}<br><span>{{ userBio }}</span></h2>
+                            <div class="id-data">
+                                <h3>{% if Articles %}
+                                    {{ Articles|length }}
+                                {% else %}
+                                    0
+                                {% endif %}<br>
+                                    <span>  Posts  </span>
+                                </h3>
+                                {% if follower >= 0 %}
+                                    <h3>{{ follower }}<br>
+                                        <span>Followers</span>
                                     </h3>
-                                    {% if follower >= 0 %}
-                                        <h3>{{ follower }}<br>
-                                            <span>Followers</span>
-                                        </h3>
-                                    {% endif %}
-                                    {% if following >= 0 %}
-                                        <h3>{{ following }}<br>
-                                            <span>Following</span>
-                                        </h3>
-                                    {% endif %}
-                                </div>
-                                <div class="id-actionBtn">
-                                    {% if canFollowed == 1 %}
-                                        <button onclick="followed()" id="follow-btn">Follow
-                                        </button>
-                                    {% else %}
-                                        <button onclick="unfollowed()" id="unfollow-btn">取消关注
-                                        </button>
-                                    {% endif %}
-                                    <button>Message</button>
-                                </div>
+                                {% endif %}
+                                {% if following >= 0 %}
+                                    <h3>{{ following }}<br>
+                                        <span>Following</span>
+                                    </h3>
+                                {% endif %}
+                            </div>
+                            <div class="id-actionBtn">
+                                {% if canFollowed == 1 %}
+                                    <button onclick="followed()" id="follow-btn">Follow
+                                    </button>
+                                {% else %}
+                                    <button onclick="unfollowed()" id="unfollow-btn">取消关注
+                                    </button>
+                                {% endif %}
+                                <button>Message</button>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="musicPlayer mb-4" id="musicPlayerContainer">
-                    {% from 'musicPlayer.html' import player %}
-                    {{ player() }}
-                </div>
-                <div class="flex space-x-4 mb-4">
-                    <a href="/" class="text-blue-700">Home</a>
-                    <a href="/media" class="text-blue-700">📂 媒体</a>
-                    <a href="/setting/profiles" class="text-blue-700">⚙️ 设置</a>
-                </div>
-                <div id="notifications" class="mb-6"></div>
-            {% else %}
-                <a href="/login?callback=profile" class="text-blue-700">需要登录</a>
-            {% endif %}
+            </div>
+            <div class="flex space-x-4 mb-4">
+                <a href="/" class="text-blue-700">Home</a>
+                <a href="/media" class="text-blue-700">📂 媒体</a>
+                <a href="/setting/profiles" class="text-blue-700">⚙️ 设置</a>
+            </div>
+            <div id="notifications" class="mb-6"></div>
             <hr class="my-4">
             <div class="space-y-4">
                 {% for article in Articles %}

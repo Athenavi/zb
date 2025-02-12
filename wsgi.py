@@ -20,7 +20,7 @@ def main():
     else:
         from src.app import app, domain, zb_safe_check
         if not zb_safe_check(domain):
-            print('请修改默认安全密钥！config.ini[admin] 项')
+            print('请修改默认安全密钥！config.ini[admin] 项, 并正确修改域名信息 然后重启程序！')
             return
         import threading
         from src.notification import run_socketio

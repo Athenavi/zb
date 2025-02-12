@@ -31,14 +31,14 @@ from src.AboutLogin import zy_login, zy_register, zy_mail_login
 from src.AboutPW import zy_change_password, zy_confirm_password
 from src.BlogDeal import get_article_names, get_article_content, clear_html_format, \
     get_blog_author, read_hidden_articles, auth_articles, get_file_date, \
-    zy_edit_article, get_subscriber_ids, get_unique_tags, get_articles_by_tag, \
+    zy_edit_article, get_unique_tags, get_articles_by_tag, \
     get_tags_by_article, set_article_info, write_tags_to_database, set_article_visibility, auth_by_id, \
     article_change_pw, get_file_summary, get_comments, auth_files, get_more_info, article_save_change
 from src.database import get_db_connection
 from src.links import create_special_url, redirect_to_long_url
-from src.notification import get_sys_notice, read_notification, send_change_mail
-from src.user import error, get_owner_articles, zy_general_conf, get_profiles, get_following_count, \
-    get_follower_count, get_can_followed, get_user_id, get_all_themes
+from src.notification import get_sys_notice, read_notification
+from src.user import error, get_owner_articles, zy_general_conf, get_following_count, \
+    get_follower_count, get_can_followed, get_all_themes
 from src.utils import admin_upload_file, get_client_ip, \
     generate_jwt, secret_key, authenticate_jwt, \
     authenticate_refresh_token, handle_article_upload, is_allowed_file, zb_safe_check, \
@@ -104,7 +104,7 @@ def inject_variables():
 
 @app.route('/login', methods=['POST', 'GET'])
 def login():
-    callback_route = request.args.get('callback', 'home')
+    callback_route = request.args.get('callback', 'index_html')
     if request.cookies.get('jwt'):
         user_id = authenticate_jwt(request.cookies.get('jwt'))
         if user_id:
@@ -125,7 +125,7 @@ def logout():
 
 @app.route('/register', methods=['POST', 'GET'])
 def register():
-    callback_route = request.args.get('callback', 'home')
+    callback_route = request.args.get('callback', 'index_html')
     if request.cookies.get('jwt'):
         user_id = authenticate_jwt(request.cookies.get('jwt'))
         if user_id:
@@ -244,7 +244,7 @@ def sys_out_file(article_name):
 
 
 def get_user_bio(user_id):
-    user_info = cache.get(f"{user_id}_userInfo") or get_profiles(user_id=user_id, user_name=None)
+    user_info = cache.get(f"{user_id}_userInfo") or get_profiles(user_id=user_id)
 
     if user_info is None:
         # 处理未找到用户信息的情况
@@ -254,10 +254,41 @@ def get_user_bio(user_id):
     return bio
 
 
+def get_profiles(user_id):
+    cached_profiles = cache.get(f"userProfiles_{user_id}") or None
+    if cached_profiles:
+        return cached_profiles
+    db = get_db_connection()
+    info_list = []
+
+    try:
+        with db.cursor() as cursor:
+            if user_id:
+                query = "SELECT * FROM users WHERE `id` = %s;"
+                params = (user_id,)
+            else:
+                return info_list
+
+            cursor.execute(query, params)
+            info = cursor.fetchone()
+
+            if info:
+                info_list = list(info)
+                if len(info_list) > 2:
+                    del info_list[2]
+                    cache.set(f"userProfiles_{user_id}", info_list, timeout=300)
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        db.close()
+        return info_list
+
+
 @app.route('/setting/profiles', methods=['GET', 'POST'])
 @finger_required
 def setting_profiles(user_id):
-    user_info = cache.get(f"{user_id}_userInfo") or get_profiles(user_id=user_id, user_name=None)
+    user_info = cache.get(f"{user_id}_userInfo") or get_profiles(user_id=user_id)
 
     if user_info is None:
         # 处理未找到用户信息的情况
@@ -277,127 +308,6 @@ def setting_profiles(user_id):
         username=user_name,
         Bio=bio
     )
-
-
-# 主页
-def get_home_data(page, tag):
-    if page <= 0:
-        page = 1
-
-    articles, has_next_page, has_previous_page = get_a_list(chanel=2, page=page)
-
-    if not articles:
-        app.logger.warning('没有找到任何文章！')
-        return None, None, None, None, None, None  # 添加 None 用于 tags
-
-    notice = ''
-    try:
-        notice = get_sys_notice(0)
-    except Exception as e:
-        app.logger.error(f'读取通知文件出错: {e}')
-
-    tags = []
-    try:
-        tags = get_unique_tags()
-    except Exception as e:
-        app.logger.error(f'获取标签出错: {e}')
-
-    if tag != 'None':
-        tag_articles = get_articles_by_tag(tag)
-        if tag_articles:
-            articles = tag_articles
-        else:
-            app.logger.warning(f'没有找到标签: {tag} 下的文章！')
-
-    info_list = get_article_info(articles)
-    summary_list = get_summary(articles)
-    compressed_list = list(zip(articles, summary_list, info_list))
-
-    if not info_list:
-        return error(message="没有找到任何文章", status_code=404)
-
-    friends_links = get_friends_link()
-    return compressed_list, notice, has_next_page, has_previous_page, friends_links, tags
-
-
-@app.route('/', methods=['GET', 'POST'])
-def home():
-    if not zb_safe_check(domain):
-        return error(message="域名配置出错,或者正在使用默认的 系统配置 将导致安全问题", status_code=503)
-
-    if request.method == 'GET':
-        page = request.args.get('page', default=1, type=int)
-        tag = request.args.get('tag', default='None')
-        wx_api = request.args.get('wxAPI', default=False, type=bool)
-
-        (compressed_list, notice, has_next_page, has_previous_page, friends_links, tags) = get_home_data(page, tag)
-
-        if wx_api:
-            response_data = {
-                'articles': compressed_list,
-                'notice': notice,
-                'has_next_page': has_next_page,
-                'has_previous_page': has_previous_page,
-                'current_page': page,
-                'tags': tags,  # 使用正确的 tags
-                'tag': tag,
-                'friends_links': friends_links
-            }
-
-            return jsonify(response_data)
-
-        if compressed_list is None:
-            return error(message="没有找到任何文章", status_code=404)
-        template_display = get_current_theme()
-        template_path = f'templates/theme/{template_display}/index.html'
-        if os.path.exists(template_path):
-            template = app.jinja_env.get_template(f'theme/{template_display}/index.html')
-        else:
-            template = app.jinja_env.get_template('zyIndex.html')
-
-        # 渲染模板并存储渲染后的页面内容到缓存中
-        home_cache = f'page_content:{template_display}:{page}:{tag}'
-        content = cache.get(home_cache)
-
-        if content:
-            app.logger.info(f'缓存命中，页面: {page}, 标签: {tag}')
-        else:
-            app.logger.info(f'缓存未命中，准备生成新内容，页面: {page}, 标签: {tag}')
-            rendered_content = template.render(
-                articles_time_list=compressed_list,
-                url_for=url_for,
-                notice=notice,
-                has_next_page=has_next_page,
-                has_previous_page=has_previous_page,
-                current_page=page,
-                tags=tags,
-                tag=tag,
-                friends_links=friends_links
-            )
-
-            # 确保渲染的内容是字符串
-            if isinstance(rendered_content, str):
-                cache.set(home_cache, rendered_content, timeout=360)  # 设置为360秒
-            else:
-                app.logger.error('渲染内容不是字符串，无法缓存。')
-
-            content = rendered_content
-
-        resp = make_response(content)
-        resp.headers['Cache-Control'] = 'public, max-age=600'
-
-        if 'key' in request.cookies:
-            visitor = request.cookies.get('key')
-            app.logger.info('访客已存在，使用现有用户名: %s', visitor)
-        else:
-            visitor = 'qks' + format(random.randint(10000, 99999))
-            app.logger.warning('新访客，生成随机用户名: %s', visitor)
-            resp.set_cookie('key', 'zyBLOG_' + sys_version + visitor, 7200)
-
-        return resp
-
-    else:
-        return error(message="此方法无效", status_code=500)
 
 
 @cache.cached(timeout=1800, key_prefix='article_info')
@@ -1025,54 +935,6 @@ def ip_api():
     return jsonify({'ip': ip})
 
 
-@app.route('/following', methods=['GET', 'POST'])
-@jwt_required
-def following(user_id):
-    ip = get_client_ip(request)
-
-    if request.method == 'GET':
-
-        user_followed_key = f'subscriber_ids_uid:{user_id}'
-
-        # 尝试从缓存中获取页面内容
-        content = cache.get(user_followed_key)
-        if content:
-            # 设置浏览器缓存
-            resp = make_response(content)
-            resp.headers['Cache-Control'] = 'public, max-age=600'  # 缓存为10分钟
-            app.logger.info(f'缓存命中，following 页面: {user_id}')
-            return resp
-        else:
-            app.logger.info(f'缓存未命中，准备生成新内容，页面: {user_id}')
-
-        # 重新获取页面内容
-        subscriber_ids_list = get_subscriber_ids(uid=user_id)
-
-        # 模版配置
-        template_display = get_current_theme()
-        template_path = f'templates/theme/{template_display}/index.html'
-        if os.path.exists(template_path):
-            template = app.jinja_env.get_template(f'theme/{template_display}/index.html')
-        else:
-            template = app.jinja_env.get_template('zyIndex.html')
-
-        app.logger.info(f'subscriber_ids 访问的用户 {user_id}, IP: {ip}')
-
-        # 渲染模板并存储渲染后的页面内容到缓存中
-        rendered_content = template.render(
-            subscriber_ids_list=subscriber_ids_list, url_for=url_for,
-            notice='', tags=[], page_mark='订阅'
-        )
-
-        # 缓存渲染后的页面内容，并设置服务端缓存过期时间
-        cache.set(user_followed_key, rendered_content, timeout=600)  # 服务端缓存10分钟
-        resp = make_response(rendered_content)
-        return resp
-
-    if request.method == 'POST':
-        return error(message='Not Found', status_code=404)
-
-
 @app.route('/api/follow', methods=['GET', 'POST'])
 @user_id_required
 def follow_user(user_id):
@@ -1330,111 +1192,6 @@ def export(user_id):
     return jsonify(result)
 
 
-@app.route('/@<user_name>', methods=['GET', 'POST'])
-@user_id_required
-def user_center(user_id, user_name):
-    if not re.match(r'^[a-zA-Z0-9]+$', user_name):
-        return error("Invalid username", 400)
-
-    user_dir = Path(base_dir) / 'media' / user_name
-    if not os.path.exists(user_dir):
-        return error("Invalid username", 400)
-
-    target_id = get_user_id(user_name)
-    user_bio = get_user_bio(user_id=target_id)
-    can_followed = 1
-    if user_id != 0 and target_id != 0:
-        can_followed = get_can_followed(user_id, target_id)
-    owner_articles = get_owner_articles(owner_id=None, user_name=user_name) or []
-    return render_template('Profile.html', url_for=url_for, avatar_url=get_avatar(user_name, 'username'),
-                           userStatus=bool(user_name), username=user_name, userBio=user_bio,
-                           target_id=target_id, user_id=user_id,
-                           Articles=owner_articles, canFollowed=can_followed)
-
-
-def diy_space(page):
-    template_path = os.path.join(base_dir, 'media', page, 'index.html')
-    print(template_path)
-    if os.path.exists(template_path):
-        with open(template_path, 'r', encoding=global_encoding) as file:
-            html_content = file.read()
-            resp = make_response(html_content)
-            visit_id = sys_version + format(random.randint(10000, 99999))
-            resp.set_cookie('visitID', 'zyBLOG' + visit_id, 7200)
-        return resp
-    return error(message="Not Found", status_code=404)
-
-
-@app.route('/guestbook', methods=['GET', 'POST'])
-@finger_required
-def guestbook(user_id):
-    user_name = get_username()
-    avatar_url = get_avatar(user_id)
-    message_list = get_guestbook() or []
-    user_finger = request.cookies.get('finger')
-    if request.method == 'POST':
-        data = request.get_json()
-        nickname = data.get('nickname') or user_name
-        message = data.get('message')
-        content = f'"{nickname}":"{message}"'
-
-        cached_user_guestbook = cache.get(f"guestbook_{user_finger}")
-        if cached_user_guestbook:
-            return jsonify({'status': 'failed', 'message_list': message_list}), 503
-        upload_guestbook(content)
-        cache.set(f"guestbook", None)
-        cache.set(f"guestbook_{user_finger}", True, timeout=180)
-        return jsonify({'status': 'success', 'message_list': message_list}), 201
-
-    return render_template('guestbook.html', avatar_url=avatar_url, username=user_name, message_list=message_list)
-
-
-def get_guestbook():
-    cached_guestbook = cache.get(f"guestbook")
-    if cached_guestbook:
-        return cached_guestbook
-    try:
-        db = get_db_connection()
-
-        try:
-            with db.cursor() as cursor:
-                query = "SELECT * FROM `events` WHERE Title = 'guestbook'"
-                cursor.execute(query)
-                result = cursor.fetchall()
-                if result:
-                    cache.set(f"guestbook", result)
-        except Exception as e:
-            print(f"An error occurred during the database operation: {e}")
-
-        finally:
-            db.close()
-            return result
-
-    except Exception as e:  # 捕获所有异常，而不是仅 FileNotFoundError
-        print(f"An error occurred while getting the database connection: {e}")
-        return None
-
-
-def upload_guestbook(content):
-    try:
-        db = get_db_connection()
-        try:
-            with db.cursor() as cursor:
-                query = ("INSERT INTO `events` (`title`, `description`, `event_date`,`created_at`) VALUES ("
-                         "'guestbook',%s,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);")
-                cursor.execute(query, (content,))
-                db.commit()
-        except Exception as e:
-            print(f"An error occurred during the database operation: {e}")
-
-        finally:
-            db.close()
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                executor.submit(send_change_mail(content, kind='guestbook'))
-    except Exception as e:
-        print(f"An error occurred while getting the database connection: {e}")
-
-
 @app.route('/api/notice', methods=['GET'])
 @jwt_required
 def user_notification(user_id):
@@ -1555,16 +1312,60 @@ def api_wx_content(article, auth_key):
         return html_content
 
 
-@app.route('/api/wx/guestbook', methods=['GET', 'POST'])
-def api_wx_guestbook():
-    avatar_url = get_avatar(user_id=random.randint(10, 50))
-    message_list = get_guestbook() or []
-    response_data = {
-        'avatar_url': avatar_url,
-        'username': "陌生人",
-        'message_list': message_list
-    }
+# wxapi主页
+def get_home_data(page, tag):
+    page = max(page, 1)  # 确保 page 至少为 1
 
+    articles, has_next_page, has_previous_page = get_a_list(chanel=2, page=page)
+
+    if not articles:
+        app.logger.warning('没有找到任何文章！')
+        return None, None, None, None, None, None  # 添加 None 用于 tags
+
+    notice = get_sys_notice(0) if (notice := get_sys_notice(0)) else ''
+
+    tags = []
+    try:
+        tags = get_unique_tags()
+    except Exception as e:
+        app.logger.error(f'获取标签出错: {e}')
+
+    if tag != 'None':
+        tag_articles = get_articles_by_tag(tag)
+        if tag_articles:
+            articles = tag_articles
+        else:
+            app.logger.warning(f'没有找到标签: {tag} 下的文章！')
+
+    info_list = get_article_info(articles)
+    if not info_list:
+        app.logger.warning('没有找到任何文章！')
+        return None, None, None, None, None, None
+
+    summary_list = get_summary(articles)
+    compressed_list = list(zip(articles, summary_list, info_list))
+    friends_links = get_friends_link()
+
+    return compressed_list, notice, has_next_page, has_previous_page, friends_links, tags
+
+
+@app.route('/api/wx', methods=['GET'])
+def api_wx():
+    page = request.args.get('page', default=1, type=int)
+    tag = request.args.get('tag', default='None')
+
+    (compressed_list, notice, has_next_page, has_previous_page, friends_links, tags) = get_home_data(page, tag)
+
+    response_data = {
+        'articles': compressed_list,
+        'notice': notice,
+        'has_next_page': has_next_page,
+        'has_previous_page': has_previous_page,
+        'current_page': page,
+        'tags': tags,
+        'tag': tag,
+        'friends_links': friends_links
+    }
     return jsonify(response_data)
 
 
@@ -1638,11 +1439,9 @@ def temp_view():
         finally:
             cursor.close()
             db.close()
-
-        referrer = request.referrer
-        app.logger.info(f"Request from {referrer} with finger {user_finger}")
-
-        return content
+            referrer = request.referrer
+            app.logger.info(f"Request from {referrer} with finger {user_finger}")
+            return content
     else:
         return jsonify({"message": "Temporary URL expired or invalid"}), 404
 
@@ -1743,17 +1542,18 @@ def comment_add(aid, user_id, pid, comment_content, ip, ua):
     c_json = {'content': comment_content, 'pid': pid, 'ip': ip, 'ua': ua}
     comment_json = json.dumps(c_json)
     db = get_db_connection()
+    comment_added = False
     try:
         with db.cursor() as cursor:
             query = "INSERT INTO `comments` (`article_id`, `user_id`, `content`) VALUES (%s, %s, %s);"
             cursor.execute(query, (int(aid), int(user_id), comment_json))
             db.commit()
-            return True
+            comment_added = True
     except Exception as e:
         print(f'Error: {e}')
-        return False
     finally:
         db.close()
+        return comment_added
 
 
 @app.route("/Comment")
@@ -1842,6 +1642,7 @@ def api_report(user_id):
 
 
 def report_add(user_id, reported_type, reported_id, reason):
+    reported = False
     db = get_db_connection()
     try:
         with db.cursor() as cursor:
@@ -1849,12 +1650,12 @@ def report_add(user_id, reported_type, reported_id, reason):
                      "%s);")
             cursor.execute(query, (int(user_id), reported_type, reported_id, reason))
             db.commit()
-            return True
+            reported = True
     except Exception as e:
         print(f'Error: {e}')
-        return False
     finally:
         db.close()
+        return reported
 
 
 @app.route('/api/comment', methods=['delete'])
@@ -1879,17 +1680,18 @@ def api_comment_delete(user_id):
 
 def comment_del(user_id, comment_id):
     db = get_db_connection()
+    comment_deleted = False
     try:
         with db.cursor() as cursor:
             query = "DELETE FROM `comments` WHERE `id` = %s AND `user_id` = %s;"
             cursor.execute(query, (int(comment_id), int(user_id)))
             db.commit()
-            return True
+            comment_deleted = True
     except Exception as e:
         print(f'Error: {e}')
-        return False
     finally:
         db.close()
+        return comment_deleted
 
 
 @app.route('/travel', methods=['GET'])
@@ -2422,7 +2224,7 @@ def get_avatar(user_identifier, identifier_type='id'):
 
                 cursor.execute(query, (user_identifier,))
                 result = cursor.fetchone()
-                if result:
+                if result[0]:
                     avatar = f"{domain}api/avatar/{result[0]}.webp"
         except Exception as e:
             app.logger.error(f"Error getting avatar: {e}")
@@ -2681,16 +2483,11 @@ def get_outer_url(user_name, user_id, filename):
 
 def fetch_articles(query, params):
     db = get_db_connection()
-    article_info = []
-    total_articles = 0
     try:
         with db.cursor() as cursor:
             cursor.execute(query, params)
             article_info = cursor.fetchall()
-
-            # 调试输出
-            print("Fetched articles:", article_info)
-
+            # 调试输出print("Fetched articles:", article_info)
             cursor.execute("SELECT COUNT(*) FROM `articles` WHERE `Hidden`=0 AND `Status`='Published'")
             total_articles = cursor.fetchone()[0]
 
@@ -2701,10 +2498,10 @@ def fetch_articles(query, params):
     finally:
         if db is not None:
             db.close()
+        return article_info, total_articles
 
-    return article_info, total_articles
 
-
+@app.route('/', methods=['GET'])
 @app.route('/index.html', methods=['GET'])
 def index_html():
     page = request.args.get('page', 1, type=int)
@@ -2712,12 +2509,24 @@ def index_html():
     offset = (page - 1) * page_size
 
     query = """
-        SELECT ArticleID, Title, Author, Views, Likes, Comments, CoverImage, ArticleType, excerpt, is_featured, tags
-        FROM `articles`
-        WHERE `Hidden`=0 AND `Status`='Published'
-        ORDER BY `ArticleID` DESC
-        LIMIT %s OFFSET %s
-    """
+            SELECT ArticleID,
+                   Title,
+                   Author,
+                   Views,
+                   Likes,
+                   Comments,
+                   CoverImage,
+                   ArticleType,
+                   excerpt,
+                   is_featured,
+                   tags
+            FROM `articles`
+            WHERE `Hidden` = 0
+              AND `Status` = 'Published'
+            ORDER BY `ArticleID` DESC
+                LIMIT %s
+            OFFSET %s \
+            """
 
     try:
         article_info, total_articles = fetch_articles(query, (page_size, offset))
@@ -2739,12 +2548,25 @@ def tag_page(tag_name):
     offset = (page - 1) * page_size
 
     query = """
-        SELECT ArticleID, Title, Author, Views, Likes, Comments, CoverImage, ArticleType, excerpt, is_featured, tags
-        FROM `articles`
-        WHERE `Hidden`=0 AND `Status`='Published' AND `tags` LIKE %s
-        ORDER BY `ArticleID` DESC
-        LIMIT %s OFFSET %s
-    """
+            SELECT ArticleID,
+                   Title,
+                   Author,
+                   Views,
+                   Likes,
+                   Comments,
+                   CoverImage,
+                   ArticleType,
+                   excerpt,
+                   is_featured,
+                   tags
+            FROM `articles`
+            WHERE `Hidden` = 0
+              AND `Status` = 'Published'
+              AND `tags` LIKE %s
+            ORDER BY `ArticleID` DESC
+                LIMIT %s
+            OFFSET %s \
+            """
 
     try:
         article_info, total_articles = fetch_articles(query, ('%' + tag_name + '%', page_size, offset))
@@ -2764,12 +2586,25 @@ def featured_page():
     offset = (page - 1) * page_size
 
     query = """
-         SELECT ArticleID, Title, Author, Views, Likes, Comments, CoverImage, ArticleType, excerpt, is_featured, tags
-         FROM `articles`
-         WHERE `Hidden`=0 AND `Status`='Published' AND `is_featured`=1
-         ORDER BY `ArticleID` DESC
-         LIMIT %s OFFSET %s
-     """
+            SELECT ArticleID,
+                   Title,
+                   Author,
+                   Views,
+                   Likes,
+                   Comments,
+                   CoverImage,
+                   ArticleType,
+                   excerpt,
+                   is_featured,
+                   tags
+            FROM `articles`
+            WHERE `Hidden` = 0
+              AND `Status` = 'Published'
+              AND `is_featured` = 1
+            ORDER BY `ArticleID` DESC
+                LIMIT %s
+            OFFSET %s \
+            """
 
     try:
         article_info, total_articles = fetch_articles(query, (page_size, offset))
@@ -2914,7 +2749,7 @@ def profile(user_id):
     user_follow = get_following_count(user_id=user_id) or 0
     follower = get_follower_count(user_id=user_id) or 0
     return render_template('Profile.html', url_for=url_for, avatar_url=avatar_url,
-                           userStatus=bool(user_id), userBio=user_bio,
+                           userBio=user_bio,
                            following=user_follow, follower=follower,
                            target_id=user_id, user_id=user_id,
                            Articles=owner_articles)
@@ -2928,7 +2763,11 @@ def generate_sitemap():
     try:
         db = get_db_connection()
         with db.cursor() as cursor:
-            query = """SELECT Title FROM `articles` WHERE `Hidden`=0 AND `Status`='Published' ORDER BY `ArticleID` DESC LIMIT 40"""
+            query = """SELECT Title
+                       FROM `articles`
+                       WHERE `Hidden` = 0
+                         AND `Status` = 'Published'
+                       ORDER BY `ArticleID` DESC LIMIT 40"""
             cursor.execute(query)
             results = cursor.fetchall()
             article_titles = [item[0] for item in results]
@@ -2998,6 +2837,70 @@ def generate_rss():
     xml_data += '</rss>\n'
     response = Response(xml_data, mimetype='application/rss+xml')
     return response
+
+
+def get_user_sub_info(query, user_id):
+    db = None
+    user_sub_info = []
+    try:
+        db = get_db_connection()
+        with db.cursor() as cursor:
+            cursor.execute(query, (int(user_id),))
+            user_sub = cursor.fetchall()
+            subscribe_ids = [sub[0] for sub in user_sub]
+            if subscribe_ids:
+                placeholders = ', '.join(['%s'] * len(subscribe_ids))
+                query = f"SELECT `id`, `username` FROM `users` WHERE `id` IN ({placeholders});"
+                cursor.execute(query, tuple(subscribe_ids))
+                user_sub_info = cursor.fetchall()
+    except Exception as e:
+        app.logger.error(f"An error occurred: {e}")
+    finally:
+        if db is not None:
+            db.close()
+    return user_sub_info
+
+
+@app.route('/fans/follow')
+@jwt_required
+def fans_follow(user_id):
+    query = "SELECT `subscribe_to_id` FROM `subscriptions` WHERE `subscriber_id` = %s and `subscribe_type` = 'User';"
+    user_sub_info = get_user_sub_info(query, user_id)
+    return render_template('fans.html', sub_info=user_sub_info, avatar_url=get_avatar(user_id),
+                           userBio=get_user_bio(user_id), page_title="我的关注")
+
+
+@app.route('/fans/fans')
+@jwt_required
+def fans_fans(user_id):
+    query = "SELECT `subscriber_id` FROM `subscriptions` WHERE `subscribe_to_id` = %s and `subscribe_type` = 'User';"
+    user_sub_info = get_user_sub_info(query, user_id)
+    return render_template('fans.html', sub_info=user_sub_info, avatar_url=get_avatar(user_id),
+                           userBio=get_user_bio(user_id), page_title="粉丝")
+
+
+@app.route('/space/<target_id>', methods=['GET', 'POST'])
+@user_id_required
+def user_space(user_id, target_id):
+    user_bio = get_user_bio(user_id=target_id)
+    can_followed = 1
+    if user_id != 0 and target_id != 0:
+        can_followed = get_can_followed(user_id, target_id)
+    owner_articles = get_owner_articles(owner_id=target_id, user_name=None) or []
+    target_username = get_profiles(user_id=target_id)[1] or "佚名"
+    print(target_username)
+    return render_template('Profile.html', url_for=url_for, avatar_url=get_avatar(target_id, 'id'),
+                           username=target_username,
+                           userBio=user_bio, follower=get_follower_count(user_id=target_id, subscribe_type='User'),
+                           following=get_following_count(user_id=target_id, subscribe_type='User'),
+                           target_id=target_id, user_id=user_id,
+                           Articles=owner_articles, canFollowed=can_followed)
+
+
+@app.route('/api/user/avatar', methods=['GET'])
+def api_user_avatar():
+    user_id = int(request.args.get('id')) or 0
+    return get_avatar(user_id, 'id')
 
 
 @app.errorhandler(404)

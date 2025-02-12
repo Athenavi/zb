@@ -229,11 +229,12 @@ def get_subscriber_ids(uid):
     try:
         # 查询用户的订阅信息和对应的用户名，合并两个查询
         query = """
-        SELECT u.id, u.username 
-        FROM subscriptions s
-        JOIN users u ON s.subscribe_to_id = u.id 
-        WHERE s.subscriber_id = %s AND s.subscribe_type = 'User';
-        """
+                SELECT u.id, u.username
+                FROM subscriptions s
+                         JOIN users u ON s.subscribe_to_id = u.id
+                WHERE s.subscriber_id = %s
+                  AND s.subscribe_type = 'User'; \
+                """
         cursor.execute(query, (uid,))
         subscribers = cursor.fetchall()
 
@@ -262,18 +263,16 @@ def get_unique_tags():
     try:
         query = "SELECT Tags FROM articles"
         cursor.execute(query)
-
         results = cursor.fetchall()
         for result in results:
             tags_str = result[0]
             if tags_str:
                 tags_list = tags_str.split(';')
-                unique_tags.extend(tags for tags in tags_list if tags)
-
+                unique_tags.extend(tag for tag in tags_list if tag)
         unique_tags = list(set(unique_tags))
 
     except Exception as e:
-        return f"未知错误{e}"
+        return f"未知错误: {e}"
 
     finally:
         cursor.close()
@@ -333,8 +332,7 @@ def get_tags_by_article(article_name):
     finally:
         cursor.close()
         db.close()
-
-    return aid, unique_tags
+        return aid, unique_tags
 
 
 def set_article_info(a_title, username):
@@ -345,16 +343,17 @@ def set_article_info(a_title, username):
 
             # 插入或更新文章信息
             cursor.execute("""
-                INSERT INTO articles (Title, Author, tags) 
-                VALUES (%s, %s, %s) 
-                ON DUPLICATE KEY UPDATE Author = VALUES(Author), tags = VALUES(tags);
-            """, (a_title, username, current_year))
+                           INSERT INTO articles (Title, Author, tags)
+                           VALUES (%s, %s, %s)
+                           ON DUPLICATE KEY UPDATE Author = VALUES(Author),
+                                                   tags   = VALUES(tags);
+                           """, (a_title, username, current_year))
 
             # 记录事件信息
             cursor.execute("""
-                INSERT INTO events (title, description, event_date, created_at) 
-                VALUES (%s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-            """, ('article update', f'{username} updated {a_title}'))
+                           INSERT INTO events (title, description, event_date, created_at)
+                           VALUES (%s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+                           """, ('article update', f'{username} updated {a_title}'))
 
             # 提交事务
             db.commit()
