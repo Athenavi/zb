@@ -31,7 +31,7 @@ from src.AboutLogin import zy_login, zy_register, zy_mail_login
 from src.AboutPW import zy_change_password, zy_confirm_password
 from src.BlogDeal import get_article_names, get_article_content, clear_html_format, \
     get_blog_author, read_hidden_articles, auth_articles, get_file_date, \
-    zy_edit_article, get_subscriber_ids, get_unique_tags, get_articles_by_tag, \
+    zy_edit_article, get_unique_tags, get_articles_by_tag, \
     get_tags_by_article, set_article_info, write_tags_to_database, set_article_visibility, auth_by_id, \
     article_change_pw, get_file_summary, get_comments, auth_files, get_more_info, article_save_change
 from src.database import get_db_connection
@@ -104,7 +104,7 @@ def inject_variables():
 
 @app.route('/login', methods=['POST', 'GET'])
 def login():
-    callback_route = request.args.get('callback', 'home')
+    callback_route = request.args.get('callback', 'index_html')
     if request.cookies.get('jwt'):
         user_id = authenticate_jwt(request.cookies.get('jwt'))
         if user_id:
@@ -125,7 +125,7 @@ def logout():
 
 @app.route('/register', methods=['POST', 'GET'])
 def register():
-    callback_route = request.args.get('callback', 'home')
+    callback_route = request.args.get('callback', 'index_html')
     if request.cookies.get('jwt'):
         user_id = authenticate_jwt(request.cookies.get('jwt'))
         if user_id:
@@ -277,122 +277,6 @@ def setting_profiles(user_id):
         username=user_name,
         Bio=bio
     )
-
-
-# 主页
-def get_home_data(page, tag):
-    if page <= 0:
-        page = 1
-
-    articles, has_next_page, has_previous_page = get_a_list(chanel=2, page=page)
-
-    if not articles:
-        app.logger.warning('没有找到任何文章！')
-        return None, None, None, None, None, None  # 添加 None 用于 tags
-
-    notice = ''
-    try:
-        notice = get_sys_notice(0)
-    except Exception as e:
-        app.logger.error(f'读取通知文件出错: {e}')
-
-    tags = []
-    try:
-        tags = get_unique_tags()
-    except Exception as e:
-        app.logger.error(f'获取标签出错: {e}')
-
-    if tag != 'None':
-        tag_articles = get_articles_by_tag(tag)
-        if tag_articles:
-            articles = tag_articles
-        else:
-            app.logger.warning(f'没有找到标签: {tag} 下的文章！')
-
-    info_list = get_article_info(articles)
-    summary_list = get_summary(articles)
-    compressed_list = list(zip(articles, summary_list, info_list))
-
-    if not info_list:
-        return error(message="没有找到任何文章", status_code=404)
-
-    friends_links = get_friends_link()
-    return compressed_list, notice, has_next_page, has_previous_page, friends_links, tags
-
-
-@app.route('/', methods=['GET', 'POST'])
-def home():
-    if request.method == 'GET':
-        page = request.args.get('page', default=1, type=int)
-        tag = request.args.get('tag', default='None')
-        wx_api = request.args.get('wxAPI', default='false').lower() == 'true'
-
-        (compressed_list, notice, has_next_page, has_previous_page, friends_links, tags) = get_home_data(page, tag)
-
-        if wx_api:
-            response_data = {
-                'articles': compressed_list,
-                'notice': notice,
-                'has_next_page': has_next_page,
-                'has_previous_page': has_previous_page,
-                'current_page': page,
-                'tags': tags,
-                'tag': tag,
-                'friends_links': friends_links
-            }
-            return jsonify(response_data)
-
-        if compressed_list is None:
-            return error(message="没有找到任何文章", status_code=404)
-
-        template_display = get_current_theme()
-        template_path = f'templates/theme/{template_display}/index.html'
-        if os.path.exists(template_path):
-            template = app.jinja_env.get_template(f'theme/{template_display}/index.html')
-        else:
-            template = app.jinja_env.get_template('zyIndex.html')
-
-        home_cache = f'page_content:{template_display}:{page}:{tag}'
-        content = cache.get(home_cache)
-
-        if content:
-            app.logger.info(f'缓存命中，页面: {page}, 标签: {tag}')
-        else:
-            app.logger.info(f'缓存未命中，准备生成新内容，页面: {page}, 标签: {tag}')
-            rendered_content = template.render(
-                articles_time_list=compressed_list,
-                url_for=url_for,
-                notice=notice,
-                has_next_page=has_next_page,
-                has_previous_page=has_previous_page,
-                current_page=page,
-                tags=tags,
-                tag=tag,
-                friends_links=friends_links
-            )
-
-            if isinstance(rendered_content, str):
-                cache.set(home_cache, rendered_content, timeout=360)
-            else:
-                app.logger.error('渲染内容不是字符串，无法缓存。')
-
-            content = rendered_content
-
-        resp = make_response(content)
-        resp.headers['Cache-Control'] = 'public, max-age=600'
-
-        if 'key' in request.cookies:
-            visitor = request.cookies.get('key')
-            app.logger.info('访客已存在，使用现有用户名: %s', visitor)
-        else:
-            visitor = 'qks' + format(random.randint(10000, 99999))
-            app.logger.warning('新访客，生成随机用户名: %s', visitor)
-            resp.set_cookie('key', 'zyBLOG_' + sys_version + visitor, 7200)
-
-        return resp
-
-    else:
-        return error(message="此方法无效", status_code=405)
 
 
 @cache.cached(timeout=1800, key_prefix='article_info')
@@ -1020,54 +904,6 @@ def ip_api():
     return jsonify({'ip': ip})
 
 
-@app.route('/following', methods=['GET', 'POST'])
-@jwt_required
-def following(user_id):
-    ip = get_client_ip(request)
-
-    if request.method == 'GET':
-
-        user_followed_key = f'subscriber_ids_uid:{user_id}'
-
-        # 尝试从缓存中获取页面内容
-        content = cache.get(user_followed_key)
-        if content:
-            # 设置浏览器缓存
-            resp = make_response(content)
-            resp.headers['Cache-Control'] = 'public, max-age=600'  # 缓存为10分钟
-            app.logger.info(f'缓存命中，following 页面: {user_id}')
-            return resp
-        else:
-            app.logger.info(f'缓存未命中，准备生成新内容，页面: {user_id}')
-
-        # 重新获取页面内容
-        subscriber_ids_list = get_subscriber_ids(uid=user_id)
-
-        # 模版配置
-        template_display = get_current_theme()
-        template_path = f'templates/theme/{template_display}/index.html'
-        if os.path.exists(template_path):
-            template = app.jinja_env.get_template(f'theme/{template_display}/index.html')
-        else:
-            template = app.jinja_env.get_template('zyIndex.html')
-
-        app.logger.info(f'subscriber_ids 访问的用户 {user_id}, IP: {ip}')
-
-        # 渲染模板并存储渲染后的页面内容到缓存中
-        rendered_content = template.render(
-            subscriber_ids_list=subscriber_ids_list, url_for=url_for,
-            notice='', tags=[], page_mark='订阅'
-        )
-
-        # 缓存渲染后的页面内容，并设置服务端缓存过期时间
-        cache.set(user_followed_key, rendered_content, timeout=600)  # 服务端缓存10分钟
-        resp = make_response(rendered_content)
-        return resp
-
-    if request.method == 'POST':
-        return error(message='Not Found', status_code=404)
-
-
 @app.route('/api/follow', methods=['GET', 'POST'])
 @user_id_required
 def follow_user(user_id):
@@ -1561,6 +1397,65 @@ def api_wx_guestbook():
     }
 
     return jsonify(response_data)
+
+
+# wxapi主页
+def get_home_data(page, tag):
+    page = max(page, 1)  # 确保 page 至少为 1
+
+    articles, has_next_page, has_previous_page = get_a_list(chanel=2, page=page)
+
+    if not articles:
+        app.logger.warning('没有找到任何文章！')
+        return None, None, None, None, None, None  # 添加 None 用于 tags
+
+    notice = get_sys_notice(0) if (notice := get_sys_notice(0)) else ''
+
+    tags = []
+    try:
+        tags = get_unique_tags()
+    except Exception as e:
+        app.logger.error(f'获取标签出错: {e}')
+
+    if tag != 'None':
+        tag_articles = get_articles_by_tag(tag)
+        if tag_articles:
+            articles = tag_articles
+        else:
+            app.logger.warning(f'没有找到标签: {tag} 下的文章！')
+
+    info_list = get_article_info(articles)
+    if not info_list:
+        app.logger.warning('没有找到任何文章！')
+        return None, None, None, None, None, None
+
+    summary_list = get_summary(articles)
+    compressed_list = list(zip(articles, summary_list, info_list))
+    friends_links = get_friends_link()
+
+    return compressed_list, notice, has_next_page, has_previous_page, friends_links, tags
+
+
+@app.route('/api/wx', methods=['GET'])
+def api_wx():
+    page = request.args.get('page', default=1, type=int)
+    tag = request.args.get('tag', default='None')
+    wx_api = request.args.get('wxAPI', default='false').lower() == 'true'
+
+    (compressed_list, notice, has_next_page, has_previous_page, friends_links, tags) = get_home_data(page, tag)
+
+    if wx_api:
+        response_data = {
+            'articles': compressed_list,
+            'notice': notice,
+            'has_next_page': has_next_page,
+            'has_previous_page': has_previous_page,
+            'current_page': page,
+            'tags': tags,
+            'tag': tag,
+            'friends_links': friends_links
+        }
+        return jsonify(response_data)
 
 
 @app.route('/api/article/unlock', methods=['GET', 'POST'])
@@ -2695,6 +2590,7 @@ def fetch_articles(query, params):
         return article_info, total_articles
 
 
+@app.route('/', methods=['GET'])
 @app.route('/index.html', methods=['GET'])
 def index_html():
     page = request.args.get('page', 1, type=int)

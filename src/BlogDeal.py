@@ -263,18 +263,16 @@ def get_unique_tags():
     try:
         query = "SELECT Tags FROM articles"
         cursor.execute(query)
-
         results = cursor.fetchall()
         for result in results:
             tags_str = result[0]
             if tags_str:
                 tags_list = tags_str.split(';')
-                unique_tags.extend(tags for tags in tags_list if tags)
-
+                unique_tags.extend(tag for tag in tags_list if tag)
         unique_tags = list(set(unique_tags))
 
     except Exception as e:
-        return f"未知错误{e}"
+        return f"未知错误: {e}"
 
     finally:
         cursor.close()
