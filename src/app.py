@@ -168,7 +168,7 @@ def search(user_id):
         if os.path.isfile(cache_path) and (
                 time.time() - os.path.getmtime(cache_path) < app.config['MAX_CACHE_TIMESTAMP']):
             # 读取缓存并继续处理
-            with open(cache_path, 'r') as cache_file:
+            with open(cache_path, 'r', encoding=global_encoding) as cache_file:
                 match_data = cache_file.read()
         else:
             files = os.listdir('articles')
@@ -194,7 +194,7 @@ def search(user_id):
             tree = ElementTree.ElementTree(root)
             match_data = ElementTree.tostring(tree.getroot(), encoding="unicode", method='xml')
 
-            with open(cache_path, 'w') as cache_file:
+            with open(cache_path, 'w', encoding=global_encoding) as cache_file:
                 cache_file.write(match_data)
 
         # 解析XML数据
@@ -533,7 +533,7 @@ def zy_save_tags(aid, tags_input):
     ]
 
     # 计算标签的哈希值
-    current_tag_hash = hashlib.md5(tags_input.encode('utf-8')).hexdigest()
+    current_tag_hash = hashlib.md5(tags_input.encode(global_encoding)).hexdigest()
     previous_content_hash = cache.get(f"{aid}:tag_hash")
 
     # 检查内容是否与上一次提交相同
@@ -557,7 +557,7 @@ def zy_save_edit(aid, content, a_name):
     save_directory = 'articles/'
 
     # 计算内容的哈希值
-    current_content_hash = hashlib.md5(content.encode('utf-8')).hexdigest()
+    current_content_hash = hashlib.md5(content.encode(global_encoding)).hexdigest()
 
     # 从缓存中获取之前的哈希值
     previous_content_hash = cache.get(f"{aid}_lasted_hash")
@@ -580,7 +580,7 @@ def zy_save_edit(aid, content, a_name):
         os.makedirs(save_directory)
 
     # 将文件保存到指定的目录上，覆盖任何已存在的文件
-    with open(file_path, 'w', encoding='utf-8') as file:
+    with open(file_path, 'w', encoding=global_encoding) as file:
         file.write(content)
 
     return {'show_edit_code': 'success'}
@@ -1067,7 +1067,7 @@ def gen_qr_token(input_string, current_time):
     input_string = sys_version + ct + input_string + str(rd_num)
     print(input_string)
     sha256_hash = hashlib.sha256()
-    sha256_hash.update(input_string.encode('utf-8'))
+    sha256_hash.update(input_string.encode(global_encoding))
     return sha256_hash.hexdigest()
 
 
@@ -1083,7 +1083,7 @@ def qrlogin():
     qr_img = qrcode.make(qr_data)
     buffered = io.BytesIO()
     qr_img.save(buffered, format="PNG")
-    qr_code_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+    qr_code_base64 = base64.b64encode(buffered.getvalue()).decode(global_encoding)
 
     # 存储二维码状态（可以根据需要扩展）
     token_json = {'status': 'pending', 'created_at': ct, 'expire_at': token_expire}
@@ -1304,7 +1304,7 @@ def api_wx_content(article, auth_key):
         return html_content
     articles_dir = os.path.join(base_dir, 'articles', article + ".md")
     try:
-        with open(articles_dir, 'r', encoding='utf-8') as file:
+        with open(articles_dir, 'r', encoding=global_encoding) as file:
             content = file.read()
             html_content = markdown.markdown(content)
             return html_content
@@ -1474,7 +1474,7 @@ def gen_md5(text):
     # 创建MD5哈希对象
     md5_hash = hashlib.md5()
     # 更新哈希对象
-    md5_hash.update(text.encode('utf-8'))
+    md5_hash.update(text.encode(global_encoding))
     # 获取十六进制表示的哈希值
     return md5_hash.hexdigest()
 
@@ -2155,7 +2155,7 @@ def music_json_change(user_id):
     save_path = os.path.join(str(user_dir), 'music.json')
 
     # 保存JSON数据
-    with open(save_path, 'w', encoding='utf-8') as file:
+    with open(save_path, 'w', encoding=global_encoding) as file:
         json.dump(json_data, file, ensure_ascii=False, indent=4)
 
     return jsonify({'message': 'success'}), 200
@@ -2334,7 +2334,7 @@ def ueditor_plus_server(user_id):
     if ueditor_config is None:
         config_path = os.path.join(base_dir, 'static', 'ueditorPlus', 'config.json')
         try:
-            with open(config_path, 'r', encoding='utf-8') as f:
+            with open(config_path, 'r', encoding=global_encoding) as f:
                 ueditor_config = json.load(f)
 
             cache.set(f"ueditor_config", ueditor_config, timeout=3600)
@@ -2540,7 +2540,7 @@ def index_html():
 
 @app.route('/tag/<tag_name>', methods=['GET'])
 def tag_page(tag_name):
-    if len(tag_name.encode('utf-8')) > 10:
+    if len(tag_name.encode(global_encoding)) > 10:
         return error("Tag 名称不能超过 10 字节。", status_code=400)
 
     page = request.args.get('page', 1, type=int)
