@@ -30,7 +30,7 @@ from werkzeug.utils import secure_filename
 from src.AboutLogin import zy_login, zy_register, zy_mail_login
 from src.AboutPW import zy_change_password, zy_confirm_password
 from src.BlogDeal import get_article_names, get_article_content, clear_html_format, \
-    get_blog_author, read_hidden_articles, auth_articles, get_file_date, \
+    get_blog_author, auth_articles, get_file_date, \
     zy_edit_article, get_unique_tags, get_articles_by_tag, \
     get_tags_by_article, set_article_info, write_tags_to_database, set_article_visibility, auth_by_id, \
     article_change_pw, get_file_summary, get_comments, auth_files, get_more_info, article_save_change
@@ -211,28 +211,28 @@ def search(user_id):
     return render_template('search.html', results=matched_content)
 
 
+@cache.memoize(120)
+def read_hidden_articles():
+    hidden_articles = []
+    try:
+        with get_db_connection() as db:
+            with db.cursor() as cursor:
+                query = "SELECT `Title` FROM `articles` WHERE `Hidden` = 1"
+                cursor.execute(query)
+                results = cursor.fetchall()
+                for result in results:
+                    hidden_articles.append(result[0])
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        # 更详细的日志记录或错误处理机制
+
+    return hidden_articles
+
+
 @cache.memoize(180)
 @app.route('/blog/api/<article_name>', methods=['GET', 'POST'])
 @app.route('/api/<article_name>', methods=['GET', 'POST'])
 def sys_out_file(article_name):
-    if article_name.startswith("tempPrev_"):
-        parts = article_name[:-3].rsplit('_', 1)
-        if len(parts) != 2:
-            # 如果 parts 长度不等于 2，直接返回错误
-            return error(message="无效的文章名称", status_code=400)
-
-        # 如果 parts 长度等于 2，继续处理
-        author, file_name = parts
-        author = get_username()
-        prev = f"""
-        ```xmind preview
-        ../blog/f/{author}/{file_name}
-        ```
-
-        """
-        return prev
-
-    # 隐藏文章判别
     hidden_articles = read_hidden_articles()
 
     if article_name[:-3] in hidden_articles:
@@ -255,20 +255,18 @@ def get_user_bio(user_id):
 
 
 def get_profiles(user_id):
-    cached_profiles = cache.get(f"userProfiles_{user_id}") or None
+    if not user_id:
+        return []
+
+    cached_profiles = cache.get(f"userProfiles_{user_id}")
     if cached_profiles:
         return cached_profiles
-    db = get_db_connection()
-    info_list = []
 
+    db = get_db_connection()
     try:
         with db.cursor() as cursor:
-            if user_id:
-                query = "SELECT * FROM users WHERE `id` = %s;"
-                params = (user_id,)
-            else:
-                return info_list
-
+            query = "SELECT * FROM users WHERE `id` = %s;"
+            params = (user_id,)
             cursor.execute(query, params)
             info = cursor.fetchone()
 
@@ -277,12 +275,14 @@ def get_profiles(user_id):
                 if len(info_list) > 2:
                     del info_list[2]
                     cache.set(f"userProfiles_{user_id}", info_list, timeout=300)
+                return info_list
+            else:
+                return []
 
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logging.error(f"An error occurred: {e}")
     finally:
         db.close()
-        return info_list
 
 
 @app.route('/setting/profiles', methods=['GET', 'POST'])
@@ -896,11 +896,11 @@ def sys_out_prev_page(user_id):
     file_name = request.args.get('file_name')
     prev_file_path = os.path.join(base_dir, 'media', str(user), file_name)
     if not os.path.exists(prev_file_path):
-        return error(message='{file_name}不存在', status_code=404)
+        return error(message=f'{file_name}不存在', status_code=404)
     else:
         app.logger.info(f'{user_id} preview: {file_name}')
         return render_template('zyDetail.html', article_content=1,
-                               articleName=f"tempPrev_{file_name}", domain=domain,
+                               articleName=f"prev_{file_name}", domain=domain,
                                url_for=url_for, article_Surl='-')
 
 
@@ -1455,18 +1455,17 @@ def article_passwd(aid):
             cursor.execute(query, (int(aid),))
             result = cursor.fetchone()
             if result:
-                a_pass = result[0]
-                return a_pass
-    except ValueError as e:  # 处理aid转换为整数时可能出现的异常
+                return result[0]
+
+    except ValueError as e:
         app.logger.error(f"Value Error: {e}")
-        return None
-    except Exception as e:  # 捕获其他未预期的异常
+    except Exception as e:
         app.logger.error(f"Unexpected Error: {e}")
-        return None
 
     finally:
-        cursor.close()
         db.close()
+
+    return None
 
 
 @cache.cached(timeout=600, key_prefix='gen_md5')
@@ -1577,7 +1576,7 @@ def comment(user_id):
     return rendered
 
 
-@app.route('/api/delete/<filename>', methods=['GET', 'DELETE'])
+@app.route('/api/delete/<filename>', methods=['DELETE'])
 @jwt_required
 def api_delete(user_id, filename):
     user_name = get_username()
@@ -2210,27 +2209,29 @@ def db_save_avatar(user_id, avatar_uuid):
 @cache.memoize(30)
 def get_avatar(user_identifier, identifier_type='id'):
     avatar = app.config['AVATAR_SERVER']  # 默认头像服务器地址
-    if user_identifier:
-        db = None
-        try:
-            db = get_db_connection()
-            with db.cursor() as cursor:
-                if identifier_type == 'id':
-                    query = "select profile_picture from users where id = %s"
-                elif identifier_type == 'username':
-                    query = "select profile_picture from users where username = %s"
-                else:
-                    raise ValueError("identifier_type must be 'id' or 'username'")
+    if not user_identifier:
+        return avatar  # 如果没有用户标识符，返回默认头像
+    query_map = {
+        'id': "select profile_picture from users where id = %s",
+        'username': "select profile_picture from users where username = %s"
+    }
 
-                cursor.execute(query, (user_identifier,))
-                result = cursor.fetchone()
-                if result[0]:
-                    avatar = f"{domain}api/avatar/{result[0]}.webp"
-        except Exception as e:
-            app.logger.error(f"Error getting avatar: {e}")
-        finally:
-            if db is not None:
-                db.close()  # 确保数据库连接在最后被关闭
+    if identifier_type not in query_map:
+        raise ValueError("identifier_type must be 'id' or 'username'")
+
+    db = None
+    try:
+        db = get_db_connection()
+        with db.cursor() as cursor:
+            cursor.execute(query_map[identifier_type], (user_identifier,))
+            result = cursor.fetchone()
+            if result and result[0]:
+                avatar = f"{domain}api/avatar/{result[0]}.webp"
+    except Exception as e:
+        app.logger.error(f"Error getting avatar for {user_identifier} with type {identifier_type}: {e}")
+    finally:
+        if db is not None:
+            db.close()
     return avatar
 
 
@@ -2487,7 +2488,6 @@ def fetch_articles(query, params):
         with db.cursor() as cursor:
             cursor.execute(query, params)
             article_info = cursor.fetchall()
-            # 调试输出print("Fetched articles:", article_info)
             cursor.execute("SELECT COUNT(*) FROM `articles` WHERE `Hidden`=0 AND `Status`='Published'")
             total_articles = cursor.fetchone()[0]
 
@@ -2690,19 +2690,16 @@ def upload_bulk(user_id):
 def save_bulk_article_db(filename, author):
     title = filename.split('.')[0]
     tags = datetime.now().year
-    db = get_db_connection()
     try:
-        with db.cursor() as cursor:
-            cursor.execute("INSERT INTO articles (Title, Author, Status, tags) VALUES (%s, %s, %s, %s)",
-                           (title, author, 'Draft', tags))
-        db.commit()
-        return True
+        with get_db_connection() as db:
+            with db.cursor() as cursor:
+                cursor.execute("INSERT INTO articles (Title, Author, Status, tags) VALUES (%s, %s, %s, %s)",
+                               (title, author, 'Draft', tags))
+            db.commit()
+            return True
     except Exception as e:
         app.logger.error(f"Error in saving to database: {e}")
         return False
-    finally:
-        if db:
-            db.close()
 
 
 @app.route('/newArticle', methods=['GET', 'POST'])
@@ -2901,6 +2898,19 @@ def user_space(user_id, target_id):
 def api_user_avatar():
     user_id = int(request.args.get('id')) or 0
     return get_avatar(user_id, 'id')
+
+
+@cache.memoize(180)
+@app.route('/api/prev_<file_name>', methods=['GET', 'POST'])
+def temp_prev(file_name):
+    author = get_username()
+    prev = f"""
+    ```xmind preview
+    ../blog/f/{author}/{file_name[:-3]}
+    ```
+
+     """
+    return prev
 
 
 @app.errorhandler(404)

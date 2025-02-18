@@ -4,6 +4,7 @@ import html
 import os
 import re
 import urllib.parse
+from contextlib import closing
 
 import markdown
 from pymysql import DatabaseError
@@ -29,8 +30,8 @@ def get_article_names(per_page, page=1):
         articles.append(article_name)
 
     # 检查每篇文章是否在hidden.txt中，并在必要时将其移除
-    hidden_articles = read_hidden_articles()
-    articles = [article for article in articles if article not in hidden_articles]
+    # hidden_articles = read_hidden_articles()
+    # articles = [article for article in articles if article not in hidden_articles]
 
     # 移除文章名称列表中以下划线开头的文章
     articles = [article for article in articles if not article.startswith('_')]
@@ -39,30 +40,6 @@ def get_article_names(per_page, page=1):
     has_previous_page = start_index > 0
 
     return articles, has_next_page, has_previous_page
-
-
-def read_hidden_articles():
-    db = get_db_connection()
-    hidden_articles = []
-
-    try:
-        with db.cursor() as cursor:
-            query = "SELECT Title FROM articles WHERE Hidden = 1"
-            cursor.execute(query)
-            results = cursor.fetchall()
-
-            for result in results:
-                hidden_articles.append(result[0])
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    finally:
-        try:
-            cursor.close()
-        except NameError:
-            pass
-        db.close()
-
-    return hidden_articles
 
 
 def get_article_content(article, limit):
@@ -174,17 +151,15 @@ def get_blog_author(title):
 
 
 def auth_articles(article_name, user_name):
-    db = get_db_connection()
     try:
-        with db.cursor() as cursor:
-            query = "SELECT 1 FROM articles WHERE Title = %s AND Author = %s"
-            cursor.execute(query, (article_name, user_name))
-            return cursor.fetchone() is not None
+        with get_db_connection() as db:
+            with db.cursor() as cursor:
+                query = "SELECT 1 FROM articles WHERE Title = %s AND Author = %s"
+                cursor.execute(query, (article_name, user_name))
+                return cursor.fetchone() is not None
     except Exception as e:
         print(f"An error occurred: {e}")
         return False
-    finally:
-        db.close()
 
 
 def auth_by_id(aid, user_name):
@@ -336,39 +311,33 @@ def get_tags_by_article(article_name):
 
 
 def set_article_info(a_title, username):
-    db = get_db_connection()
     try:
-        with db.cursor() as cursor:
-            current_year = datetime.datetime.now().year
+        with closing(get_db_connection()) as db:
+            with db.cursor() as cursor:
+                current_year = datetime.datetime.now().year
 
-            # 插入或更新文章信息
-            cursor.execute("""
-                           INSERT INTO articles (Title, Author, tags)
-                           VALUES (%s, %s, %s)
-                           ON DUPLICATE KEY UPDATE Author = VALUES(Author),
-                                                   tags   = VALUES(tags);
-                           """, (a_title, username, current_year))
+                # 插入或更新文章信息
+                cursor.execute("""
+                               INSERT INTO articles (Title, Author, tags)
+                               VALUES (%s, %s, %s)
+                               ON DUPLICATE KEY UPDATE Author = VALUES(Author),
+                                                       tags   = VALUES(tags);
+                               """, (a_title, username, current_year))
 
-            # 记录事件信息
-            cursor.execute("""
-                           INSERT INTO events (title, description, event_date, created_at)
-                           VALUES (%s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-                           """, ('article update', f'{username} updated {a_title}'))
+                # 记录事件信息
+                cursor.execute("""
+                               INSERT INTO events (title, description, event_date, created_at)
+                               VALUES (%s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+                               """, ('article update', f'{username} updated {a_title}'))
 
-            # 提交事务
-            db.commit()
-            return True
+                # 提交事务
+                db.commit()
+                return True
 
     except Exception as e:
         print(f"数据库操作期间发生错误: {e}")
         db.rollback()
         return False
-    finally:
-        try:
-            cursor.close()
-        except NameError:
-            pass
-        db.close()
 
 
 def write_tags_to_database(aid, tags_list):
