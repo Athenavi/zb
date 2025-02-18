@@ -2906,7 +2906,7 @@ def temp_prev(file_name):
     author = get_username()
     prev = f"""
     ```xmind preview
-    ../blog/f/{author}/{file_name[:-3]}
+    {domain}/blog/f/{author}/{file_name[:-3]}
     ```
 
      """

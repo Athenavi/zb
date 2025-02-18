@@ -147,18 +147,6 @@ def generate_short_url():
     return short_url
 
 
-def allowed_file(filename):
-    allowed_extensions = {
-        'txt': 5 * 1024 * 1024,  # 5MB
-        'jpg': 10 * 1024 * 1024,  # 10MB
-        'png': 10 * 1024 * 1024,  # 10MB
-        'md': 5 * 1024 * 1024,  # 5MB
-        'zip': 10 * 1024 * 1024,  # 10MB
-
-    }
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions
-
-
 def admin_upload_file(size_limit):
     # 检查是否有文件被上传
     if 'file' not in request.files:
@@ -170,8 +158,8 @@ def admin_upload_file(size_limit):
     if file.filename == '':
         return error('No file selected', 400)
 
-    # 检查文件类型和大小是否在允许范围内
-    if not allowed_file(file.filename) or file.content_length > size_limit:
+    # 检查文件大小是否在允许范围内
+    if file.content_length > size_limit:
         return error('Invalid file', 400)
 
     file_type = request.form.get('type')
@@ -277,15 +265,6 @@ def handle_article_upload(file, upload_folder, allowed_size):
 def is_allowed_file(filename, allowed_types):
     # 检查文件是否是允许的类型
     return any(filename.lower().endswith(ext) for ext in allowed_types)
-
-
-def check_exist(cache_file):
-    if os.path.exists(cache_file):
-        with open(cache_file, 'r') as f:
-            cache_data = json.load(f)
-            cache_timestamp = datetime.fromtimestamp(os.path.getmtime(cache_file))
-            if datetime.now() - cache_timestamp <= timedelta(hours=1):
-                return jsonify(cache_data)
 
 
 def zb_safe_check(url):
@@ -482,25 +461,6 @@ def theme_safe_check(theme_id, channel=1):
                 return True
     else:
         return False
-
-
-def parse_update_file(filename):
-    updates = []
-    with open(filename, 'r', encoding='utf-8') as file:
-        content = file.read()
-
-    # 使用正则表达式提取版本信息
-    pattern = re.compile(r"版本 (.+?)\s+发布日期:(.+?)\s+-*\n((?:-.*(?:\n|$))*)", re.MULTILINE)
-    matches = pattern.findall(content)
-
-    for match in matches:
-        version_info = {
-            'version': match[0].strip(),
-            'date': match[1].strip(),
-            'updates': [update.strip() for update in match[2].strip().splitlines() if update.strip()]
-        }
-        updates.append(version_info)
-    return updates
 
 
 def user_agent_info(user_agent):
