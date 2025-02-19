@@ -154,7 +154,7 @@ def auth_articles(article_name, user_name):
     try:
         with get_db_connection() as db:
             with db.cursor() as cursor:
-                query = "SELECT 1 FROM articles WHERE Title = %s AND Author = %s"
+                query = "SELECT 1 FROM articles WHERE Title = %s AND `Status` != 'Deleted' AND Author = %s"
                 cursor.execute(query, (article_name, user_name))
                 return cursor.fetchone() is not None
     except Exception as e:

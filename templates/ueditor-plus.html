@@ -10,8 +10,8 @@
 </head>
 <body>
 <!--导航栏-->
-{% from 'header.html' import zytopbar %}
-{{ zytopbar() }}
+{% from 'header.html' import SimpleHeader %}
+{{ SimpleHeader(title) }}
 <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <header class="mb-8">
         <h1 id="txtTitle" class="text-4xl font-bold text-gray-900">{{ articleName }}</h1>
@@ -135,14 +135,17 @@
     });
 
     document.getElementById("save-button").addEventListener("click", function () {
+        var button = this;
+        button.disabled = true; // 禁用按钮以防止重复点击
+
         var title = `{{ articleName }}`;
         var content = UE.getEditor('txtContent').getContent();
         var excerpt = document.getElementById("txtExcerpt").value;
         var status = document.querySelector('input[name="rStatus"]:checked').value;
         var hiddenStatus = document.querySelector('input[name="HiddenStatus"]:checked').value;
 
-        // 使用 confirm 对话框来确认删除操作
         if (status === 'Deleted' && !confirm('您正在尝试删除文章，是否继续？')) {
+            button.disabled = false; // 如果用户取消，重新启用按钮
             return;
         }
 
@@ -165,18 +168,24 @@
         })
             .then(response => response.json())
             .then(data => {
-                // 根据服务器返回的 data.show_edit_code 值来提示用户
+                // 处理返回的数据显示
+                console.log(data); // 调试信息
                 if (data.show_edit_code === 'success') {
                     alert('文章保存成功');
-                }
-                if (data.show_edit_code === 'deleted') {
+                } else if (data.show_edit_code === 'deleted') {
                     alert('已删除！');
-                    window.location.href = '/profile'
+                    window.location.href = '/profile';
                 } else {
                     alert('文章保存失败');
                 }
             })
-            .catch(error => console.error('保存失败:', error));
+            .catch(error => {
+                console.error('保存失败:', error);
+                alert('文章保存失败');
+            })
+            .finally(() => {
+                button.disabled = false; // 无论成功与否，重新启用按钮
+            });
     });
 
     document.getElementById('upLoadCoverImg').addEventListener('change', function (event) {
@@ -191,4 +200,7 @@
     });
 </script>
 </body>
+<!-- Footer -->
+{% from 'footer.html' import SimpleFooter %}
+{{ SimpleFooter(title,beian) }}
 </html>
