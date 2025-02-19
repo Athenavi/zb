@@ -501,12 +501,14 @@ def markdown_editor(user_id, article):
         if request.args.get('editor') == 'ueditor':
             return ueditor_plus_edit(user_id, aid, user_name)
         if request.method == 'GET':
+            all_info = get_more_info(aid)
             edit_html = zy_edit_article(article, max_line=app.config['MAX_LINE'])
             article_url = domain + 'blog/' + article
             article_surl = api_shortlink(article_url)
             # 渲染编辑页面并将转换后的HTML传递到模板中
             return render_template('editor.html', edit_html=edit_html, aid=aid, articleName=article,
-                                   tags=tags, article_surl=article_surl)
+                                   tags=tags, user_id=user_id, article_surl=article_surl, user_name=user_name,
+                                   all_info=all_info)
         elif request.method == 'POST':
             content = request.json['content']
             return zy_save_edit(aid, content, article)
@@ -2911,6 +2913,11 @@ def temp_prev(file_name):
 
      """
     return prev
+
+
+@app.route('/test', methods=['GET', 'POST'])
+def test():
+    return render_template('test.html')
 
 
 @app.errorhandler(404)

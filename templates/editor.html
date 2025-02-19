@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-cn">
+{% set aid=all_info[0] %}{% set articleName=all_info[1] %}{% set isHidden=all_info[3] %}{% set articleStatus=all_info[7] %}{% set coverImage=all_info[8] %}{% set articleExcerpt=all_info[10] %}{% set tags=all_info[12].split(';') %}
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
@@ -9,49 +10,109 @@
     <!-- 引入 SimpleMDE CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/simplemde/latest/simplemde.min.css">
 </head>
-{% from 'header.html' import zytopbar %}
-<!-- 调用topbar -->
-{{ zytopbar() }}
+{% from 'header.html' import SimpleHeader %}
+{{ SimpleHeader(title) }}
 <body class="bg-gray-100">
 <div class="container mx-auto my-8">
-    <div class="bg-white p-6 rounded-lg shadow-lg">
-        <div class="mb-4">
-            <span onclick="copyAndAlert('{{ article_surl }}')">{{ article_surl }}（copy）</span>
-            <label for="tagInput" class="block text-gray-700 text-sm font-bold mb-2">标签（用逗号分隔）：</label>
-            <input type="text" id="tagInput"
-                   value="{% for tag in tags %}{{ tag }}{% if not loop.last %}, {% endif %}{% endfor %}"
-                   class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                   placeholder="Enter tags, separated by commas">
-            <button id="editTags"
-                    class="mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                保存标签
-            </button>
-            <a href="/blog/{{ articleName }}" target="_blank">
-                <button class="mt-4 bg-green-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                    文章页
-                </button>
-            </a>
-            <br/>
-            <br/>
-            <form onsubmit="changePassword(event)">
-                <input type="password" id="new-password" maxlength="4" required
-                       class="border rounded text-gray-700 leading-tight">
-                <button type="submit"
-                        class="hover:bg-red-700">
-                    🔑
-                </button>
-            </form>
-
+    <div class="bg-white p-8 rounded-lg shadow-lg">
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">编辑文章</h1>
+        <div class="mb-6">
+            <span onclick="copyAndAlert('{{ article_surl }}')"
+                  class="text-blue-600 cursor-pointer hover:underline">{{ article_surl }}（复制）</span>
         </div>
 
-        <label for="md-editor" class="block text-gray-700 text-sm font-bold mb-2"></label>
-        <button id="save-button"
-                class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-            保存内容
+        <label for="tagInput" class="block text-gray-700 text-sm font-bold mb-2">标签（用逗号分隔）：</label>
+        <input type="text" id="tagInput"
+               value="{% for tag in tags %}{{ tag }}{% if not loop.last %}, {% endif %}{% endfor %}"
+               class="shadow appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-4"
+               placeholder="输入标签，用逗号分隔">
+        <button id="editTags"
+                class="mt-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+            保存标签
         </button>
-        <a href="#" data-article={{ articleName }} class="hidden121">隐藏/取消隐藏</a>
-        <a href="#" data-article={{ articleName }} class="delete121">删除</a>
-        <textarea id="md-editor" class="shadow border rounded py-2 px-3 text-grey-darker mb-3 w-full"
+
+        <a href="/blog/{{ articleName }}" target="_blank">
+            <button class="mt-4 mb-4 bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                文章页
+            </button>
+        </a>
+
+        <form onsubmit="changePassword(event)" class="mb-4">
+            <input type="password" id="new-password" maxlength="4" required
+                   class="border border-gray-300 rounded text-gray-700 py-2 px-3 mb-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+            <button type="submit"
+                    class="hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none">
+                🔑
+            </button>
+        </form>
+
+        <!-- 文章简介 -->
+        <section class="mb-6">
+            <label for="txtExcerpt" class="block text-sm font-medium text-gray-700">文章简介</label>
+            <textarea class="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" id="txtExcerpt"
+                      rows="3" maxlength="145">{{ articleExcerpt }}</textarea>
+        </section>
+
+        <!-- 封面及状态 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div>
+                <label for="upLoadCoverImg" class="block text-sm font-medium text-gray-700">文章封面</label>
+                <input type="file" class="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                       id="upLoadCoverImg">
+                <div id="coverImg" class="mt-2">
+                    {% if coverImage %}
+                        <img src="{{ coverImage }}" alt="文章封面" class="max-w-full h-auto rounded-md"
+                             style="max-height:185px;" id="coverImage">
+                    {% else %}
+                        <img src="" alt="文章封面" class="max-w-full h-auto rounded-md" style="max-height:185px;"
+                             id="coverImage">
+                    {% endif %}
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">文章状态</label>
+                <div class="flex flex-col mt-2">
+                    <label class="flex items-center mb-2">
+                        <input class="form-check-input" type="radio" name="rStatus" value="Draft"
+                               {% if articleStatus == 'Draft' %}checked{% endif %}>
+                        <span class="ml-2 text-gray-700">草稿</span>
+                    </label>
+                    <label class="flex items-center mb-2">
+                        <input class="form-check-input" type="radio" name="rStatus" value="Published"
+                               {% if articleStatus == 'Published' %}checked{% endif %}>
+                        <span class="ml-2 text-green-700">发布</span>
+                    </label>
+                    <label class="flex items-center mb-2">
+                        <input class="form-check-input" type="radio" name="rStatus" value="Deleted"
+                               {% if articleStatus == 'Deleted' %}checked{% endif %}>
+                        <span class="ml-2 text-red-700">永久删除</span>
+                    </label>
+                </div>
+                <br>
+                <div class="flex flex-col mt-4">
+                    <label class="flex items-center mb-2">
+                        <input class="form-check-input" type="radio" name="HiddenStatus" value="0"
+                               {% if isHidden == 0 %}checked{% endif %}>
+                        <span class="ml-2 text-green-700">可见</span>
+                    </label>
+                    <label class="flex items-center mb-2">
+                        <input class="form-check-input" type="radio" name="HiddenStatus" value="1"
+                               {% if isHidden == 1 %}checked{% endif %}>
+                        <span class="ml-2 text-gray-700">隐藏</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- 保存按钮 -->
+        <div class="text-center mb-8">
+            <button id="save-button" type="button"
+                    class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                保存更改
+            </button>
+        </div>
+        <label for="md-editor" class="block text-gray-700 text-sm font-bold mb-2">文章内容</label>
+        <textarea id="md-editor" class="shadow border rounded py-2 px-3 text-gray-700 mb-3 w-full"
                   rows="10">{{ edit_html }}</textarea>
     </div>
 </div>
@@ -61,21 +122,58 @@
 <script>
     var simplemde = new SimpleMDE({element: document.getElementById("md-editor")});
     document.getElementById("save-button").addEventListener("click", function () {
+        var title = `{{ articleName }}`;
         var content = simplemde.value();
-        fetch('/edit/{{ articleName }}', {
+        var excerpt = document.getElementById("txtExcerpt").value;
+        var status = document.querySelector('input[name="rStatus"]:checked').value;
+        var hiddenStatus = document.querySelector('input[name="HiddenStatus"]:checked').value;
+
+        // 使用 confirm 对话框来确认删除操作
+        if (status === 'Deleted' && !confirm('您正在尝试删除文章，是否继续？')) {
+            return;
+        }
+
+        var formData = new FormData();
+        formData.append('title', title);
+        formData.append('content', content);
+        formData.append('excerpt', excerpt);
+        formData.append('status', status);
+        formData.append('hiddenStatus', hiddenStatus);
+
+        var coverImgInput = document.getElementById('upLoadCoverImg');
+        if (coverImgInput.files.length > 0) {
+            formData.append('coverImage', coverImgInput.files[0]);
+        }
+
+        fetch('/api/edit/{{ aid }}', {
             method: 'POST',
-            body: JSON.stringify({content}),
-            headers: {'Content-Type': 'application/json'}
+            body: formData,
+            credentials: 'include'
         })
             .then(response => response.json())
             .then(data => {
                 if (data.show_edit_code === 'success') {
-                    alert('保存成功');
+                    alert('文章保存成功');
+                }
+                if (data.show_edit_code === 'deleted') {
+                    alert('已删除！');
+                    window.location.href = '/profile'
                 } else {
-                    alert('保存失败');
+                    alert('文章保存失败');
                 }
             })
             .catch(error => console.error('保存失败:', error));
+    });
+
+    document.getElementById('upLoadCoverImg').addEventListener('change', function (event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                document.getElementById('coverImage').src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
     });
 
     document.getElementById("editTags").addEventListener("click", function () {
@@ -104,91 +202,10 @@
     });
 </script>
 </body>
-{% from 'footer.html' import zyfooter %}
-<!-- 调用footer -->
-{{ zyfooter() }}
+{% from 'footer.html' import SimpleFooter %}
+{{ SimpleFooter(title,beian) }}
 </html>
-<script>
-    const hiddenLinks = document.querySelectorAll('a.hidden121');
 
-    hiddenLinks.forEach(link => {
-        link.addEventListener('click', event => {
-            event.preventDefault();
-
-            // 获取文章标题
-            const article = link.getAttribute('data-article');
-            if (!article) {
-                alert('缺少文章标题');
-                return;
-            }
-
-            const requestBody = JSON.stringify({article});
-
-            if (confirm('您正在尝试对文章进行一个操作，是否继续？')) {
-                fetch('/api/hidden/article', {
-                    method: 'PUT',
-                    headers: {'Content-Type': 'application/json'},
-                    body: requestBody
-                })
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('网络响应不正常');
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        if (data.deal === 'hide') {
-                            alert('文章已隐藏');
-                        } else if (data.deal === 'unhide') {
-                            alert('已经取消隐藏');
-                        } else if (data.deal === 'noAuth') {
-                            alert('无权限操作');
-                        } else {
-                            alert(data.deal);
-                            console.log(data.message);
-                        }
-                    })
-                    .catch(error => {
-                        alert('请求出错');
-                        console.error('请求出错:', error);
-                    });
-            }
-        });
-    });
-
-    const deleteLinks = document.querySelectorAll('a.delete121');
-
-    deleteLinks.forEach(link => {
-        link.addEventListener('click', async event => {
-            event.preventDefault();
-            const articleId = link.getAttribute('data-article');
-
-            // 数据验证
-            if (!articleId) {
-                alert('无法找到文章ID，删除操作失败！');
-                return;
-            }
-
-            if (confirm('您正在尝试永久删除该文章！！！是否继续？')) {
-                if (confirm('再次确认是否删除？')) {
-                    try {
-                        const response = await fetch(`/api/delete/${articleId}?type=article`, {method: 'DELETE'});
-
-                        if (response.ok) {
-                            alert('文章删除成功！');
-                            location.reload();
-                        } else {
-                            const responseData = await response.json();
-                            alert(`文章删除失败！原因：${responseData.message || '未知错误'}`);
-                        }
-                    } catch (error) {
-                        alert('请求出错：' + error.message);
-                    }
-                }
-            }
-        });
-    });
-</script>
 <script>
     async function changePassword(event) {
         event.preventDefault(); // 防止默认表单提交
@@ -204,9 +221,18 @@
         const result = await response.json();
 
         if (response.ok) {
-            alert('Password changed successfully!');
+            alert('密码更改成功！');
         } else {
-            alert(`Error: ${result.message}`);
+            alert(`错误: ${result.message}`);
         }
+    }
+</script>
+<script>
+    function copyAndAlert(text) {
+        navigator.clipboard.writeText(text).then(function () {
+            alert("已复制");
+        }).catch(function (error) {
+            alert("复制失败：" + error);
+        });
     }
 </script>
