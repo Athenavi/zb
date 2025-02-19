@@ -2227,8 +2227,9 @@ def ueditor_plus_edit(user_id, aid, user_name):
 def ueditor_plus_server(user_id):
     # /ueditor-plus/_demo_server/handle.php
     aid = request.args.get('aid')
-    user_name = request.args.get('user_name')
-    if not aid or not user_name:
+    argparse_username = request.args.get('user_name')
+    user_name = get_username()
+    if not aid or user_name != argparse_username:
         return jsonify({'state': 'ERROR', 'message': '参数不完整'}), 400
     action = request.args.get('action', default=None)
     upload_folder = app.config['USER_BASE_PATH'] + '/' + user_name

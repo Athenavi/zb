@@ -29,6 +29,14 @@
                 保存标签
             </button>
         </div>
+        <form onsubmit="changePassword(event)" class="mb-4">
+            <input type="password" id="new-password" maxlength="4" required
+                   class="border border-gray-300 rounded text-gray-700 py-2 px-3 mb-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+            <button type="submit"
+                    class="hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none">
+                🔑
+            </button>
+        </form>
     </section>
 
     <!-- 文章简介 -->
@@ -197,6 +205,26 @@
             reader.readAsDataURL(file);
         }
     });
+
+    async function changePassword(event) {
+        event.preventDefault(); // 防止默认表单提交
+
+        const aid = "{{ aid }}";
+        const newPassword = document.getElementById('new-password').value;
+
+        const response = await fetch(`/api/article/PW?aid=${aid}&new-passwd=${newPassword}`, {
+            method: 'POST',
+            credentials: 'include', // 发送 cookies
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            alert('密码更改成功！');
+        } else {
+            alert(`错误: ${result.message}`);
+        }
+    }
 </script>
 </body>
 <!-- Footer -->
