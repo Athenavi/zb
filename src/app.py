@@ -1549,7 +1549,7 @@ def comment(user_id):
 
 @app.route('/api/delete/<filename>', methods=['DELETE'])
 @jwt_required
-def api_delete(user_id, filename):
+def api_delete_file(user_id, filename):
     user_name = get_username()
     arg_type = request.args.get('type')
     if arg_type == 'article':
@@ -2213,7 +2213,7 @@ def get_avatar_image(avatar_uuid):
 
 def ueditor_plus_edit(user_id, aid, user_name):
     all_info = get_more_info(aid)
-    edit_html = zy_edit_article(all_info[1], max_line=app.config['MAX_LINE'])
+    edit_html = api_wx_content(all_info[1], auth_key=DEFAULT_KEY)
     article_url = domain + 'blog/' + all_info[1]
     article_surl = api_shortlink(article_url)
     # 渲染编辑页面并将转换后的HTML传递到模板中
@@ -2336,7 +2336,7 @@ def markdown_editor2(user_id, aid):
         cover_image_path = 'cover'
         if status == 'Deleted':
             if handle_article_delete(a_name, app.config['TEMP_FOLDER']):
-                return jsonify({'show_edit_code': 'deleted'}), 201
+                return api_delete(user_id, aid)
         if cover_image:
             # 保存封面图片
             cover_image_path = os.path.join('cover', f"{aid}.png")
@@ -2381,6 +2381,33 @@ def api_edit_tag(user_id, aid):
     # 写入更新后的标签到数据库
     write_tags_to_database(aid, tags_list)
     return jsonify({'show_edit': "success"})
+
+
+@app.route('/api/edit/hidden/<int:aid>', methods=['PUT'])
+@jwt_required
+def api_edit_hidden(user_id, aid):
+    hidden_status = request.get_json().get('hiddenStatus')
+    try:
+        with get_db_connection() as db:
+            with db.cursor() as cursor:
+                cursor.execute("UPDATE `articles` SET `Hidden`=%s WHERE `ArticleID`=%s", (hidden_status, aid))
+                db.commit()
+            return jsonify({'show_edit': "success"}), 201
+    except Exception as e:
+        app.logger.error(f"Error updating hidden status: {e} by user {user_id} ")
+        return jsonify({'show_edit': 'error', 'message': '更新隐藏状态失败'}), 500
+
+
+def api_delete(user_id, aid):
+    try:
+        with get_db_connection() as db:
+            with db.cursor() as cursor:
+                cursor.execute("UPDATE `articles` SET `Status`=%s WHERE `ArticleID`=%s", ('Deleted', aid))
+                db.commit()
+        return jsonify({'show_edit_code': "deleted"}), 201
+    except Exception as e:
+        app.logger.error(f"Error deleting article: {e} by user {user_id} ")
+        return jsonify({'show_edit_code': 'error', 'message': '删除文章失败'}), 500
 
 
 @app.route('/api/cover/<cover_img>', methods=['GET'])
