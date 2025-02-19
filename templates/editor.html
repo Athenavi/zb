@@ -178,10 +178,11 @@
 
     document.getElementById("editTags").addEventListener("click", function () {
         var tagsInput = document.getElementById("tagInput").value;
-        fetch('/edit/{{ articleName }}', {
+        fetch('/api/edit/tag/{{ aid }}', {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({tags: tagsInput})
+            body: JSON.stringify({tags: tagsInput}),
+            credentials: 'include'
         })
             .then(response => {
                 if (response.ok) {

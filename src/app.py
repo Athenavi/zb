@@ -512,42 +512,11 @@ def markdown_editor(user_id, article):
         elif request.method == 'POST':
             content = request.json['content']
             return zy_save_edit(aid, content, article)
-        elif request.method == 'PUT':
-            tags_input = request.get_json().get('tags')
-            return zy_save_tags(aid, tags_input)
         else:
             return render_template('editor.html')
 
     else:
         return error(message='您没有权限', status_code=503)
-
-
-def zy_save_tags(aid, tags_input):
-    if not isinstance(tags_input, str):
-        return jsonify({'show_edit': 'error', 'message': '标签输入不是字符串'})
-
-    # 将中文逗号转换为英文逗号
-    tags_input = tags_input.replace("，", ",")
-
-    # 用正则表达式限制标签数量和每个标签的长度
-    tags_list = [
-        tag.strip() for tag in re.split(",", tags_input, maxsplit=4) if len(tag.strip()) <= 10
-    ]
-
-    # 计算标签的哈希值
-    current_tag_hash = hashlib.md5(tags_input.encode(global_encoding)).hexdigest()
-    previous_content_hash = cache.get(f"{aid}:tag_hash")
-
-    # 检查内容是否与上一次提交相同
-    if current_tag_hash == previous_content_hash:
-        return jsonify({'show_edit': 'success'})
-
-    # 更新缓存中的标签哈希值
-    cache.set(f"{aid}:tag_hash", current_tag_hash, timeout=28800)
-
-    # 写入更新后的标签到数据库
-    write_tags_to_database(aid, tags_list)
-    return jsonify({'show_edit': "success"})
 
 
 def zy_save_edit(aid, content, a_name):
@@ -2383,6 +2352,37 @@ def markdown_editor2(user_id, aid):
         return jsonify({'show_edit_code': 'failed'}), 500
 
 
+@app.route('/api/edit/tag/<int:aid>', methods=['PUT'])
+@jwt_required
+def api_edit_tag(user_id, aid):
+    tags_input = request.get_json().get('tags')
+    if not isinstance(tags_input, str):
+        return jsonify({'show_edit': 'error', 'message': '标签输入不是字符串'})
+
+    # 将中文逗号转换为英文逗号
+    tags_input = tags_input.replace("，", ",")
+
+    # 用正则表达式限制标签数量和每个标签的长度
+    tags_list = [
+        tag.strip() for tag in re.split(",", tags_input, maxsplit=4) if len(tag.strip()) <= 10
+    ]
+
+    # 计算标签的哈希值
+    current_tag_hash = hashlib.md5(tags_input.encode(global_encoding)).hexdigest()
+    previous_content_hash = cache.get(f"{aid}:tag_hash")
+
+    # 检查内容是否与上一次提交相同
+    if current_tag_hash == previous_content_hash:
+        return jsonify({'show_edit': 'success'})
+
+    # 更新缓存中的标签哈希值
+    cache.set(f"{aid}:tag_hash", current_tag_hash, timeout=28800)
+
+    # 写入更新后的标签到数据库
+    write_tags_to_database(aid, tags_list)
+    return jsonify({'show_edit': "success"})
+
+
 @app.route('/api/cover/<cover_img>', methods=['GET'])
 @app.route('/edit/cover/<cover_img>', methods=['GET'])
 def api_cover(cover_img):
@@ -2917,7 +2917,7 @@ def temp_prev(file_name):
 
 @app.route('/test', methods=['GET', 'POST'])
 def test():
-    return render_template('test.html')
+    return render_template('test2.html')
 
 
 @app.errorhandler(404)
