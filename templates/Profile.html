@@ -72,11 +72,11 @@
             <div class="space-y-4">
                 {% for article in Articles %}
                     <div class="bg-gray-200 p-4 rounded-lg flex justify-between items-center">
-                        <a href="{{ url_for('blog_detail', article=article) }}"
-                           class="text-xl font-semibold text-blue-700">{{ article }}</a>
+                        <a href="{{ url_for('blog_detail', article=article[1]) }}"
+                           class="text-xl font-semibold text-blue-700">{{ article[1] }}</a>
                         <div class="flex items-center space-x-4">
                             {% if target_id == user_id %}
-                                <a href="/edit/{{ article }}" class="text-green-500">编辑</a>
+                                <a href="/edit/blog/{{ article[0] }}" class="text-green-500">编辑</a>
                             {% endif %}
                         </div>
                     </div>

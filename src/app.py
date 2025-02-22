@@ -374,11 +374,6 @@ def get_a_list(chanel=1, page=1):
         return articles
 
 
-@app.route('/blog/<article>.html', methods=['GET', 'POST'])
-def blog_detail_seo(article):
-    return redirect(f'/blog/{article}')
-
-
 @app.route('/blog/<article>', methods=['GET', 'POST'])
 @cache.memoize(180)
 def blog_detail(article):
