@@ -30,10 +30,10 @@ from werkzeug.utils import secure_filename
 from src.AboutLogin import zy_login, zy_register, zy_mail_login
 from src.AboutPW import zy_change_password, zy_confirm_password
 from src.BlogDeal import get_article_names, get_article_content, clear_html_format, \
-    get_blog_author, auth_articles, get_file_date, \
+    get_blog_author, get_file_date, \
     zy_edit_article, get_unique_tags, get_articles_by_tag, \
-    get_tags_by_article, set_article_info, write_tags_to_database, set_article_visibility, auth_by_id, \
-    article_change_pw, get_file_summary, get_comments, auth_files, get_more_info, article_save_change
+    get_tags_by_article, set_article_info, write_tags_to_database, auth_by_id, \
+    article_change_pw, get_file_summary, get_comments, auth_files, get_more_info, article_save_change, auth_aid
 from src.database import get_db_connection
 from src.links import create_special_url, redirect_to_long_url
 from src.notification import get_sys_notice, read_notification
@@ -485,40 +485,6 @@ def static_from_root():
     return response
 
 
-@app.route('/edit/<article>', methods=['GET', 'POST', 'PUT'])
-@jwt_required
-def markdown_editor(user_id, article):
-    if article == 'default':
-        return error(404, status_code=404)
-    user_name = get_username()
-    auth = False
-
-    if user_name is not None:
-        auth = auth_articles(article, user_name)
-
-    if auth:
-        aid, tags = get_tags_by_article(article)
-        if request.args.get('editor') == 'ueditor':
-            return ueditor_plus_edit(user_id, aid, user_name)
-        if request.method == 'GET':
-            all_info = get_more_info(aid)
-            edit_html = zy_edit_article(article, max_line=app.config['MAX_LINE'])
-            article_url = domain + 'blog/' + article
-            article_surl = api_shortlink(article_url)
-            # 渲染编辑页面并将转换后的HTML传递到模板中
-            return render_template('editor.html', edit_html=edit_html, aid=aid, articleName=article,
-                                   tags=tags, user_id=user_id, article_surl=article_surl, user_name=user_name,
-                                   all_info=all_info)
-        elif request.method == 'POST':
-            content = request.json['content']
-            return zy_save_edit(aid, content, article)
-        else:
-            return render_template('editor.html')
-
-    else:
-        return error(message='您没有权限', status_code=503)
-
-
 def zy_save_edit(aid, content, a_name):
     if content is None:
         raise ValueError("Content cannot be None")
@@ -555,48 +521,6 @@ def zy_save_edit(aid, content, a_name):
         file.write(content)
 
     return {'show_edit_code': 'success'}
-
-
-last_request_time = {}
-
-
-@app.route('/api/hidden/article', methods=['PUT'])
-def hidden_article():
-    article = request.json.get('article')
-
-    if article is None:
-        return jsonify({'message': '404'}), 404
-
-    user_name = get_username()
-    if user_name is None:
-        return jsonify({'deal': 'noAuth'})
-
-    if not auth_articles(article, user_name):
-        return jsonify({'deal': 'noAuth'})
-
-    # 防抖机制：限制时间内对相同文章的请求
-    current_time = time.time()
-    cooldown_time = 6
-    hidden_status_key = f"{article}_hiddenStatus"
-
-    if hidden_status_key in last_request_time:
-        last_time = last_request_time[hidden_status_key]
-        if current_time - last_time < cooldown_time:
-            return jsonify({'deal': 'Please wait before trying again'})
-
-    # 更新最后请求时间
-    last_request_time[hidden_status_key] = current_time
-
-    cached_status = cache.get(hidden_status_key)
-
-    if cached_status:
-        current_hidden_status = set_article_visibility(article, hide=True)
-        cache.set(hidden_status_key, current_hidden_status)
-        return jsonify({'deal': 'hide'})
-    else:
-        current_hidden_status = set_article_visibility(article, hide=False)
-        cache.set(hidden_status_key, current_hidden_status)
-        return jsonify({'deal': 'unhide'})
 
 
 @app.route('/media', methods=['GET', 'POST'])
@@ -2325,7 +2249,7 @@ def markdown_editor2(user_id, aid):
     user_name = get_username()
     if not user_name or not a_name:
         return jsonify({'show_edit_code': 'failed'}), 500
-    auth = auth_articles(article_name=a_name, user_name=user_name)
+    auth = auth_aid(aid, user_name)
     if auth is False:
         return jsonify({'show_edit_code': 'failed'}), 403
     try:
@@ -2943,9 +2867,35 @@ def temp_prev(file_name):
     return prev
 
 
-@app.route('/test', methods=['GET', 'POST'])
-def test():
-    return render_template('test2.html')
+@app.route('/edit/blog/<int:aid>', methods=['GET', 'POST', 'PUT'])
+@jwt_required
+def markdown_editor(user_id, aid):
+    user_name = get_username()
+    auth = False
+
+    if user_name is not None:
+        auth = auth_aid(aid, user_name)
+
+    if auth:
+        if request.args.get('editor') == 'ueditor':
+            return ueditor_plus_edit(user_id, aid, user_name)
+        all_info = get_more_info(aid)
+        if request.method == 'GET':
+            edit_html = zy_edit_article(all_info[1], max_line=app.config['MAX_LINE'])
+            article_url = domain + 'blog/' + all_info[1]
+            article_surl = api_shortlink(article_url)
+            # 渲染编辑页面并将转换后的HTML传递到模板中
+            return render_template('editor.html', edit_html=edit_html, aid=aid, articleName=all_info[1],
+                                   tags=all_info[12], user_id=user_id, article_surl=article_surl, user_name=user_name,
+                                   all_info=all_info)
+        elif request.method == 'POST':
+            content = request.json['content']
+            return zy_save_edit(aid, content, all_info[1])
+        else:
+            return render_template('editor.html')
+
+    else:
+        return error(message='您没有权限', status_code=503)
 
 
 @app.errorhandler(404)

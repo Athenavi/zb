@@ -150,12 +150,12 @@ def get_blog_author(title):
         db.close()
 
 
-def auth_articles(article_name, user_name):
+def auth_aid(article_id, user_name):
     try:
         with get_db_connection() as db:
             with db.cursor() as cursor:
-                query = "SELECT 1 FROM articles WHERE Title = %s AND `Status` != 'Deleted' AND Author = %s"
-                cursor.execute(query, (article_name, user_name))
+                query = "SELECT 1 FROM articles WHERE ArticleID = %s AND `Status` != 'Deleted' AND Author = %s"
+                cursor.execute(query, (article_id, user_name))
                 return cursor.fetchone() is not None
     except Exception as e:
         print(f"An error occurred: {e}")
@@ -362,42 +362,6 @@ def write_tags_to_database(aid, tags_list):
         print(f"An error occurred during database operation: {e}")
         pass
 
-    finally:
-        cursor.close()
-        db.close()
-
-
-def set_article_visibility(article, hide=True):
-    if not isinstance(article, str):
-        raise ValueError("Article must be a string")
-    db = get_db_connection()
-    cursor = db.cursor()
-    try:
-        with cursor:
-            # 查询文章的当前状态
-            query = "SELECT Hidden FROM articles WHERE Title = %s"
-            cursor.execute(query, (article,))
-            result = cursor.fetchone()
-
-            if result is None:
-                # 如果文章不存在，则插入新记录
-                hidden_status = 1 if hide else 0
-                tags_value = str(datetime.datetime.now().year)
-                query = "INSERT INTO articles (Title, Author, Hidden, Tags) VALUES (%s, 'test', %s, %s)"
-                cursor.execute(query, (article, hidden_status, tags_value))
-                db.commit()
-                return hidden_status
-            else:
-                current_hidden_status = result[0]
-                if (hide and current_hidden_status == 0) or (not hide and current_hidden_status == 1):
-                    # 如果需要改变隐藏状态，则更新记录
-                    query = "UPDATE articles SET Hidden = %s WHERE Title = %s"
-                    cursor.execute(query, (1 if hide else 0, article))
-                    db.commit()
-                return current_hidden_status
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return None
     finally:
         cursor.close()
         db.close()
