@@ -59,7 +59,7 @@ url=https://download.bt.cn/install/install_lts.sh;if [ -f /usr/bin/curl ];then c
 
 不使用宝塔?
 
-1. 确保你的系统已经安装了 Python 和 pip。
+1. 确保你的系统已经安装了 Python(建议3.12及以上版本) 和 pip。
 2. 克隆或下载 zyBLOG 代码库到本地。创建一个数据库，导入本项目里的 *sql* 文件（注意sql版本），复制 *config_example.ini* 文件到
    *config.ini* ，配置 *config.ini*
 3. 在终端中进入项目根目录，并执行以下命令的顺序执行以启动 zyBLOG 博客程序：
@@ -78,59 +78,7 @@ $ gunicorn --workers 4 --threads 2 --bind 0.0.0.0:9421 --timeout 60 --access-log
 2. 管理后台 (/dashboard) 默认账号 'test' 默认密码 '123456'
 
 ## 无法运行？
-
-首先升级你的python至3.10及更高版本
-
-下述以Ubuntu系统中 python3.9升级到3.10为例
-要将Ubuntu中的Python 3.9升级到Python 3.10，可以按照以下步骤进行操作：
-
-1. 确保系统已经更新到最新版本：
-
-   ```
-   sudo apt update
-   sudo apt upgrade
-   ```
-
-2. 添加 deadsnakes PPA（Personal Package Archive）：
-
-   ```
-   sudo add-apt-repository ppa:deadsnakes/ppa
-   ```
-
-3. 更新软件包列表：
-
-   ```
-   sudo apt update
-   ```
-
-4. 安装Python 3.10：
-
-   ```
-   sudo apt install python3.10
-   ```
-
-5. 验证安装是否成功：
-
-   ```
-   python --version
-   ```
-
-现在，你的系统中应该已经成功安装了Python 3.10
-此时你可以重新安装依赖以及启动程序
-
-仍然无法运行？建议使用python虚拟环境
-
-尝试使用Python的虚拟环境来隔离你的应用程序和系统环境。首先，安装venv模块（如果尚未安装）：
-
-```bash
-$ sudo apt install python3-venv
-#创建一个新的虚拟环境：
-$ python3.10 -m venv myenv
-#激活虚拟环境：
-$ source myenv/bin/activate
-```
-
-现在你可以在虚拟环境下重新安装依赖以及启动程序
+   建议使用python虚拟环境
 ## python版本遇到问题？
 
 - [更多问题](./articles/Linux上python多版本问题.md)
@@ -139,11 +87,6 @@ $ source myenv/bin/activate
 
 如果你了解docker，可以尝试使用Dockerfile来部署运行
 
-## ~~评论（241031）~~
-
-    ~~评论: twikoo    （V1.2.101）~~
-    ~~https://twikoo.js.org/~~
-    ~~可自行更改评论环境~~
 
 ## 开源贡献者
 

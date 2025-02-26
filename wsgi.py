@@ -1,6 +1,4 @@
-from src.database import test_database_connection, check_db
 import os
-from waitress import serve
 
 
 def main():
@@ -20,18 +18,13 @@ def main():
     else:
         from src.app import app, domain, zb_safe_check
         if not zb_safe_check(domain):
-            print('请修改默认安全密钥！config.ini[admin] 项, 并正确修改域名信息 然后重启程序！')
+            print('请修改默认安全密钥！config.ini[security] 项, 并正确修改域名信息 然后重启程序！')
             return
-        import threading
-        from src.notification import run_socketio
+        from src.database import test_database_connection, check_db
         test_database_connection()
         check_db()
         print("从浏览器打开: http://127.0.0.1:9421")
-
-        # 启动 SocketIO 服务的线程
-        socketio_thread = threading.Thread(target=run_socketio)
-        socketio_thread.start()
-
+        from waitress import serve
         # 运行 Waitress
         serve(app, host='0.0.0.0', port=9421)
 

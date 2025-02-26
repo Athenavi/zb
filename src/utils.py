@@ -1,6 +1,5 @@
 import configparser
 import io
-import json
 import os
 import random
 import re
@@ -20,12 +19,9 @@ from packaging.version import Version
 from user_agents import parse
 from werkzeug.utils import secure_filename
 
-from src.user import error, zy_general_conf
+from src.user import error, zy_safe_conf
 
-secret_key = 'your_secret_key'
-
-JWT_EXPIRATION_DELTA = 21600  # JWT过期时间设置为6小时
-REFRESH_TOKEN_EXPIRATION_DELTA = 604800  # 刷新令牌过期时间设置为7天
+secret_key, JWT_EXPIRATION_DELTA, REFRESH_TOKEN_EXPIRATION_DELTA = zy_safe_conf()
 
 
 def generate_jwt(user_id, user_name):
@@ -214,18 +210,6 @@ def mask_ip(ip):
     return ip
 
 
-def zy_noti_conf():
-    noti_config = ConfigParser()
-    try:
-        noti_config.read('config.ini', encoding='utf-8')
-    except UnicodeDecodeError:
-        noti_config.read('config.ini', encoding='gbk')
-    noti_host = noti_config.get('notification', 'host', fallback='error').strip("'")
-    noti_port = noti_config.get('notification', 'port', fallback='error').strip("'")
-
-    return noti_host, noti_port
-
-
 def zy_mail_conf():
     mail_config = ConfigParser()
     try:
@@ -268,8 +252,6 @@ def is_allowed_file(filename, allowed_types):
 
 
 def zb_safe_check(url):
-    if DEFAULT_KEY == '237':
-        return False
     pattern = r"^(https?://)?([a-zA-Z0-9-]+\.)*[a-zA-Z]{2,}(\/)$"
     if re.match(pattern, url):
         return True
@@ -414,9 +396,6 @@ def generate_video_thumb(video_path, thumb_path, time=1):
     cap.release()
 
 
-domain, title, beian, sys_version, api_host, app_id, app_key, DEFAULT_KEY = zy_general_conf()
-
-
 def theme_safe_check(theme_id, channel=1):
     theme_path = f'templates/theme/{theme_id}'
     if not os.path.exists(theme_path):
@@ -455,7 +434,7 @@ def theme_safe_check(theme_id, channel=1):
             return jsonify(theme_properties)
         else:
             # print(Version(theme_version) > Version(sys_version))
-            if Version(theme_version) < Version(sys_version):
+            if Version(theme_version) < Version('1.0.0'):
                 return False
             else:
                 return True

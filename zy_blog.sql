@@ -48,7 +48,7 @@ CREATE TABLE `articles` (
 --
 
 INSERT INTO `articles` (`ArticleID`, `Title`, `Author`, `Hidden`, `Views`, `Likes`, `Comments`, `Status`, `CoverImage`, `ArticleType`, `excerpt`, `is_featured`, `tags`) VALUES
-(1, 'README', 'test', 0, 666, 66, 0, 'Published', NULL, NULL, NULL, 0, '2024;');
+(1, 'changelog', 'test', 0, 666, 66, 0, 'Published', NULL, NULL, NULL, 0, '2024;');
 
 -- --------------------------------------------------------
 
