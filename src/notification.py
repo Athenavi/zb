@@ -8,7 +8,7 @@ from flask import Flask, request, jsonify
 from flask_caching import Cache
 
 from src.database import get_db_connection
-from src.utils import zy_noti_conf, authenticate_jwt, secret_key, zy_mail_conf
+from src.utils import authenticate_jwt, secret_key, zy_mail_conf
 
 noti = Flask(__name__, template_folder='../templates')
 socketio = flask_socketio.SocketIO(noti, cors_allowed_origins='*')
@@ -18,12 +18,6 @@ noti.config['SESSION_COOKIE_NAME'] = 'zb_session'
 
 cache = Cache(config={'CACHE_TYPE': 'simple'})
 cache.init_app(noti)
-
-
-def run_socketio():
-    noti_host, noti_port = zy_noti_conf()
-    print(f"推送服务：{noti_host},端口：{noti_port}")
-    socketio.run(noti, port=noti_port, allow_unsafe_werkzeug=True, log_output=True, use_reloader=False)
 
 
 def get_user_id():
