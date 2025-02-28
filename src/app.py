@@ -526,13 +526,9 @@ def get_image_path(user_name, img_name):
         return api_img(user_name, img_name)
     try:
         img_dir = Path(base_dir) / 'media' / user_name / img_name
-        with open(img_dir, 'rb') as f:
-            img_data = f.read()
-        # 使用 BytesIO 包装图像数据
-        return send_file(io.BytesIO(img_data), mimetype='image/png')
-    except Exception as e:
-        print(f"Error in getting image path: {e}")
-        return None
+        return send_file(img_dir, mimetype='image/png', max_age=360)
+    except FileNotFoundError:
+        abort(404)
 
 
 @app.route('/upload_file', methods=['POST'])
@@ -627,15 +623,15 @@ def get_screenshot(theme_id, img_name):
         img_io = io.BytesIO(img_data)
         img_io.seek(0)
 
-        return send_file(img_io, mimetype='image/png')
+        return send_file(img_io, mimetype='image/png', max_age=3600)
     except Exception as e:
         print(f"Error in getting image path: {e}")
         return jsonify(error='Failed to get image path')
 
 
-@app.route('/favicon.ico', methods=['GET', 'POST'])
+@app.route('/favicon.ico', methods=['GET'])
 def favicon():
-    return send_file('../static/favicon.ico', mimetype='image/png')
+    return send_file('../static/favicon.ico', mimetype='image/png', max_age=3600)
 
 
 @cache.cached(timeout=24 * 3600, key_prefix='short_link')
@@ -714,7 +710,7 @@ def sys_out_user_file(author, file_name):
     xmind_file_path = Path(base_dir) / 'media' / str(author) / file_name  # 使用 pathlib.Path 处理路径
     # 返回 用户 文件
     try:
-        return send_file(xmind_file_path, as_attachment=True)
+        return send_file(xmind_file_path, as_attachment=True, max_age=3600)
     except Exception as e:
         logging.error("An error occurred: %s", str(e))
         return "An error occurred while trying to access the file."
@@ -2248,13 +2244,13 @@ def api_cover(cover_img):
         return send_file(f'../cover/{cover_img}', mimetype='image/png')
     cached_cover = cache.get(f"cover_{cover_img}")
     if cached_cover:
-        return send_file(io.BytesIO(cached_cover), mimetype='image/webp')
+        return send_file(io.BytesIO(cached_cover), mimetype='image/webp', max_age=600)
     cover_path = f'cover/{cover_img}'
     if os.path.isfile(cover_path):
         with Image.open(cover_path) as img:
             cover_data = handle_cover_resize(img, 480, 270)
         cache.set(f"cover_{cover_img}", cover_data, timeout=28800)
-        return send_file(io.BytesIO(cover_data), mimetype='image/webp')
+        return send_file(io.BytesIO(cover_data), mimetype='image/webp', max_age=600)
     else:
         print("File not found, returning default image")
         return send_file('../static/image/dark.jpg', mimetype='image/png')
@@ -2863,7 +2859,7 @@ def api_img(user_name, img):
     if not img_dir.is_file():
         abort(404)
     if img_thumbs.is_file():
-        return send_file(img_thumbs, mimetype='image/jpeg')
+        return send_file(img_thumbs, mimetype='image/jpeg', max_age=600)
     thumbs_dir = img_thumbs.parent
     thumbs_dir.mkdir(parents=True, exist_ok=True)
     try:
@@ -2885,7 +2881,7 @@ def api_video(user_name, video):
     if not video_dir.is_file():
         abort(404)
     if video_thumbs.is_file():
-        return send_file(video_thumbs, mimetype='image/jpeg')
+        return send_file(video_thumbs, mimetype='image/jpeg', max_age=600)
     thumbs_dir = video_thumbs.parent
     thumbs_dir.mkdir(parents=True, exist_ok=True)
     try:
@@ -2907,7 +2903,7 @@ def start_video(user_name, video_name):
         video_path = video_dir / video_name
         if not video_path.exists():
             return f"Video {video_name} not found for user {user_name}.", 404
-        return send_file(video_path, mimetype='video/mp4', as_attachment=False, conditional=True)
+        return send_file(video_path, mimetype='video/mp4', as_attachment=False, conditional=True, max_age=600)
     except Exception as e:
         print(f"Error in getting video path: {e}")
         return "Internal Server Error", 500
