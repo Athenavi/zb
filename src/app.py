@@ -2044,7 +2044,8 @@ def music_json_change(user_id):
     save_path = os.path.join(str(user_dir), 'music.json')
 
     # 保存JSON数据
-    with open(save_path, 'w', encoding=global_encoding) as file:
+    file: io.TextIOWrapper
+    with io.open(save_path, 'w', encoding=global_encoding) as file:
         json.dump(json_data, file, ensure_ascii=False, indent=4)
 
     return jsonify({'message': 'success'}), 200

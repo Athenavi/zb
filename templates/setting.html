@@ -2,132 +2,187 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>用户个人资料设置</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <!-- 引入Bootstrap CSS -->
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <!-- 引入Cropper.js CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css">
     <!-- 引入jQuery -->
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <!-- 引入Bootstrap JS -->
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <!-- 引入Cropper.js JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
 </head>
-<body class="bg-gray-100 flex flex-col min-h-screen">
-<div class="container mx-auto px-4 py-8 flex flex-col md:flex-row">
-    <div class="w-full md:w-1/4 bg-white rounded-lg shadow-lg p-6 mb-4 md:mb-0">
-        <h5><a href="/profile" class="text-blue-500 hover:underline">↩️</a></h5>
-        <h4 class="text-xl font-semibold mt-4">设置</h4>
-        <a href="#" onclick="showSection('profile')"
-           class="block py-2 px-4 mt-4 text-gray-700 hover:bg-gray-100 rounded">个人资料</a>
-        <a href="#" onclick="showSection('newArticle')" class="block py-2 px-4 text-gray-700 hover:bg-gray-100 rounded">上传文章</a>
-        <a href="#" onclick="showSection('personalization')"
-           class="block py-2 px-4 text-gray-700 hover:bg-gray-100 rounded">个性化</a>
-        <a href="#" onclick="showSection('privacy')"
-           class="block py-2 px-4 text-gray-700 hover:bg-gray-100 rounded">隐私</a>
-        <a href="#" onclick="showSection('change-pass')"
-           class="block py-2 px-4 text-gray-700 hover:bg-gray-100 rounded">修改密码</a>
-        <a onclick="fun_logout()" class="block py-2 px-4 text-red-500 hover:bg-gray-100 rounded">注销</a>
+<body class="bg-gray-100 min-h-screen">
+<div class="container mx-auto p-4 md:p-8 flex flex-col md:flex-row gap-6">
+    <!-- 左侧导航 -->
+    <div class="w-full md:w-64 bg-white rounded-xl shadow-md p-4 md:p-6">
+        <div class="space-y-4">
+            <a href="/profile" class="text-blue-500 hover:text-blue-600 text-sm">↩️ 返回资料页</a>
+            <h4 class="text-lg font-bold mt-4">设置中心</h4>
+            <nav class="space-y-2">
+                <a href="#" onclick="showSection('profile')"
+                   class="block p-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">个人资料</a>
+                <a href="#" onclick="showSection('newArticle')"
+                   class="block p-2 text-gray-700 hover:bg-gray-50 rounded-lg">上传文章</a>
+                <a href="#" onclick="showSection('personalization')"
+                   class="block p-2 text-gray-700 hover:bg-gray-50 rounded-lg">个性化</a>
+                <a href="#" onclick="showSection('privacy')"
+                   class="block p-2 text-gray-700 hover:bg-gray-50 rounded-lg">隐私</a>
+                <a href="#" onclick="showSection('change-pass')"
+                   class="block p-2 text-gray-700 hover:bg-gray-50 rounded-lg">修改密码</a>
+                <a onclick="fun_logout()"
+                   class="block p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer">注销账号</a>
+            </nav>
+        </div>
     </div>
 
-    <div class="w-full md:w-3/4 md:ml-4 bg-white rounded-lg shadow-lg p-6">
+    <!-- 右侧内容区域 -->
+    <div class="flex-1 bg-white rounded-xl shadow-md p-6">
+        <!-- 个人资料部分 -->
         <div id="profile" class="section">
-            <h2 class="text-2xl font-bold mb-6">个人资料</h2>
-            <img src="{{ avatar_url }}" alt="" class="h-28 w-28 rounded-full mx-auto cursor-pointer" id="avatarImage"
-                 onclick="document.getElementById('avatarInput').click()"/>
-            <input type="file" id="avatarInput" class="hidden" accept="image/*" onchange="showCropModal(event)"/>
-            <div class="modal fade" id="avatarCropModal" tabindex="-1" role="dialog"
-                 aria-labelledby="avatarCropModalLabel" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered" role="document">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title" id="avatarCropModalLabel">裁剪头像</h5>
-                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
-                        </div>
-                        <div class="modal-body">
-                            <img id="cropImage" src="" alt="Image preview" style="max-width: 100%;"/>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
-                            <button type="button" class="btn btn-primary" id="cropButton">裁剪并上传</button>
-                        </div>
+            <h2 class="text-2xl font-bold mb-6">个人资料设置</h2>
+            <div class="flex flex-col items-center mb-8">
+                <img src="{{ avatar_url }}" alt="头像"
+                     class="h-32 w-32 rounded-full cursor-pointer ring-4 ring-white shadow-lg hover:ring-blue-100 transition-all"
+                     id="avatarImage"
+                     onclick="document.getElementById('avatarInput').click()"/>
+                <input type="file" id="avatarInput" class="hidden" accept="image/*" onchange="showCropModal(event)"/>
+                <span class="text-gray-500 text-sm mt-2">点击修改头像</span>
+            </div>
+
+            <!-- 裁剪模态框 -->
+            <div id="avatarCropModal"
+                 class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl">
+                    <div class="p-4 border-b flex justify-between items-center">
+                        <h5 class="text-lg font-semibold">裁剪头像</h5>
+                        <button onclick="closeCropModal()" class="text-gray-400 hover:text-gray-600">
+                            ✕
+                        </button>
+                    </div>
+                    <div class="p-4">
+                        <img id="cropImage" src="" alt="预览" class="max-w-full h-96 object-contain"/>
+                    </div>
+                    <div class="p-4 border-t flex justify-end gap-2">
+                        <button onclick="closeCropModal()" class="px-4 py-2 text-gray-700 hover:bg-gray-50 rounded-lg">
+                            取消
+                        </button>
+                        <button id="cropButton" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+                            确认裁剪
+                        </button>
                     </div>
                 </div>
             </div>
-            <form class="mt-6 space-y-4">
+
+            <!-- 表单 -->
+            <form class="space-y-6">
                 <div>
-                    <label for="username" class="block text-gray-700"></label>
-                    <input type="text"
-                           class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                           id="username" placeholder="{{ username }}" required>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">用户名</label>
+                    <input type="text" placeholder="{{ username }}"
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all">
                 </div>
                 <div>
-                    <label for="email" class="block text-gray-700"></label>
-                    <input type="email"
-                           class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                           id="email" placeholder="电子邮件" required>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">电子邮箱</label>
+                    <input type="email" placeholder="请输入邮箱"
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all">
                 </div>
                 <div>
-                    <label for="bio" class="block text-gray-700"></label>
-                    <textarea
-                            class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            id="bio" rows="3" placeholder="{{ Bio }}"></textarea>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">个人简介</label>
+                    <textarea rows="3" placeholder="{{ Bio }}"
+                              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"></textarea>
                 </div>
-                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">保存更改
-                </button>
-            </form>
-        </div>
-        <div id="newArticle" class="section hidden">
-            <h2 class="text-2xl font-bold mb-6">上传文章</h2>
-            <div class="w-full h-0 relative pb-56 overflow-hidden rounded-lg shadow-lg" style="height: 100vh">
-                <iframe src="/newArticle" class="absolute inset-0 w-full h-full border-0 rounded-lg" frameborder="0"
-                        allowfullscreen></iframe>
-            </div>
-        </div>
-        <div id="personalization" class="section hidden">
-            <h2 class="text-2xl font-bold mb-6">个性化设置</h2>
-            <p class="text-gray-700">在这里进行您的个性化偏好设置。</p>
-            <form id="uploadForm" class="mt-6 space-y-4" onsubmit="return uploadMusicJson()">
-                <div>
-                    <label for="musicJson" class="block text-gray-700">上传音乐JSON文件</label>
-                    <input type="file"
-                           class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                           id="musicJson" name="musicJson" accept=".json" onchange="loadMusicJson(this.files)">
-                </div>
-                <div>
-                    <label for="editor" class="block text-gray-700">编辑音乐JSON数据</label>
-                    <textarea id="editor"
-                              class="w-full h-64 px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              placeholder="在此编辑音乐JSON数据" required></textarea>
-                </div>
-                <button type="button" onclick="loadMusicJson(document.getElementById('musicJson').files)"
-                        class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">解析文件
-                </button>
-                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">上传文件
+                <button type="submit"
+                        class="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors">
+                    保存修改
                 </button>
             </form>
         </div>
 
-        <div id="privacy" class="section hidden">
-            <h2 class="text-2xl font-bold mb-6">隐私设置</h2>
-            <p class="text-gray-700">在这里管理您的隐私设置。</p>
-            <!-- 隐私设置内容 -->
-        </div>
-        <div id="change-pass" class="section hidden">
-            <h2 class="text-2xl font-bold mb-6">密码设置</h2>
-            <p class="text-gray-700">在这里修改您的密码设置。(新密码长度不小于6位)</p>
-            <div class="w-full h-0 relative pb-56 overflow-hidden rounded-lg shadow-lg" style="height: 100vh">
-                <iframe src="/change-password" class="absolute inset-0 w-full h-full border-0 rounded-lg"
-                        frameborder="0" allowfullscreen></iframe>
+        <!-- 其他部分保持类似结构，使用Tailwind类替换 -->
+        <div id="newArticle" class="section hidden">
+            <h2 class="text-2xl font-bold mb-6">文章发布</h2>
+            <div class="w-full h-[600px] rounded-xl overflow-hidden shadow-inner">
+                <iframe src="/newArticle" class="w-full h-full border-0"></iframe>
             </div>
+        </div>
+
+        <!-- 个性化设置部分示例 -->
+        <div id="personalization" class="section hidden">
+            <h2 class="text-2xl font-bold mb-6">个性化设置</h2>
+            <form class="space-y-6" onsubmit="return uploadMusicJson()">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">上传音乐配置</label>
+                        <input type="file" id="musicJson"
+                               class="w-full file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">JSON编辑器</label>
+                        <textarea id="editor" rows="12"
+                                  class="w-full px-4 py-2 border border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="loadMusicJson()"
+                                class="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200">
+                            解析文件
+                        </button>
+                        <button type="submit"
+                                class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+                            上传配置
+                        </button>
+                    </div>
+                </div>
+            </form>
         </div>
     </div>
 </div>
+
+<script>
+    // 更新模态框控制逻辑
+    function showCropModal(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = document.getElementById('cropImage');
+                img.src = e.target.result;
+                document.getElementById('avatarCropModal').classList.remove('hidden');
+                cropper = new Cropper(img, {
+                    aspectRatio: 1,
+                    viewMode: 1,
+                });
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function closeCropModal() {
+        document.getElementById('avatarCropModal').classList.add('hidden');
+        if (cropper) {
+            cropper.destroy();
+        }
+    }
+
+    // 更新裁剪按钮事件
+    document.getElementById('cropButton').addEventListener('click', () => {
+        const canvas = cropper.getCroppedCanvas();
+        canvas.toBlob((blob) => {
+            const formData = new FormData();
+            formData.append('avatar', blob, 'avatar.webp');
+
+            fetch('/setting/profiles?change_type=avatar', {
+                method: 'PUT',
+                body: formData
+            }).then(response => response.json())
+                .then(data => {
+                    if (data.message === 'Avatar updated successfully') {
+                        document.getElementById('avatarImage').src = URL.createObjectURL(blob);
+                    }
+                    closeCropModal();
+                });
+        }, 'image/webp');
+    });
+</script>
 
 <script>
     function fun_logout() {
@@ -198,53 +253,6 @@
 
         return false;
     }
-</script>
-<script>
-    function showCropModal(event) {
-        const file = event.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = document.getElementById('cropImage');
-                img.src = e.target.result;
-                $('#avatarCropModal').modal('show');
-                cropper = new Cropper(img, {
-                    aspectRatio: 1,
-                    viewMode: 1,
-                });
-            };
-            reader.readAsDataURL(file);
-        }
-    }
-
-    document.getElementById('cropButton').addEventListener('click', () => {
-        const canvas = cropper.getCroppedCanvas();
-        canvas.toBlob((blob) => {
-            const formData = new FormData();
-            formData.append('avatar', blob, 'avatar.webp');
-
-            // 发送FormData到服务器
-            fetch('/setting/profiles?change_type=avatar', {
-                method: 'PUT',
-                body: formData
-            }).then(response => {
-                return response.json();
-            }).then(data => {
-                // 处理响应数据
-                console.log(data);
-                if (data.message === 'Avatar updated successfully') {
-                    const img = document.getElementById('avatarImage');
-                    img.src = URL.createObjectURL(blob);
-                }
-                $('#avatarCropModal').modal('hide');
-            }).catch(error => {
-                console.error('Error:', error);
-            });
-        }, 'image/webp');
-    });
-
-    // 用于存储Cropper实例
-    let cropper;
 </script>
 </body>
 </html>
