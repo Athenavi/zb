@@ -5,33 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>用户个人资料设置</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <!-- 引入Cropper.js CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css">
-    <!-- 引入jQuery -->
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <!-- 引入Cropper.js JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
 </head>
 <body class="bg-gray-100 min-h-screen">
+<!-- Navigation Bar -->
+{% from 'header.html' import SimpleHeader %}
+{{ SimpleHeader(title) }}
 <div class="container mx-auto p-4 md:p-8 flex flex-col md:flex-row gap-6">
     <!-- 左侧导航 -->
     <div class="w-full md:w-64 bg-white rounded-xl shadow-md p-4 md:p-6">
         <div class="space-y-4">
-            <a href="/profile" class="text-blue-500 hover:text-blue-600 text-sm">↩️ 返回资料页</a>
             <h4 class="text-lg font-bold mt-4">设置中心</h4>
             <nav class="space-y-2">
                 <a href="#" onclick="showSection('profile')"
                    class="block p-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">个人资料</a>
-                <a href="#" onclick="showSection('newArticle')"
-                   class="block p-2 text-gray-700 hover:bg-gray-50 rounded-lg">上传文章</a>
                 <a href="#" onclick="showSection('personalization')"
                    class="block p-2 text-gray-700 hover:bg-gray-50 rounded-lg">个性化</a>
                 <a href="#" onclick="showSection('privacy')"
                    class="block p-2 text-gray-700 hover:bg-gray-50 rounded-lg">隐私</a>
-                <a href="#" onclick="showSection('change-pass')"
-                   class="block p-2 text-gray-700 hover:bg-gray-50 rounded-lg">修改密码</a>
+                <a href="#" onclick="window.open('/new', '_blank')"
+                   class="block p-2 text-gray-700 hover:bg-gray-50 rounded-lg">上传文章↗️</a>
+                <a href="#" onclick="window.open('/change-password', '_blank')"
+                   class="block p-2 text-gray-700 hover:bg-gray-50 rounded-lg">修改密码↗️</a>
                 <a onclick="fun_logout()"
-                   class="block p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer">注销账号</a>
+                   class="block p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer">注销登录</a>
             </nav>
         </div>
     </div>
@@ -44,8 +43,7 @@
             <div class="flex flex-col items-center mb-8">
                 <img src="{{ avatar_url }}" alt="头像"
                      class="h-32 w-32 rounded-full cursor-pointer ring-4 ring-white shadow-lg hover:ring-blue-100 transition-all"
-                     id="avatarImage"
-                     onclick="document.getElementById('avatarInput').click()"/>
+                     id="avatarImage" onclick="document.getElementById('avatarInput').click()"/>
                 <input type="file" id="avatarInput" class="hidden" accept="image/*" onchange="showCropModal(event)"/>
                 <span class="text-gray-500 text-sm mt-2">点击修改头像</span>
             </div>
@@ -56,9 +54,7 @@
                 <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl">
                     <div class="p-4 border-b flex justify-between items-center">
                         <h5 class="text-lg font-semibold">裁剪头像</h5>
-                        <button onclick="closeCropModal()" class="text-gray-400 hover:text-gray-600">
-                            ✕
-                        </button>
+                        <button onclick="closeCropModal()" class="text-gray-400 hover:text-gray-600">✕</button>
                     </div>
                     <div class="p-4">
                         <img id="cropImage" src="" alt="预览" class="max-w-full h-96 object-contain"/>
@@ -98,14 +94,6 @@
             </form>
         </div>
 
-        <!-- 其他部分保持类似结构，使用Tailwind类替换 -->
-        <div id="newArticle" class="section hidden">
-            <h2 class="text-2xl font-bold mb-6">文章发布</h2>
-            <div class="w-full h-[600px] rounded-xl overflow-hidden shadow-inner">
-                <iframe src="/newArticle" class="w-full h-full border-0"></iframe>
-            </div>
-        </div>
-
         <!-- 个性化设置部分示例 -->
         <div id="personalization" class="section hidden">
             <h2 class="text-2xl font-bold mb-6">个性化设置</h2>
@@ -123,11 +111,9 @@
                     </div>
                     <div class="flex gap-2">
                         <button type="button" onclick="loadMusicJson()"
-                                class="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200">
-                            解析文件
+                                class="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200">解析文件
                         </button>
-                        <button type="submit"
-                                class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+                        <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
                             上传配置
                         </button>
                     </div>
@@ -139,6 +125,8 @@
 
 <script>
     // 更新模态框控制逻辑
+    let cropper;
+
     function showCropModal(event) {
         const file = event.target.files[0];
         if (file) {
@@ -182,11 +170,9 @@
                 });
         }, 'image/webp');
     });
-</script>
 
-<script>
     function fun_logout() {
-        const confirmed = confirm("确定要注销吗？");
+        const confirmed = confirm("确定要注销登录吗？");
         if (confirmed) {
             window.location.href = "/logout";
         }
@@ -198,15 +184,15 @@
         });
         document.getElementById(section).classList.remove('hidden');
     }
-</script>
-<script>
-    async function loadMusicJson(files) {
-        if (files.length === 0) {
+
+    async function loadMusicJson() {
+        const input = document.getElementById('musicJson');
+        if (input.files.length === 0) {
             alert('请选择一个文件。');
             return;
         }
 
-        const file = files[0];
+        const file = input.files[0];
         const reader = new FileReader();
 
         reader.onload = function (e) {
@@ -226,7 +212,6 @@
         const editorContent = document.getElementById('editor').value;
         try {
             const json_data = JSON.parse(editorContent);
-            // 检查JSON数据格式是否正确
             if (!Array.isArray(json_data)) {
                 alert('JSON数据应为音乐轨道列表。');
                 return false;
@@ -254,5 +239,8 @@
         return false;
     }
 </script>
+<!-- Footer -->
+{% from 'footer.html' import SimpleFooter %}
+{{ SimpleFooter(SiteName,beian) }}
 </body>
 </html>

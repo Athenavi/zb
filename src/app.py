@@ -298,7 +298,7 @@ def setting_profiles(user_id):
 
     # 确保索引存在
     avatar_url = user_info[5] if len(user_info) > 5 and user_info[5] else app.config['AVATAR_SERVER']
-    bio = user_info[5] if len(user_info) > 5 and user_info[5] else "这人很懒，什么也没留下"
+    bio = user_info[6] if len(user_info) > 6 and user_info[6] else "这人很懒，什么也没留下"
     user_name = user_info[1] if len(user_info) > 1 else "匿名用户"
 
     return render_template(
