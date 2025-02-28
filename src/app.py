@@ -44,7 +44,7 @@ from src.utils import admin_upload_file, get_client_ip, \
     authenticate_refresh_token, handle_article_upload, is_allowed_file, zb_safe_check, \
     generate_thumbs, generate_video_thumb, \
     get_username, admin_required, jwt_required, finger_required, theme_safe_check, mask_ip, user_id_required, \
-    user_agent_info, handle_article_delete, handle_cover_resize
+    user_agent_info, handle_article_delete, handle_cover_resize, generate_etag
 
 global_encoding = 'utf-8'
 
@@ -2357,47 +2357,48 @@ def fetch_articles(query, params):
 
 @app.route('/', methods=['GET'])
 @app.route('/index.html', methods=['GET'])
+@cache.cached(timeout=180, query_string=True)
 def index_html():
     page = request.args.get('page', 1, type=int)
+    page = max(page, 1)
     page_size = 45
     offset = (page - 1) * page_size
 
     query = """
-            SELECT ArticleID,
-                   Title,
-                   Author,
-                   Views,
-                   Likes,
-                   Comments,
-                   CoverImage,
-                   ArticleType,
-                   excerpt,
-                   is_featured,
-                   tags
-            FROM `articles`
-            WHERE `Hidden` = 0
-              AND `Status` = 'Published'
-            ORDER BY `ArticleID` DESC
-                LIMIT %s
-            OFFSET %s \
-            """
+        SELECT ArticleID, Title, Author, Views, Likes, Comments, 
+               CoverImage, ArticleType, excerpt, is_featured, tags
+        FROM `articles`
+        WHERE `Hidden` = 0 AND `Status` = 'Published'
+        ORDER BY `ArticleID` DESC
+        LIMIT %s OFFSET %s
+    """
 
     try:
         article_info, total_articles = fetch_articles(query, (page_size, offset))
         total_pages = (total_articles + page_size - 1) // page_size
+    except Exception as e:
+        return error(str(e), 500)
 
-    except Exception:
-        return error("An error occurred while fetching articles.", status_code=500)
+    html_content = render_template('index.html', article_info=article_info, page=page, total_pages=total_pages)
 
-    return render_template('index.html', article_info=article_info, page=page, total_pages=total_pages)
+    # 生成 ETag（基于数据版本）
+    etag = generate_etag(total_articles, article_info, page)
+
+    # 设置响应头
+    response = make_response(html_content)
+    response.set_etag(etag)
+    response.headers['Cache-Control'] = 'public, max-age=180'
+    return response.make_conditional(request.environ)
 
 
 @app.route('/tag/<tag_name>', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def tag_page(tag_name):
     if len(tag_name.encode(global_encoding)) > 10:
         return error("Tag 名称不能超过 10 字节。", status_code=400)
 
     page = request.args.get('page', 1, type=int)
+    page = max(page, 1)
     page_size = 45
     offset = (page - 1) * page_size
 
@@ -2429,13 +2430,22 @@ def tag_page(tag_name):
     except Exception:
         return error("获取文章时发生错误。", status_code=500)
 
-    return render_template('index.html', article_info=article_info, page=page, total_pages=total_pages,
-                           tag_name=tag_name)
+    html_content = render_template('index.html', article_info=article_info, page=page, total_pages=total_pages,
+                                   tag_name=tag_name)
+    etag = generate_etag(total_articles, article_info, page)
+
+    # 设置响应头
+    response = make_response(html_content)
+    response.set_etag(etag)
+    response.headers['Cache-Control'] = 'public, max-age=180'
+    return response
 
 
 @app.route('/featured', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def featured_page():
     page = request.args.get('page', 1, type=int)
+    page = max(page, 1)
     page_size = 45
     offset = (page - 1) * page_size
 
@@ -2466,9 +2476,16 @@ def featured_page():
 
     except Exception:
         return error("获取文章时发生错误。", status_code=500)
+    html_content = render_template('index.html', article_info=article_info, page=page, total_pages=total_pages,
+                                   tag_name='featured')
 
-    return render_template('index.html', article_info=article_info, page=page, total_pages=total_pages,
-                           tag_name='featured')
+    etag = generate_etag(total_articles, article_info, page)
+
+    # 设置响应头
+    response = make_response(html_content)
+    response.set_etag(etag)
+    response.headers['Cache-Control'] = 'public, max-age=180'
+    return response
 
 
 def validate_api_key(api_key):
@@ -2807,7 +2824,7 @@ def media(user_id):
         imgs, total_pages = get_media_db(user_id, category='image', page=page, per_page=20)
         has_next_page = bool(total_pages - page)
         has_previous_page = bool(total_pages - 1)
-        return render_template('Media_V2.html', imgs=imgs, title='Media', url_for=url_for,
+        return render_template('Media_V2.html', imgs=imgs, url_for=url_for,
                                has_next_page=has_next_page,
                                has_previous_page=has_previous_page, current_page=page,
                                domain=domain)
@@ -2815,7 +2832,7 @@ def media(user_id):
         videos, total_pages = get_media_db(user_id, category='video', page=1, per_page=20)
         has_next_page = bool(total_pages - page)
         has_previous_page = bool(total_pages - 1)
-        return render_template('Media_V2.html', videos=videos, title='Media', url_for=url_for,
+        return render_template('Media_V2.html', videos=videos, url_for=url_for,
                                has_next_page=has_next_page,
                                has_previous_page=has_previous_page, current_page=page,
                                domain=domain)
@@ -2886,7 +2903,7 @@ def api_video(user_name, video):
     thumbs_dir.mkdir(parents=True, exist_ok=True)
     try:
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            executor.submit(generate_video_thumb, video_dir, video_thumbs)
+            executor.submit(generate_video_thumb, video_dir, video_thumbs, time=1)
     except Exception as e:
         app.logger.error(f"Error submitting video thumbnail generation task: {e}")
     placeholder_path = Path(base_dir) / 'static' / 'favicon.ico'

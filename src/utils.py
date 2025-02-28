@@ -1,4 +1,5 @@
 import configparser
+import hashlib
 import io
 import os
 import random
@@ -14,7 +15,7 @@ from pathlib import Path
 import cv2
 import jwt
 from PIL import Image
-from flask import request, jsonify, redirect, url_for, render_template
+from flask import request, jsonify, redirect, url_for, render_template, json
 from packaging.version import Version
 from user_agents import parse
 from werkzeug.utils import secure_filename
@@ -485,3 +486,9 @@ def handle_cover_resize(img, width, height):
     img.save(img_byte_arr, format='WEBP')
     img_byte_arr.seek(0)
     return img_byte_arr.getvalue()
+
+
+def generate_etag(total_articles: int, article_info: list, page: int) -> str:
+    """生成 ETag（包含分页参数和数据版本）"""
+    etag_data = f"{json.dumps(article_info)}-{total_articles}-page-{page}"
+    return hashlib.md5(etag_data.encode()).hexdigest()
