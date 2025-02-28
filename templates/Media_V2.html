@@ -32,8 +32,6 @@
                    class="ml-2 text-blue-500 hover:underline">仅图片</a>
                 <a href="{{ url_for('media', user_name=username, page=1,type='video') }}"
                    class="ml-2 text-blue-500 hover:underline">仅视频</a>
-                <a href="{{ url_for('media', user_name=username, page=1,type='xmind') }}"
-                   class="ml-2 text-blue-500 hover:underline">Xmind文件</a>
             </div>
         </div>
     </header>
@@ -67,35 +65,39 @@
         <!-- Media Display Section -->
         <section>
             <ul class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {% for img in imgs %}
+                {% for id, img in imgs %}
                     <li class="group">
                         <div class="bg-gray-200 rounded-lg overflow-hidden shadow">
-                            <a href="/zyImg/{{ username }}/{{ img }}" class="fancybox" data-fancybox="gallery"
-                               title="">
-                                <img src="/img/{{ username }}/thumbs/{{ img }}" alt=""
+                            <a href="/{{ img }}" class="fancybox" data-fancybox="gallery"
+                               title="{{ img }}">
+                                <img src="/thumb/{{ img }}" alt=""
                                      class="w-full h-40 object-cover"/>
                             </a>
                         </div>
                     </li>
                 {% endfor %}
-                {% for video in videos %}
-                    <li class="group">
-                        <div class="bg-gray-200 rounded-lg overflow-hidden shadow">
-                            <a class="card-link" onclick="startVideo('{{ video }}')">
-                                <button class="btn btn-primary" onclick="copyVideoURL('{{ video }}')">copy</button>
-                                <img src="/video/{{ username }}/thumbs/{{ video }}.png" alt=""
-                                     class="w-full h-40 object-cover"/>
-                            </a>
-                        </div>
-                    </li>
-                {% endfor %}
-                {% for xmind in xminds %}
+                {% for id,video in videos %}
                     <li class="group">
                         <div class="bg-gray-200 rounded-lg overflow-hidden shadow">
                             <a class="card-link"
-                               onclick="prewXmind('{{ domain }}preview?user={{ username }}&file_name={{ xmind }}')">
-                                {{ xmind }}
-                                <img src="/xmind/{{ username }}/thumbs/{{ xmind }}.png" alt=""
+                               onclick="startVideo('{{ video.replace('\\', '/')|escape }}')">
+                                <button class="btn btn-primary"
+                                        onclick="copyVideoURL('{{ video.replace('\\', '/')|escape }}')">
+                                    copy
+                                </button>
+                                <img src="/V-thumb/{{ video }}.png" alt=""
+                                     class="w-full h-40 object-cover"/>
+                            </a>
+                        </div>
+                    </li>
+                {% endfor %}
+                {% for id,doc in docs %}
+                    <li class="group">
+                        <div class="bg-gray-200 rounded-lg overflow-hidden shadow">
+                            <a class="card-link"
+                               onclick="prewXmind('{{ domain }}preview?user={{ username }}&file_name={{ doc }}')">
+                                {{ doc }}
+                                <img src="/xmind/{{ username }}/thumbs/{{ doc }}.png" alt=""
                                      class="w-full h-40 object-cover"/>
                             </a>
                         </div>
@@ -106,7 +108,7 @@
 
         <!-- Pagination Section -->
         <div class="pagination my-4">
-            {% for mediaType in ['imgs', 'videos', 'xminds'] %}
+            {% for mediaType in ['imgs', 'videos', 'docs'] %}
                 <div class="flex justify-between my-4">
                     {% if has_previous_page and eval(mediaType) %}
                         <a href="{{ url_for('media', user_name=username, page=current_page-1, type=mediaType) }}"
@@ -172,9 +174,9 @@
     }
 
     function startVideo(video) {
-        var videoSrc = "/zyVideo/{{ username }}/" + video;
-        document.getElementById("video-image").src = videoSrc; // 设置视频源
-        document.getElementById("video-popup").classList.remove("hidden"); // 显示弹窗
+        const videoSrc = `/video/` + video;
+        document.getElementById("video-image").src = videoSrc;
+        document.getElementById("video-popup").classList.remove("hidden");
     }
 </script>
 </body>

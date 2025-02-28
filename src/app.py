@@ -21,7 +21,7 @@ import qrcode
 import requests
 from PIL import Image
 from flask import Flask, render_template, redirect, request, url_for, Response, jsonify, send_file, \
-    make_response, send_from_directory
+    make_response, send_from_directory, abort
 from flask_caching import Cache
 from jinja2 import select_autoescape
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -42,7 +42,7 @@ from src.user import error, get_owner_articles, zy_general_conf, get_following_c
 from src.utils import admin_upload_file, get_client_ip, \
     generate_jwt, secret_key, authenticate_jwt, \
     authenticate_refresh_token, handle_article_upload, is_allowed_file, zb_safe_check, \
-    get_all_img, get_all_video, get_all_xmind, generate_thumbs, generate_video_thumb, \
+    generate_thumbs, generate_video_thumb, \
     get_username, admin_required, jwt_required, finger_required, theme_safe_check, mask_ip, user_id_required, \
     user_agent_info, handle_article_delete, handle_cover_resize
 
@@ -518,47 +518,6 @@ def zy_save_edit(aid, content, a_name):
     return {'show_edit_code': 'success'}
 
 
-@app.route('/media', methods=['GET', 'POST'])
-@jwt_required
-def media(user_id):
-    media_type = request.args.get('type', default='img')
-    page = request.args.get('page', default=1, type=int)
-    user_name = get_username()
-    if request.method == 'GET':
-        if not media_type or media_type == 'img':
-            imgs, has_next_page, has_previous_page = get_all_img(user_name, page=page, per_page=20)
-
-            return render_template('Media_V2.html', imgs=imgs, title='Media', url_for=url_for,
-                                   has_next_page=has_next_page,
-                                   has_previous_page=has_previous_page, current_page=page,
-                                   domain=domain)
-        if media_type == 'video':
-            videos, has_next_page, has_previous_page = get_all_video(user_name, page=page)
-
-            return render_template('Media_V2.html', videos=videos, title='Media', url_for=url_for,
-                                   has_next_page=has_next_page,
-                                   has_previous_page=has_previous_page, current_page=page,
-                                   domain=domain)
-
-        if media_type == 'xmind':
-            xminds, has_next_page, has_previous_page = get_all_xmind(user_name, page=page)
-
-            return render_template('Media_V2.html', xminds=xminds, url_for=url_for,
-                                   has_next_page=has_next_page,
-                                   has_previous_page=has_previous_page, current_page=page,
-                                   domain=domain)
-    elif request.method == 'POST':
-        img_name = request.json.get('img_name')
-        if not img_name:
-            return error(message=f'缺少图像名称 with POST method in media_{user_id}', status_code=400)
-
-        image = get_image_path(user_name, img_name)
-        if not image:
-            return error(message=f'未找到图像in media_{user_id}', status_code=404)
-
-        return image
-
-
 @app.route('/media/<user_name>/<img_name>')
 @app.route('/zyImg/<user_name>/<img_name>')
 def get_image_path(user_name, img_name):
@@ -581,24 +540,6 @@ def get_image_path(user_name, img_name):
 def upload_user_path(user_id):
     user_name = get_username()
     handle_user_upload(user_name=user_name, user_id=user_id)
-
-
-@app.route('/zyVideo/<user_name>/<video_name>')
-def start_video(user_name, video_name):
-    try:
-        # 使用 pathlib.Path 处理路径
-        video_dir = Path(base_dir) / 'media' / user_name
-        video_path = video_dir / video_name
-
-        # 检查文件是否存在
-        if not video_path.exists():
-            return f"Video {video_name} not found for user {user_name}.", 404
-
-        # 使用 send_file 发送视频文件
-        return send_file(video_path, mimetype='video/mp4', as_attachment=False, conditional=True)
-    except Exception as e:
-        print(f"Error in getting video path: {e}")
-        return "Internal Server Error", 500
 
 
 @app.route('/jump', methods=['GET', 'POST'])
@@ -1098,39 +1039,6 @@ def read_user_notification():
 @app.route('/changelog')
 def changelog():
     return redirect('https://github.com/Athenavi/zb/blob/main/articles/changelog.md')
-
-
-@app.route('/img/<user_name>/thumbs/<img>', methods=['GET', 'POST'])
-def api_img(user_name, img):
-    if request.method == 'GET':
-        img_dir = Path(base_dir) / 'media' / user_name / img
-        img_thumbs = Path(base_dir) / 'media' / user_name / 'thumbs' / img
-        if os.path.isfile(img_dir) and os.path.isfile(img_thumbs):
-            return send_file(img_thumbs, mimetype='image/jpeg')
-        if os.path.isfile(img_dir) and not os.path.isfile(img_thumbs):
-            # 使用线程池异步执行 gen_thumbs 函数
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                thumbs_path = os.path.join(base_dir, 'media', user_name, 'thumbs')
-                if not os.path.exists(thumbs_path):
-                    os.makedirs(thumbs_path)
-                executor.submit(generate_thumbs(img_dir, img_thumbs))
-            return send_file('../static/favicon.ico', mimetype='image/png')
-
-
-@app.route('/video/<user_name>/thumbs/<video>.png', methods=['GET', 'POST'])
-def api_video(user_name, video):
-    if request.method == 'GET':
-        video_dir = Path(base_dir) / 'media' / user_name / video
-        video_thumbs = Path(base_dir) / 'media' / user_name / 'thumbs' / f"V-thumbs_{video}.png"
-        if os.path.isfile(video_dir) and os.path.isfile(video_thumbs):
-            return send_file(video_thumbs, mimetype='image/jpeg')
-        if os.path.isfile(video_dir) and not os.path.isfile(video_thumbs):
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                thumbs_path = os.path.join(base_dir, 'media', user_name, 'thumbs')
-                if not os.path.exists(thumbs_path):
-                    os.makedirs(thumbs_path)
-                executor.submit(generate_video_thumb(video_dir, video_thumbs))
-            return send_file('../static/favicon.ico', mimetype='image/png')
 
 
 @app.route('/xmind/<user_name>/thumbs/<xmind>.png', methods=['GET', 'POST'])
@@ -2892,6 +2800,117 @@ def markdown_editor(user_id, aid):
 
     else:
         return error(message='您没有权限', status_code=503)
+
+
+@app.route('/media', methods=['GET'])
+@jwt_required
+def media(user_id):
+    media_type = request.args.get('type', default='img')
+    page = request.args.get('page', default=1, type=int)
+    if not media_type or media_type == 'img':
+        imgs, total_pages = get_media_db(user_id, category='image', page=page, per_page=20)
+        has_next_page = bool(total_pages - page)
+        has_previous_page = bool(total_pages - 1)
+        return render_template('Media_V2.html', imgs=imgs, title='Media', url_for=url_for,
+                               has_next_page=has_next_page,
+                               has_previous_page=has_previous_page, current_page=page,
+                               domain=domain)
+    if media_type == 'video':
+        videos, total_pages = get_media_db(user_id, category='video', page=1, per_page=20)
+        has_next_page = bool(total_pages - page)
+        has_previous_page = bool(total_pages - 1)
+        return render_template('Media_V2.html', videos=videos, title='Media', url_for=url_for,
+                               has_next_page=has_next_page,
+                               has_previous_page=has_previous_page, current_page=page,
+                               domain=domain)
+    if media_type == 'other':
+        docs, total_pages = get_media_db(user_id, category='document', page=1, per_page=20)
+        has_next_page = bool(total_pages - page)
+        has_previous_page = bool(total_pages - 1)
+        return render_template('Media_V2.html', docs=docs, url_for=url_for,
+                               has_next_page=has_next_page,
+                               has_previous_page=has_previous_page, current_page=page,
+                               domain=domain)
+
+
+@cache.memoize(120)
+def get_media_db(user_id, category, page=1, per_page=20):
+    media_type = category or 'image'
+    try:
+        with get_db_connection() as db:
+            with db.cursor() as cursor:
+                offset = (page - 1) * per_page
+                # 查询文件路径和ID，并按id降序排列
+                query = f"SELECT `id`, `file_path` FROM media WHERE user_id = %s AND file_type = %s ORDER BY id DESC LIMIT %s OFFSET %s"
+                cursor.execute(query, (user_id, media_type, per_page, offset))
+                files = cursor.fetchall()
+                print(files)
+                count_query = f"SELECT COUNT(*) FROM media WHERE user_id = %s AND file_type = %s"
+                cursor.execute(count_query, (user_id, media_type))
+                total_files = cursor.fetchone()[0]
+                total_pages = (total_files + per_page - 1) // per_page
+
+                return files, total_pages
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return [], 0
+
+
+@app.route('/thumb/media/<user_name>/<img>', methods=['GET'])
+def api_img(user_name, img):
+    img_dir = Path(base_dir) / 'media' / user_name / img
+    img_thumbs = Path(base_dir) / 'media' / user_name / 'thumbs' / img
+    if not img_dir.is_file():
+        abort(404)
+    if img_thumbs.is_file():
+        return send_file(img_thumbs, mimetype='image/jpeg')
+    thumbs_dir = img_thumbs.parent
+    thumbs_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            executor.submit(generate_thumbs, img_dir, img_thumbs)
+    except Exception as e:
+        app.logger.error(f"Error submitting thumb generation task: {e}")
+    placeholder_path = Path(base_dir) / 'static' / 'favicon.ico'
+    if placeholder_path.is_file():
+        return send_file(placeholder_path, mimetype='image/png')
+    else:
+        return "Thumbnail is being generated, please refresh later.", 202
+
+
+@app.route('/V-thumb/media/<user_name>/<video>.png', methods=['GET'])
+def api_video(user_name, video):
+    video_dir = Path(base_dir) / 'media' / user_name / video
+    video_thumbs = Path(base_dir) / 'media' / user_name / 'thumbs' / f"V-thumbs_{video}.png"
+    if not video_dir.is_file():
+        abort(404)
+    if video_thumbs.is_file():
+        return send_file(video_thumbs, mimetype='image/jpeg')
+    thumbs_dir = video_thumbs.parent
+    thumbs_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            executor.submit(generate_video_thumb, video_dir, video_thumbs)
+    except Exception as e:
+        app.logger.error(f"Error submitting video thumbnail generation task: {e}")
+    placeholder_path = Path(base_dir) / 'static' / 'favicon.ico'
+    if placeholder_path.is_file():
+        return send_file(placeholder_path, mimetype='image/png')
+    else:
+        return "Video thumbnail is being generated, please refresh later.", 202
+
+
+@app.route('/video/media/<user_name>/<video_name>')
+def start_video(user_name, video_name):
+    try:
+        video_dir = Path(base_dir) / 'media' / user_name
+        video_path = video_dir / video_name
+        if not video_path.exists():
+            return f"Video {video_name} not found for user {user_name}.", 404
+        return send_file(video_path, mimetype='video/mp4', as_attachment=False, conditional=True)
+    except Exception as e:
+        print(f"Error in getting video path: {e}")
+        return "Internal Server Error", 500
 
 
 @app.errorhandler(404)
