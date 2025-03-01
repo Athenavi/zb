@@ -54,7 +54,6 @@ cache = Cache(app)
 app.secret_key = secret_key
 app.config['SESSION_COOKIE_NAME'] = 'zb_session'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=4)
-app.config['USER_BASE_PATH'] = 'media'
 app.config['TEMP_FOLDER'] = 'temp/upload'
 app.config['AVATAR_PATH'] = 'avatar'
 # 定义随机头像服务器
@@ -1902,7 +1901,7 @@ def music_json(user_id):
     referrer = request.referrer
     if referrer and "@" in referrer:
         username_from_referrer = referrer.split('@')[-1]
-        user_dir = os.path.join(app.config['USER_BASE_PATH'], username_from_referrer)
+        user_dir = os.path.join('media', username_from_referrer)
         # 确保 user_dir 是字符串类型
         user_dir = base_dir + '\\' + str(user_dir)
         return send_from_directory(user_dir, 'music.json')
@@ -1910,7 +1909,7 @@ def music_json(user_id):
         return send_from_directory(app.static_folder, 'music/music.json')
     else:
         user_name = get_username()
-        user_dir = os.path.join(app.config['USER_BASE_PATH'], user_name)
+        user_dir = os.path.join('media', user_name)
         # 确保 user_dir 是字符串类型
         user_dir = base_dir + '\\' + str(user_dir)
         return send_from_directory(user_dir, 'music.json')
@@ -1938,7 +1937,7 @@ def music_json_change(user_id):
                 'error': '需要包含的属性name, audio_url, singer, album, cover, time'}), 400
 
     user_name = get_username()
-    user_dir = os.path.join(app.config['USER_BASE_PATH'], user_name)
+    user_dir = os.path.join('media', user_name)
 
     # 确保 user_dir 存在
     if not os.path.exists(user_dir):
@@ -2056,7 +2055,7 @@ def ueditor_plus_server(user_id):
     if not aid or user_name != argparse_username:
         return jsonify({'state': 'ERROR', 'message': '参数不完整'}), 400
     action = request.args.get('action', default=None)
-    upload_folder = app.config['USER_BASE_PATH'] + '/' + user_name
+    upload_folder = 'media' + '/' + user_name
     if os.path.exists(upload_folder) is False:
         return jsonify({'state': 'ERROR', 'message': '请先前往媒体管理页面上传文件'}), 400
     if action == 'showPost':
@@ -2261,7 +2260,7 @@ def handle_user_upload(user_name, user_id):
         return jsonify({'message': 'failed, user not authenticated'}), 403
     try:
         allowed_types = app.config['ALLOWED_EXTENSIONS']
-        user_dir = os.path.join(app.config['USER_BASE_PATH'], user_name)  # 用户文件存储目录
+        user_dir = os.path.join('media', user_name)  # 用户文件存储目录
         os.makedirs(user_dir, exist_ok=True)  # 如果目录不存在则创建
         file_records = []  # 用于存储文件记录的列表
         with get_db_connection() as db:  # 使用上下文管理器获取数据库连接
@@ -2924,6 +2923,89 @@ def start_video(user_name, video_name):
     except Exception as e:
         print(f"Error in getting video path: {e}")
         return "Internal Server Error", 500
+
+
+@app.route('/media', methods=['DELETE'])
+@jwt_required
+def media_delete(user_id):
+    try:
+        user_name = get_username()
+        file_ids = request.args.get('file-id-list', '')
+
+        if not file_ids:
+            return jsonify({"message": "缺少文件ID列表"}), 400
+
+        id_list = file_ids.split(',')
+        if not all(id.isdigit() for id in id_list):
+            return jsonify({"message": "文件ID格式错误"}), 400
+
+        # 转换为整数列表
+        id_list = list(map(int, id_list))
+
+        with get_db_connection() as connection:
+            with connection.cursor() as cursor:
+                # 1. 动态生成占位符
+                placeholders = ', '.join(['%s'] * len(id_list))
+                query = f"""
+                    SELECT id, file_path, file_type 
+                    FROM media 
+                    WHERE id IN ({placeholders}) AND user_id = %s
+                """
+                params = id_list + [user_id]
+                cursor.execute(query, params)
+                files = cursor.fetchall()
+
+                if len(files) != len(id_list):
+                    return jsonify({"message": "部分文件不存在或无权操作"}), 400
+
+                # 2. 先删除文件
+                deleted_count = 0
+                try:
+                    for file in files:
+                        file_id, filepath, file_type = file
+                        file_path = os.path.join(base_dir, filepath)
+                        # 删除主文件
+                        try:
+                            if os.path.exists(file_path):
+                                os.remove(file_path)
+                                deleted_count += 1
+                        except FileNotFoundError:
+                            pass  # 文件已不存在，忽略
+                        except Exception as e:
+                            app.logger.error(f"删除文件失败: {str(e)}")
+                            raise
+
+                        # 删除缩略图
+                        thumb_dir = os.path.join(base_dir, 'media', user_name, 'thumbs')
+                        if file_type == 'image':
+                            thumb_name = filepath.split('\\')[-1]
+                        else:
+                            thumb_name = f"V-thumbs_{filepath.split('\\')[-1]}.png"
+
+                        thumb_path = os.path.join(thumb_dir, thumb_name)
+                        if os.path.exists(thumb_path):
+                            try:
+                                os.remove(thumb_path)
+                                deleted_count += 1
+                            except Exception as e:
+                                app.logger.error(f"删除缩略图失败: {str(e)}")
+                                # 可根据需求决定是否终止
+
+                except Exception as file_error:
+                    return jsonify({"message": "文件删除失败", "error": str(file_error)}), 500
+
+                # 3. 文件删除成功后，删除数据库记录
+                delete_query = f"DELETE FROM media WHERE id IN ({placeholders}) AND user_id = %s"
+                cursor.execute(delete_query, params)
+                connection.commit()
+
+        app.logger.info(f"用户 {user_id} 删除文件成功")
+        return jsonify({"message": "删除成功", "deleted_count": deleted_count}), 200
+
+
+    except Exception as e:
+        app.logger.error(f"删除操作异常: {str(e)}")
+        return jsonify({"message": "服务器内部错误"}), 500
 
 
 @app.errorhandler(404)
