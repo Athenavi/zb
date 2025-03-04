@@ -1,132 +1,117 @@
 <div align="center">
-	<img src="https://7trees.cn/static/favicon.ico" width="160"  alt=""/>
-	<h1>zyblog</h1>
+  <h1>zyBLOG - 轻量易用的Python Flask博客系统</h1>
+  
+  [![Python Version](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
+  [![Flask Version](https://img.shields.io/badge/flask-3.1.x-green.svg)](https://flask.palletsprojects.com/)
+  [![License](https://img.shields.io/badge/license-Apache%202.0-orange.svg)](./LICENSE)
+  [![GitHub Stars](https://img.shields.io/github/stars/Athenavi/zb.svg?style=social)](https://github.com/Athenavi/zb/stargazers)
+
 </div>
 
+## 🌟 项目亮点
 
+- **Python实现** - 基于Flask框架
+- **响应式设计** - 完美适配桌面与移动设备
+- **轻量高效** - 核心功能精简
 
-> [!NOTE]
-> 如果您觉得 `zyblog`对您有所帮助，或者您喜欢我们的项目，请在 GitHub 上给我们一个 ⭐️。您的支持是我们持续改进和增加新功能的动力！感谢您的支持！
+## 🚀 快速开始
 
-- **更新日志**
-    - [更新详情](./articles/changelog.md)
-    - [旧版](https://github.com/Athenavi/zyBLOG)
+### 环境要求
+- Python 3.12+
+- MySQL 5.7+
 
-## 预览
+### 宝塔面板部署（新手推荐）
+```bash
+# 安装宝塔面板（国内服务器）
+url=https://download.bt.cn/install/install_lts.sh && \
+curl -sSO $url || wget -O install_lts.sh $url && \
+bash install_lts.sh ed8484bec
 
-- [地址](https://7trees.cn)
-
-[zyBLOG](https://github.com/Athenavi/zyBLOG) 是一个基于 Python Flask 和 WSGI 的简易博客程序
-
-## 技术组成
-
-- **Python Flask**: 作为 Web 框架，提供了构建网页应用的基础功能。
-- **WSGI**: 作为 Python Web 应用程序与 Web 服务器之间的接口标准，实现了 Web 应用程序与服务器之间的通信。
-- **HTML/CSS**: 用于构建博客界面的前端技术。
-- **MySQL**: 作为数据库，用于存储用户、文章信息、评论等数据。
-
-## 功能特点
-
-- [x] 提供文章分类和标签功能，方便用户组织和浏览文章。
-- [x] 界面适应手机
-- [x] ~~SEO优化~~(自完全使用前端渲染之后,SEO功能可谓是完全丧失了)
-- [x] 支持创建、编辑和删除博客文章。
-- [x] 提供评论功能，让用户可以与其他用户进行交流和互动。
-- [x] 用户可以注册和登录，以便管理他们的博客文章。
-- [x] 博客文章可以包含图片、视频和代码片段。
-- [x] 支持搜索功能，使用户可以快速找到感兴趣的文章。
-
-## 示例图片
-
-![](https://7trees.cn/zyImg/test/ac2764bba0b08d79e8f4bb1ba0d57a59.png)
-
-## 如何运行
-
-建议使用 **Linux宝塔面板**
-
-1. 宝塔 **V9.0.0** 稳定版安装脚本
-
-```sh
-url=https://download.bt.cn/install/install_lts.sh;if [ -f /usr/bin/curl ];then curl -sSO $url;else wget -O install_lts.sh $url;fi;bash install_lts.sh ed8484bec
+# 安装后通过Web界面配置：
+1. 创建Python项目（推荐3.12.x）
+2. 导入项目仓库
+3. 配置MySQL数据库
+4. 安装依赖：pip install -r requirements.txt
 ```
 
-1. 克隆或下载 zyBLOG 代码库到本地。创建一个数据库，导入本项目里的 *sql* 文件（注意sql版本），复制 *config_example.ini* 文件到
-   *config.ini* ，配置 *config.ini*
-2. BT面板部署成功后(BT主程序页面 可以在 右侧 *网站* 选项卡配置Python项目,建议使用 Python V3.12.3 项目依赖
-   requirements.txt)
-3. 
-通用python项目部署参考步骤 [https://www.bt.cn/bbs/thread-125161-1-1.html](https://www.bt.cn/bbs/thread-125161-1-1.html)
+### 手动部署
+```bash
+# 克隆仓库
+git clone https://github.com/Athenavi/zb.git
+cd zb
 
-不使用宝塔?
+# 初始化环境
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
-1. 确保你的系统已经安装了 Python(建议3.12及以上版本) 和 pip。
-2. 克隆或下载 zyBLOG 代码库到本地。创建一个数据库，导入本项目里的 *sql* 文件（注意sql版本），复制 *config_example.ini* 文件到
-   *config.ini* ，配置 *config.ini*
-3. 在终端中进入项目根目录，并执行以下命令的顺序执行以启动 zyBLOG 博客程序：
+# 安装依赖
+pip install -r requirements.txt
+
+# 配置数据库
+cp config_example.ini config.ini
+# 编辑config.ini中的数据库配置
+
+# 启动服务
+python wsgi.py
+```
 
 ```bash
 $ pip install -r requirements.txt
 $ python wsgi.py
 ```
-(可选)使用gunicorn运行一个高性能守护进程(--daemon)实例
+
+(可选) 使用gunicorn运行高性能守护进程实例：
 ```bash
 $ touch ./temp/access.log && touch ./temp/error.log
 $ sudo chmod 777 ./temp/access.log && sudo chmod 777 ./temp/error.log
 $ gunicorn --workers 4 --threads 2 --bind 0.0.0.0:9421 --timeout 60 --access-logfile ./temp/access.log --error-logfile ./temp/error.log --daemon src.app:app
 ```
 1. 在浏览器中访问 `http://localhost:9421`，即可进入 zyBLOG。
-2. 管理后台 (/dashboard) 默认账号 'test' 默认密码 '123456'
+2. 管理后台 (/dashboard) 默认账号 'test'，默认密码 '123456'。
 
-## 无法运行？
-   建议使用python虚拟环境
-## python版本遇到问题？
+## 遇到Python版本问题？
 
 - [更多问题](./articles/Linux上python多版本问题.md)
-     
+
 ## 仍然无法运行？
 
-如果你了解docker，可以尝试使用Dockerfile来部署运行
+如果您熟悉Docker，可以尝试使用Dockerfile进行部署。
 
+## 📚 功能概览
 
-## 开源贡献者
+| 模块         | 功能               | 状态 |
+|--------------|------------------|------|
+| 文章管理     | Markdown支持/标签/搜索 | ✅   |
+| 用户系统     | 注册/登录/自定义        | ✅   |
+| 评论系统     | 嵌套评论/审核机制        | ✅   |
+| 后台管理     | 用户管理/内容管理        | ✅   |
+| SEO优化      | 自动生成sitemap/规范链接 | ✅   |
+| 主题系统     | 多主题支持/热切换        | 🚧   |
+| API接口      | RESTful API设计    | 🚧   |
 
-感谢以下各位的贡献
+## 📸 移动端界面预览
 
-<img src="https://contrib.rocks/image?repo=Athenavi/zb"  alt=""/>
+![新版首页界面](https://7trees.cn/media/test/preview.png)
+*▲ 响应式后台管理界面*
 
-## 交流
+## 🛠️ 开发者指南
 
-我们热烈欢迎并感谢所有形式的贡献。如果您有任何想法或建议，欢迎通过提交 [pull requests](https://github.com/soybeanjs/soybean-admin/pulls)
-或创建 GitHub [issue](https://github.com/soybeanjs/soybean-admin/issues/new) 来分享。
+### 项目结构
+```bash
+├── src/                 # 核心源代码
+├── templates/           # 前端模板
+├── static/              # 静态资源
+├── requirements.txt     # 依赖清单
+└── wsgi.py              # 启动入口
+```
 
-## Star 趋势
+### 模板开发
 
-![Star History Chart](https://api.star-history.com/svg?repos=Athenavi/zb&type=Date)
+在开发模板之前，确保完成zyBLOG的环境搭建。
 
-## 开源协议
+#### 模板的组成
 
-项目基于 [Apache V2.0](./LICENSE) 协议，仅供学习参考，商业使用请保留作者版权信息，作者不保证也不承担任何软件的使用风险。
-
-## 免责声明
-
-zyBLOG 是一个个人项目，并未经过详尽测试和完善，因此不对其能力和稳定性做出任何保证。使用 zyBLOG 时请注意自己的数据安全和程序稳定性。任何由于使用
-zyBLOG 造成的数据丢失、损坏或其他问题，作者概不负责。
-
-**请谨慎使用 zyBLOG，并在使用之前备份你的数据。**
-
-# 开发文档
-
-## 概述
-
-欢迎使用，在开始开发 zyBLOG 之前，你应该对 html、JavaScript、Python、MySql 数据库、服务器等有基本的认识。本文档是建立在这些基础知识之上的。
-
-## 模板开发
-
-在开发模板之前，先做好zyBLOG的环境搭建
-
-### 模板的组成
-
-一个完整的模板，文件内容如下：
+一个完整的模板应包含以下文件：
 
 ```
 newtemplate
@@ -135,20 +120,15 @@ newtemplate
 └── template.ini
 ```
 
-其中 `index.html` 、 `screenshot.png` 、`template.ini` 是模板的必须文件，一个模板最少由这三个文件组成。
+- `index.html` : 网站首页的模板
+- `screenshot.png` : 后台的模板缩略图
+- `template.ini` : 模板的配置信息
 
-`index.html` : 网站首页的模板
-`screenshot.png` : 后台的模板缩略图
-`template.ini` 模板的配置信息
+**提示**：您可以将这三个文件打包成zip文件，通过zyBLOG后台进行上传安装，或者直接将NewTemplate文件夹复制到zyBLOG的templates/theme目录下。
 
-提示
-当我们开始开发一个新的模板的时候，可以先用这三个文件，打包成 zip 包之后，通过 zyBLOG 后台进行上传安装。
+模板的配置文件`template.ini`内容如下：
 
-或者可以把 NewTemplate 文件夹直接复制到 zyBLOG 的 templates/theme 目录下也等同于安装。
-
-模板的配置文件 template.ini 内容如下
-
-``` ini
+```ini
 [default]
 id = 'cn.7trees.2024'
 title = '2024Theme'
@@ -161,4 +141,23 @@ updateUrl = ''
 screenshot = 'screenshot.png'
 ```
 
-`当至少我们拥有这三个文件之后 刷新我们的程序 那么新的模板 就会出现在后台模板中`
+确保拥有这三个文件后，刷新程序，新的模板将出现在后台模板中。
+
+## 📈 用户增长
+
+![Star History Chart](https://api.star-history.com/svg?repos=Athenavi/zb&type=Date)
+
+## 🤝 开源协议
+
+本项目采用 [Apache License 2.0](./LICENSE) 开源协议，您可以在遵守协议条款的前提下自由使用、修改和分发代码。
+
+## 📬 联系我们
+
+- 示例网站：[7trees.cn](https://7trees.cn)
+- 问题反馈：[GitHub Issues](https://github.com/Athenavi/zb/issues)
+- 社区讨论：QQ群（暂未开放）
+
+---
+
+> 💡 提示：项目持续迭代中，建议使用 `main` 分支获取最新更新。
+
