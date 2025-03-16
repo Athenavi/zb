@@ -53,9 +53,8 @@ app.config['CACHE_TYPE'] = 'simple'
 cache = Cache(app)
 app.secret_key = secret_key
 app.config['SESSION_COOKIE_NAME'] = 'zb_session'
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=4)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=48)
 app.config['TEMP_FOLDER'] = 'temp/upload'
-app.config['AVATAR_PATH'] = 'avatar'
 # 定义随机头像服务器
 app.config['AVATAR_SERVER'] = "https://api.7trees.cn/avatar"
 # 定义允许上传的文件类型/文件大小
@@ -282,31 +281,6 @@ def get_profiles(user_id):
         logging.error(f"An error occurred: {e}")
     finally:
         db.close()
-
-
-@app.route('/setting/profiles', methods=['GET', 'POST'])
-@finger_required
-def setting_profiles(user_id):
-    user_info = cache.get(f"{user_id}_userInfo") or get_profiles(user_id=user_id)
-
-    if user_info is None:
-        # 处理未找到用户信息的情况
-        return "用户信息未找到", 404
-
-    cache.set(f'{user_id}_userInfo', user_info, timeout=3600)
-
-    # 确保索引存在
-    avatar_url = user_info[5] if len(user_info) > 5 and user_info[5] else app.config['AVATAR_SERVER']
-    bio = user_info[6] if len(user_info) > 6 and user_info[6] else "这人很懒，什么也没留下"
-    user_name = user_info[1] if len(user_info) > 1 else "匿名用户"
-
-    return render_template(
-        'setting.html',
-        avatar_url=avatar_url,
-        userStatus=bool(user_id),
-        username=user_name,
-        Bio=bio
-    )
 
 
 @cache.cached(timeout=1800, key_prefix='article_info')
@@ -738,22 +712,6 @@ def api_mail(user_id):
     return 'success'
 
 
-@app.route('/api/ip')
-def ip_api():
-    key = request.cookies.get('key')
-
-    if key:
-        cached_ip = cache.get(key)
-        if cached_ip:
-            query_params = request.args.to_dict()
-            print(f"{key} cache ip : {cached_ip} with {query_params}")
-            return jsonify({'ip': cached_ip})
-
-    ip = get_client_ip(request)
-    cache.set(key, ip, timeout=600)
-    return jsonify({'ip': ip})
-
-
 @app.route('/api/follow', methods=['GET', 'POST'])
 @user_id_required
 def follow_user(user_id):
@@ -989,26 +947,6 @@ def finger(user_id):
         return jsonify({"msg": "Failed to save fingerprint"}), 400
     if request.method == 'GET':
         return render_template("Authentication.html", form='finger')
-
-
-@app.route('/api/user/export', methods=['GET', 'POST'])
-@jwt_required
-def export(user_id):
-    key = request.cookies.get('key')
-    cached_ip = cache.get(key)
-    cached_finger = cache.get(f'fingerprint_{user_id}')
-    user_info = cache.get(f'{user_id}_userInfo')
-    user_followed = cache.get(f'{user_id}_followed')
-    user_liked = cache.get(f'{user_id}_liked')
-    result = {
-        'key': key,
-        'ip': cached_ip,
-        'cachedFinger': cached_finger,
-        'UserInfo': user_info,
-        'user_followed': user_followed,
-        'user_liked': user_liked,
-    }
-    return jsonify(result)
 
 
 @app.route('/api/notice', methods=['GET'])
@@ -1947,52 +1885,6 @@ def music_json_change(user_id):
     return jsonify({'message': 'success'}), 200
 
 
-@app.route('/setting/profiles', methods=['PUT'])
-@user_id_required
-def change_profiles(user_id):
-    change_type = request.args.get('change_type')
-    if not change_type:
-        return jsonify({'error': 'Change type is required'}), 400
-    if change_type not in ['avatar', 'username', 'email', 'password']:
-        return jsonify({'error': 'Invalid change type'}), 400
-
-    if change_type == 'avatar':
-        if 'avatar' not in request.files:
-            return jsonify({'error': 'Avatar is required'}), 400
-        avatar_file = request.files['avatar']
-        if avatar_file.filename == '':
-            return jsonify({'error': 'No selected file'}), 400
-
-        # 生成UUID
-        avatar_uuid = uuid.uuid4()
-        save_path = Path(app.config['AVATAR_PATH']) / f'{avatar_uuid}.webp'
-
-        # 确保目录存在
-        save_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # 使用with语句保存文件
-        with save_path.open('wb') as avatar_path:
-            avatar_file.save(avatar_path)
-            db_save_avatar(user_id, str(avatar_uuid))
-
-        return jsonify({'message': 'Avatar updated successfully', 'avatar_id': str(avatar_uuid)}), 200
-
-
-def db_save_avatar(user_id, avatar_uuid):
-    db = None
-    try:
-        db = get_db_connection()
-        with db.cursor() as cursor:
-            query = "UPDATE users SET profile_picture = %s WHERE id = %s"
-            cursor.execute(query, (avatar_uuid, user_id))
-            db.commit()
-    except Exception as e:
-        app.logger.error(f"Error saving avatar: {e} by user {user_id} avatar uuid: {avatar_uuid}")
-    finally:
-        if db is not None:
-            db.close()
-
-
 @cache.memoize(30)
 def get_avatar(user_identifier, identifier_type='id'):
     avatar = app.config['AVATAR_SERVER']  # 默认头像服务器地址
@@ -2024,7 +1916,7 @@ def get_avatar(user_identifier, identifier_type='id'):
 
 @app.route('/api/avatar/<avatar_uuid>.webp', methods=['GET'])
 def get_avatar_image(avatar_uuid):
-    return send_file(f'{base_dir}/{app.config['AVATAR_PATH']}/{avatar_uuid}.webp', mimetype='image/webp')
+    return send_file(f'{base_dir}/avatar/{avatar_uuid}.webp', mimetype='image/webp')
 
 
 def ueditor_plus_edit(user_id, aid, user_name):
@@ -3001,6 +2893,172 @@ def media_delete(user_id):
         return jsonify({"message": "服务器内部错误"}), 500
 
 
+@app.route('/setting/profiles', methods=['GET'])
+@finger_required
+def setting_profiles(user_id):
+    user_info = cache.get(f"{user_id}_userInfo") or get_profiles(user_id=user_id)
+    print(user_info)
+
+    if user_info is None:
+        # 处理未找到用户信息的情况
+        return "用户信息未找到", 404
+
+    cache.set(f'{user_id}_userInfo', user_info, timeout=3600)
+
+    # 确保索引存在
+    avatar_url = user_info[5] if len(user_info) > 5 and user_info[5] else app.config['AVATAR_SERVER']
+    bio = user_info[6] if len(user_info) > 6 and user_info[6] else "这人很懒，什么也没留下"
+    user_name = user_info[1] if len(user_info) > 1 else "匿名用户"
+    user_email = user_info[2] if len(user_info) > 2 else "未绑定邮箱"
+
+    return render_template(
+        'setting.html',
+        avatar_url=avatar_url,
+        userStatus=bool(user_id),
+        username=user_name,
+        Bio=bio,
+        userEmail=user_email,
+    )
+
+
+@app.route('/setting/profiles', methods=['PUT'])
+@user_id_required
+def change_profiles(user_id):
+    change_type = request.args.get('change_type')
+    if not change_type:
+        return jsonify({'error': 'Change type is required'}), 400
+    if change_type not in ['avatar', 'username', 'email', 'password']:
+        return jsonify({'error': 'Invalid change type'}), 400
+
+    if change_type == 'avatar':
+        if 'avatar' not in request.files:
+            return jsonify({'error': 'Avatar is required'}), 400
+        avatar_file = request.files['avatar']
+        if avatar_file.filename == '':
+            return jsonify({'error': 'No selected file'}), 400
+
+        # 生成UUID
+        avatar_uuid = uuid.uuid4()
+        save_path = Path('avatar') / f'{avatar_uuid}.webp'
+
+        # 确保目录存在
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # 使用with语句保存文件
+        with save_path.open('wb') as avatar_path:
+            avatar_file.save(avatar_path)
+            db_save_avatar(user_id, str(avatar_uuid))
+
+        return jsonify({'message': 'Avatar updated successfully', 'avatar_id': str(avatar_uuid)}), 200
+    if change_type == 'bio':
+        bio = request.json.get('bio')
+        db_save_bio(user_id, bio)
+        return jsonify({'message': 'Bio updated successfully'}), 200
+    if change_type == 'username':
+        username = request.json.get('username')
+        if not username:
+            return jsonify({'error': 'Username is required'}), 400
+        if not re.match(r'^[a-zA-Z0-9_]{4,16}$', username):
+            return jsonify({'error': 'Username should be 4-16 characters, letters, numbers or underscores'}), 400
+        if check_conflict(zone='username', value=username):
+            return jsonify({'error': 'Username already exists'}), 400
+        db_change_username(user_id, new_username=username)
+        return jsonify({'message': 'Username updated successfully'}), 200
+    if change_type == 'email':
+        email = request.json.get('email')
+        if not email:
+            return jsonify({'error': 'Email is required'}), 400
+        if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+            return jsonify({'error': 'Invalid email format'}), 400
+        if check_conflict(zone='email', value=email):
+            return jsonify({'error': 'Email already exists'}), 400
+        db_bind_email(user_id, (None, email))
+        return jsonify({'message': 'Email updated successfully'}), 200
+
+
+def check_conflict(zone, value):
+    if zone == 'username':
+        query = "SELECT username FROM users"
+    elif zone == 'email':
+        query = "SELECT email FROM users"
+    else:
+        return False
+    try:
+        with get_db_connection() as db:
+            with db.cursor() as cursor:
+                cursor.execute(query)
+                if value not in [row[0] for row in cursor.fetchall()]:
+                    return False
+        return False
+    except Exception as e:
+        app.logger.error(f"Error getting user list: {e}")
+        return False
+
+
+def db_save_avatar(user_id, avatar_uuid):
+    db = None
+    try:
+        db = get_db_connection()
+        with db.cursor() as cursor:
+            query = "UPDATE users SET profile_picture = %s WHERE id = %s"
+            cursor.execute(query, (avatar_uuid, user_id))
+            db.commit()
+    except Exception as e:
+        app.logger.error(f"Error saving avatar: {e} by user {user_id} avatar uuid: {avatar_uuid}")
+    finally:
+        if db is not None:
+            db.close()
+
+
+def db_save_bio(user_id, bio):
+    db = None
+    try:
+        db = get_db_connection()
+        with db.cursor() as cursor:
+            query = "UPDATE users SET bio = %s WHERE id = %s"
+            cursor.execute(query, (bio, user_id))
+            db.commit()
+    except Exception as e:
+        app.logger.error(f"Error saving bio: {e} by user {user_id} bio: {bio}")
+    finally:
+        if db is not None:
+            db.close()
+
+
+def db_change_username(user_id, new_username):
+    # 修改用户名将可能导致资料被意外删除,建议先导出您的资料再进行下一步操作
+    # 导出资料: 点击右上角头像 -> 点击设置 -> 点击导出资料
+    db = None
+    try:
+        db = get_db_connection()
+        with db.cursor() as cursor:
+            query = "UPDATE users SET username = %s WHERE id = %s"
+            cursor.execute(query, (new_username, user_id))
+            db.commit()
+    except Exception as e:
+        app.logger.error(f"Error changing username: {e} by user {user_id} new username: {new_username}")
+    finally:
+        if db is not None:
+            db.close()
+
+
+def db_bind_email(user_id, param):
+    pass
+
+
+@app.route('/api/user/export', methods=['GET', 'POST'])
+@jwt_required
+def export(user_id):
+    user_info = cache.get(f'{user_id}_userInfo')
+    user_followed = cache.get(f'{user_id}_followed')
+    result = {
+        'UserInfo': user_info,
+        'user_followed': user_followed,
+        '0': '请不要泄露此信息，请勿透露给他人！若信息为空请进入个人中心一次，即可获取！'
+    }
+    return jsonify(result)
+
+
 @app.route('/api/wx/activity')
 def api_wx_activity():
     content = {
@@ -3027,6 +3085,35 @@ def api_wx_activity():
         ]
     }
     return content
+
+
+@app.route('/api/wx/activity')
+def api_wx_activity_detail(activity_id):
+    activity_id = int(request.args.get('id'))
+    if activity_id == 1:
+        detail = {
+            "success": True,
+            "data": {
+                "id": 1,
+                "title": "活动标题",
+                "time": "2023-09-30 14:00",
+                "location": "活动地点",
+                "content": "活动详情内容..."
+            }
+        }
+    else:
+        detail = {
+            "success": True,
+            "data": {
+                "id": 2,
+                "title": "活动标题2",
+                "time": "2023-09-30 14:00",
+                "location": "活动地点",
+                "content": "活动详情内容..."
+            }
+        }
+
+    return detail
 
 
 @app.errorhandler(404)
