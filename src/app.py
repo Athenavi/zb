@@ -530,13 +530,6 @@ def get_image_path(user_name, img_name):
         abort(404)
 
 
-@app.route('/upload_file', methods=['POST'])
-@jwt_required
-def upload_user_path(user_id):
-    user_name = get_username()
-    handle_user_upload(user_name=user_name, user_id=user_id)
-
-
 @app.route('/jump', methods=['GET', 'POST'])
 def jump():
     url = request.args.get('url', default=domain)
@@ -2255,34 +2248,42 @@ def api_cover(cover_img):
         return send_file('../static/image/dark.jpg', mimetype='image/png')
 
 
+@app.route('/upload_file', methods=['POST'])
+@jwt_required
+def upload_user_path(user_id):
+    user_name = get_username()
+    return handle_user_upload(user_name=user_name, user_id=user_id)
+
+
 def handle_user_upload(user_name, user_id):
     if not user_name:
         return jsonify({'message': 'failed, user not authenticated'}), 403
+
+    if not request.files.getlist('file'):
+        return jsonify({'message': 'no files uploaded'}), 400
+
     try:
         allowed_types = app.config['ALLOWED_EXTENSIONS']
-        user_dir = os.path.join('media', user_name)  # 用户文件存储目录
-        os.makedirs(user_dir, exist_ok=True)  # 如果目录不存在则创建
-        file_records = []  # 用于存储文件记录的列表
-        with get_db_connection() as db:  # 使用上下文管理器获取数据库连接
-            with db.cursor() as cursor:  # 使用上下文管理器获取数据库游标
-                # 处理每个上传的文件
+        user_dir = os.path.join('media', user_name)
+        os.makedirs(user_dir, exist_ok=True)
+        file_records = []
+        with get_db_connection() as db:
+            with db.cursor() as cursor:
                 for f in request.files.getlist('file'):
-                    if not is_allowed_file(f.filename, allowed_types):  # 检查文件类型
+                    if not is_allowed_file(f.filename, allowed_types):
+                        app.logger.warning(f'User: {user_name}, File {f.filename} not allowed')
                         continue
 
                     if f.content_length > app.config['UPLOAD_LIMIT']:
                         return jsonify({'message': f'File size exceeds the limit of {app.config["UPLOAD_LIMIT"]}'}), 413
 
-                    # 确保文件名安全并确保是字符串类型
                     newfile_name = secure_filename(str(f.filename))
                     user_dir = str(user_dir)
 
-                    # 生成新文件路径并保存文件
                     newfile_path = os.path.join(user_dir, newfile_name)
                     old_thumb_path = os.path.join(user_dir, 'thumbs', newfile_name)
 
                     if isinstance(f, io.BytesIO):
-                        # 如果是 BytesIO 对象，直接写入文件
                         with open(newfile_path, 'wb') as file:
                             file.write(f.getvalue())
                     else:
@@ -2291,7 +2292,6 @@ def handle_user_upload(user_name, user_id):
                     if os.path.isfile(old_thumb_path):
                         os.remove(old_thumb_path)
 
-                    # 确定文件类型
                     file_type = (
                         'image' if f.filename.lower().endswith(
                             ('.jpg', '.jpeg', '.png', '.webp', '.jfif', '.pjpeg', '.pjp')
@@ -2299,34 +2299,34 @@ def handle_user_upload(user_name, user_id):
                         else 'document'
                     )
 
-                    # 查询是否存在相同的文件路径
                     cursor.execute("SELECT `id` FROM `media` WHERE `file_path`=%s", (newfile_path,))
                     existing_record = cursor.fetchone()
 
                     if existing_record:
-                        # 更新已存在文件的 updated_at
                         cursor.execute(
                             "UPDATE `media` SET `updated_at`=%s WHERE `id`=%s",
                             (datetime.now(), existing_record[0])
                         )
                     else:
-                        # 文件路径不存在，添加新的记录
                         file_records.append(
-                            (user_id, newfile_path, file_type, datetime.now(), datetime.now()))  # 添加文件记录
-                        app.logger.info(f'User: {user_name}, Uploaded file: {newfile_name}')  # 记录上传日志
+                            (user_id, newfile_path, file_type, datetime.now(), datetime.now())
+                        )
+                        app.logger.info(f'User: {user_name}, Uploaded file: {newfile_name}')
 
-                # 如果有文件记录，则插入数据库
                 if file_records:
                     insert_query = ("INSERT INTO `media` (`user_id`, `file_path`, `file_type`, `created_at`, "
                                     "`updated_at`) VALUES (%s, %s, %s, %s, %s)")
-                    cursor.executemany(insert_query, file_records)  # 批量插入文件记录
+                    cursor.executemany(insert_query, file_records)
+                else:
+                    app.logger.info(f'User: {user_name}, No valid files uploaded')
+                    return jsonify({'message': 'no valid files uploaded'}), 200
 
-            db.commit()  # 提交数据库事务
+            db.commit()
 
-        return jsonify({'message': 'success'}), 200  # 返回成功响应
+        return jsonify({'message': 'success'}), 200
 
     except Exception as e:
-        app.logger.error(f"Error in file upload: {e}")  # 记录错误日志
+        app.logger.error(f"Error in file upload: {e}")
         return jsonify({'message': 'failed', 'error': str(e)}), 500
 
 
@@ -2824,7 +2824,7 @@ def media(user_id):
         has_next_page = bool(total_pages - page)
         has_previous_page = bool(total_pages - 1)
         return render_template('Media_V2.html', imgs=imgs, url_for=url_for,
-                               has_next_page=has_next_page,
+                               has_next_page=has_next_page, mediaType='img',
                                has_previous_page=has_previous_page, current_page=page,
                                domain=domain)
     if media_type == 'video':
@@ -2832,17 +2832,10 @@ def media(user_id):
         has_next_page = bool(total_pages - page)
         has_previous_page = bool(total_pages - 1)
         return render_template('Media_V2.html', videos=videos, url_for=url_for,
-                               has_next_page=has_next_page,
+                               has_next_page=has_next_page, mediaType='video',
                                has_previous_page=has_previous_page, current_page=page,
                                domain=domain)
-    if media_type == 'other':
-        docs, total_pages = get_media_db(user_id, category='document', page=1, per_page=20)
-        has_next_page = bool(total_pages - page)
-        has_previous_page = bool(total_pages - 1)
-        return render_template('Media_V2.html', docs=docs, url_for=url_for,
-                               has_next_page=has_next_page,
-                               has_previous_page=has_previous_page, current_page=page,
-                               domain=domain)
+    return "Media type not supported", 404
 
 
 @cache.memoize(120)
@@ -3006,6 +2999,34 @@ def media_delete(user_id):
     except Exception as e:
         app.logger.error(f"删除操作异常: {str(e)}")
         return jsonify({"message": "服务器内部错误"}), 500
+
+
+@app.route('/api/wx/activity')
+def api_wx_activity():
+    content = {
+        "code": 0,
+        "data": [
+            {
+                "id": 1,
+                "title": "周末户外徒步",
+                "cover_img": "https://7trees.cn/api/cover/2.png?format=webp",
+                "start_time": 1672531200000,
+                "end_time": 1672617600000,
+                "address": "西湖风景区",
+                "status": "ongoing"
+            },
+            {
+                "id": 2,
+                "title": "周末户外徒步2",
+                "cover_img": "https://7trees.cn/api/cover/53.png?format=webp",
+                "start_time": 1672531200000,
+                "end_time": 1672617600000,
+                "address": "西湖风景区",
+                "status": "ongoing"
+            }
+        ]
+    }
+    return content
 
 
 @app.errorhandler(404)

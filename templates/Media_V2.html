@@ -74,7 +74,8 @@
                 this.on('error', function (file, errorMessage) {
                     console.log('文件上传错误: ' + errorMessage);
                 });
-            }
+            },
+            withCredentials: true,
         };
     </script>
     <hr class="my-4">
@@ -117,35 +118,21 @@
                     </div>
                 </li>
             {% endfor %}
-            {% for id,doc in docs %}
-                <li class="group">
-                    <div class="bg-gray-200 rounded-lg overflow-hidden shadow">
-                        <a class="card-link"
-                           onclick="prewXmind('{{ domain }}preview?user={{ username }}&file_name={{ doc }}')">
-                            {{ doc }}
-                            <img src="/xmind/{{ username }}/thumbs/{{ doc }}.png" alt=""
-                                 class="w-full h-40 object-cover"/>
-                        </a>
-                    </div>
-                </li>
-            {% endfor %}
         </ul>
     </section>
 
     <!-- Pagination Section -->
     <div class="pagination my-4">
-        {% for mediaType in ['imgs', 'videos', 'docs'] %}
-            <div class="flex justify-between my-4">
-                {% if has_previous_page and eval(mediaType) %}
-                    <a href="{{ url_for('media', user_name=username, page=current_page-1, type=mediaType) }}"
-                       class="btn btn-secondary">Previous</a>
-                {% endif %}
-                {% if has_next_page and eval(mediaType) %}
-                    <a href="{{ url_for('media', user_name=username, page=current_page+1, type=mediaType) }}"
-                       class="btn btn-secondary">Next</a>
-                {% endif %}
-            </div>
-        {% endfor %}
+        <div class="flex justify-between my-4">
+            {% if has_previous_page and mediaType %}
+                <a href="{{ url_for('media', user_name=username, page=current_page-1, type=mediaType) }}"
+                   class="btn btn-secondary">Previous</a>
+            {% endif %}
+            {% if has_next_page and mediaType %}
+                <a href="{{ url_for('media', user_name=username, page=current_page+1, type=mediaType) }}"
+                   class="btn btn-secondary">Next</a>
+            {% endif %}
+        </div>
     </div>
 </main>
 
