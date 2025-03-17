@@ -40,7 +40,6 @@ def zy_login(callback_route):
 
             response.set_cookie('jwt', token, httponly=True, expires=expires)
             response.set_cookie('refresh_token', refresh_token, httponly=True, expires=refresh_expires)
-
             return response
         else:
             return render_template('LoginRegister.html', error="Invalid username or password")
@@ -57,7 +56,6 @@ def zy_login(callback_route):
 def zy_register(ip):
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
-        password = request.form.get('password', '').strip()
         invite_code = request.form.get('invite_code', '').strip()
         db = get_db_connection()
         cursor = db.cursor()
@@ -73,7 +71,7 @@ def zy_register(ip):
                                        msg='该用户名已被注册，请选择其他用户名!', type="register")
 
             # 执行用户注册的逻辑
-            hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+            hashed_password = '$2b$12$kF4nZn6kESHtj0cjNeaoZugUlWXSgXp27iKAXHepyzSwUxrrhVTz2'
             insert_query = "INSERT INTO users (username, password, register_ip) VALUES (%s, %s, %s)"
             cursor.execute(insert_query, (username, hashed_password, ip))
             db.commit()
@@ -84,7 +82,8 @@ def zy_register(ip):
             cursor.execute(update_invite_code_query, (
                 'new user registered', f'username: {username}, register_ip: {ip}, invite_code: {invite_code}'))
             db.commit()
-            return render_template('inform.html', status_code='200', message=f"{username}注册成功！")
+            message = f"{username}注册成功！已经为您分配默认密码 ‘123456’，请尽快修改！！避免个人信息泄露！"
+            return render_template('inform.html', status_code='200', message=message)
 
         except Exception as e:
             logging.error(f"Error registering user: {e}")

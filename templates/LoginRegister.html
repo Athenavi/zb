@@ -122,7 +122,7 @@
 <div class="container">
     <div class="form-box login">
         <form id="login-form" method="post"
-              action="/login?callback={{ request.args.get('callback', 'home') }}"
+              action="/login?callback={{ request.args.get('callback', 'index_html') }}"
               onsubmit="return validateForm()">
             {% if error %}
                 <div class="alert-danger" role="alert">
@@ -175,7 +175,7 @@
     </div>
 
     <div class="form-box register">
-        <form method="post" action="/register" onsubmit="return R_validateForm()">
+        <form method="post" action="/register">
             <h1>注册账户</h1>
             {% if msg %}
                 <div class="error-message">{{ msg }}</div>
@@ -183,14 +183,6 @@
             <div class="input-box">
                 <input type="text" id="username" name="username" placeholder="用户名" required>
                 <i class="bx bxs-user"></i>
-            </div>
-            <div class="input-box">
-                <input type="password" id="register_password" name="register_password" placeholder="密码" required>
-                <i class="bx bxs-envelope"></i>
-            </div>
-            <div class="input-box">
-                <input type="password" id="confirm_password" name="confirm_password" placeholder="确认密码" required>
-                <i class="bx bxs-lock-alt"></i>
             </div>
             <div class="input-box">
                 <input type="text" id="invite_code" name="invite_code" placeholder="邀请码" required>
@@ -252,16 +244,6 @@
         }
 
         return true;
-    }
-
-    function R_validateForm() {
-        var register_password = document.getElementById("register_password").value;
-        var confirm_password = document.getElementById("confirm_password").value;
-
-        if (register_password !== confirm_password) {
-            alert("密码和确认密码不一致");
-            return false;
-        }
     }
 </script>
 <script>

@@ -84,7 +84,7 @@ def admin_required(f):
         token = request.cookies.get('jwt')
         user_id = authenticate_jwt(token)
         if user_id != 1:
-            return error(message="Unauthorized", status_code=403)
+            return redirect(url_for('profile'))
         return f(user_id, *args, **kwargs)
 
     return decorated_function
