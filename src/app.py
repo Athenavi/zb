@@ -543,19 +543,17 @@ def get_theme_detail(theme_id):
 @app.route('/theme/<theme_id>/<img_name>')
 def get_screenshot(theme_id, img_name):
     if theme_id == 'default':
-        return send_file('../static/favicon.ico', mimetype='image/png')
+        return send_file('../static/favicon.ico', mimetype='image/x-icon')  # 修正mime类型
+
     try:
-        img_dir = os.path.join(base_dir, 'templates', 'theme', theme_id, img_name)
-        with open(img_dir, 'rb') as f:
-            img_data = f.read()
-
-        img_io = io.BytesIO(img_data)
-        img_io.seek(0)
-
-        return send_file(img_io, mimetype='image/png', max_age=3600)
+        theme_dir: Path = Path(base_dir) / 'templates' / 'theme' / theme_id
+        return send_from_directory(theme_dir, img_name, mimetype='image/png', max_age=3600)
+    except FileNotFoundError:
+        print(f"File not found: {theme_id}/{img_name}")
+        return jsonify(error='Image not found'), 404
     except Exception as e:
-        print(f"Error in getting image path: {e}")
-        return jsonify(error='Failed to get image path')
+        print(f"Error in getting image: {e}")
+        return jsonify(error='Failed to get image'), 500
 
 
 @app.route('/favicon.ico', methods=['GET'])
@@ -2023,26 +2021,17 @@ def api_edit_tag(user_id, aid):
     tags_input = request.get_json().get('tags')
     if not isinstance(tags_input, str):
         return jsonify({'show_edit': 'error', 'message': '标签输入不是字符串'})
-
-    # 将中文逗号转换为英文逗号
     tags_input = tags_input.replace("，", ",")
-
-    # 用正则表达式限制标签数量和每个标签的长度
     tags_list = [
         tag.strip() for tag in re.split(",", tags_input, maxsplit=4) if len(tag.strip()) <= 10
     ]
-
-    # 计算标签的哈希值
     current_tag_hash = hashlib.md5(tags_input.encode(global_encoding)).hexdigest()
     previous_content_hash = cache.get(f"{aid}:tag_hash")
-
     # 检查内容是否与上一次提交相同
     if current_tag_hash == previous_content_hash:
         return jsonify({'show_edit': 'success'})
-
     # 更新缓存中的标签哈希值
     cache.set(f"{aid}:tag_hash", current_tag_hash, timeout=28800)
-
     # 写入更新后的标签到数据库
     write_tags_to_database(aid, tags_list)
     return jsonify({'show_edit': "success"})
@@ -2818,15 +2807,13 @@ def media_delete(user_id):
                         except Exception as e:
                             app.logger.error(f"删除文件失败: {str(e)}")
                             raise
-
-                        # 删除缩略图
-                        thumb_dir = os.path.join(base_dir, 'media', user_name, 'thumbs')
+                        thumb_dir: Path = Path(base_dir) / 'media' / user_name / 'thumbs'
                         if file_type == 'image':
                             thumb_name = filepath.split('\\')[-1]
                         else:
                             thumb_name = f"V-thumbs_{filepath.split('\\')[-1]}.png"
 
-                        thumb_path = os.path.join(thumb_dir, thumb_name)
+                        thumb_path: Path = Path(thumb_dir) / thumb_name
                         if os.path.exists(thumb_path):
                             try:
                                 os.remove(thumb_path)
