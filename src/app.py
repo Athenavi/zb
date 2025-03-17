@@ -22,7 +22,7 @@ import qrcode
 import requests
 from PIL import Image
 from flask import Flask, render_template, redirect, request, url_for, Response, jsonify, send_file, \
-    make_response, send_from_directory, abort
+    make_response, send_from_directory, abort, flash
 from flask_caching import Cache
 from jinja2 import select_autoescape, TemplateNotFound
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -3107,61 +3107,134 @@ def db_change_theme(user_id, theme_id):
         return False
 
 
-@app.route('/api/wx/activity')
+@app.route('/api/wx/activity', methods=['GET'])
 def api_wx_activity():
-    content = {
-        "code": 0,
-        "data": [
-            {
-                "id": 1,
-                "title": "周末户外徒步",
-                "cover_img": "https://7trees.cn/api/cover/2.png?format=webp",
-                "start_time": 1672531200000,
-                "end_time": 1672617600000,
-                "address": "西湖风景区",
-                "status": "ongoing"
-            },
-            {
-                "id": 2,
-                "title": "周末户外徒步2",
-                "cover_img": "https://7trees.cn/api/cover/53.png?format=webp",
-                "start_time": 1672531200000,
-                "end_time": 1672617600000,
-                "address": "西湖风景区",
-                "status": "ongoing"
+    current_timestamp = int(time.time() * 1000)
+    db = get_db_connection()
+    cursor = db.cursor()
+
+    try:
+        query = """
+            SELECT 
+                activityId,
+                title,
+                cover_img,
+                start_time,
+                end_time,
+                list_address
+            FROM activities
+            WHERE is_deleted = 0
+        """
+        cursor.execute(query)
+        activities = cursor.fetchall()
+        activities_list = []
+        for activity in activities:
+            activity_dict = {
+                'id': activity[0],
+                'title': activity[1],
+                'cover_img': activity[2],
+                'start_time': activity[3],
+                'end_time': activity[4],
+                'address': activity[5],
             }
-        ]
-    }
-    return content
+            if current_timestamp < activity_dict['start_time']:
+                activity_dict['status'] = "upcoming"
+            elif activity_dict['start_time'] <= current_timestamp <= activity_dict['end_time']:
+                activity_dict['status'] = "ongoing"
+            else:
+                activity_dict['status'] = "ended"
+            activities_list.append(activity_dict)
+
+        return jsonify({
+            "code": 0,
+            "data": activities_list
+        })
+    finally:
+        cursor.close()
+        db.close()
 
 
-@app.route('/api/wx/activity')
+@app.route('/api/wx/activity/<int:activity_id>', methods=['GET'])
 def api_wx_activity_detail(activity_id):
-    activity_id = int(request.args.get('id'))
-    if activity_id == 1:
-        detail = {
-            "success": True,
-            "data": {
-                "id": 1,
-                "title": "活动标题",
-                "time": "2023-09-30 14:00",
-                "location": "活动地点",
-                "content": "活动详情内容..."
-            }
-        }
-    else:
-        detail = {
-            "success": True,
-            "data": {
-                "id": 2,
-                "title": "活动标题2",
-                "time": "2023-09-30 14:00",
-                "location": "活动地点",
-                "content": "活动详情内容..."
-            }
+    db = get_db_connection()
+    cursor = db.cursor()
+
+    try:
+        query = """
+            SELECT 
+                cover_img,
+                title,
+                start_time,
+                end_time,
+                detail_location,
+                content
+            FROM activities
+            WHERE activityId = %s AND is_deleted = 0
+        """
+        cursor.execute(query, (activity_id,))
+        activity = cursor.fetchone()
+        if activity is None:
+            return jsonify({
+                "success": False,
+                "message": "活动未找到"
+            }), 404
+
+        start_timestamp = activity[2] / 1000
+        end_timestamp = activity[3] / 1000
+
+        start_time = datetime.fromtimestamp(start_timestamp).strftime('%Y-%m-%d')
+        end_time = datetime.fromtimestamp(end_timestamp).strftime('%Y-%m-%d')
+
+        activity_dict = {
+            "id": activity_id,
+            "title": activity[1],
+            "time": f"{start_time} - {end_time}",
+            "location": activity[4],
+            "content": activity[5],
+            "cover_img": activity[0]
         }
 
-    return detail
+        return jsonify({
+            "success": True,
+            "data": activity_dict
+        })
+    finally:
+        cursor.close()
+        db.close()
+
+
+@app.route('/activity/new', methods=['GET', 'POST'])
+def new_activity():
+    if request.method == 'POST':
+        title = request.form.get('title')
+        cover_img = request.form.get('cover_img')
+        start_time = request.form.get('start_time')
+        end_time = request.form.get('end_time')
+        list_address = request.form.get('list_address')
+        detail_location = request.form.get('detail_location')
+        display_time = request.form.get('display_time')
+        content = request.form.get('content')
+
+        db = get_db_connection()
+        cursor = db.cursor()
+        try:
+            cursor.execute(
+                "INSERT INTO activities (title, cover_img, start_time, end_time, list_address, detail_location, display_time, content) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                (title, cover_img, start_time, end_time, list_address, detail_location, display_time, content)
+            )
+            db.commit()
+            flash('活动创建成功！', 'success')
+        except Exception as e:
+            db.rollback()
+            flash('创建活动失败！', 'danger')
+            print(e)
+        finally:
+            cursor.close()
+            db.close()
+        return redirect(url_for('new_activity'))
+
+    return render_template('activity-form.html')
 
 
 @app.errorhandler(404)
