@@ -3033,13 +3033,13 @@ def delete_theme():
     if not theme_id:
         return jsonify({'error': 'Missing theme_id'}), 400
 
-    if not re.match(r'^[a-zA-Z0-9_-]+$', theme_id):
-        return jsonify({'error': 'Invalid theme_id format'}), 400
+    if theme_id == 'default':
+        return jsonify({'message': 'default Theme can not be deleted'}), 403
 
-    theme_dir = base_dir / 'templates' / theme_id
+    theme_dir = Path(base_dir) / 'templates' / 'theme' / theme_id
 
     try:
-        if not theme_dir.resolve().relative_to(base_dir.resolve()):
+        if not theme_dir.resolve().relative_to(Path(base_dir).resolve()):
             return jsonify({'error': 'Invalid theme path'}), 400
     except ValueError:
         return jsonify({'error': 'Path traversal attempt detected'}), 400
@@ -3051,8 +3051,6 @@ def delete_theme():
     try:
         # 执行删除
         shutil.rmtree(theme_dir)
-
-        # 如果删除的是当前主题，重置缓存
         current_theme = cache.get('display_theme')
         if current_theme == theme_id:
             cache.set('display_theme', 'default')

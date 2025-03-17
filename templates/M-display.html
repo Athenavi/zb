@@ -26,7 +26,7 @@
                 </div>
             </form>
             {% for display in displayList %}
-                <li>
+                <li id="{{ display }}">
                     {{ display }}
                     <button class="btn btn-primary btn-block" onclick="showDetail('{{ display }}')">查看详情
                     </button>
@@ -67,6 +67,7 @@
                         <p id="versionCode"></p>
                         <p id="statu"></p>
                         <button id="changeDisplay">应用此主题(预览)</button>
+                        <button id="deleteDisplay">删除此主题(预览)</button>
                     </div>
                 </div>
             </div>
@@ -128,6 +129,39 @@
                 });
         });
 
+        document.getElementById("deleteDisplay").addEventListener("click", function () {
+            const themeId = document.getElementById("themeId").innerText;
+            if (!confirm(`确定要删除主题『${themeId}』吗？此操作不可恢复！`)) {
+                return;
+            }
+
+            fetch(`/api/theme?theme_id=${encodeURIComponent(themeId)}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            })
+                .then(response => {
+                    return response.json().then(data => ({
+                        status: response.status,
+                        data
+                    }));
+                })
+                .then(({status, data}) => {
+                    if (status === 200) {
+                        // 成功处理
+                        alert(data.message || '主题删除成功');
+                        document.getElementById("title").textContent = "标题: " + themeId + " (已删除)";
+                        const themeItem = document.getElementById(themeId);
+                        if (themeItem) themeItem.remove();
+                    } else {
+                        // 显示服务端返回的具体错误
+                        alert(`删除失败 (${status}): ${data.error || data.message || '未知错误'}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Delete request failed:', error);
+                    alert('请求发送失败，请检查网络连接');
+                });
+        });
 
     </script>
     <script>
