@@ -2355,7 +2355,7 @@ def featured_page():
             FROM `articles`
             WHERE `Hidden` = 0
               AND `Status` = 'Published'
-              AND `is_featured` = 1
+              AND `is_featured` >= 127
             ORDER BY `ArticleID` DESC
                 LIMIT %s
             OFFSET %s \

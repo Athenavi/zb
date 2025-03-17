@@ -31,29 +31,31 @@
             </thead>
             <tbody>
             {% for user in users %}
-                <td class="py-2 px-4">{{ user['id'] }}</td>
-                <td class="py-2 px-4">{{ user['username'] }}</td>
-                <td class="py-2 px-4">{{ user['email'] }}</td>
-                <td class="py-2 px-4">
-                    {% if user['profile_picture'] %}
-                        <img width="50" height="50"
-                             src="{{ domain +'api/avatar/' + user['profile_picture'] + '.webp' }}"
-                             onmousemove="showBigPic(event, this.src)"
-                             onmouseout="closeimg()" alt=""/>
-                    {% else %}
-                        暂无头像
-                    {% endif %}
-                </td>
-                <td class="py-2 px-4">{{ user['bio'] }}</td>
-                <td class="py-2 px-4">{{ user['role'] }}</td>
-                <td class="py-2 px-4">{{ user['created_at'] }}</td>
-                <td class="py-2 px-4">{{ user['register_ip'] }}</td>
-                <td class="py-2 px-4">
-                    <a href="#" class="text-blue-500 hover:underline"
-                       onclick="editUser({{ user['id'] }},'{{ user['username'] }}')">编辑</a> |
-                    {% if user['id'] != 1 %}<a href="#" class="text-red-500 hover:underline"
-                                               onclick="deleteUser({{ user['id'] }})">删除</a>{% endif %}
-                </td>
+                <tr>
+                    <td class="py-2 px-4">{{ user['id'] }}</td>
+                    <td class="py-2 px-4">{{ user['username'] }}</td>
+                    <td class="py-2 px-4">{{ user['email'] }}</td>
+                    <td class="py-2 px-4">
+                        {% if user['profile_picture'] %}
+                            <img width="50" height="50"
+                                 src="{{ domain +'api/avatar/' + user['profile_picture'] + '.webp' }}"
+                                 onmousemove="showBigPic(event, this.src)"
+                                 onmouseout="closeimg()" alt=""/>
+                        {% else %}
+                            暂无头像
+                        {% endif %}
+                    </td>
+                    <td class="py-2 px-4">{{ user['bio'] }}</td>
+                    <td class="py-2 px-4">{{ user['role'] }}</td>
+                    <td class="py-2 px-4">{{ user['created_at'] }}</td>
+                    <td class="py-2 px-4">{{ user['register_ip'] }}</td>
+                    <td class="py-2 px-4">
+                        <a href="#" class="text-blue-500 hover:underline"
+                           onclick="editUser({{ user['id'] }},'{{ user['username'] }}')">编辑</a> |
+                        {% if user['id'] != 1 %}<a href="#" class="text-red-500 hover:underline"
+                                                   onclick="deleteUser({{ user['id'] }})">删除</a>{% endif %}
+                    </td>
+                </tr>
             {% endfor %}
             </tbody>
         </table>
@@ -68,9 +70,9 @@
             <input type="text" id="edit-username"><br>
             <label for="edit-user-role"></label><select name="type" class="form-control focus:outline-none
                    focus:ring-2 focus:ring-blue-500" id="edit-user-role">
-                <option value="Subscriber">订阅者</option>
-                <option value="Editor">编者</option>
-            </select>
+            <option value="Subscriber">订阅者</option>
+            <option value="Editor">编者</option>
+        </select>
             <button onclick="saveEdit()">保存</button>
             <button onclick="closeEditModal()">取消</button>
         </div>
