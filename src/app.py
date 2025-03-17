@@ -23,7 +23,7 @@ from PIL import Image
 from flask import Flask, render_template, redirect, request, url_for, Response, jsonify, send_file, \
     make_response, send_from_directory, abort
 from flask_caching import Cache
-from jinja2 import select_autoescape
+from jinja2 import select_autoescape, TemplateNotFound
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
 
@@ -397,43 +397,6 @@ def confirm_password(user_id):
 def change_password(user_id):
     ip = get_client_ip(request)
     return zy_change_password(user_id, ip)
-
-
-@app.route('/admin/changeTheme', methods=['POST'])
-@admin_required
-def change_display(user_id):
-    if cache.get("Theme_Lock"):
-        return "failed"
-    theme_id = request.args.get('NT')
-
-    if not theme_id:
-        return error("非管理员用户禁止访问！！！", 403)
-
-    current_theme = get_current_theme()
-
-    if theme_id == current_theme:
-        return "failed001"
-
-    # 使用上下文管理器处理数据库连接
-    try:
-        if theme_id == 'default':
-            cache.set('display_theme', theme_id)
-            cache.set(f"Theme_Lock", theme_id, timeout=15)  # 设置超时
-            return 'success'
-
-        if not theme_safe_check(theme_id, channel=2):
-            return "failed"
-
-        # 更新缓存并插入数据库记录
-        cache.set('display_theme', theme_id)
-        cache.set(f"Theme_Lock", theme_id, timeout=15)  # 设置超时
-
-        app.logger.info(f'{user_id} : change theme to {theme_id}')
-        return "success"
-
-    except Exception as e:
-        logging.error(f"Error during theme change: {e}")
-        return error("未知错误", 500), 500
 
 
 @app.route('/Admin_upload', methods=['POST'])
@@ -822,13 +785,6 @@ def like(user_id):
             db.close()
     else:
         return jsonify({'like_code': 'failed'})
-
-
-def get_current_theme():
-    current_theme = cache.get('display_theme')
-    if current_theme is None:
-        current_theme = 'default'
-    return current_theme
 
 
 def sanitize_user_agent(user_agent):
@@ -2269,17 +2225,27 @@ def index_html():
         total_pages = (total_articles + page_size - 1) // page_size
     except Exception as e:
         return error(str(e), 500)
-
-    html_content = render_template('index.html', article_info=article_info, page=page, total_pages=total_pages)
-
-    # 生成 ETag（基于数据版本）
-    etag = generate_etag(total_articles, article_info, page)
-
+    html_content, etag = handle_data(total_articles, article_info, page, total_pages)
     # 设置响应头
     response = make_response(html_content)
     response.set_etag(etag)
     response.headers['Cache-Control'] = 'public, max-age=180'
     return response.make_conditional(request.environ)
+
+
+def handle_data(total_articles, article_info, page, total_pages):
+    current_theme = get_current_theme()
+    template_rel_path = f'theme/{current_theme}/index.html' if current_theme != 'default' else 'index.html'
+
+    try:
+        loader = app.jinja_loader
+        loader.get_source(app.jinja_env, template_rel_path)
+    except TemplateNotFound:
+        cache.set('display_theme', 'default')
+        template_rel_path = 'index.html'
+    html_content = render_template(template_rel_path, article_info=article_info, page=page, total_pages=total_pages)
+    etag = generate_etag(total_articles, article_info, page, current_theme)
+    return html_content, etag
 
 
 @app.route('/tag/<tag_name>', methods=['GET'])
@@ -2321,9 +2287,7 @@ def tag_page(tag_name):
     except Exception:
         return error("获取文章时发生错误。", status_code=500)
 
-    html_content = render_template('index.html', article_info=article_info, page=page, total_pages=total_pages,
-                                   tag_name=tag_name)
-    etag = generate_etag(total_articles, article_info, page)
+    html_content, etag = handle_data(total_articles, article_info, page, total_pages)
 
     # 设置响应头
     response = make_response(html_content)
@@ -2367,12 +2331,7 @@ def featured_page():
 
     except Exception:
         return error("获取文章时发生错误。", status_code=500)
-    html_content = render_template('index.html', article_info=article_info, page=page, total_pages=total_pages,
-                                   tag_name='featured')
-
-    etag = generate_etag(total_articles, article_info, page)
-
-    # 设置响应头
+    html_content, etag = handle_data(total_articles, article_info, page, total_pages)
     response = make_response(html_content)
     response.set_etag(etag)
     response.headers['Cache-Control'] = 'public, max-age=180'
@@ -3057,6 +3016,75 @@ def export(user_id):
         '0': '请不要泄露此信息，请勿透露给他人！若信息为空请进入个人中心一次，即可获取！'
     }
     return jsonify(result)
+
+
+@app.route('/api/theme', methods=['GET'])
+def get_current_theme():
+    current_theme = cache.get('display_theme')
+    if current_theme is None:
+        try:
+            with get_db_connection() as db:
+                with db.cursor() as cursor:
+                    query = """
+                        SELECT field_value FROM custom_fields WHERE user_id = 1 AND field_name = 'theme' ORDER BY id DESC LIMIT 1;
+                    """
+                    cursor.execute(query)
+                    result = cursor.fetchone()
+                    current_theme = result[0] if result else 'default'
+        except Exception as e:
+            app.logger.error(f"Error getting current theme: {e}")
+            current_theme = 'default'
+        cache.set('display_theme', current_theme)
+    return str(current_theme)
+
+
+@app.route('/api/theme', methods=['PUT'])
+@admin_required
+def change_display(user_id):
+    if cache.get("Theme_Lock"):
+        return "failed"
+    theme_id = request.args.get('NT')
+
+    if not theme_id:
+        return "failed403"
+
+    current_theme = get_current_theme()
+
+    if theme_id == current_theme:
+        return "failed001"
+
+    # 使用上下文管理器处理数据库连接
+    try:
+        if theme_id == 'default':
+            cache.set('display_theme', theme_id)
+            cache.set(f"Theme_Lock", theme_id, timeout=15)
+            return 'success'
+
+        if not theme_safe_check(theme_id, channel=2):
+            return "failed"
+
+        if db_change_theme(user_id, theme_id):
+            # 更新缓存并插入数据库记录
+            cache.set('display_theme', theme_id)
+            cache.set(f"Theme_Lock", theme_id, timeout=15)
+        app.logger.info(f'{user_id} : change theme to {theme_id}')
+        return "success"
+
+    except Exception as e:
+        logging.error(f"Error during theme change: {e}")
+        return "failed500"
+
+
+def db_change_theme(user_id, theme_id):
+    try:
+        with get_db_connection() as db:
+            with db.cursor() as cursor:
+                query = "INSERT `custom_fields` (`user_id`,`field_name`, `field_value`) VALUES (%s, %s, %s)"
+                cursor.execute(query, (user_id, "theme", theme_id))
+                db.commit()
+                return True
+    except Exception as e:
+        return False
 
 
 @app.route('/api/wx/activity')
