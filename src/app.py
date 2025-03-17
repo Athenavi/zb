@@ -8,6 +8,7 @@ import logging
 import os
 import random
 import re
+import shutil
 import time
 import urllib.parse
 import uuid
@@ -3025,6 +3026,45 @@ def get_current_theme():
     return str(current_theme)
 
 
+@app.route('/api/theme', methods=['DELETE'])
+def delete_theme():
+    # 参数校验
+    theme_id = request.args.get('theme_id')
+    if not theme_id:
+        return jsonify({'error': 'Missing theme_id'}), 400
+
+    if not re.match(r'^[a-zA-Z0-9_-]+$', theme_id):
+        return jsonify({'error': 'Invalid theme_id format'}), 400
+
+    theme_dir = base_dir / 'templates' / theme_id
+
+    try:
+        if not theme_dir.resolve().relative_to(base_dir.resolve()):
+            return jsonify({'error': 'Invalid theme path'}), 400
+    except ValueError:
+        return jsonify({'error': 'Path traversal attempt detected'}), 400
+
+    # 检查目录存在性
+    if not theme_dir.is_dir():
+        return jsonify({'error': 'Theme not found'}), 404
+
+    try:
+        # 执行删除
+        shutil.rmtree(theme_dir)
+
+        # 如果删除的是当前主题，重置缓存
+        current_theme = cache.get('display_theme')
+        if current_theme == theme_id:
+            cache.set('display_theme', 'default')
+            # 可选：清理相关缓存模板
+            cache.delete_memoized(index_html)
+
+        return jsonify({'message': 'Theme deleted successfully'}), 200
+
+    except Exception as e:
+        return jsonify({'error': f'Deletion failed: {str(e)}'}), 500
+
+
 @app.route('/api/theme', methods=['PUT'])
 @admin_required
 def change_display(user_id):
@@ -3060,6 +3100,8 @@ def change_display(user_id):
     except Exception as e:
         logging.error(f"Error during theme change: {e}")
         return "failed500"
+    finally:
+        cache.delete_memoized(index_html)
 
 
 def db_change_theme(user_id, theme_id):
