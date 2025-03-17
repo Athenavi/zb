@@ -3068,49 +3068,42 @@ def delete_theme():
 def change_display(user_id):
     if cache.get("Theme_Lock"):
         return "failed"
-    theme_id = request.args.get('NT')
 
+    theme_id = request.args.get('NT')
     if not theme_id:
         return "failed403"
 
     current_theme = get_current_theme()
-
     if theme_id == current_theme:
         return "failed001"
 
-    # 使用上下文管理器处理数据库连接
-    try:
-        if theme_id == 'default':
-            cache.set('display_theme', theme_id)
-            cache.set(f"Theme_Lock", theme_id, timeout=15)
-            return 'success'
-
-        if not theme_safe_check(theme_id, channel=2):
-            return "failed"
-
-        if db_change_theme(user_id, theme_id):
-            # 更新缓存并插入数据库记录
-            cache.set('display_theme', theme_id)
-            cache.set(f"Theme_Lock", theme_id, timeout=15)
-        app.logger.info(f'{user_id} : change theme to {theme_id}')
-        return "success"
-
-    except Exception as e:
-        logging.error(f"Error during theme change: {e}")
-        return "failed500"
-    finally:
-        cache.delete_memoized(index_html)
+    if theme_id == 'default' or theme_safe_check(theme_id, channel=2):
+        try:
+            if db_change_theme(user_id, theme_id):
+                cache.set('display_theme', theme_id)
+                cache.set(f"Theme_Lock", theme_id, timeout=15)
+                app.logger.info(f'{user_id} : change theme to {theme_id}')
+                return "success"
+            else:
+                return "failed"
+        except Exception as e:
+            logging.error(f"Error during theme change: {e}")
+            return "failed500"
+        finally:
+            cache.delete_memoized(index_html)
+    else:
+        return "failed"
 
 
 def db_change_theme(user_id, theme_id):
     try:
         with get_db_connection() as db:
             with db.cursor() as cursor:
-                query = "INSERT `custom_fields` (`user_id`,`field_name`, `field_value`) VALUES (%s, %s, %s)"
+                query = "INSERT INTO `custom_fields` (`user_id`, `field_name`, `field_value`) VALUES (%s, %s, %s)"
                 cursor.execute(query, (user_id, "theme", theme_id))
                 db.commit()
                 return True
-    except Exception as e:
+    except Exception:
         return False
 
 
