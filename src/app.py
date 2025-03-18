@@ -1316,7 +1316,7 @@ def api_report(user_id):
         cache.set(f"reportLock{report_id}_{user_id}", report_id, timeout=3600)
         return jsonify({'report-id': report_id, 'info': '举报已记录'}), 201
     else:
-        return jsonify({"message": "评论失败"}), 500
+        return jsonify({"message": "举报失败"}), 500
 
 
 def report_add(user_id, reported_type, reported_id, reason):
@@ -3235,6 +3235,147 @@ def new_activity():
         return redirect(url_for('new_activity'))
 
     return render_template('activity-form.html')
+
+
+@app.route('/activity', methods=['DELETE'])
+def delete_activity():
+    activity_id = request.args.get('activity_id')
+    if not activity_id:
+        return jsonify({'error': 'Missing activity_id'}), 400
+
+    db = get_db_connection()
+    cursor = db.cursor()
+    try:
+        cursor.execute("UPDATE activities SET is_deleted = 1 WHERE activityId = %s", (activity_id,))
+        db.commit()
+        flash('活动删除成功！', 'info')
+    except Exception as e:
+        db.rollback()
+        flash('删除活动失败！', 'danger')
+        print(e)
+    finally:
+        cursor.close()
+        db.close()
+    return redirect(url_for('new_activity'))
+
+
+@app.route('/guestbook', methods=['GET', 'POST'])
+def guestbook():
+    return '当前功能暂未开放！'
+
+
+@app.route('/api/submit_report', methods=['POST'])
+def submit_report():
+    data = request.json
+    required_fields = ['phone', 'reportContent', 'imageList']
+
+    # 验证必填字段
+    for field in required_fields:
+        if not data.get(field):
+            return jsonify({'code': 400, 'msg': f'Missing {field}'})
+
+    # 生成报告 UUID
+    report_id = uuid.uuid4().hex
+    report_data = {
+        'id': report_id,
+        'name': data.get('name', ''),
+        'phone': data['phone'],
+        'content': data['reportContent'],
+        'images': data.get('imageList', []),
+        'status': 'pending',
+        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+    }
+
+    # 保存报告文件
+    report_dir = Path(base_dir) / 'reports'
+    report_file = report_dir / f'{report_id}.json'
+
+    # 确保 reports 目录存在
+    report_dir.mkdir(parents=True, exist_ok=True)
+
+    with open(report_file, 'w', encoding='utf-8') as f:
+        json.dump(report_data, f, ensure_ascii=False, indent=2)
+
+    return jsonify({'code': 200, 'data': {'report_id': report_id}})
+
+
+@app.route('/api/wx/report', methods=['POST'])
+def api_wx_report():
+    user_id = 1
+    try:
+        report_id = int(request.json.get('report-id'))
+        report_type = request.json.get('report-type') or ''
+        report_reason = request.json.get('report-reason') or ''
+        reason = report_type + report_reason
+    except (TypeError, ValueError):
+        return jsonify({"message": "Invalid Report ID"}), 400
+
+    if report_id == cache.get(f"reportLock{report_id}_{user_id}"):
+        return jsonify({"message": "已提交举报，请勿重复提交"}), 400
+
+    result = report_add(user_id, "Comment", report_id, reason)
+
+    if result:
+        cache.set(f"reportLock{report_id}_{user_id}", report_id, timeout=3600)
+        return jsonify({'report-id': report_id, 'info': '举报已记录'}), 201
+    else:
+        return jsonify({"message": "举报失败"}), 500
+
+
+@app.route('/api/get_report/<report_id>', methods=['GET'])
+def get_report(report_id):
+    try:
+        report_file = Path(base_dir) / 'reports' / f'{report_id}.json'
+        if not report_file.exists():
+            return jsonify({'code': 404, 'msg': '报告不存在'}), 404
+        return send_file(report_file, as_attachment=True, max_age=86400)
+    except Exception as e:
+        return jsonify({'code': 500, 'msg': f'服务器错误: {str(e)}'}), 500
+
+
+@app.route('/api/upload_image', methods=['POST'])
+def upload_image():
+    key = request.form.get('key')
+    if key != DEFAULT_KEY:
+        return jsonify({'code': 503, 'msg': 'File type not allowed'})
+    (Path(base_dir) / 'uploads').mkdir(parents=True, exist_ok=True)
+    if 'file' not in request.files:
+        return jsonify({'code': 400, 'msg': 'No file part'})
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'code': 400, 'msg': 'No selected file'})
+    if file:
+        filename = secure_filename(file.filename)
+        unique_filename = f"{uuid.uuid4().hex}_{filename}"
+        save_path = os.path.join('uploads', unique_filename)
+        file.save(save_path)
+        return jsonify({
+            'code': 200,
+            'data': {
+                'url': f"{domain}uploads/{unique_filename}",
+                'path': unique_filename
+            }
+        })
+
+    return jsonify({'code': 400, 'msg': 'File type not allowed'})
+
+
+@app.route('/uploads/<filename>', methods=['GET'])
+def uploaded_file(filename):
+    # 检查文件名是否以允许的图片后缀结束
+    if not any(filename.lower().endswith(ext) for ext in app.config['ALLOWED_EXTENSIONS']):
+        return jsonify({'code': 403, 'msg': 'Access denied, file type not allowed'}), 403
+
+    # 构建文件路径
+    file = Path(base_dir) / 'uploads' / filename
+
+    # 检查文件是否存在
+    if not file.exists():
+        return jsonify({'code': 404, 'msg': 'File not found'}), 404
+
+    # 发送文件
+    return send_file(file, max_age=86400)
 
 
 @app.errorhandler(404)
