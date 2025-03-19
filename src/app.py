@@ -3234,7 +3234,7 @@ def new_activity():
             db.close()
         return redirect(url_for('new_activity'))
 
-    return render_template('activity-form.html')
+    return render_template('activity-form.html', DEFAULT_KEY=DEFAULT_KEY)
 
 
 @app.route('/activity', methods=['DELETE'])
@@ -3262,6 +3262,62 @@ def delete_activity():
 @app.route('/guestbook', methods=['GET', 'POST'])
 def guestbook():
     return '当前功能暂未开放！'
+
+
+@app.route('/dashboard/activities', methods=['GET', 'POST'])
+def m_activities():
+    if request.method == 'POST':
+        # 处理表单提交
+        activity_id = request.form.get('activity_id')
+        title = request.form.get('title')
+        cover_img = request.form.get('cover_img')
+        start_time = request.form.get('start_time')
+        end_time = request.form.get('end_time')
+        list_address = request.form.get('list_address')
+        detail_location = request.form.get('detail_location')
+        display_time = request.form.get('display_time')
+        content = request.form.get('content')
+        is_deleted = request.form.get('is_deleted', 0)
+
+        # 更新或插入活动
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        if activity_id:
+            cursor.execute(
+                'UPDATE activities SET title=%s, cover_img=%s, start_time=%s, end_time=%s, list_address=%s, detail_location=%s, display_time=%s, content=%s, is_deleted=%s WHERE activityId=%s',
+                (title, cover_img, start_time, end_time, list_address, detail_location, display_time, content,
+                 is_deleted, activity_id))
+        else:
+            cursor.execute(
+                'INSERT INTO activities (title, cover_img, start_time, end_time, list_address, detail_location, display_time, content, is_deleted) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)',
+                (title, cover_img, start_time, end_time, list_address, detail_location, display_time, content,
+                 is_deleted))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return redirect(url_for('m_activities'))
+
+    # 处理活动选择
+    activity_id = request.args.get('activity_id')
+    activity_details = None
+    if activity_id:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute('SELECT * FROM activities WHERE activityId=%s', (activity_id,))
+        activity_details = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+    # 获取活动列表
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute('SELECT activityId, title FROM activities WHERE is_deleted=0')
+    activities = cursor.fetchall()
+    cursor.close()
+    conn.close()
+
+    return render_template('M-activities.html', activities=activities, activity_details=activity_details,
+                           DEFAULT_KEY=DEFAULT_KEY)
 
 
 @app.route('/api/submit_report', methods=['POST'])
@@ -3299,29 +3355,6 @@ def submit_report():
     return jsonify({'code': 200, 'data': {'report_id': report_id}})
 
 
-@app.route('/api/wx/report', methods=['POST'])
-def api_wx_report():
-    user_id = 1
-    try:
-        report_id = int(request.json.get('report-id'))
-        report_type = request.json.get('report-type') or ''
-        report_reason = request.json.get('report-reason') or ''
-        reason = report_type + report_reason
-    except (TypeError, ValueError):
-        return jsonify({"message": "Invalid Report ID"}), 400
-
-    if report_id == cache.get(f"reportLock{report_id}_{user_id}"):
-        return jsonify({"message": "已提交举报，请勿重复提交"}), 400
-
-    result = report_add(user_id, "Comment", report_id, reason)
-
-    if result:
-        cache.set(f"reportLock{report_id}_{user_id}", report_id, timeout=3600)
-        return jsonify({'report-id': report_id, 'info': '举报已记录'}), 201
-    else:
-        return jsonify({"message": "举报失败"}), 500
-
-
 @app.route('/api/get_report/<report_id>', methods=['GET'])
 def get_report(report_id):
     try:
@@ -3335,7 +3368,7 @@ def get_report(report_id):
 
 @app.route('/api/upload_image', methods=['POST'])
 def upload_image():
-    key = request.form.get('key')
+    key = request.args.get('key')
     if key != DEFAULT_KEY:
         return jsonify({'code': 503, 'msg': 'File type not allowed'})
     (Path(base_dir) / 'uploads').mkdir(parents=True, exist_ok=True)
@@ -3376,6 +3409,61 @@ def uploaded_file(filename):
 
     # 发送文件
     return send_file(file, max_age=86400)
+
+
+def create_access_token(identity, phone):
+    # 添加过期时间（这里设置为24小时）
+    expiration_time = datetime.now(tz=timezone.utc) + timedelta(seconds=86400)
+    payload = {
+        'identity': identity,
+        'exp': expiration_time.timestamp(),
+        'phone': phone
+    }
+    return jwt.encode(payload, DEFAULT_KEY, algorithm='HS256')
+
+
+@app.route('/api/wx/auth', methods=['GET', 'POST'])
+def decode_access_token(token):
+    token = request.args.get('token')
+    try:
+        decoded_payload = jwt.decode(token, DEFAULT_KEY, algorithms=['HS256'])
+        return decoded_payload
+    except jwt.ExpiredSignatureError:
+        return {'error': 'Token has expired'}
+    except jwt.InvalidTokenError:
+        return {'error': 'Invalid token'}
+
+
+@app.route('/api/wx/login', methods=['POST'])
+def wx_login():
+    try:
+        if not request.is_json:
+            return jsonify({"msg": "Request must be JSON"}), 400
+
+        data = request.get_json()
+        username = data.get('username')
+        phone = data.get('phone')
+
+        if not username or not phone:
+            return jsonify({"msg": "Username and phone are required"}), 400
+
+        if not re.match(r'^1[3-9]\d{9}$', phone):
+            return jsonify({"msg": "Invalid phone number"}), 400
+
+        access_token = create_access_token(identity=username, phone=phone)
+        return jsonify(
+            access_token=access_token,
+            channel='wx',
+            code=200
+        ), 200
+
+    except Exception as e:
+        app.logger.error(f"Error: {str(e)}")
+        return jsonify({"msg": "Internal server error"}), 500
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
 
 
 @app.errorhandler(404)

@@ -439,19 +439,22 @@ COMMIT;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 
 
-CREATE TABLE activities (
-    activityId INT PRIMARY KEY AUTO_INCREMENT,
-    title VARCHAR(255) NOT NULL COMMENT '活动标题',
-    cover_img VARCHAR(255) NOT NULL COMMENT '封面图URL',
-    start_time BIGINT NOT NULL COMMENT '开始时间（毫秒时间戳）',
-    end_time BIGINT NOT NULL COMMENT '结束时间（毫秒时间戳）',
-    list_address VARCHAR(255) NOT NULL COMMENT '列表展示地址',
-    detail_location VARCHAR(255) NOT NULL COMMENT '详情页地点',
-    display_time VARCHAR(50) NOT NULL COMMENT '前端展示时间（如：2023-09-30 14:00）',
-    content TEXT NOT NULL COMMENT '活动详情正文',
-    is_deleted TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标记，0 为未删除，1 为已删除'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+create table activities
+(
+    activityId      int auto_increment
+        primary key,
+    title           varchar(255)         not null comment '活动标题',
+    cover_img       varchar(255)         not null comment '封面图URL',
+    start_time      bigint               not null comment '开始时间（毫秒时间戳）',
+    end_time        bigint               not null comment '结束时间（毫秒时间戳）',
+    list_address    varchar(255)         not null comment '列表展示地址',
+    detail_location varchar(255)         not null comment '详情页地点',
+    display_time    bigint               null comment '前端展示时间（时间戳，毫秒单位）',
+    content         text                 not null comment '活动详情正文',
+    is_deleted      tinyint(1) default 0 not null comment '软删除标记，0 为未删除，1 为已删除',
+    constraint chk_time
+        check (`end_time` >= `start_time`)
+);
 
-ALTER TABLE activities ADD CONSTRAINT chk_time CHECK (end_time >= start_time);
-
-CREATE INDEX idx_is_deleted ON activities (is_deleted);
+create index idx_is_deleted
+    on activities (is_deleted);

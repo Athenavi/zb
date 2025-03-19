@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>创建新活动</title>
+    <script>
+        // 时间转换函数
+        function convertTimestamp() {
+            // 处理展示时间
+            const displayInput = document.getElementById('display_time_input');
+            const displayHidden = document.getElementById('display_time');
+            if (displayInput.value) {
+                const date = new Date(displayInput.value);
+                displayHidden.value = date.getTime();
+            }
+
+            // 处理开始时间
+            const startInput = document.getElementById('start_time_input');
+            const startHidden = document.getElementById('start_time');
+            if (startInput.value) {
+                const date = new Date(startInput.value);
+                startHidden.value = date.getTime();
+            }
+
+            // 处理结束时间
+            const endInput = document.getElementById('end_time_input');
+            const endHidden = document.getElementById('end_time');
+            if (endInput.value) {
+                const date = new Date(endInput.value);
+                endHidden.value = date.getTime();
+            }
+        }
+
+        // 初始化时间输入
+        function initDateTimeInputs() {
+            const initInput = (hiddenId, inputId) => {
+                const hidden = document.getElementById(hiddenId);
+                const input = document.getElementById(inputId);
+                if (hidden.value) {
+                    const date = new Date(parseInt(hidden.value));
+                    input.value = date.toISOString().slice(0, 16);
+                }
+            }
+
+            initInput('display_time', 'display_time_input');
+            initInput('start_time', 'start_time_input');
+            initInput('end_time', 'end_time_input');
+        }
+
+        window.onload = function () {
+            initDateTimeInputs();
+        };
+    </script>
+</head>
+<body>
+<h1>创建新活动</h1>
+
+<!-- 消息提示 -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        <div class="messages">
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endwith %}
+
+<form method="POST" onsubmit="convertTimestamp()">
+    <!-- 时间戳隐藏字段 -->
+    <input type="hidden" name="start_time" id="start_time">
+    <input type="hidden" name="end_time" id="end_time">
+    <input type="hidden" name="display_time" id="display_time">
+
+    <div class="form-group">
+        <label>活动标题：</label>
+        <input type="text" name="title" required class="form-control">
+    </div>
+
+    <!-- 在封面图URL的form-group中添加文件上传 -->
+    <div class="form-group">
+        <label>封面图URL：</label>
+        <div class="upload-container">
+            <input type="url" name="cover_img" required class="form-control" id="cover_img_input">
+            <label class="upload-btn">
+                上传图片
+                <input type="file" id="cover_upload" accept="image/*" hidden>
+            </label>
+        </div>
+        <div id="cover_upload_status" class="upload-status"></div>
+    </div>
+
+    <div class="time-group">
+        <div class="form-group">
+            <label>开始时间：</label>
+            <input type="datetime-local" id="start_time_input" required class="form-control">
+        </div>
+
+        <div class="form-group">
+            <label>结束时间：</label>
+            <input type="datetime-local" id="end_time_input" required class="form-control">
+        </div>
+
+        <div class="form-group">
+            <label>展示时间：</label>
+            <input type="datetime-local" id="display_time_input" required class="form-control">
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>列表地址：</label>
+        <input type="text" name="list_address" required class="form-control">
+    </div>
+
+    <div class="form-group">
+        <label>详细地址：</label>
+        <input type="text" name="detail_location" required class="form-control">
+    </div>
+
+    <div class="form-group">
+        <label>活动内容：</label>
+        <textarea name="content" rows="6" required class="form-control"></textarea>
+    </div>
+
+    <button type="submit" class="submit-btn">创建活动</button>
+</form>
+
+
+<script>
+    const DEFAULT_KEY = "{{ DEFAULT_KEY }}";
+
+    // 封面图上传处理
+    document.getElementById('cover_upload').addEventListener('change', function (e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const statusDiv = document.getElementById('cover_upload_status');
+        statusDiv.style.color = '#666';
+        statusDiv.textContent = '上传中...';
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        fetch(`/api/upload_image?key=${DEFAULT_KEY}`, {
+            method: 'POST',
+            body: formData
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.code === 200) {
+                    document.getElementById('cover_img_input').value = data.data.url;
+                    statusDiv.style.color = 'green';
+                    statusDiv.textContent = '✓ 上传成功';
+                } else {
+                    statusDiv.style.color = 'red';
+                    statusDiv.textContent = `上传失败：${data.msg}`;
+                }
+            })
+            .catch(error => {
+                statusDiv.style.color = 'red';
+                statusDiv.textContent = '网络错误，请重试';
+                console.error('上传错误:', error);
+            });
+    });
+</script>
+
+
+<style>
+    body {
+        max-width: 800px;
+        margin: 20px auto;
+        padding: 0 20px;
+        font-family: Arial, sans-serif;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+
+    .time-group {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+
+    .submit-btn {
+        background: #007bff;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .alert {
+        padding: 10px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+
+    .alert-success {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .alert-danger {
+        background: #f8d7da;
+        color: #721c24;
+    }
+
+    /* 新增样式 */
+    .upload-container {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .upload-btn {
+        background: #28a745;
+        color: white;
+        padding: 8px 15px;
+        border-radius: 4px;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+
+    .upload-btn:hover {
+        background: #218838;
+    }
+
+    .upload-status {
+        margin-top: 5px;
+        font-size: 0.9em;
+        min-height: 20px;
+    }
+</style>
+</body>
+</html>
