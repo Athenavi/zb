@@ -1,9 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>活动管理</title>
+{% extends 'dashboard-base.html' %}
+
+{% block content %}
     <script>
         // 新增图片上传功能
         function handleImageUpload() {
@@ -55,12 +52,19 @@
         function timestampToDateString(timestamp) {
             if (!timestamp) return '';
             const date = new Date(parseInt(timestamp));
-            return date.toISOString().split('T')[0];
+            // 转换为本地日期时间字符串（YYYY-MM-DDTHH:mm）
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${year}-${month}-${day}T${hours}:${minutes}`;
         }
 
         // 将日期字符串转换为时间戳
         function dateStringToTimestamp(dateString) {
             if (!dateString) return '';
+            // 将本地日期时间字符串转换为时间戳
             const date = new Date(dateString);
             return date.getTime();
         }
@@ -72,7 +76,6 @@
             const startTimeHidden = document.getElementById('start_time');
             const endTimeHidden = document.getElementById('end_time');
 
-            // 如果隐藏字段有值，初始化日期选择器
             if (startTimeHidden.value) {
                 startTimeInput.value = timestampToDateString(startTimeHidden.value);
             }
@@ -80,7 +83,6 @@
                 endTimeInput.value = timestampToDateString(endTimeHidden.value);
             }
 
-            // 监听日期选择器的变化，更新隐藏字段
             startTimeInput.addEventListener('change', function () {
                 startTimeHidden.value = dateStringToTimestamp(this.value);
             });
@@ -91,10 +93,16 @@
         }
 
         // 页面加载时初始化
-        window.onload = function () {
+        if (document.readyState === 'loading') {  // 加载中
+            document.addEventListener('DOMContentLoaded', initFunctions);
+        } else {  // 已经加载完成
+            initFunctions();
+        }
+
+        function initFunctions() {
             initializeDatePickers();
             initDisplayTime();
-        };
+        }
 
         // 时间转换函数
         function initDisplayTime() {
@@ -115,135 +123,133 @@
             });
         }
     </script>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-</head>
-<body class="bg-gray-100 min-h-screen">
-<div class="container mx-auto p-6">
-    <h1 class="text-3xl font-bold text-gray-800 mb-8">活动管理</h1>
+    <body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto p-6">
+        <div class="flex flex-col lg:flex-row gap-8">
+            <!-- 选择活动侧边栏 -->
+            <div class="lg:w-1/4 bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-xl font-semibold text-gray-700 mb-4">选择活动</h2>
+                <form method="GET" action="">
+                    <select name="activity_id" id="activity_id" onchange="this.form.submit();"
+                            class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">选择活动</option>
+                        {% for activity in activities %}
+                            <option value="{{ activity['activityId'] }}"
+                                    {% if activity_details and activity['activityId'] == activity_details['activityId'] %}selected{% endif %}>
+                                {{ activity['title'] }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <button onclick="location.href='/activity/new';">创建活动↗️</button>
+                </form>
+            </div>
 
-    <div class="flex flex-col lg:flex-row gap-8">
-        <!-- 选择活动侧边栏 -->
-        <div class="lg:w-1/4 bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-xl font-semibold text-gray-700 mb-4">选择活动</h2>
-            <form method="GET" action="">
-                <select name="activity_id" id="activity_id" onchange="this.form.submit();"
-                        class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    <option value="">选择活动</option>
-                    {% for activity in activities %}
-                        <option value="{{ activity['activityId'] }}"
-                                {% if activity_details and activity['activityId'] == activity_details['activityId'] %}selected{% endif %}>
-                            {{ activity['title'] }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </form>
-        </div>
+            <!-- 活动编辑表单 -->
+            <div class="flex-1 bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-xl font-semibold text-gray-700 mb-6">活动编辑</h2>
+                <form method="POST" action="" class="space-y-6">
+                    <input type="hidden" name="activity_id"
+                           value="{{ activity_details['activityId'] if activity_details else '' }}">
+                    <input type="hidden" name="start_time" id="start_time"
+                           value="{{ activity_details['start_time'] if activity_details else '' }}">
+                    <input type="hidden" name="end_time" id="end_time"
+                           value="{{ activity_details['end_time'] if activity_details else '' }}">
 
-        <!-- 活动编辑表单 -->
-        <div class="flex-1 bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-xl font-semibold text-gray-700 mb-6">活动编辑</h2>
-            <form method="POST" action="" class="space-y-6">
-                <input type="hidden" name="activity_id"
-                       value="{{ activity_details['activityId'] if activity_details else '' }}">
-                <input type="hidden" name="start_time" id="start_time"
-                       value="{{ activity_details['start_time'] if activity_details else '' }}">
-                <input type="hidden" name="end_time" id="end_time"
-                       value="{{ activity_details['end_time'] if activity_details else '' }}">
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">标题</label>
-                    <input type="text" name="title" value="{{ activity_details['title'] if activity_details else '' }}"
-                           class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                           required>
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">封面图</label>
-                    <div class="flex items-center gap-4">
-                        <div class="relative flex-1">
-                            <input type="text" name="cover_img" id="cover_img_input"
-                                   value="{{ activity_details['cover_img'] if activity_details else '' }}"
-                                   class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                   required
-                                   readonly>
-                            <div id="upload_status" class="hidden absolute right-2 top-2 text-sm text-gray-500"></div>
-                        </div>
-
-                        <div class="flex flex-col gap-2">
-                            <!-- 隐藏的文件输入 -->
-                            <input type="file" id="image_upload" accept="image/*"
-                                   class="hidden"
-                                   onchange="handleImageUpload()">
-                            <!-- 上传按钮 -->
-                            <button type="button"
-                                    onclick="document.getElementById('image_upload').click()"
-                                    class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-colors">
-                                上传图片
-                            </button>
-                            <!-- 图片预览 -->
-                            <img id="image_preview" src="#" alt="图片预览"
-                                 class="hidden w-20 h-20 object-cover rounded-md border">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">开始时间</label>
-                        <input type="date" id="start_time_input" required
-                               class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">标题</label>
+                        <input type="text" name="title"
+                               value="{{ activity_details['title'] if activity_details else '' }}"
+                               class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                               required>
                     </div>
+
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">结束时间</label>
-                        <input type="date" id="end_time_input" required
-                               class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">封面图</label>
+                        <div class="flex items-center gap-4">
+                            <div class="relative flex-1">
+                                <input type="text" name="cover_img" id="cover_img_input"
+                                       value="{{ activity_details['cover_img'] if activity_details else '' }}"
+                                       class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                       required
+                                       readonly>
+                                <div id="upload_status"
+                                     class="hidden absolute right-2 top-2 text-sm text-gray-500"></div>
+                            </div>
+
+                            <div class="flex flex-col gap-2">
+                                <!-- 隐藏的文件输入 -->
+                                <input type="file" id="image_upload" accept="image/*"
+                                       class="hidden"
+                                       onchange="handleImageUpload()">
+                                <!-- 上传按钮 -->
+                                <button type="button"
+                                        onclick="document.getElementById('image_upload').click()"
+                                        class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-colors">
+                                    上传图片
+                                </button>
+                                <!-- 图片预览 -->
+                                <img id="image_preview" src="#" alt="图片预览"
+                                     class="hidden w-20 h-20 object-cover rounded-md border">
+                            </div>
+                        </div>
                     </div>
-                </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">列表展示地址</label>
-                    <input type="text" name="list_address"
-                           value="{{ activity_details['list_address'] if activity_details else '' }}"
-                           class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                           required>
-                </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">开始时间</label>
+                            <input type="datetime-local" id="start_time_input" required
+                                   class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">结束时间</label>
+                            <input type="datetime-local" id="end_time_input" required
+                                   class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">前端展示时间</label>
+                            <input type="datetime-local" id="display_time_input"
+                                   class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <input type="hidden" name="display_time" id="display_time_hidden"
+                                   value="{{ activity_details['display_time'] if activity_details else '' }}" required>
+                        </div>
+                    </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">详情页地点</label>
-                    <input type="text" name="detail_location"
-                           value="{{ activity_details['detail_location'] if activity_details else '' }}"
-                           class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                           required>
-                </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">列表展示地址</label>
+                        <input type="text" name="list_address"
+                               value="{{ activity_details['list_address'] if activity_details else '' }}"
+                               class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                               required>
+                    </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">前端展示时间</label>
-                    <input type="datetime-local" id="display_time_input"
-                           class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    <input type="hidden" name="display_time" id="display_time_hidden"
-                           value="{{ activity_details['display_time'] if activity_details else '' }}" required>
-                </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">详情页地点</label>
+                        <input type="text" name="detail_location"
+                               value="{{ activity_details['detail_location'] if activity_details else '' }}"
+                               class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                               required>
+                    </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">活动详情</label>
-                    <textarea name="content" required
-                              class="w-full p-2 border rounded-md h-32 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">{{ activity_details['content'] if activity_details else '' }}</textarea>
-                </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">活动详情</label>
+                        <textarea name="content" required
+                                  class="w-full p-2 border rounded-md h-32 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">{{ activity_details['content'] if activity_details else '' }}</textarea>
+                    </div>
 
-                <div class="flex items-center">
-                    <input type="checkbox" name="is_deleted" value="1" id="is_deleted"
-                           class="h-4 w-4 text-blue-500 focus:ring-blue-500 border-gray-300 rounded"
-                           {% if activity_details and activity_details['is_deleted'] %}checked{% endif %}>
-                    <label for="is_deleted" class="ml-2 text-sm text-gray-700">软删除标记</label>
-                </div>
+                    <div class="flex items-center">
+                        <input type="checkbox" name="is_deleted" value="1" id="is_deleted"
+                               class="h-4 w-4 text-blue-500 focus:ring-blue-500 border-gray-300 rounded"
+                               {% if activity_details and activity_details['is_deleted'] %}checked{% endif %}>
+                        <label for="is_deleted" class="ml-2 text-sm text-gray-700">软删除标记</label>
+                    </div>
 
-                <button type="submit"
-                        class="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md transition-colors">
-                    保存活动
-                </button>
-            </form>
+                    <button type="submit"
+                            class="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md transition-colors">
+                        保存活动
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
-</div>
-</body>
-</html>
+    </body>
+{% endblock %}
