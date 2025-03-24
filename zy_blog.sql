@@ -16,7 +16,7 @@ SET NAMES utf8mb4;
 CREATE TABLE `users`
 (
     `id`              int          NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    `username`        varchar(255) NOT NULL COMMENT '用户名',
+    `username`        varchar(255) NOT NULL COMMENT '用户名' UNIQUE,
     `password`        varchar(255) NOT NULL COMMENT '用户密码',
     `email`           varchar(255) NOT NULL DEFAULT 'guest@7trees.cn' COMMENT '用户邮箱',
     `created_at`      timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -40,9 +40,9 @@ CREATE TABLE `articles`
     `Title`       varchar(255) NOT NULL COMMENT '文章标题',
     `Author`      varchar(100) NOT NULL COMMENT '作者名称',
     `Hidden`      tinyint(1)   NOT NULL                DEFAULT '0' COMMENT '是否隐藏 1 隐藏 0 不隐藏',
-    `Views`       smallint                             DEFAULT '0' COMMENT '文章阅读量',
-    `Likes`       smallint                             DEFAULT '0' COMMENT '文章点赞数',
-    `Comments`    smallint                             DEFAULT '0' COMMENT '评论数',
+    `Views`       INT UNSIGNED                         DEFAULT '0' COMMENT '文章阅读量',
+    `Likes`       INT UNSIGNED                         DEFAULT '0' COMMENT '文章点赞数',
+    `Comments`    INT UNSIGNED                         DEFAULT '0' COMMENT '评论数',
     `Status`      enum ('Draft','Published','Deleted') DEFAULT 'Draft' COMMENT '文章状态',
     `CoverImage`  varchar(255)                         DEFAULT NULL COMMENT '封面图片路径',
     `ArticleType` varchar(50)                          DEFAULT NULL COMMENT '文章类型',
@@ -164,8 +164,8 @@ CREATE TABLE `urls`
     `created_at` timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `username`   varchar(255) NOT NULL COMMENT '创建者用户名',
     UNIQUE KEY `short_url` (`short_url`)
-) ENGINE = MyISAM
-  DEFAULT CHARSET = utf8mb3;
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4;
 
 -- 创建表 `article_pass`
 CREATE TABLE `article_pass`
