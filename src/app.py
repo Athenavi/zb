@@ -1630,8 +1630,8 @@ def m_users_edit(user_id):
     try:
         with get_db_connection() as connection:
             with connection.cursor(dictionary=True) as cursor:
-                query = "UPDATE `users` SET `username` = %s,`role`= %s WHERE `id` = %s;"
-                cursor.execute(query, (user_name, user_role, int(u_id)))
+                query = "UPDATE `users` SET `username` = %s WHERE `id` = %s;"
+                cursor.execute(query, (user_name, int(u_id)))
                 connection.commit()
 
         return jsonify({"message": "操作成功"}), 200
@@ -3484,9 +3484,76 @@ def wx_register():  # 注册用户
     return jsonify({'code': 200, 'data': {'token': token.decode('utf-8')}})
 
 
-@app.route('/dashboard/system')
-def dashboard_system():
-    return '当前功能暂未开放！'
+@app.route('/dashboard/permissions', methods=['GET', 'POST'])
+@admin_required
+def manage_permissions(user_id):
+    db = get_db_connection()
+    cursor = db.cursor(dictionary=True)
+
+    # 处理权限操作
+    if request.method == 'POST':
+        # 添加新权限
+        if 'add_permission' in request.form:
+            code = request.form['code']
+            description = request.form['description']
+            cursor.execute('INSERT INTO permissions (code, description) VALUES (%s, %s)', (code, description))
+
+        # 添加新角色
+        elif 'add_role' in request.form:
+            name = request.form['name']
+            description = request.form['description']
+            cursor.execute('INSERT INTO roles (name, description) VALUES (%s, %s)', (name, description))
+
+        # 分配权限给角色
+        elif 'assign_permission' in request.form:
+            role_id = request.form['role_id']
+            permission_id = request.form['permission_id']
+            cursor.execute('INSERT IGNORE INTO role_permissions (role_id, permission_id) VALUES (%s, %s)',
+                           (role_id, permission_id))
+
+        # 分配角色给用户
+        elif 'assign_role' in request.form:
+            user_id = request.form['user_id']
+            role_id = request.form['role_id']
+            cursor.execute('INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (%s, %s)',
+                           (user_id, role_id))
+
+        db.commit()
+
+    # 获取所有数据
+    cursor.execute('SELECT * FROM permissions')
+    permissions = cursor.fetchall()
+
+    cursor.execute('SELECT * FROM roles')
+    roles = cursor.fetchall()
+
+    cursor.execute(
+        'SELECT u.id, u.username, GROUP_CONCAT(r.name) as roles FROM users u LEFT JOIN user_roles ur ON u.id = ur.user_id LEFT JOIN roles r ON ur.role_id = r.id GROUP BY u.id')
+    users = cursor.fetchall()
+
+    cursor.execute(
+        'SELECT r.id as role_id, r.name as role_name, GROUP_CONCAT(p.code) as permissions FROM roles r LEFT JOIN role_permissions rp ON r.id = rp.role_id LEFT JOIN permissions p ON rp.permission_id = p.id GROUP BY r.id')
+    role_permissions = cursor.fetchall()
+
+    cursor.close()
+    db.close()
+
+    return render_template('permissions.html',
+                           permissions=permissions,
+                           roles=roles,
+                           users=users,
+                           role_permissions=role_permissions)
+
+
+def filter_sensitive_words(comment_content):
+    sensitive_words = ['违禁词1', '违禁词2', '敏感词1', '敏感词2']
+
+    comment_content_lower = comment_content.lower()
+    for word in sensitive_words:
+        if word in comment_content_lower:
+            return False
+
+    return True
 
 
 @app.route('/sys/update', methods=['GET', 'POST'])
@@ -3510,7 +3577,6 @@ def _sys_version(check=False):
             return response.json()['tag_name']
         return None
     return jsonify({'code': 200, 'data': {'version': sys_version}})
-
 
 
 if __name__ == '__main__':
