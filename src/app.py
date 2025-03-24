@@ -3241,22 +3241,20 @@ def new_activity():
 def delete_activity():
     activity_id = request.args.get('activity_id')
     if not activity_id:
-        return jsonify({'error': 'Missing activity_id'}), 400
+        return jsonify({'error': '活动ID缺失'}), 400
 
     db = get_db_connection()
     cursor = db.cursor()
     try:
-        cursor.execute("UPDATE activities SET is_deleted = 1 WHERE activityId = %s", (activity_id,))
+        cursor.execute("DELETE FROM activities WHERE activityId=%s", (activity_id,))
         db.commit()
-        flash('活动删除成功！', 'info')
+        return jsonify({'message': '活动删除成功！'}), 200
     except Exception as e:
         db.rollback()
-        flash('删除活动失败！', 'danger')
-        print(e)
+        return jsonify({'error': '删除活动失败！'}), 500
     finally:
         cursor.close()
         db.close()
-    return redirect(url_for('new_activity'))
 
 
 @app.route('/guestbook', methods=['GET', 'POST'])
@@ -3311,7 +3309,7 @@ def m_activities():
     # 获取活动列表
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute('SELECT activityId, title FROM activities WHERE is_deleted=0')
+    cursor.execute('SELECT activityId, title FROM activities')
     activities = cursor.fetchall()
     cursor.close()
     conn.close()
@@ -3411,55 +3409,39 @@ def uploaded_file(filename):
     return send_file(file, max_age=86400)
 
 
-def create_access_token(identity, phone):
-    # 添加过期时间（这里设置为24小时）
-    expiration_time = datetime.now(tz=timezone.utc) + timedelta(seconds=86400)
-    payload = {
-        'identity': identity,
-        'exp': expiration_time.timestamp(),
-        'phone': phone
-    }
-    return jwt.encode(payload, DEFAULT_KEY, algorithm='HS256')
-
-
 @app.route('/api/wx/auth', methods=['GET', 'POST'])
 def decode_access_token(token):
-    token = request.args.get('token')
     try:
-        decoded_payload = jwt.decode(token, DEFAULT_KEY, algorithms=['HS256'])
-        return decoded_payload
+        decoded_token = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        return jsonify({'code': 200, 'data': decoded_token})
     except jwt.ExpiredSignatureError:
-        return {'error': 'Token has expired'}
+        return jsonify({'code': 401, 'msg': 'Token expired'}), 401
     except jwt.InvalidTokenError:
-        return {'error': 'Invalid token'}
+        return jsonify({'code': 401, 'msg': 'Invalid token'}), 401
 
 
 @app.route('/api/wx/login', methods=['POST'])
 def wx_login():
+    code = request.json.get('code')
+    if not code:
+        return jsonify({'code': 400, 'msg': 'Missing code parameter'}), 400
+
+    wx_app_id = os.getenv('WX_APP_ID')
+    wx_app_secret = os.getenv('WX_APP_SECRET')
+    wx_login_url = f"https://api.weixin.qq.com/sns/jscode2session?appid={wx_app_id}&secret={wx_app_secret}&js_code={code}&grant_type=authorization_code"
+
     try:
-        if not request.is_json:
-            return jsonify({"msg": "Request must be JSON"}), 400
+        response = requests.get(wx_login_url)
+        response.raise_for_status()
+        wx_login_data = response.json()
+        if 'errcode' in wx_login_data:
+            return jsonify({'code': 400, 'msg': 'Invalid code parameter'}), 400
 
-        data = request.get_json()
-        username = data.get('username')
-        phone = data.get('phone')
-
-        if not username or not phone:
-            return jsonify({"msg": "Username and phone are required"}), 400
-
-        if not re.match(r'^1[3-9]\d{9}$', phone):
-            return jsonify({"msg": "Invalid phone number"}), 400
-
-        access_token = create_access_token(identity=username, phone=phone)
-        return jsonify(
-            access_token=access_token,
-            channel='wx',
-            code=200
-        ), 200
-
-    except Exception as e:
-        app.logger.error(f"Error: {str(e)}")
-        return jsonify({"msg": "Internal server error"}), 500
+        openid = wx_login_data['openid']  # 用户唯一标识
+        session_key = wx_login_data['session_key']  # 会话密钥
+        return jsonify({'code': 200, 'data': {'openid': openid, 'session_key': session_key}})
+    except requests.exceptions.RequestException as e:
+        return jsonify({'code': 500, 'msg': f'Server error: {str(e)}'}), 500
 
 
 if __name__ == '__main__':

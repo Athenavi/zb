@@ -122,6 +122,30 @@
                 displayTimeHidden.value = date.getTime();
             });
         }
+
+        function deleteActivity() {
+            const activityId = document.getElementById('activity_id').value;
+            if (confirm('确定要删除此活动吗？')) {
+                fetch(`/activity?activity_id=${activityId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.message) {
+                            alert(data.message);
+                        } else if (data.error) {
+                            alert(data.error);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                    });
+            }
+        }
+
     </script>
     <body class="bg-gray-100 min-h-screen">
     <div class="container mx-auto p-6">
@@ -246,6 +270,9 @@
                     <button type="submit"
                             class="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md transition-colors">
                         保存活动
+                    </button>
+                    <button onclick="deleteActivity()" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-700">
+                        删除活动
                     </button>
                 </form>
             </div>
