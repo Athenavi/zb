@@ -3444,6 +3444,75 @@ def wx_login():
         return jsonify({'code': 500, 'msg': f'Server error: {str(e)}'}), 500
 
 
+@app.route('/api/wx/register', methods=['POST'])
+def wx_register():  # 注册用户
+    data = request.json
+    required_fields = ['openid', 'name', 'phone', 'password']
+
+    # 验证必填字段
+    for field in required_fields:
+        if not data.get(field):
+            return jsonify({'code': 400, 'msg': f'Missing {field}'})
+
+    # 验证手机号码格式
+    if not re.match(r'^1[3-9]\d{9}$', data['phone']):
+        return jsonify({'code': 400, 'msg': 'Invalid phone number format'})
+
+    # 验证密码格式
+    if not re.match(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$', data['password']):
+        return jsonify({'code': 400, 'msg': 'Invalid password format'})
+
+    # 验证用户是否已注册
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM users WHERE phone=%s', (data['phone'],))
+    user = cursor.fetchone()
+    if user:
+        return jsonify({'code': 400, 'msg': 'User already registered'})
+
+    # 注册用户
+    cursor.execute(
+        'INSERT INTO users (openid, name, phone, password) VALUES (%s, %s, %s, %s)',
+        (data['openid'], data['name'], data['phone'], data['password'])
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    # 生成 JWT token
+    token = jwt.encode({'openid': data['openid']}, app.config['SECRET_KEY'], algorithm='HS256')
+    return jsonify({'code': 200, 'data': {'token': token.decode('utf-8')}})
+
+
+@app.route('/dashboard/system')
+def dashboard_system():
+    return '当前功能暂未开放！'
+
+
+@app.route('/sys/update', methods=['GET', 'POST'])
+def sys_update():
+    if request.method == 'GET':
+        return _sys_version(check=True)
+    else:
+        current_version = sys_version
+        latest_version = _sys_version(check=True)
+        if latest_version and latest_version > current_version:
+            return jsonify({"status": "update_available", "latest": latest_version})
+        return jsonify({"status": "up_to_date"})
+
+
+@app.route('/api/sys/version', methods=['GET'])
+def _sys_version(check=False):
+    if check:
+        url = "https://api.github.com/repos/Athenavi/zb/releases/latest"
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.json()['tag_name']
+        return None
+    return jsonify({'code': 200, 'data': {'version': sys_version}})
+
+
+
 if __name__ == '__main__':
     app.run(debug=True)
 
