@@ -1,4 +1,5 @@
 <div align="center">
+  此项目为旧版本 zyBLOG，现已迁移至新版本 [zyBlog-2.0](https://github.com/Athenavi/zb-v2)。
   <h1>zyBLOG - 轻量易用的Python Flask博客系统</h1>
   
   [![Python Version](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
