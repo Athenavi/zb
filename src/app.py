@@ -3318,78 +3318,94 @@ def m_activities():
                            DEFAULT_KEY=DEFAULT_KEY)
 
 
-@app.route('/api/submit_report', methods=['POST'])
-def submit_report():
-    data = request.json
-    required_fields = ['phone', 'reportContent', 'imageList']
-
-    # 验证必填字段
-    for field in required_fields:
-        if not data.get(field):
-            return jsonify({'code': 400, 'msg': f'Missing {field}'})
-
-    # 生成报告 UUID
-    report_id = uuid.uuid4().hex
-    report_data = {
-        'id': report_id,
-        'name': data.get('name', ''),
-        'phone': data['phone'],
-        'content': data['reportContent'],
-        'images': data.get('imageList', []),
-        'status': 'pending',
-        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-    }
-
-    # 保存报告文件
-    report_dir = Path(base_dir) / 'reports'
-    report_file = report_dir / f'{report_id}.json'
-
-    # 确保 reports 目录存在
-    report_dir.mkdir(parents=True, exist_ok=True)
-
-    with open(report_file, 'w', encoding='utf-8') as f:
-        json.dump(report_data, f, ensure_ascii=False, indent=2)
-
-    return jsonify({'code': 200, 'data': {'report_id': report_id}})
-
-
-@app.route('/api/get_report/<report_id>', methods=['GET'])
-def get_report(report_id):
-    try:
-        report_file = Path(base_dir) / 'reports' / f'{report_id}.json'
-        if not report_file.exists():
-            return jsonify({'code': 404, 'msg': '报告不存在'}), 404
-        return send_file(report_file, as_attachment=True, max_age=86400)
-    except Exception as e:
-        return jsonify({'code': 500, 'msg': f'服务器错误: {str(e)}'}), 500
-
-
 @app.route('/api/upload_image', methods=['POST'])
 def upload_image():
     key = request.args.get('key')
-    if key != DEFAULT_KEY:
-        return jsonify({'code': 503, 'msg': 'File type not allowed'})
-    (Path(base_dir) / 'uploads').mkdir(parents=True, exist_ok=True)
+    if not key:
+        return jsonify({'code': 400, 'msg': 'Missing key parameter'}), 400
+
+    # 创建 uploads 目录
+    uploads_path = Path(base_dir) / 'uploads'
+    uploads_path.mkdir(parents=True, exist_ok=True)
+
     if 'file' not in request.files:
-        return jsonify({'code': 400, 'msg': 'No file part'})
+        return jsonify({'code': 400, 'msg': 'No file part'}), 400
 
+    # 文件内容类型验证
     file = request.files['file']
-    if file.filename == '':
-        return jsonify({'code': 400, 'msg': 'No selected file'})
-    if file:
-        filename = secure_filename(file.filename)
-        unique_filename = f"{uuid.uuid4().hex}_{filename}"
-        save_path = os.path.join('uploads', unique_filename)
-        file.save(save_path)
-        return jsonify({
-            'code': 200,
-            'data': {
-                'url': f"{domain}uploads/{unique_filename}",
-                'path': unique_filename
-            }
-        })
+    file.seek(0)
+    buffer = file.read(2048)  # 读取文件头部用于MIME检测
+    file.seek(0)  # 重置文件指针
 
-    return jsonify({'code': 400, 'msg': 'File type not allowed'})
+    # 使用文件内容检测真实MIME类型
+    try:
+        mime_type = magic.from_buffer(buffer, mime=True)
+        allowed_mime = {'image/png', 'image/jpeg', 'image/gif'}
+        if mime_type not in allowed_mime:
+            return jsonify({'code': 400, 'msg': 'File type not allowed'}), 400
+    except Exception as e:
+        logging.error(f"MIME detection failed: {e}")
+        return jsonify({'code': 400, 'msg': 'Invalid file content'}), 400
+
+    # 计算SHA-256哈希
+    file_hash = hashlib.sha256()
+    while True:  # 替代海象运算符保持兼容性
+        chunk = file.read(8192)
+        if not chunk:
+            break
+        file_hash.update(chunk)
+    file.seek(0)  # 重置文件指针
+
+    try:
+        with get_db_connection() as db:
+            with db.cursor() as cursor:
+                # 检查是否已存在
+                cursor.execute('SELECT filename FROM file_hashes WHERE hash = %s', (file_hash.hexdigest(),))
+                if (result := cursor.fetchone()):
+                    return jsonify({
+                        'code': 200,
+                        'data': {
+                            'url': f"{domain}uploads/{result[0]}",
+                            'path': result[0]
+                        }
+                    })
+
+                # 生成唯一文件名
+                unique_filename = f"{uuid.uuid4().hex}_{secure_filename(file.filename)}"
+
+                # 先插入数据库记录
+                cursor.execute('INSERT INTO file_hashes (hash, filename) VALUES (%s, %s)',
+                               (file_hash.hexdigest(), unique_filename))
+                db.commit()  # 提交事务
+
+                # 事务成功后保存文件
+                save_path = uploads_path / unique_filename
+                try:
+                    file.save(save_path)
+                except Exception as save_error:
+                    # 尝试清理已插入的记录
+                    try:
+                        cursor.execute('DELETE FROM file_hashes WHERE hash = %s', (file_hash.hexdigest(),))
+                        db.commit()
+                    except Exception as delete_error:
+                        logging.error(f"Cleanup failed: {delete_error}")
+                    raise save_error
+
+                return jsonify({
+                    'code': 200,
+                    'data': {
+                        'url': f"{domain}uploads/{unique_filename}",
+                        'path': unique_filename
+                    }
+                })
+    except Exception as e:
+        logging.error(f"Error occurred: {e}")
+        if 'save_path' in locals() and save_path.exists():  # 清理残留文件
+            try:
+                save_path.unlink()
+            except:
+                pass
+        return jsonify({'code': 500, 'msg': 'Internal server error'}), 500
 
 
 @app.route('/uploads/<filename>', methods=['GET'])
@@ -3407,81 +3423,6 @@ def uploaded_file(filename):
 
     # 发送文件
     return send_file(file, max_age=86400)
-
-
-@app.route('/api/wx/auth', methods=['GET', 'POST'])
-def decode_access_token(token):
-    try:
-        decoded_token = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-        return jsonify({'code': 200, 'data': decoded_token})
-    except jwt.ExpiredSignatureError:
-        return jsonify({'code': 401, 'msg': 'Token expired'}), 401
-    except jwt.InvalidTokenError:
-        return jsonify({'code': 401, 'msg': 'Invalid token'}), 401
-
-
-@app.route('/api/wx/login', methods=['POST'])
-def wx_login():
-    code = request.json.get('code')
-    if not code:
-        return jsonify({'code': 400, 'msg': 'Missing code parameter'}), 400
-
-    wx_app_id = os.getenv('WX_APP_ID')
-    wx_app_secret = os.getenv('WX_APP_SECRET')
-    wx_login_url = f"https://api.weixin.qq.com/sns/jscode2session?appid={wx_app_id}&secret={wx_app_secret}&js_code={code}&grant_type=authorization_code"
-
-    try:
-        response = requests.get(wx_login_url)
-        response.raise_for_status()
-        wx_login_data = response.json()
-        if 'errcode' in wx_login_data:
-            return jsonify({'code': 400, 'msg': 'Invalid code parameter'}), 400
-
-        openid = wx_login_data['openid']  # 用户唯一标识
-        session_key = wx_login_data['session_key']  # 会话密钥
-        return jsonify({'code': 200, 'data': {'openid': openid, 'session_key': session_key}})
-    except requests.exceptions.RequestException as e:
-        return jsonify({'code': 500, 'msg': f'Server error: {str(e)}'}), 500
-
-
-@app.route('/api/wx/register', methods=['POST'])
-def wx_register():  # 注册用户
-    data = request.json
-    required_fields = ['openid', 'name', 'phone', 'password']
-
-    # 验证必填字段
-    for field in required_fields:
-        if not data.get(field):
-            return jsonify({'code': 400, 'msg': f'Missing {field}'})
-
-    # 验证手机号码格式
-    if not re.match(r'^1[3-9]\d{9}$', data['phone']):
-        return jsonify({'code': 400, 'msg': 'Invalid phone number format'})
-
-    # 验证密码格式
-    if not re.match(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$', data['password']):
-        return jsonify({'code': 400, 'msg': 'Invalid password format'})
-
-    # 验证用户是否已注册
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM users WHERE phone=%s', (data['phone'],))
-    user = cursor.fetchone()
-    if user:
-        return jsonify({'code': 400, 'msg': 'User already registered'})
-
-    # 注册用户
-    cursor.execute(
-        'INSERT INTO users (openid, name, phone, password) VALUES (%s, %s, %s, %s)',
-        (data['openid'], data['name'], data['phone'], data['password'])
-    )
-    conn.commit()
-    cursor.close()
-    conn.close()
-
-    # 生成 JWT token
-    token = jwt.encode({'openid': data['openid']}, app.config['SECRET_KEY'], algorithm='HS256')
-    return jsonify({'code': 200, 'data': {'token': token.decode('utf-8')}})
 
 
 @app.route('/dashboard/permissions', methods=['GET', 'POST'])
