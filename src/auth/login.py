@@ -6,11 +6,11 @@ import bcrypt
 import bleach
 from flask import request, redirect, url_for, render_template, make_response
 
+from src.auth.core import generate_jwt, generate_refresh_token
 from src.database import get_db_connection
-from src.utils import generate_jwt, generate_refresh_token
 
 
-def zy_login(callback_route):
+def user_login(callback_route):
     input_value = bleach.clean(request.form['username'])  # 用户输入的用户名或邮箱
     password = bleach.clean(request.form['password'])
 
@@ -53,7 +53,7 @@ def zy_login(callback_route):
         db.close()
 
 
-def zy_register(ip):
+def create_user(ip):
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         invite_code = request.form.get('invite_code', '').strip()
@@ -96,7 +96,7 @@ def zy_register(ip):
     return render_template('LoginRegister.html', title="注册", type="register")
 
 
-def zy_mail_login(user_email, ip):
+def tp_mail_login(user_email, ip):
     username = 'qks' + format(random.randint(1000, 9999))
     password = '123456'
     db = get_db_connection()

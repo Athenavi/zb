@@ -1,7 +1,15 @@
+import string
+import random
+
 from pymysql.err import DatabaseError
 
 from src.database import get_db_connection
-from src.utils import generate_short_url
+
+
+def generate_short_url():
+    characters = string.ascii_letters + string.digits
+    short_url = ''.join(random.choice(characters) for _ in range(6))
+    return short_url
 
 
 # 专属
@@ -68,29 +76,3 @@ def delete_link(short_url):
     finally:
         cursor.close()
         db.close()
-
-
-def get_link_info(username):
-    db = get_db_connection()
-    cursor = db.cursor()
-
-    # 查询用户是否为管理员
-    query_admin = "SELECT `role` FROM users WHERE username = %s"
-    cursor.execute(query_admin, (username,))
-    admin_result = cursor.fetchone()
-
-    # 如果用户是管理员，则查询所有链接信息
-    if admin_result and admin_result[0] == 'Admin':
-        query = "SELECT created_at, short_url, long_url FROM urls"
-        cursor.execute(query)
-    else:
-        # 否则，查询特定用户的链接信息
-        query = "SELECT created_at, short_url, long_url FROM urls WHERE username = %s"
-        cursor.execute(query, (username,))
-
-    result = cursor.fetchall()
-
-    cursor.close()
-    db.close()
-
-    return result

@@ -4,7 +4,7 @@ from flask import session, flash, redirect, url_for, render_template, request
 from src.database import get_db_connection
 
 
-def zy_change_password(user_id, ip):
+def update_password(user_id, ip):
     if 'password_confirmed' not in session or not session['password_confirmed']:
         return redirect(url_for('confirm_password'))
 
@@ -42,7 +42,7 @@ def zy_change_password(user_id, ip):
     return render_template('Authentication.html', form='change')
 
 
-def zy_confirm_password(user_id):
+def validate_password(user_id):
     if 'password_confirmed' in session and session['password_confirmed']:
         return redirect(url_for('change_password'))
 

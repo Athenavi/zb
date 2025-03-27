@@ -28,24 +28,29 @@ from jinja2 import select_autoescape, TemplateNotFound
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
 
-from src.AboutLogin import zy_login, zy_register, zy_mail_login
-from src.AboutPW import zy_change_password, zy_confirm_password
-from src.BlogDeal import get_article_names, get_article_content, clear_html_format, \
-    get_blog_author, get_file_date, \
-    zy_edit_article, get_unique_tags, get_articles_by_tag, \
-    get_tags_by_article, set_article_info, write_tags_to_database, auth_by_id, \
-    article_change_pw, get_file_summary, get_comments, auth_files, get_more_info, article_save_change, auth_aid
+from src.auth.core import secret_key, get_username, authenticate_jwt, authenticate_refresh_token, generate_jwt, \
+    jwt_required, admin_required, user_id_required
+from src.auth.login import user_login, create_user, tp_mail_login
+from src.auth.password import update_password, validate_password
+from src.auth.permissions import verify_file_permissions
+from src.blog.article import get_article_last_modified, get_article_content, clean_html_format, get_file_summary, \
+    get_article_titles, get_article_metadata, update_article_password, save_article_changes, edit_article_content, \
+    delete_article, upsert_article_metadata, get_articles_by_owner
+from src.blog.comment import get_comments
+from src.blog.media import generate_video_thumb, generate_thumbs, handle_cover_resize
+from src.blog.tag import query_article_tags, get_unique_article_tags, get_articles_by_tag, update_article_tags
+from src.blog.user import query_blog_author, authorize_by_aid
+from src.config.general import get_general_config, zy_mail_conf, error, get_all_themes
+from src.config.theme import theme_safe_check
 from src.database import get_db_connection
-from src.links import create_special_url, redirect_to_long_url
+from src.social.core import get_following_count, get_can_followed, get_follower_count
+from src.upload.admin_upload import admin_upload_file
+from src.upload.check import is_allowed_file
+from src.utils.http import generate_etag
+from src.utils.ip_utils import get_client_ip, user_agent_info, anonymize_ip_address
+from src.utils.links import create_special_url, redirect_to_long_url
 from src.notification import get_sys_notice, read_notification
-from src.user import error, get_owner_articles, zy_general_conf, get_following_count, \
-    get_follower_count, get_can_followed, get_all_themes
-from src.utils import admin_upload_file, get_client_ip, \
-    generate_jwt, secret_key, authenticate_jwt, \
-    authenticate_refresh_token, handle_article_upload, is_allowed_file, zb_safe_check, \
-    generate_thumbs, generate_video_thumb, \
-    get_username, admin_required, jwt_required, finger_required, theme_safe_check, mask_ip, user_id_required, \
-    user_agent_info, handle_article_delete, handle_cover_resize, generate_etag
+from src.utils.safe import zb_safe_check
 
 global_encoding = 'utf-8'
 
@@ -83,7 +88,7 @@ app.logger.setLevel(logging.INFO)
 
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-domain, sitename, beian, sys_version, api_host, app_id, app_key, DEFAULT_KEY = zy_general_conf()
+domain, sitename, beian, sys_version, api_host, app_id, app_key, DEFAULT_KEY = get_general_config()
 print("please check information")
 print("++++++++++==========================++++++++++")
 print(
@@ -109,7 +114,7 @@ def login():
         if user_id:
             return redirect(url_for(callback_route))
     if request.method == 'POST':
-        return zy_login(callback_route)
+        return user_login(callback_route)
 
     return render_template('LoginRegister.html', title="登录")
 
@@ -130,7 +135,7 @@ def register():
         if user_id:
             return redirect(url_for(callback_route))
     ip = get_client_ip(request)
-    return zy_register(ip)
+    return create_user(ip)
 
 
 @app.before_request
@@ -178,9 +183,9 @@ def search(user_id):
                 article_name = file[:-3]  # 移除文件扩展名 (.md)
                 encoded_article_name = urllib.parse.quote(article_name)
                 article_url = domain + 'blog/' + encoded_article_name
-                date = get_file_date(encoded_article_name)
+                date = get_article_last_modified(encoded_article_name)
                 describe = get_article_content(article_name, 50)
-                describe = clear_html_format(describe)
+                describe = clean_html_format(describe)
 
                 if keyword.lower() in article_name.lower() or keyword.lower() in describe.lower():
                     item = ElementTree.SubElement(root, 'item')
@@ -293,7 +298,7 @@ def get_article_info(articles):
             db = get_db_connection()
 
             try:
-                article_info += get_file_date(a_title)
+                article_info += get_article_last_modified(a_title)
                 article_info += ';'
                 with db.cursor() as cursor:
                     query = "SELECT * FROM articles WHERE Title = %s"
@@ -337,14 +342,14 @@ def get_summary(articles):
 @cache.memoize(30)
 def get_a_list(chanel=1, page=1):
     if chanel == 1:
-        articles, has_next_page, has_previous_page = get_article_names(page=1, per_page=99999)
+        articles, has_next_page, has_previous_page = get_article_titles(page=1, per_page=99999)
         return articles
     if chanel == 2:
-        articles, has_next_page, has_previous_page = get_article_names(page=page, per_page=12)
+        articles, has_next_page, has_previous_page = get_article_titles(page=page, per_page=12)
         return articles, has_next_page, has_previous_page
     if chanel == 3:
         # rss页面
-        articles, has_next_page, has_previous_page = get_article_names(page=1, per_page=30)
+        articles, has_next_page, has_previous_page = get_article_titles(page=1, per_page=30)
         return articles
 
 
@@ -357,14 +362,12 @@ def blog_detail(article):
         if article not in article_names:
             pass
 
-        aid, article_tags = get_tags_by_article(article)
+        aid, article_tags = query_article_tags(article)
         if article in hidden_articles:
             return render_template('inform.html', aid=aid)
 
-        # article_url = domain + 'blog/' + article
-        # article_surl = api_shortlink(article_url)
-        author, author_uid = get_blog_author(article)
-        update_date = get_file_date(article)
+        author, author_uid = query_blog_author(article)
+        update_date = get_article_last_modified(article)
 
         response = make_response(render_template('zyDetail.html',
                                                  article_content=1,
@@ -390,14 +393,14 @@ def blog_detail(article):
 @app.route('/confirm-password', methods=['GET', 'POST'])
 @jwt_required
 def confirm_password(user_id):
-    return zy_confirm_password(user_id)
+    return validate_password(user_id)
 
 
 @app.route('/change-password', methods=['GET', 'POST'])
 @jwt_required
 def change_password(user_id):
     ip = get_client_ip(request)
-    return zy_change_password(user_id, ip)
+    return update_password(user_id, ip)
 
 
 @app.route('/Admin_upload', methods=['POST'])
@@ -518,7 +521,7 @@ def callback(provider):
         social_uid = data.get('social_uid')
         ip = get_client_ip(request)
         user_email = social_uid + f"@{provider}.com"
-        return zy_mail_login(user_email, ip)
+        return tp_mail_login(user_email, ip)
 
     return render_template('LoginRegister.html', error=msg)
 
@@ -626,7 +629,7 @@ def id_find_article(article_id):
 @cache.cached(timeout=3 * 3600, key_prefix='article_img')
 @app.route('/blog/<article_name>/images/<image_name>', methods=['GET'])
 def article_img(article_name, image_name):
-    author, author_uid = get_blog_author(article_name)
+    author, author_uid = query_blog_author(article_name)
     if author is None:
         author = 'test'
     articles_img_dir = os.path.join(base_dir, 'media', str(author))
@@ -662,7 +665,6 @@ def sys_out_prev_page(user_id):
 @app.route('/api/mail')
 @jwt_required
 def api_mail(user_id):
-    from src.utils import zy_mail_conf
     from src.notification import send_email
     smtp_server, stmp_port, sender_email, password = zy_mail_conf()
     receiver_email = sender_email
@@ -878,14 +880,6 @@ def phone_scan():
         return jsonify(token_json)
 
 
-# 获取在线设备
-@app.route('/api/devices', methods=['GET'])
-@finger_required
-def get_devices(user_id):
-    cached_finger = cache.get(f'fingerprint_{user_id}') or []
-    return jsonify(cached_finger), 200
-
-
 @app.route('/finger', methods=['GET', 'POST'])
 @jwt_required
 def finger(user_id):
@@ -953,11 +947,11 @@ def api_wx_blog_detail(article):
         if article in hidden_articles or article not in article_names:
             return generate_response_data()
 
-        aid, article_tags = get_tags_by_article(article)
+        aid, article_tags = query_article_tags(article)
         article_url = f"{domain}blog/{article}"
         article_surl = api_shortlink(article_url)
-        author, author_uid = get_blog_author(article)
-        update_date = get_file_date(article)
+        author, author_uid = query_blog_author(article)
+        update_date = get_article_last_modified(article)
         content = api_wx_content(article, auth_key=visited_key)
 
         response_data = {
@@ -1005,7 +999,7 @@ def get_home_data(page, tag):
 
     tags = []
     try:
-        tags = get_unique_tags()
+        tags = get_unique_article_tags()
     except Exception as e:
         app.logger.error(f'获取标签出错: {e}')
 
@@ -1049,7 +1043,7 @@ def api_wx():
 
 
 @app.route('/api/article/unlock', methods=['GET', 'POST'])
-@finger_required
+@user_id_required
 def api_article_unlock(user_id):
     try:
         aid = int(request.args.get('aid'))
@@ -1158,7 +1152,7 @@ def gen_md5(text):
 
 
 @app.route('/api/article/PW', methods=['POST'])
-@finger_required
+@user_id_required
 def api_article_pw(user_id):
     try:
         aid = int(request.args.get('aid'))
@@ -1173,11 +1167,11 @@ def api_article_pw(user_id):
     if len(new_password) != 4:
         return jsonify({"message": "无效的密码"}), 400
 
-    auth = auth_by_id(aid, user_name=get_username())
+    auth = authorize_by_aid(aid, user_name=get_username())
 
     if auth:
         cache.set(f"PWLock_{user_id}", aid, timeout=30)
-        result = article_change_pw(aid, new_password)
+        result = update_article_password(aid, new_password)
         return jsonify({'aid': aid, 'changed': result}), 200
     else:
         return jsonify({"message": "身份验证失败"}), 401
@@ -1202,7 +1196,7 @@ def api_comment(user_id):
     user_ip = get_client_ip(request) or ''
     masked_ip = ''
     if user_ip:
-        masked_ip = mask_ip(user_ip)
+        masked_ip = anonymize_ip_address(user_ip)
 
     user_agent = request.headers.get('User-Agent') or ''
     user_agent = user_agent_info(user_agent)
@@ -1278,7 +1272,7 @@ def api_delete_file(user_id, filename):
             db.close()
 
     file_path = os.path.join('media', user_name, filename)
-    if auth_files(file_path, user_name):
+    if verify_file_permissions(file_path, user_name):
         os.remove(file_path) if os.path.exists(file_path) else None
         return jsonify({'filename': filename, 'Deleted': True}), 201
     else:
@@ -1875,7 +1869,7 @@ def get_avatar_image(avatar_uuid):
 
 
 def ueditor_plus_edit(user_id, aid, user_name):
-    all_info = get_more_info(aid)
+    all_info = get_article_metadata(aid)
     edit_html = api_wx_content(all_info[1], auth_key=DEFAULT_KEY)
     article_url = domain + 'blog/' + all_info[1]
     article_surl = api_shortlink(article_url)
@@ -1988,7 +1982,7 @@ def markdown_editor2(user_id, aid):
     user_name = get_username()
     if not user_name or not a_name:
         return jsonify({'show_edit_code': 'failed'}), 500
-    auth = auth_aid(aid, user_name)
+    auth = authorize_by_aid(aid, user_name)
     if auth is False:
         return jsonify({'show_edit_code': 'failed'}), 403
     try:
@@ -1999,7 +1993,7 @@ def markdown_editor2(user_id, aid):
         cover_image = request.files.get('coverImage') or None
         cover_image_path = 'cover'
         if status == 'Deleted':
-            if handle_article_delete(a_name, app.config['TEMP_FOLDER']):
+            if delete_article(a_name, app.config['TEMP_FOLDER']):
                 return api_delete(user_id, aid)
         if cover_image:
             # 保存封面图片
@@ -2007,9 +2001,9 @@ def markdown_editor2(user_id, aid):
             os.makedirs(os.path.dirname(cover_image_path), exist_ok=True)
             with open(cover_image_path, 'wb') as f:
                 cover_image.save(f)
-        if article_save_change(aid, int(hidden_status), status, cover_image_path, excerpt) and zy_save_edit(aid,
-                                                                                                            content,
-                                                                                                            a_name):
+        if save_article_changes(aid, int(hidden_status), status, cover_image_path, excerpt) and zy_save_edit(aid,
+                                                                                                             content,
+                                                                                                             a_name):
             return jsonify({'show_edit_code': 'success'}), 200
     except Exception as e:
         app.logger.error(f"保存文章 article id: {aid} 时出错: {e} by user {user_id} ")
@@ -2034,7 +2028,7 @@ def api_edit_tag(user_id, aid):
     # 更新缓存中的标签哈希值
     cache.set(f"{aid}:tag_hash", current_tag_hash, timeout=28800)
     # 写入更新后的标签到数据库
-    write_tags_to_database(aid, tags_list)
+    update_article_tags(aid, tags_list)
     return jsonify({'show_edit': "success"})
 
 
@@ -2427,14 +2421,15 @@ def new_article(user_id):
         if not file:
             return jsonify({'message': '未提供文件。', 'upload_locked': upload_locked, 'Lock_countdown': 15}), 400
 
-        error_message = handle_article_upload(file, app.config['TEMP_FOLDER'], app.config['UPLOAD_LIMIT'])
+        from src.upload.article_upload import upload_article
+        error_message = upload_article(file, app.config['TEMP_FOLDER'], app.config['UPLOAD_LIMIT'])
         if error_message:
             logging.error(f"File upload error: {error_message[0]}")
             return jsonify({'message': error_message[0], 'upload_locked': upload_locked, 'Lock_countdown': 300}), 400
 
         file_name = os.path.splitext(file.filename)[0]
 
-        if set_article_info(file_name, username=get_username()):
+        if upsert_article_metadata(file_name, username=get_username()):
             message = f'上传成功。但请您前往编辑页面进行编辑:<a href="/edit/{file_name}" target="_blank">编辑</a>'
             logging.info(f"Article info successfully saved for {file_name} by user:{user_id}.")
             cache.set(f'upload_locked_{user_id}', True, timeout=300)
@@ -2453,7 +2448,7 @@ def new_article(user_id):
 def profile(user_id):
     avatar_url = get_avatar(user_id)
     user_bio = get_user_bio(user_id) or "这人很懒，什么也没留下"
-    owner_articles = get_owner_articles(owner_id=user_id, user_name=None) or []
+    owner_articles = get_articles_by_owner(owner_id=user_id, user_name=None) or []
     user_follow = get_following_count(user_id=user_id) or 0
     follower = get_follower_count(user_id=user_id) or 0
     return render_template('Profile.html', url_for=url_for, avatar_url=avatar_url,
@@ -2485,7 +2480,7 @@ def generate_sitemap():
             # 遍历文章标题列表
             for title in article_titles:
                 article_url = domain + 'blog/' + title
-                date = get_file_date(title)
+                date = get_article_last_modified(title)
                 article_surl = api_shortlink(article_url)
                 # 创建url标签并包含链接
                 xml_data += '<url>\n'
@@ -2525,7 +2520,7 @@ def generate_rss():
     for file in markdown_files:
         encoded_article_name = urllib.parse.quote(file)  # 对文件名进行编码处理
         article_url = domain + 'blog/' + encoded_article_name
-        date = get_file_date(encoded_article_name)
+        date = get_article_last_modified(encoded_article_name)
         content, *_ = get_article_content(file, 10)
         describe = encoded_article_name
 
@@ -2594,7 +2589,7 @@ def user_space(user_id, target_id):
     can_followed = 1
     if user_id != 0 and target_id != 0:
         can_followed = get_can_followed(user_id, target_id)
-    owner_articles = get_owner_articles(owner_id=target_id, user_name=None) or []
+    owner_articles = get_articles_by_owner(owner_id=target_id, user_name=None) or []
     target_username = get_profiles(user_id=target_id)[1] or "佚名"
     print(target_username)
     return render_template('Profile.html', url_for=url_for, avatar_url=get_avatar(target_id, 'id'),
@@ -2631,14 +2626,14 @@ def markdown_editor(user_id, aid):
     auth = False
 
     if user_name is not None:
-        auth = auth_aid(aid, user_name)
+        auth = authorize_by_aid(aid, user_name)
 
     if auth:
         if request.args.get('editor') == 'ueditor':
             return ueditor_plus_edit(user_id, aid, user_name)
-        all_info = get_more_info(aid)
+        all_info = get_article_metadata(aid)
         if request.method == 'GET':
-            edit_html = zy_edit_article(all_info[1], max_line=app.config['MAX_LINE'])
+            edit_html = edit_article_content(all_info[1], max_line=app.config['MAX_LINE'])
             article_url = domain + 'blog/' + all_info[1]
             article_surl = api_shortlink(article_url)
             # 渲染编辑页面并将转换后的HTML传递到模板中
@@ -2841,7 +2836,7 @@ def media_delete(user_id):
 
 
 @app.route('/setting/profiles', methods=['GET'])
-@finger_required
+@user_id_required
 def setting_profiles(user_id):
     user_info = cache.get(f"{user_id}_userInfo") or get_profiles(user_id=user_id)
     print(user_info)
@@ -3495,29 +3490,6 @@ def filter_sensitive_words(comment_content):
             return False
 
     return True
-
-
-@app.route('/sys/update', methods=['GET', 'POST'])
-def sys_update():
-    if request.method == 'GET':
-        return _sys_version(check=True)
-    else:
-        current_version = sys_version
-        latest_version = _sys_version(check=True)
-        if latest_version and latest_version > current_version:
-            return jsonify({"status": "update_available", "latest": latest_version})
-        return jsonify({"status": "up_to_date"})
-
-
-@app.route('/api/sys/version', methods=['GET'])
-def _sys_version(check=False):
-    if check:
-        url = "https://api.github.com/repos/Athenavi/zb/releases/latest"
-        response = requests.get(url)
-        if response.status_code == 200:
-            return response.json()['tag_name']
-        return None
-    return jsonify({'code': 200, 'data': {'version': sys_version}})
 
 
 if __name__ == '__main__':

@@ -7,8 +7,8 @@ import flask_socketio
 from flask import Flask, request, jsonify
 from flask_caching import Cache
 
+from src.auth.core import secret_key, authenticate_jwt
 from src.database import get_db_connection
-from src.utils import authenticate_jwt, secret_key, zy_mail_conf
 
 noti = Flask(__name__, template_folder='../templates')
 socketio = flask_socketio.SocketIO(noti, cors_allowed_origins='*')
