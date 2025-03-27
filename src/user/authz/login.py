@@ -6,7 +6,7 @@ import bcrypt
 import bleach
 from flask import request, redirect, url_for, render_template, make_response
 
-from src.auth.core import generate_jwt, generate_refresh_token
+from src.user.authz.core import generate_jwt, generate_refresh_token
 from src.database import get_db_connection
 
 

@@ -4,43 +4,13 @@ import html
 import os
 import re
 import urllib
-from contextlib import closing
 from pathlib import Path
-from pymysql import DatabaseError
+
 import markdown
 
-from src.config.general import error
 from src.database import get_db_connection
-
-
-def upsert_article_metadata(a_title, username):
-    try:
-        with closing(get_db_connection()) as db:
-            with db.cursor() as cursor:
-                current_year = datetime.datetime.now().year
-
-                # 插入或更新文章信息
-                cursor.execute("""
-                               INSERT INTO articles (Title, Author, tags)
-                               VALUES (%s, %s, %s)
-                               ON DUPLICATE KEY UPDATE Author = VALUES(Author),
-                                                       tags   = VALUES(tags);
-                               """, (a_title, username, current_year))
-
-                # 记录事件信息
-                cursor.execute("""
-                               INSERT INTO events (title, description, event_date, created_at)
-                               VALUES (%s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-                               """, ('article update', f'{username} updated {a_title}'))
-
-                # 提交事务
-                db.commit()
-                return True
-
-    except Exception as e:
-        print(f"数据库操作期间发生错误: {e}")
-        db.rollback()
-        return False
+from src.error import error
+from src.utils.security.safe import clean_html_format
 
 
 def delete_article(article_name, temp_folder):
@@ -167,11 +137,6 @@ def zy_show_article(content):
         return error(f'Error in displaying the article :{e}', 404)
 
 
-def clean_html_format(text):
-    clean_text = re.sub('<.*?>', '', str(text))
-    return clean_text
-
-
 def edit_article_content(article, max_line):
     limit = max_line
     try:
@@ -213,33 +178,6 @@ def get_article_last_modified(file_path):
         return None
 
 
-def update_article_password(aid, passwd):
-    db = get_db_connection()
-    aid = int(aid)
-    try:
-        with db.cursor() as cursor:
-            query = "SELECT * FROM article_pass WHERE aid = %s;"
-            cursor.execute(query, (aid,))
-            result = cursor.fetchone()
-            if result:
-                query = "UPDATE `article_pass` SET `pass` = %s WHERE `article_pass`.`aid` = %s;"
-                cursor.execute(query, (passwd, aid,))
-            else:
-                query = "INSERT INTO `article_pass` (`aid`, `pass`) VALUES (%s, %s);"
-                cursor.execute(query, (aid, passwd,))
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return False
-    finally:
-        db.commit()
-        try:
-            cursor.close()
-        except NameError:
-            pass
-        db.close()
-        return True
-
-
 def get_file_summary(a_title):
     articles_dir = os.path.join('articles', a_title + ".md")
     try:
@@ -251,26 +189,6 @@ def get_file_summary(a_title):
     text_content = clean_html_format(html_content)
     summary = (text_content[:75] + "...") if len(text_content) > 75 else text_content
     return summary
-
-
-def get_article_metadata(aid):
-    result = (None,) * 13
-    db = get_db_connection()
-    cursor = db.cursor()
-    try:
-        query = "SELECT * FROM articles WHERE ArticleID = %s"
-        cursor.execute(query, (int(aid),))
-        fetched_result = cursor.fetchone()
-        if fetched_result:
-            result = fetched_result
-    except DatabaseError as db_err:
-        print(f"数据库错误: {db_err}")
-    except Exception as e:
-        print(f"发生了一个错误: {e}")
-    finally:
-        cursor.close()
-        db.close()
-    return result
 
 
 def save_article_changes(aid, hidden, status, cover_image_path, excerpt):
@@ -319,31 +237,3 @@ def zy_delete_article(filename):
             cursor.close()
         if db:
             db.close()
-
-
-def get_articles_by_owner(owner_id=None, user_name=None):
-    db = get_db_connection()
-    articles = []
-
-    try:
-        with db.cursor() as cursor:
-            if user_name:
-                query = "SELECT ArticleID, Title FROM articles WHERE `Author` = %s and `Status` != 'Deleted';"
-                cursor.execute(query, (user_name,))
-                articles.extend((result[0], result[1]) for result in cursor.fetchall())
-
-            if owner_id:
-                query = """
-                SELECT a.ArticleID, a.Title
-                FROM articles AS a 
-                JOIN users AS u ON a.Author = u.username
-                WHERE u.id = %s and a.`Status` != 'Deleted';
-                """
-                cursor.execute(query, (owner_id,))
-                articles.extend((result[0], result[1]) for result in cursor.fetchall())
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    finally:
-        db.close()
-
-    return articles

@@ -4,7 +4,7 @@ import zipfile
 from werkzeug.utils import secure_filename
 from flask import request
 
-from src.config.general import error
+from src.error import error
 
 
 def admin_upload_file(size_limit):

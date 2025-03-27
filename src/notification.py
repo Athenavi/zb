@@ -7,7 +7,7 @@ import flask_socketio
 from flask import Flask, request, jsonify
 from flask_caching import Cache
 
-from src.auth.core import secret_key, authenticate_jwt
+from src.user.authz.core import secret_key, authenticate_jwt
 from src.database import get_db_connection
 
 noti = Flask(__name__, template_folder='../templates')

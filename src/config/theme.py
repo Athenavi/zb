@@ -49,3 +49,17 @@ def theme_safe_check(theme_id, channel=1):
                 return True
     else:
         return False
+
+
+def get_all_themes():
+    display_list = ['default']
+    themes_path = 'templates/theme'
+    if os.path.exists(themes_path):
+        subfolders = [f.path for f in os.scandir(themes_path) if f.is_dir()]
+        for subfolder in subfolders:
+            has_index_html = os.path.exists(os.path.join(subfolder, 'index.html'))
+            has_template_ini = os.path.exists(os.path.join(subfolder, 'template.ini'))
+            if has_index_html and has_template_ini:
+                display_list.append(os.path.basename(subfolder))
+    # print(display_list)
+    return display_list

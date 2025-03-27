@@ -28,29 +28,35 @@ from jinja2 import select_autoescape, TemplateNotFound
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
 
-from src.auth.core import secret_key, get_username, authenticate_jwt, authenticate_refresh_token, generate_jwt, \
-    jwt_required, admin_required, user_id_required
-from src.auth.login import user_login, create_user, tp_mail_login
-from src.auth.password import update_password, validate_password
-from src.auth.permissions import verify_file_permissions
-from src.blog.article import get_article_last_modified, get_article_content, clean_html_format, get_file_summary, \
-    get_article_titles, get_article_metadata, update_article_password, save_article_changes, edit_article_content, \
-    delete_article, upsert_article_metadata, get_articles_by_owner
+from src.blog.article.core.content import get_article_last_modified, get_article_content, get_file_summary, \
+    get_article_titles, delete_article, save_article_changes, edit_article_content
+from src.blog.article.core.crud import get_articles_by_owner
+from src.blog.article.metadata.handlers import get_article_metadata, upsert_article_metadata
+from src.blog.article.security.password import update_article_password
+from src.error import error
+from src.user.authz.core import secret_key, get_username, authenticate_jwt, authenticate_refresh_token, generate_jwt
+from src.user.authz.decorators import jwt_required, admin_required, user_id_required
+from src.user.authz.login import user_login, create_user, tp_mail_login
+from src.user.authz.password import update_password, validate_password
+from src.media.permissions import verify_file_permissions
+
 from src.blog.comment import get_comments
-from src.blog.media import generate_video_thumb, generate_thumbs, handle_cover_resize
+from src.config.mail import zy_mail_conf
+from src.media.processing import generate_video_thumbnail, generate_thumbnail, handle_cover_resize
 from src.blog.tag import query_article_tags, get_unique_article_tags, get_articles_by_tag, update_article_tags
-from src.blog.user import query_blog_author, authorize_by_aid
-from src.config.general import get_general_config, zy_mail_conf, error, get_all_themes
-from src.config.theme import theme_safe_check
+from src.user.entities import query_blog_author, authorize_by_aid
+from src.config.general import get_general_config
+from src.config.theme import theme_safe_check, get_all_themes
 from src.database import get_db_connection
-from src.social.core import get_following_count, get_can_followed, get_follower_count
+from src.user.profile.social import get_following_count, get_can_followed, get_follower_count
 from src.upload.admin_upload import admin_upload_file
 from src.upload.check import is_allowed_file
-from src.utils.http import generate_etag
-from src.utils.ip_utils import get_client_ip, user_agent_info, anonymize_ip_address
-from src.utils.links import create_special_url, redirect_to_long_url
+from src.utils.http.etag import generate_etag
+from src.utils.security.ip_utils import get_client_ip, anonymize_ip_address
+from src.utils.shortener.links import create_special_url, redirect_to_long_url
 from src.notification import get_sys_notice, read_notification
-from src.utils.safe import zb_safe_check
+from src.utils.security.safe import run_security_checks, clean_html_format
+from src.utils.user_agent.parser import user_agent_info
 
 global_encoding = 'utf-8'
 
@@ -479,7 +485,7 @@ def jump():
 
 @app.route('/login/<provider>')
 def cc_login(provider):
-    if zb_safe_check(api_host):
+    if run_security_checks(api_host):
         pass
     else:
         return error(message="彩虹聚合登录API接口配置错误,您的程序无法使用第三方登录", status_code='503'), 503
@@ -2421,7 +2427,7 @@ def new_article(user_id):
         if not file:
             return jsonify({'message': '未提供文件。', 'upload_locked': upload_locked, 'Lock_countdown': 15}), 400
 
-        from src.upload.article_upload import upload_article
+        from src.upload.public_upload import upload_article
         error_message = upload_article(file, app.config['TEMP_FOLDER'], app.config['UPLOAD_LIMIT'])
         if error_message:
             logging.error(f"File upload error: {error_message[0]}")
@@ -2709,7 +2715,7 @@ def api_img(user_name, img):
     thumbs_dir.mkdir(parents=True, exist_ok=True)
     try:
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            executor.submit(generate_thumbs, img_dir, img_thumbs)
+            executor.submit(generate_thumbnail, img_dir, img_thumbs)
     except Exception as e:
         app.logger.error(f"Error submitting thumb generation task: {e}")
     placeholder_path = Path(base_dir) / 'static' / 'favicon.ico'
@@ -2731,7 +2737,7 @@ def api_video(user_name, video):
     thumbs_dir.mkdir(parents=True, exist_ok=True)
     try:
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            executor.submit(generate_video_thumb, video_dir, video_thumbs, time=1)
+            executor.submit(generate_video_thumbnail, video_dir, video_thumbs, time=1)
     except Exception as e:
         app.logger.error(f"Error submitting video thumbnail generation task: {e}")
     placeholder_path = Path(base_dir) / 'static' / 'favicon.ico'

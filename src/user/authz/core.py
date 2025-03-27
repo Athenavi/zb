@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta, timezone
-from functools import wraps
 
-from flask import request, redirect, url_for
+from flask import request
 from jwt import ExpiredSignatureError, InvalidTokenError, encode, decode
 
 from src.config.general import zy_safe_conf
@@ -61,39 +60,3 @@ def get_username():
         payload = decode(token, secret_key, algorithms=['HS256'], options={"verify_exp": False})
         return payload['username']
 
-
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        token = request.cookies.get('jwt')
-        user_id = authenticate_jwt(token)
-        if user_id != 1:
-            return redirect(url_for('profile'))
-        return f(user_id, *args, **kwargs)
-
-    return decorated_function
-
-
-def jwt_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        token = request.cookies.get('jwt')
-        user_id = authenticate_jwt(token)
-        if user_id is None:
-            callback_route = request.endpoint
-            return redirect(url_for('login', callback=callback_route))
-        return f(user_id, *args, **kwargs)
-
-    return decorated_function
-
-
-def user_id_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        token = request.cookies.get('jwt')
-        user_id = authenticate_jwt(token)
-        if user_id is None:
-            user_id = 0
-        return f(user_id, *args, **kwargs)
-
-    return decorated_function
