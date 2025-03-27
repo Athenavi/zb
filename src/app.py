@@ -30,7 +30,7 @@ from werkzeug.utils import secure_filename
 
 from src.blog.article.core.content import get_article_last_modified, get_article_content, get_file_summary, \
     delete_article, save_article_changes, edit_article_content, get_a_list
-from src.blog.article.core.crud import get_articles_by_owner, read_hidden_articles
+from src.blog.article.core.crud import get_articles_by_owner, read_hidden_articles, delete_db_article, fetch_articles
 from src.blog.article.metadata.handlers import get_article_metadata, upsert_article_metadata
 from src.blog.article.security.password import update_article_password
 from src.blog.comment import get_comments, create_comment, delete_comment
@@ -40,20 +40,21 @@ from src.blueprints.dashboard import dashboard_bp
 from src.blueprints.website import create_website_blueprint
 from src.config.general import get_general_config
 from src.config.mail import zy_mail_conf
-from src.config.theme import theme_safe_check, get_all_themes
+from src.config.theme import theme_safe_check, db_change_theme
 from src.database import get_db_connection
 from src.error import error
-from src.media.permissions import verify_file_permissions
+from src.media.permissions import verify_file_permissions, get_media_db
 from src.media.processing import generate_video_thumbnail, generate_thumbnail, handle_cover_resize
 from src.notification import get_sys_notice, read_notification
 from src.other.report import report_add
 from src.upload.admin_upload import admin_upload_file
-from src.upload.check import is_allowed_file
+from src.upload.public_upload import handle_user_upload
 from src.user.authz.core import secret_key, get_username, authenticate_refresh_token, generate_jwt
 from src.user.authz.decorators import jwt_required, admin_required, user_id_required
 from src.user.authz.login import tp_mail_login
 from src.user.authz.password import update_password, validate_password
-from src.user.entities import query_blog_author, authorize_by_aid
+from src.user.entities import query_blog_author, authorize_by_aid, get_user_sub_info, check_user_conflict, \
+    db_save_avatar, db_save_bio, db_change_username, db_bind_email
 from src.user.profile.social import get_following_count, get_can_followed, get_follower_count
 from src.utils.http.etag import generate_etag
 from src.utils.security.ip_utils import get_client_ip, anonymize_ip_address
@@ -745,11 +746,6 @@ def read_user_notification():
     return jsonify(read_content), 200
 
 
-@app.route('/changelog')
-def changelog():
-    return redirect('https://github.com/Athenavi/zb/blob/main/articles/changelog.md')
-
-
 @app.route('/xmind/<user_name>/thumbs/<xmind>.png', methods=['GET', 'POST'])
 def api_xmind(user_name, xmind):
     if request.method == 'GET':
@@ -1149,8 +1145,6 @@ def api_delete_comment(user_id):
         return jsonify({"message": "操作失败"}), 500
 
 
-
-
 @app.template_filter('fromjson')
 def json_filter(value):
     """将 JSON 字符串解析为 Python 对象"""
@@ -1164,8 +1158,6 @@ def json_filter(value):
     except (ValueError, TypeError) as e:
         print(f"Error parsing JSON: {e}, Value: {value}")
         return None
-
-
 
 
 @app.route('/static/music/music.json', methods=['GET'])
@@ -1384,7 +1376,7 @@ def api_edit(user_id, aid):
         cover_image_path = 'cover'
         if status == 'Deleted':
             if delete_article(a_name, app.config['TEMP_FOLDER']):
-                return api_delete(user_id, aid)
+                return delete_db_article(user_id, aid)
         if cover_image:
             # 保存封面图片
             cover_image_path = os.path.join('cover', f"{aid}.png")
@@ -1437,18 +1429,6 @@ def api_edit_hidden(user_id, aid):
         return jsonify({'show_edit': 'error', 'message': '更新隐藏状态失败'}), 500
 
 
-def api_delete(user_id, aid):
-    try:
-        with get_db_connection() as db:
-            with db.cursor() as cursor:
-                cursor.execute("UPDATE `articles` SET `Status`=%s WHERE `ArticleID`=%s", ('Deleted', aid))
-                db.commit()
-        return jsonify({'show_edit_code': "deleted"}), 201
-    except Exception as e:
-        app.logger.error(f"Error deleting article: {e} by user {user_id} ")
-        return jsonify({'show_edit_code': 'error', 'message': '删除文章失败'}), 500
-
-
 @app.route('/api/cover/<cover_img>', methods=['GET'])
 @app.route('/edit/cover/<cover_img>', methods=['GET'])
 def api_cover(cover_img):
@@ -1474,106 +1454,14 @@ def api_cover(cover_img):
 @jwt_required
 def upload_user_path(user_id):
     user_name = get_username()
-    return handle_user_upload(user_name=user_name, user_id=user_id)
-
-
-def handle_user_upload(user_name, user_id):
-    if not user_name:
-        return jsonify({'message': 'failed, user not authenticated'}), 403
-
-    if not request.files.getlist('file'):
-        return jsonify({'message': 'no files uploaded'}), 400
-
-    try:
-        allowed_types = app.config['ALLOWED_EXTENSIONS']
-        user_dir = os.path.join('media', user_name)
-        os.makedirs(user_dir, exist_ok=True)
-        file_records = []
-        with get_db_connection() as db:
-            with db.cursor() as cursor:
-                for f in request.files.getlist('file'):
-                    if not is_allowed_file(f.filename, allowed_types):
-                        app.logger.warning(f'User: {user_name}, File {f.filename} not allowed')
-                        continue
-
-                    if f.content_length > app.config['UPLOAD_LIMIT']:
-                        return jsonify({'message': f'File size exceeds the limit of {app.config["UPLOAD_LIMIT"]}'}), 413
-
-                    newfile_name = secure_filename(str(f.filename))
-                    user_dir = str(user_dir)
-
-                    newfile_path = os.path.join(user_dir, newfile_name)
-                    old_thumb_path = os.path.join(user_dir, 'thumbs', newfile_name)
-
-                    if isinstance(f, io.BytesIO):
-                        with open(newfile_path, 'wb') as file:
-                            file.write(f.getvalue())
-                    else:
-                        f.save(newfile_path)
-
-                    if os.path.isfile(old_thumb_path):
-                        os.remove(old_thumb_path)
-
-                    file_type = (
-                        'image' if f.filename.lower().endswith(
-                            ('.jpg', '.jpeg', '.png', '.webp', '.jfif', '.pjpeg', '.pjp')
-                        ) else 'video' if f.filename.lower().endswith('.mp4')
-                        else 'document'
-                    )
-
-                    cursor.execute("SELECT `id` FROM `media` WHERE `file_path`=%s", (newfile_path,))
-                    existing_record = cursor.fetchone()
-
-                    if existing_record:
-                        cursor.execute(
-                            "UPDATE `media` SET `updated_at`=%s WHERE `id`=%s",
-                            (datetime.now(), existing_record[0])
-                        )
-                    else:
-                        file_records.append(
-                            (user_id, newfile_path, file_type, datetime.now(), datetime.now())
-                        )
-                        app.logger.info(f'User: {user_name}, Uploaded file: {newfile_name}')
-
-                if file_records:
-                    insert_query = ("INSERT INTO `media` (`user_id`, `file_path`, `file_type`, `created_at`, "
-                                    "`updated_at`) VALUES (%s, %s, %s, %s, %s)")
-                    cursor.executemany(insert_query, file_records)
-                else:
-                    app.logger.info(f'User: {user_name}, No valid files uploaded')
-                    return jsonify({'message': 'no valid files uploaded'}), 200
-
-            db.commit()
-
-        return jsonify({'message': 'success'}), 200
-
-    except Exception as e:
-        app.logger.error(f"Error in file upload: {e}")
-        return jsonify({'message': 'failed', 'error': str(e)}), 500
+    return handle_user_upload(user_name=user_name, user_id=user_id, allowed_size=app.config["UPLOAD_LIMIT"],
+                              allowed_types=app.config['ALLOWED_EXTENSIONS'])
 
 
 def get_outer_url(user_name, user_id, filename):
-    if handle_user_upload(user_name, user_id):
+    if handle_user_upload(user_name, user_id, allowed_size=app.config["UPLOAD_LIMIT"],
+                          allowed_types=app.config['ALLOWED_EXTENSIONS']):
         return domain + 'media/' + user_name + '/' + filename
-
-
-def fetch_articles(query, params):
-    db = get_db_connection()
-    try:
-        with db.cursor() as cursor:
-            cursor.execute(query, params)
-            article_info = cursor.fetchall()
-            cursor.execute("SELECT COUNT(*) FROM `articles` WHERE `Hidden`=0 AND `Status`='Published'")
-            total_articles = cursor.fetchone()[0]
-
-    except Exception as e:
-        app.logger.error(f"Error getting articles: {e}")
-        raise
-
-    finally:
-        if db is not None:
-            db.close()
-        return article_info, total_articles
 
 
 @app.route('/', methods=['GET'])
@@ -1848,28 +1736,6 @@ def profile(user_id):
                            Articles=owner_articles)
 
 
-def get_user_sub_info(query, user_id):
-    db = None
-    user_sub_info = []
-    try:
-        db = get_db_connection()
-        with db.cursor() as cursor:
-            cursor.execute(query, (int(user_id),))
-            user_sub = cursor.fetchall()
-            subscribe_ids = [sub[0] for sub in user_sub]
-            if subscribe_ids:
-                placeholders = ', '.join(['%s'] * len(subscribe_ids))
-                query = f"SELECT `id`, `username` FROM `users` WHERE `id` IN ({placeholders});"
-                cursor.execute(query, tuple(subscribe_ids))
-                user_sub_info = cursor.fetchall()
-    except Exception as e:
-        app.logger.error(f"An error occurred: {e}")
-    finally:
-        if db is not None:
-            db.close()
-    return user_sub_info
-
-
 @app.route('/fans/follow')
 @jwt_required
 def fans_follow(user_id):
@@ -1912,19 +1778,6 @@ def api_user_avatar():
     return get_avatar(user_id, 'id')
 
 
-@cache.memoize(180)
-@app.route('/api/prev_<file_name>', methods=['GET', 'POST'])
-def generate_temp_preview(file_name):
-    author = get_username()
-    prev = f"""
-    ```xmind preview
-    {domain}/blog/f/{author}/{file_name[:-3]}
-    ```
-
-     """
-    return prev
-
-
 @app.route('/edit/blog/<int:aid>', methods=['GET', 'POST', 'PUT'])
 @jwt_required
 def markdown_editor(user_id, aid):
@@ -1956,13 +1809,18 @@ def markdown_editor(user_id, aid):
         return error(message='您没有权限', status_code=503)
 
 
+@cache.memoize(120)
+def get_media_cahce(user_id, category, page=1, per_page=20):
+    return get_media_db(user_id, category, page, per_page)
+
+
 @app.route('/media', methods=['GET'])
 @jwt_required
 def media(user_id):
     media_type = request.args.get('type', default='img')
     page = request.args.get('page', default=1, type=int)
     if not media_type or media_type == 'img':
-        imgs, total_pages = get_media_db(user_id, category='image', page=page, per_page=20)
+        imgs, total_pages = get_media_cahce(user_id, category='image', page=page, per_page=20)
         has_next_page = bool(total_pages - page)
         has_previous_page = bool(total_pages - 1)
         return render_template('Media_V2.html', imgs=imgs, url_for=url_for,
@@ -1970,7 +1828,7 @@ def media(user_id):
                                has_previous_page=has_previous_page, current_page=page,
                                domain=domain)
     if media_type == 'video':
-        videos, total_pages = get_media_db(user_id, category='video', page=1, per_page=20)
+        videos, total_pages = get_media_cahce(user_id, category='video', page=1, per_page=20)
         has_next_page = bool(total_pages - page)
         has_previous_page = bool(total_pages - 1)
         return render_template('Media_V2.html', videos=videos, url_for=url_for,
@@ -1978,29 +1836,6 @@ def media(user_id):
                                has_previous_page=has_previous_page, current_page=page,
                                domain=domain)
     return "Media type not supported", 404
-
-
-@cache.memoize(120)
-def get_media_db(user_id, category, page=1, per_page=20):
-    media_type = category or 'image'
-    try:
-        with get_db_connection() as db:
-            with db.cursor() as cursor:
-                offset = (page - 1) * per_page
-                # 查询文件路径和ID，并按id降序排列
-                query = f"SELECT `id`, `file_path` FROM media WHERE user_id = %s AND file_type = %s ORDER BY id DESC LIMIT %s OFFSET %s"
-                cursor.execute(query, (user_id, media_type, per_page, offset))
-                files = cursor.fetchall()
-                print(files)
-                count_query = f"SELECT COUNT(*) FROM media WHERE user_id = %s AND file_type = %s"
-                cursor.execute(count_query, (user_id, media_type))
-                total_files = cursor.fetchone()[0]
-                total_pages = (total_files + per_page - 1) // per_page
-
-                return files, total_pages
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return [], 0
 
 
 @app.route('/thumb/media/<user_name>/<img>', methods=['GET'])
@@ -2208,7 +2043,7 @@ def change_profiles(user_id):
             return jsonify({'error': 'Username is required'}), 400
         if not re.match(r'^[a-zA-Z0-9_]{4,16}$', username):
             return jsonify({'error': 'Username should be 4-16 characters, letters, numbers or underscores'}), 400
-        if check_conflict(zone='username', value=username):
+        if check_user_conflict(zone='username', value=username):
             return jsonify({'error': 'Username already exists'}), 400
         db_change_username(user_id, new_username=username)
         return jsonify({'message': 'Username updated successfully'}), 200
@@ -2218,80 +2053,10 @@ def change_profiles(user_id):
             return jsonify({'error': 'Email is required'}), 400
         if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
             return jsonify({'error': 'Invalid email format'}), 400
-        if check_conflict(zone='email', value=email):
+        if check_user_conflict(zone='email', value=email):
             return jsonify({'error': 'Email already exists'}), 400
         db_bind_email(user_id, (None, email))
         return jsonify({'message': 'Email updated successfully'}), 200
-
-
-def check_conflict(zone, value):
-    if zone == 'username':
-        query = "SELECT username FROM users"
-    elif zone == 'email':
-        query = "SELECT email FROM users"
-    else:
-        return False
-    try:
-        with get_db_connection() as db:
-            with db.cursor() as cursor:
-                cursor.execute(query)
-                if value not in [row[0] for row in cursor.fetchall()]:
-                    return False
-        return False
-    except Exception as e:
-        app.logger.error(f"Error getting user list: {e}")
-        return False
-
-
-def db_save_avatar(user_id, avatar_uuid):
-    db = None
-    try:
-        db = get_db_connection()
-        with db.cursor() as cursor:
-            query = "UPDATE users SET profile_picture = %s WHERE id = %s"
-            cursor.execute(query, (avatar_uuid, user_id))
-            db.commit()
-    except Exception as e:
-        app.logger.error(f"Error saving avatar: {e} by user {user_id} avatar uuid: {avatar_uuid}")
-    finally:
-        if db is not None:
-            db.close()
-
-
-def db_save_bio(user_id, bio):
-    db = None
-    try:
-        db = get_db_connection()
-        with db.cursor() as cursor:
-            query = "UPDATE users SET bio = %s WHERE id = %s"
-            cursor.execute(query, (bio, user_id))
-            db.commit()
-    except Exception as e:
-        app.logger.error(f"Error saving bio: {e} by user {user_id} bio: {bio}")
-    finally:
-        if db is not None:
-            db.close()
-
-
-def db_change_username(user_id, new_username):
-    # 修改用户名将可能导致资料被意外删除,建议先导出您的资料再进行下一步操作
-    # 导出资料: 点击右上角头像 -> 点击设置 -> 点击导出资料
-    db = None
-    try:
-        db = get_db_connection()
-        with db.cursor() as cursor:
-            query = "UPDATE users SET username = %s WHERE id = %s"
-            cursor.execute(query, (new_username, user_id))
-            db.commit()
-    except Exception as e:
-        app.logger.error(f"Error changing username: {e} by user {user_id} new username: {new_username}")
-    finally:
-        if db is not None:
-            db.close()
-
-
-def db_bind_email(user_id, param):
-    pass
 
 
 @app.route('/api/user/export', methods=['GET', 'POST'])
@@ -2394,18 +2159,6 @@ def change_display(user_id):
             cache.delete_memoized(index_html)
     else:
         return "failed"
-
-
-def db_change_theme(user_id, theme_id):
-    try:
-        with get_db_connection() as db:
-            with db.cursor() as cursor:
-                query = "INSERT INTO `custom_fields` (`user_id`, `field_name`, `field_value`) VALUES (%s, %s, %s)"
-                cursor.execute(query, (user_id, "theme", theme_id))
-                db.commit()
-                return True
-    except Exception:
-        return False
 
 
 @app.route('/api/wx/activity', methods=['GET'])
@@ -2558,12 +2311,6 @@ def delete_activity():
         db.close()
 
 
-@app.route('/guestbook', methods=['GET', 'POST'])
-def guestbook():
-    return '当前功能暂未开放！'
-
-
-
 @app.route('/api/upload_image', methods=['POST'])
 def upload_image():
     key = request.args.get('key')
@@ -2669,19 +2416,6 @@ def uploaded_file(filename):
 
     # 发送文件
     return send_file(file, max_age=86400)
-
-
-
-
-def filter_sensitive_words(comment_content):
-    sensitive_words = ['违禁词1', '违禁词2', '敏感词1', '敏感词2']
-
-    comment_content_lower = comment_content.lower()
-    for word in sensitive_words:
-        if word in comment_content_lower:
-            return False
-
-    return True
 
 
 if __name__ == '__main__':

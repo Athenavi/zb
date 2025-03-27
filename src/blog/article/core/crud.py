@@ -1,4 +1,25 @@
+from flask import jsonify
+
 from src.database import get_db_connection
+
+
+def fetch_articles(query, params):
+    db = get_db_connection()
+    try:
+        with db.cursor() as cursor:
+            cursor.execute(query, params)
+            article_info = cursor.fetchall()
+            cursor.execute("SELECT COUNT(*) FROM `articles` WHERE `Hidden`=0 AND `Status`='Published'")
+            total_articles = cursor.fetchone()[0]
+
+    except Exception as e:
+        print(f"Error getting articles: {e}")
+        raise
+
+    finally:
+        if db is not None:
+            db.close()
+        return article_info, total_articles
 
 
 def get_articles_by_owner(owner_id=None, user_name=None):
@@ -44,3 +65,14 @@ def read_hidden_articles():
         # 更详细的日志记录或错误处理机制
 
     return hidden_articles
+
+
+def delete_db_article(user_id, aid):
+    try:
+        with get_db_connection() as db:
+            with db.cursor() as cursor:
+                cursor.execute("UPDATE `articles` SET `Status`=%s WHERE `ArticleID`=%s", ('Deleted', aid))
+                db.commit()
+        return jsonify({'show_edit_code': "deleted"}), 201
+    except Exception as e:
+        return jsonify({'show_edit_code': 'error', 'message': f'删除文章失败{e}'}), 500
