@@ -13,6 +13,19 @@ from src.error import error
 from src.utils.security.safe import clean_html_format
 
 
+def get_a_list(chanel=1, page=1):
+    if chanel == 1:
+        articles, has_next_page, has_previous_page = get_article_titles(page=1, per_page=99999)
+        return articles
+    if chanel == 2:
+        articles, has_next_page, has_previous_page = get_article_titles(page=page, per_page=12)
+        return articles, has_next_page, has_previous_page
+    if chanel == 3:
+        # rss页面
+        articles, has_next_page, has_previous_page = get_article_titles(page=1, per_page=30)
+        return articles
+
+
 def delete_article(article_name, temp_folder):
     # 确保 temp_folder 是 Path 对象
     temp_folder = Path(temp_folder)

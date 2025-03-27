@@ -21,7 +21,7 @@ import markdown
 import qrcode
 import requests
 from PIL import Image
-from flask import Flask, render_template, redirect, request, url_for, Response, jsonify, send_file, \
+from flask import Flask, render_template, redirect, request, url_for, jsonify, send_file, \
     make_response, send_from_directory, abort, flash
 from flask_caching import Cache
 from jinja2 import select_autoescape, TemplateNotFound
@@ -29,32 +29,34 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
 
 from src.blog.article.core.content import get_article_last_modified, get_article_content, get_file_summary, \
-    get_article_titles, delete_article, save_article_changes, edit_article_content
-from src.blog.article.core.crud import get_articles_by_owner
+    delete_article, save_article_changes, edit_article_content, get_a_list
+from src.blog.article.core.crud import get_articles_by_owner, read_hidden_articles
 from src.blog.article.metadata.handlers import get_article_metadata, upsert_article_metadata
 from src.blog.article.security.password import update_article_password
-from src.error import error
-from src.user.authz.core import secret_key, get_username, authenticate_jwt, authenticate_refresh_token, generate_jwt
-from src.user.authz.decorators import jwt_required, admin_required, user_id_required
-from src.user.authz.login import user_login, create_user, tp_mail_login
-from src.user.authz.password import update_password, validate_password
-from src.media.permissions import verify_file_permissions
-
-from src.blog.comment import get_comments
-from src.config.mail import zy_mail_conf
-from src.media.processing import generate_video_thumbnail, generate_thumbnail, handle_cover_resize
+from src.blog.comment import get_comments, create_comment, delete_comment
 from src.blog.tag import query_article_tags, get_unique_article_tags, get_articles_by_tag, update_article_tags
-from src.user.entities import query_blog_author, authorize_by_aid
+from src.blueprints.auth import auth_bp
+from src.blueprints.dashboard import dashboard_bp
+from src.blueprints.website import create_website_blueprint
 from src.config.general import get_general_config
+from src.config.mail import zy_mail_conf
 from src.config.theme import theme_safe_check, get_all_themes
 from src.database import get_db_connection
-from src.user.profile.social import get_following_count, get_can_followed, get_follower_count
+from src.error import error
+from src.media.permissions import verify_file_permissions
+from src.media.processing import generate_video_thumbnail, generate_thumbnail, handle_cover_resize
+from src.notification import get_sys_notice, read_notification
+from src.other.report import report_add
 from src.upload.admin_upload import admin_upload_file
 from src.upload.check import is_allowed_file
+from src.user.authz.core import secret_key, get_username, authenticate_refresh_token, generate_jwt
+from src.user.authz.decorators import jwt_required, admin_required, user_id_required
+from src.user.authz.login import tp_mail_login
+from src.user.authz.password import update_password, validate_password
+from src.user.entities import query_blog_author, authorize_by_aid
+from src.user.profile.social import get_following_count, get_can_followed, get_follower_count
 from src.utils.http.etag import generate_etag
 from src.utils.security.ip_utils import get_client_ip, anonymize_ip_address
-from src.utils.shortener.links import create_special_url, redirect_to_long_url
-from src.notification import get_sys_notice, read_notification
 from src.utils.security.safe import run_security_checks, clean_html_format
 from src.utils.user_agent.parser import user_agent_info
 
@@ -64,6 +66,19 @@ app = Flask(__name__, template_folder='../templates', static_folder="../static")
 app.config['CACHE_TYPE'] = 'simple'
 cache = Cache(app)
 app.secret_key = secret_key
+
+base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+domain, sitename, beian, sys_version, api_host, app_id, app_key, DEFAULT_KEY = get_general_config()
+print("please check information")
+print("++++++++++==========================++++++++++")
+print(
+    f'\n domain: {domain} \n title: {sitename} \n beian: {beian} \n Version: {sys_version} \n 三方登录api: {api_host} \n')
+print("++++++++++==========================++++++++++")
+
+app.register_blueprint(auth_bp)
+app.register_blueprint(create_website_blueprint(cache, domain, sitename))
+app.register_blueprint(dashboard_bp)
 app.config['SESSION_COOKIE_NAME'] = 'zb_session'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=48)
 app.config['TEMP_FOLDER'] = 'temp/upload'
@@ -92,15 +107,6 @@ file_handler.setFormatter(log_formatter)
 app.logger.addHandler(file_handler)
 app.logger.setLevel(logging.INFO)
 
-base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-domain, sitename, beian, sys_version, api_host, app_id, app_key, DEFAULT_KEY = get_general_config()
-print("please check information")
-print("++++++++++==========================++++++++++")
-print(
-    f'\n domain: {domain} \n title: {sitename} \n beian: {beian} \n Version: {sys_version} \n 三方登录api: {api_host} \n')
-print("++++++++++==========================++++++++++")
-
 
 @app.context_processor
 def inject_variables():
@@ -110,38 +116,6 @@ def inject_variables():
         username=get_username(),
         domain=domain
     )
-
-
-@app.route('/login', methods=['POST', 'GET'])
-def login():
-    callback_route = request.args.get('callback', 'index_html')
-    if request.cookies.get('jwt'):
-        user_id = authenticate_jwt(request.cookies.get('jwt'))
-        if user_id:
-            return redirect(url_for(callback_route))
-    if request.method == 'POST':
-        return user_login(callback_route)
-
-    return render_template('LoginRegister.html', title="登录")
-
-
-@app.route('/logout')
-def logout():
-    response = make_response(redirect(url_for('login')))
-    response.set_cookie('jwt', '', expires=0)  # 清除 Cookie
-    response.set_cookie('refresh_token', '', expires=0)  # 清除刷新令牌
-    return response
-
-
-@app.route('/register', methods=['POST', 'GET'])
-def register():
-    callback_route = request.args.get('callback', 'index_html')
-    if request.cookies.get('jwt'):
-        user_id = authenticate_jwt(request.cookies.get('jwt'))
-        if user_id:
-            return redirect(url_for(callback_route))
-    ip = get_client_ip(request)
-    return create_user(ip)
 
 
 @app.before_request
@@ -219,24 +193,6 @@ def search(user_id):
             matched_content.append(content)
 
     return render_template('search.html', results=matched_content)
-
-
-@cache.memoize(120)
-def read_hidden_articles():
-    hidden_articles = []
-    try:
-        with get_db_connection() as db:
-            with db.cursor() as cursor:
-                query = "SELECT `Title` FROM `articles` WHERE `Hidden` = 1"
-                cursor.execute(query)
-                results = cursor.fetchall()
-                for result in results:
-                    hidden_articles.append(result[0])
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        # 更详细的日志记录或错误处理机制
-
-    return hidden_articles
 
 
 @cache.memoize(180)
@@ -345,57 +301,6 @@ def get_summary(articles):
     return articles_summary
 
 
-@cache.memoize(30)
-def get_a_list(chanel=1, page=1):
-    if chanel == 1:
-        articles, has_next_page, has_previous_page = get_article_titles(page=1, per_page=99999)
-        return articles
-    if chanel == 2:
-        articles, has_next_page, has_previous_page = get_article_titles(page=page, per_page=12)
-        return articles, has_next_page, has_previous_page
-    if chanel == 3:
-        # rss页面
-        articles, has_next_page, has_previous_page = get_article_titles(page=1, per_page=30)
-        return articles
-
-
-@app.route('/blog/<article>', methods=['GET', 'POST'])
-@cache.memoize(180)
-def blog_detail(article):
-    try:
-        article_names = get_a_list(chanel=1)
-        hidden_articles = read_hidden_articles()
-        if article not in article_names:
-            pass
-
-        aid, article_tags = query_article_tags(article)
-        if article in hidden_articles:
-            return render_template('inform.html', aid=aid)
-
-        author, author_uid = query_blog_author(article)
-        update_date = get_article_last_modified(article)
-
-        response = make_response(render_template('zyDetail.html',
-                                                 article_content=1,
-                                                 aid=aid,
-                                                 articleName=article,
-                                                 author=author,
-                                                 authorUID=str(author_uid),
-                                                 blogDate=update_date,
-                                                 domain=domain,
-                                                 url_for=url_for,
-                                                 # article_Surl=article_surl,
-                                                 article_tags=article_tags))
-
-        # 只设置缓存的 max_age
-        response.cache_control.max_age = 180
-
-        return response
-
-    except FileNotFoundError:
-        return error(message="页面不见了", status_code=404)
-
-
 @app.route('/confirm-password', methods=['GET', 'POST'])
 @jwt_required
 def confirm_password(user_id):
@@ -414,16 +319,6 @@ def change_password(user_id):
 def upload_file1(user_id):
     app.logger.info(f'{user_id} : Try Upload file')
     return admin_upload_file(app.config['UPLOAD_LIMIT'])
-
-
-@cache.cached(timeout=14400)
-@app.route('/robots.txt')
-def static_from_root():
-    content = "User-agent: *\nDisallow: /admin"
-    modified_content = content + '\nSitemap: ' + domain + 'sitemap.xml'
-
-    response = Response(modified_content, mimetype='text/plain')
-    return response
 
 
 def zy_save_edit(aid, content, a_name):
@@ -475,12 +370,6 @@ def get_image_path(user_name, img_name):
         return send_file(img_dir, mimetype='image/png', max_age=360)
     except FileNotFoundError:
         abort(404)
-
-
-@app.route('/jump', methods=['GET', 'POST'])
-def jump():
-    url = request.args.get('url', default=domain)
-    return render_template('inform.html', url=url, domain=domain)
 
 
 @app.route('/login/<provider>')
@@ -569,67 +458,6 @@ def get_screenshot(theme_id, img_name):
 @app.route('/favicon.ico', methods=['GET'])
 def favicon():
     return send_file('../static/favicon.ico', mimetype='image/png', max_age=3600)
-
-
-@cache.cached(timeout=24 * 3600, key_prefix='short_link')
-@app.route('/s/<short_url>', methods=['GET', 'POST'])
-def redirect_to_long_url_route(short_url):
-    if len(short_url) != 6:
-        return 'error'
-    user_agent = request.headers.get('User-Agent')
-    long_url = redirect_to_long_url(short_url)
-    if long_url:
-        app.logger.info(f"{user_agent}->{short_url}")
-        return redirect(long_url, code=302)
-    else:
-        # 如果没有找到对应的长网址，则返回错误页面或其他处理逻辑
-        logging.error(f"Invalid short URL: {short_url}")
-        return "短网址无效"
-
-
-@app.route('/api/shortlink')
-def api_shortlink(long_url):
-    if not long_url.startswith('https://') and not long_url.startswith('http://'):
-        return 'error'
-    user_name = sitename
-    short_url = create_special_url(long_url, user_name)
-    article_surl = domain + 's/' + short_url
-    return article_surl
-
-
-@cache.cached(timeout=3 * 3600, key_prefix='aid')
-@app.route('/<article_id>.html', methods=['GET', 'POST'])
-def id_find_article(article_id):
-    if not re.match(r'^\d{1,4}$', article_id):
-        logging.error(f"Invalid article ID: {article_id}")
-        return error(message='无效的文章', status_code=404)
-
-    user_agent = request.headers.get('User-Agent')
-    db = get_db_connection()
-    cursor = db.cursor()
-    try:
-        query = "SELECT long_url FROM urls WHERE id = %s"
-        cursor.execute(query, (article_id,))
-        result = cursor.fetchone()
-
-        if result:
-            long_url = result[0]
-            last_slash_index = long_url.rfind("/")
-            article = long_url[last_slash_index + 1:]
-            return blog_detail(article)
-        else:
-            # If no URL is found
-            logging.error(f"URL not found for: {article_id}")
-            return error(message='没有找到文章', status_code=404)
-    except Exception as e:
-        logging.error(f"An error occurred: {str(e)}")
-        db.rollback()
-        return error(message='服务器内部错误', status_code=500)
-    finally:
-        ip_address = get_client_ip(request)
-        app.logger.info(f'IP:{ip_address}, UA:{user_agent}')
-        cursor.close()
-        db.close()
 
 
 @cache.cached(timeout=3 * 3600, key_prefix='article_img')
@@ -955,7 +783,7 @@ def api_wx_blog_detail(article):
 
         aid, article_tags = query_article_tags(article)
         article_url = f"{domain}blog/{article}"
-        article_surl = api_shortlink(article_url)
+        article_surl = f"{domain}blog/{article}"
         author, author_uid = query_blog_author(article)
         update_date = get_article_last_modified(article)
         content = api_wx_content(article, auth_key=visited_key)
@@ -1048,6 +876,28 @@ def api_wx():
     return jsonify(response_data)
 
 
+@cache.cached(timeout=600, key_prefix='article_passwd')
+def article_passwd(aid):
+    db = get_db_connection()
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT `pass` FROM article_pass WHERE aid = %s"
+            cursor.execute(query, (int(aid),))
+            result = cursor.fetchone()
+            if result:
+                return result[0]
+
+    except ValueError as e:
+        pass
+    except Exception as e:
+        pass
+
+    finally:
+        db.close()
+
+    return None
+
+
 @app.route('/api/article/unlock', methods=['GET', 'POST'])
 @user_id_required
 def api_article_unlock(user_id):
@@ -1125,28 +975,6 @@ def temp_view():
         return jsonify({"message": "Temporary URL expired or invalid"}), 404
 
 
-@cache.cached(timeout=600, key_prefix='article_passwd')
-def article_passwd(aid):
-    db = get_db_connection()
-    try:
-        with db.cursor() as cursor:
-            query = "SELECT `pass` FROM article_pass WHERE aid = %s"
-            cursor.execute(query, (int(aid),))
-            result = cursor.fetchone()
-            if result:
-                return result[0]
-
-    except ValueError as e:
-        app.logger.error(f"Value Error: {e}")
-    except Exception as e:
-        app.logger.error(f"Unexpected Error: {e}")
-
-    finally:
-        db.close()
-
-    return None
-
-
 @cache.cached(timeout=600, key_prefix='GENMD5')
 def generate_md5_hash(text):
     # 创建MD5哈希对象
@@ -1214,24 +1042,6 @@ def api_comment(user_id):
         return jsonify({'aid': aid, 'changed': True}), 201
     else:
         return jsonify({"message": "评论失败"}), 500
-
-
-def create_comment(aid, user_id, pid, comment_content, ip, ua):
-    c_json = {'content': comment_content, 'pid': pid, 'ip': ip, 'ua': ua}
-    comment_json = json.dumps(c_json)
-    db = get_db_connection()
-    comment_added = False
-    try:
-        with db.cursor() as cursor:
-            query = "INSERT INTO `comments` (`article_id`, `user_id`, `content`) VALUES (%s, %s, %s);"
-            cursor.execute(query, (int(aid), int(user_id), comment_json))
-            db.commit()
-            comment_added = True
-    except Exception as e:
-        print(f'Error: {e}')
-    finally:
-        db.close()
-        return comment_added
 
 
 @app.route("/Comment")
@@ -1319,23 +1129,6 @@ def api_report(user_id):
         return jsonify({"message": "举报失败"}), 500
 
 
-def report_add(user_id, reported_type, reported_id, reason):
-    reported = False
-    db = get_db_connection()
-    try:
-        with db.cursor() as cursor:
-            query = ("INSERT INTO `reports` (`reported_by`, `content_type`, `content_id`,`reason`) VALUES (%s, %s, %s,"
-                     "%s);")
-            cursor.execute(query, (int(user_id), reported_type, reported_id, reason))
-            db.commit()
-            reported = True
-    except Exception as e:
-        print(f'Error: {e}')
-    finally:
-        db.close()
-        return reported
-
-
 @app.route('/api/comment', methods=['delete'])
 @user_id_required
 def api_delete_comment(user_id):
@@ -1356,100 +1149,6 @@ def api_delete_comment(user_id):
         return jsonify({"message": "操作失败"}), 500
 
 
-def delete_comment(user_id, comment_id):
-    db = get_db_connection()
-    comment_deleted = False
-    try:
-        with db.cursor() as cursor:
-            query = "DELETE FROM `comments` WHERE `id` = %s AND `user_id` = %s;"
-            cursor.execute(query, (int(comment_id), int(user_id)))
-            db.commit()
-            comment_deleted = True
-    except Exception as e:
-        print(f'Error: {e}')
-    finally:
-        db.close()
-        return comment_deleted
-
-
-@app.route('/travel', methods=['GET'])
-def travel():
-    return '此接口暂时弃用'
-
-
-@app.route('/dashboard/articles', methods=['GET'])
-@admin_required
-def m_articles(user_id):
-    try:
-        connection = get_db_connection()
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute('SELECT * FROM articles')
-        articles = cursor.fetchall()
-        cursor.close()
-        connection.close()
-        return render_template('M-articles.html', articles=articles)
-    except Exception as e:
-        # 记录错误日志
-        app.logger.error(f"Error fetching articles by user {user_id}: {str(e)}")
-        # 返回错误信息或重定向到错误页面
-        return error(message=f"获取文章时出错: {str(e)}", status_code=500), 500
-
-
-@app.route('/dashboard', methods=['GET'])
-@app.route('/dashboard/overview', methods=['GET'])
-@admin_required
-def m_overview(user_id):
-    try:
-        connection = get_db_connection()
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute("SHOW TABLE STATUS WHERE Name IN ('articles', 'users', 'comments','media','events');")
-        dash_info = cursor.fetchall()
-        cursor.execute('SELECT * FROM events')
-        events = cursor.fetchall()
-        cursor.close()
-        connection.close()
-        return render_template('M-overview.html', dashInfo=dash_info, events=events)
-    except Exception as e:
-        # 记录错误日志
-        app.logger.error(f"Error fetching overview by user {user_id}: {str(e)}")
-        # 返回错误信息或重定向到错误页面
-        return error(message=f"获取Overview时出错: {str(e)}", status_code=500), 500
-
-
-@app.route('/dashboard/users', methods=['GET'])
-@admin_required
-def m_users(user_id):
-    try:
-        connection = get_db_connection()
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute('SELECT * FROM users')  # 从数据库获取用户列表
-        users = cursor.fetchall()
-        cursor.close()
-        connection.close()
-        return render_template('M-users.html', users=users)
-    except Exception as e:
-        # 记录错误日志
-        app.logger.error(f"Error fetching users by user {user_id}: {str(e)}")
-        # 返回错误信息或重定向到错误页面
-        return error(message=f"获取用户时出错: {str(e)}", status_code=500), 500
-
-
-@app.route('/dashboard/comments', methods=['GET'])
-@admin_required
-def m_comments(user_id):
-    try:
-        connection = get_db_connection()
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute('SELECT * FROM comments')
-        comments = cursor.fetchall()
-        cursor.close()
-        connection.close()
-        return render_template('M-comments.html', comments=comments)
-    except Exception as e:
-        # 记录错误日志
-        app.logger.error(f"Error fetching comments by user {user_id}: {str(e)}")
-        # 返回错误信息或重定向到错误页面
-        return error(message=f"获取文章时出错: {str(e)}", status_code=500), 500
 
 
 @app.template_filter('fromjson')
@@ -1467,318 +1166,6 @@ def json_filter(value):
         return None
 
 
-@app.route('/dashboard/media', methods=['GET'])
-@admin_required
-def m_media(user_id):
-    try:
-        connection = get_db_connection()
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute('SELECT * FROM media')  # 从数据库获取媒体列表
-        media_items = cursor.fetchall()
-        cursor.close()
-        connection.close()
-        return render_template('M-media.html', media_items=media_items, domain=domain)
-    except Exception as e:
-        # 记录错误日志
-        app.logger.error(f"An error occurred while user-{user_id} was retrieving media : {str(e)}")
-        # 返回错误信息或重定向到错误页面
-        return error(message=f"获取媒体时出错: {str(e)}", status_code=500), 500
-
-
-@app.route('/dashboard/notifications', methods=['GET'])
-@admin_required
-def m_notifications(user_id):
-    try:
-        connection = get_db_connection()
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute('SELECT * FROM notifications')  # 从数据库获取通知列表
-        notifications = cursor.fetchall()
-        cursor.close()
-        connection.close()
-        return render_template('M-notifications.html', notifications=notifications)
-    except Exception as e:
-        # 记录错误日志
-        app.logger.error(f"An error occurred while user-{user_id} was getting notifications : {str(e)}")
-        # 返回错误信息或重定向到错误页面
-        return error(message=f"获取文章时出错: {str(e)}", status_code=500), 500
-
-
-@app.route('/dashboard/reports', methods=['GET'])
-@admin_required
-def m_reports(user_id):
-    try:
-        connection = get_db_connection()
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute('SELECT * FROM reports')  # 从数据库获取举报列表
-        reports = cursor.fetchall()
-        cursor.close()
-        connection.close()
-        return render_template('M-reports.html', reports=reports)
-    except Exception as e:
-        # 记录错误日志
-        app.logger.error(f"An error occurred while user-{user_id} was getting reports : {str(e)}")
-        # 返回错误信息或重定向到错误页面
-        return error(message=f"获取举报信息时出错: {str(e)}", status_code=500), 500
-
-
-@app.route('/dashboard/urls', methods=['GET'])
-@admin_required
-def m_urls(user_id):
-    try:
-        connection = get_db_connection()
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute('SELECT * FROM urls')  # 从数据库获取短链接列表
-        urls = cursor.fetchall()
-        cursor.close()
-        connection.close()
-        return render_template('M-urls.html', urls=urls)
-    except Exception as e:
-        # 记录错误日志
-        app.logger.error(f"An error occurred while user-{user_id} was getting urls : {str(e)}")
-        # 返回错误信息或重定向到错误页面
-        return error(message=f"获取短链接时出错: {str(e)}", status_code=500), 500
-
-
-@app.route('/dashboard/display', methods=['GET'])
-@admin_required
-def m_display(user_id):
-    return render_template('M-display.html', displayList=get_all_themes(), user_id=user_id)
-
-
-@app.route('/dashboard/articles', methods=['DELETE'])
-@admin_required
-def m_articles_delete(user_id):
-    aid = request.args.get('aid')
-    if not aid:
-        return jsonify({"message": "操作失败"}), 400
-
-    try:
-        with get_db_connection() as connection:
-            with connection.cursor(dictionary=True) as cursor:
-                query = "DELETE FROM `articles` WHERE `articles`.`ArticleID` = %s;"
-                cursor.execute(query, (int(aid),))
-                connection.commit()
-
-        return jsonify({"message": "操作成功"}), 200
-
-    except Exception as e:
-        return jsonify({"message": "操作失败", "error": str(e)}), 500
-    finally:
-        referrer = request.referrer
-        app.logger.error(f"{referrer} delete {aid} by: {user_id}")
-
-
-@app.route('/dashboard/articles', methods=['PUT'])
-@admin_required
-def m_articles_edit(user_id):
-    data = request.get_json()
-    article_id = data.get('ArticleID')
-    article_title = data.get('Title')
-    article_status = data.get('Status')
-    if not article_id or not article_title:
-        return jsonify({"message": "操作失败"}), 400
-
-    try:
-        with get_db_connection() as connection:
-            with connection.cursor(dictionary=True) as cursor:
-                query = "UPDATE `articles` SET `Title` = %s,`Status`= %s WHERE `ArticleID` = %s;"
-                cursor.execute(query, (article_title, article_status, int(article_id)))
-                connection.commit()
-
-        return jsonify({"message": "操作成功"}), 200
-
-    except Exception as e:
-        return jsonify({"message": "操作失败", "error": str(e)}), 500
-    finally:
-        referrer = request.referrer
-        app.logger.info(f"{referrer} : modify article {article_id} by  {user_id}")
-
-
-@app.route('/dashboard/users', methods=['DELETE'])
-@admin_required
-def m_users_delete(user_id):
-    uid = int(request.args.get('uid'))
-    if not uid or uid == 1:
-        return jsonify({"message": "操作失败"}), 400
-
-    try:
-        with get_db_connection() as connection:
-            with connection.cursor(dictionary=True) as cursor:
-                query = "DELETE FROM `users` WHERE `id` = %s;"
-                cursor.execute(query, (uid,))
-                connection.commit()
-
-        return jsonify({"message": "操作成功"}), 200
-
-    except Exception as e:
-        return jsonify({"message": "操作失败", "error": str(e)}), 500
-    finally:
-        referrer = request.referrer
-        app.logger.info(f"{referrer}: delete user {uid} by: {user_id}")
-
-
-@app.route('/dashboard/users', methods=['PUT'])
-@admin_required
-def m_users_edit(user_id):
-    data = request.get_json()
-    u_id = data.get('UId')
-    user_name = data.get('UName')
-    user_role = data.get('URole')
-    if not u_id or not user_name:
-        return jsonify({"message": "操作失败"}), 400
-
-    try:
-        with get_db_connection() as connection:
-            with connection.cursor(dictionary=True) as cursor:
-                query = "UPDATE `users` SET `username` = %s WHERE `id` = %s;"
-                cursor.execute(query, (user_name, int(u_id)))
-                connection.commit()
-
-        return jsonify({"message": "操作成功"}), 200
-
-    except Exception as e:
-        return jsonify({"message": "操作失败", "error": str(e)}), 500
-    finally:
-        referrer = request.referrer
-        app.logger.info(f"{referrer} edit {u_id} to {user_role} by: {user_id}")
-
-
-@app.route('/dashboard/comments', methods=['DELETE'])
-@admin_required
-def m_comments_delete(user_id):
-    cid = int(request.args.get('cid'))
-    if not cid:
-        return jsonify({"message": "操作失败"}), 400
-
-    try:
-        with get_db_connection() as connection:
-            with connection.cursor(dictionary=True) as cursor:
-                query = "DELETE FROM `comments` WHERE `id` = %s;"
-                cursor.execute(query, (cid,))
-                connection.commit()
-
-        return jsonify({"message": "操作成功"}), 200
-
-    except Exception as e:
-        return jsonify({"message": "操作失败", "error": str(e)}), 500
-    finally:
-        referrer = request.referrer
-        app.logger.info(f"{referrer}: delete comment {cid} by: {user_id}")
-
-
-@app.route('/dashboard/media', methods=['DELETE'])
-@admin_required
-def m_media_delete(user_id):
-    file_id = int(request.args.get('file-id'))
-    if not file_id:
-        return jsonify({"message": "操作失败"}), 400
-
-    try:
-        with get_db_connection() as connection:
-            with connection.cursor(dictionary=True) as cursor:
-                query = "DELETE FROM `media` WHERE `id` = %s;"
-                cursor.execute(query, (file_id,))
-                connection.commit()
-
-        return jsonify({"message": "操作成功"}), 200
-
-    except Exception as e:
-        return jsonify({"message": "操作失败", "error": str(e)}), 500
-    finally:
-        referrer = request.referrer
-        app.logger.info(f"{referrer}: delete file {file_id} by: {user_id}")
-
-
-@app.route('/dashboard/notifications', methods=['DELETE'])
-@admin_required
-def m_notifications_delete(user_id):
-    nid = int(request.args.get('nid'))
-    if not nid:
-        return jsonify({"message": "操作失败"}), 400
-
-    try:
-        with get_db_connection() as connection:
-            with connection.cursor(dictionary=True) as cursor:
-                query = "DELETE FROM `notifications` WHERE `id` = %s;"
-                cursor.execute(query, (nid,))
-                connection.commit()
-
-        return jsonify({"message": "操作成功"}), 200
-
-    except Exception as e:
-        return jsonify({"message": "操作失败", "error": str(e)}), 500
-    finally:
-        referrer = request.referrer
-        app.logger.info(f"{referrer} delete notification {nid} by: {user_id}")
-
-
-@app.route('/dashboard/reports', methods=['DELETE'])
-@admin_required
-def m_reports_delete(user_id):
-    rid = int(request.args.get('rid'))
-    if not rid:
-        return jsonify({"message": "操作失败"}), 400
-
-    try:
-        with get_db_connection() as connection:
-            with connection.cursor(dictionary=True) as cursor:
-                query = "DELETE FROM `reports` WHERE `id` = %s;"
-                cursor.execute(query, (rid,))
-                connection.commit()
-
-        return jsonify({"message": "操作成功"}), 200
-
-    except Exception as e:
-        return jsonify({"message": "操作失败", "error": str(e)}), 500
-    finally:
-        referrer = request.referrer
-        app.logger.info(f"{referrer}: delete report {rid} by: {user_id}")
-
-
-@app.route('/dashboard/overview', methods=['DELETE'])
-@admin_required
-def m_overview_delete(user_id):
-    event_id = int(request.args.get('id'))
-    if not id:
-        return jsonify({"message": "操作失败"}), 400
-
-    try:
-        with get_db_connection() as connection:
-            with connection.cursor(dictionary=True) as cursor:
-                query = "DELETE FROM `events` WHERE `id` = %s;"
-                cursor.execute(query, (event_id,))
-                connection.commit()
-
-        return jsonify({"message": "操作成功"}), 200
-
-    except Exception as e:
-        return jsonify({"message": "操作失败", "error": str(e)}), 500
-    finally:
-        referrer = request.referrer
-        app.logger.info(f"{referrer}: delete event {event_id} by: {user_id}")
-
-
-@app.route('/dashboard/urls', methods=['DELETE'])
-@admin_required
-def m_urls_delete(user_id):
-    url_id = int(request.args.get('id'))
-    if not id:
-        return jsonify({"message": "操作失败"}), 400
-
-    try:
-        with get_db_connection() as connection:
-            with connection.cursor(dictionary=True) as cursor:
-                query = "DELETE FROM `urls` WHERE `id` = %s;"
-                cursor.execute(query, (url_id,))
-                connection.commit()
-
-        return jsonify({"message": "操作成功"}), 200
-
-    except Exception as e:
-        return jsonify({"message": "操作失败", "error": str(e)}), 500
-    finally:
-        referrer = request.referrer
-        app.logger.info(f"{referrer}: {user_id}")
 
 
 @app.route('/static/music/music.json', methods=['GET'])
@@ -1877,11 +1264,8 @@ def api_avatar_image(avatar_uuid):
 def ueditor_plus_edit(user_id, aid, user_name):
     all_info = get_article_metadata(aid)
     edit_html = api_wx_content(all_info[1], auth_key=DEFAULT_KEY)
-    article_url = domain + 'blog/' + all_info[1]
-    article_surl = api_shortlink(article_url)
-    # 渲染编辑页面并将转换后的HTML传递到模板中
     return render_template('ueditor-plus.html',
-                           user_id=user_id, article_surl=article_surl, user_name=user_name,
+                           user_id=user_id, user_name=user_name,
                            edit_html=edit_html, all_info=all_info)
 
 
@@ -2464,90 +1848,6 @@ def profile(user_id):
                            Articles=owner_articles)
 
 
-@cache.memoize(app.config['MAX_CACHE_TIMESTAMP'])
-@app.route('/sitemap.xml')
-@app.route('/sitemap')
-def generate_sitemap():
-    db = None
-    try:
-        db = get_db_connection()
-        with db.cursor() as cursor:
-            query = """SELECT Title
-                       FROM `articles`
-                       WHERE `Hidden` = 0
-                         AND `Status` = 'Published'
-                       ORDER BY `ArticleID` DESC LIMIT 40"""
-            cursor.execute(query)
-            results = cursor.fetchall()
-            article_titles = [item[0] for item in results]
-            xml_data = '<?xml version="1.0" encoding="UTF-8"?>\n'
-            xml_data += '<urlset xmlns="https://www.sitemaps.org/schemas/sitemap/0.9/">\n'
-
-            # 遍历文章标题列表
-            for title in article_titles:
-                article_url = domain + 'blog/' + title
-                date = get_article_last_modified(title)
-                article_surl = api_shortlink(article_url)
-                # 创建url标签并包含链接
-                xml_data += '<url>\n'
-                xml_data += f'\t<loc>{article_surl}</loc>\n'
-                xml_data += f'\t<lastmod>{date}</lastmod>\n'  # 添加适当的标签
-                xml_data += '\t<changefreq>Monthly</changefreq>\n'  # 添加适当的标签
-                xml_data += '\t<priority>0.8</priority>\n'  # 添加适当的标签
-                xml_data += '</url>\n'
-
-            # 关闭urlset标签
-            xml_data += '</urlset>\n'
-            response = Response(xml_data, mimetype='text/xml')
-            return response
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    finally:
-        if db is not None:
-            db.close()
-
-
-@cache.memoize(app.config['MAX_CACHE_TIMESTAMP'])
-@app.route('/feed')
-@app.route('/rss')
-def generate_rss():
-    markdown_files = get_a_list(chanel=3, page=1)
-    # 创建XML文件头及其他信息...
-    xml_data = '<?xml version="1.0" encoding="UTF-8"?>\n'
-    xml_data += '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">\n'
-    xml_data += '<channel>\n'
-    xml_data += '<title>' + sitename + 'RSS Feed </title>\n'
-    xml_data += '<link>' + domain + '</link>\n'
-    xml_data += '<description>' + sitename + 'RSS Feed</description>\n'
-    xml_data += '<language>en-us</language>\n'
-    xml_data += '<lastBuildDate>' + datetime.now().strftime("%a, %d %b %Y %H:%M:%S %z") + '</lastBuildDate>\n'
-    xml_data += '<atom:link href="' + domain + 'rss" rel="self" type="application/rss+xml" />\n'
-
-    for file in markdown_files:
-        encoded_article_name = urllib.parse.quote(file)  # 对文件名进行编码处理
-        article_url = domain + 'blog/' + encoded_article_name
-        date = get_article_last_modified(encoded_article_name)
-        content, *_ = get_article_content(file, 10)
-        describe = encoded_article_name
-
-        article_surl = api_shortlink(article_url)
-        # 创建item标签并包含内容
-        xml_data += '<item>\n'
-        xml_data += f'\t<title>{file}</title>\n'
-        xml_data += f'\t<link>{article_surl}</link>\n'
-        xml_data += f'\t<guid>{article_url}</guid>\n'
-        xml_data += f'\t<pubDate>{date}</pubDate>\n'
-        xml_data += f'\t<description>{describe}</description>\n'
-        xml_data += f'\t<content:encoded><![CDATA[{content}]]></content:encoded>'
-        xml_data += '</item>\n'
-
-    # 关闭channel和rss标签
-    xml_data += '</channel>\n'
-    xml_data += '</rss>\n'
-    response = Response(xml_data, mimetype='application/rss+xml')
-    return response
-
-
 def get_user_sub_info(query, user_id):
     db = None
     user_sub_info = []
@@ -2640,11 +1940,11 @@ def markdown_editor(user_id, aid):
         all_info = get_article_metadata(aid)
         if request.method == 'GET':
             edit_html = edit_article_content(all_info[1], max_line=app.config['MAX_LINE'])
-            article_url = domain + 'blog/' + all_info[1]
-            article_surl = api_shortlink(article_url)
+            # article_url = domain + 'blog/' + all_info[1]
+            # article_surl = api_shortlink(article_url)
             # 渲染编辑页面并将转换后的HTML传递到模板中
             return render_template('editor.html', edit_html=edit_html, aid=aid, articleName=all_info[1],
-                                   tags=all_info[12], user_id=user_id, article_surl=article_surl, user_name=user_name,
+                                   tags=all_info[12], user_id=user_id, article_surl=None, user_name=user_name,
                                    all_info=all_info)
         elif request.method == 'POST':
             content = request.json['content']
@@ -3263,61 +2563,6 @@ def guestbook():
     return '当前功能暂未开放！'
 
 
-@app.route('/dashboard/activities', methods=['GET', 'POST'])
-def m_activities():
-    if request.method == 'POST':
-        # 处理表单提交
-        activity_id = request.form.get('activity_id')
-        title = request.form.get('title')
-        cover_img = request.form.get('cover_img')
-        start_time = request.form.get('start_time')
-        end_time = request.form.get('end_time')
-        list_address = request.form.get('list_address')
-        detail_location = request.form.get('detail_location')
-        display_time = request.form.get('display_time')
-        content = request.form.get('content')
-        is_deleted = request.form.get('is_deleted', 0)
-
-        # 更新或插入活动
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        if activity_id:
-            cursor.execute(
-                'UPDATE activities SET title=%s, cover_img=%s, start_time=%s, end_time=%s, list_address=%s, detail_location=%s, display_time=%s, content=%s, is_deleted=%s WHERE activityId=%s',
-                (title, cover_img, start_time, end_time, list_address, detail_location, display_time, content,
-                 is_deleted, activity_id))
-        else:
-            cursor.execute(
-                'INSERT INTO activities (title, cover_img, start_time, end_time, list_address, detail_location, display_time, content, is_deleted) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)',
-                (title, cover_img, start_time, end_time, list_address, detail_location, display_time, content,
-                 is_deleted))
-        conn.commit()
-        cursor.close()
-        conn.close()
-        return redirect(url_for('m_activities'))
-
-    # 处理活动选择
-    activity_id = request.args.get('activity_id')
-    activity_details = None
-    if activity_id:
-        conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute('SELECT * FROM activities WHERE activityId=%s', (activity_id,))
-        activity_details = cursor.fetchone()
-        cursor.close()
-        conn.close()
-
-    # 获取活动列表
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute('SELECT activityId, title FROM activities')
-    activities = cursor.fetchall()
-    cursor.close()
-    conn.close()
-
-    return render_template('M-activities.html', activities=activities, activity_details=activity_details,
-                           DEFAULT_KEY=DEFAULT_KEY)
-
 
 @app.route('/api/upload_image', methods=['POST'])
 def upload_image():
@@ -3426,65 +2671,6 @@ def uploaded_file(filename):
     return send_file(file, max_age=86400)
 
 
-@app.route('/dashboard/permissions', methods=['GET', 'POST'])
-@admin_required
-def manage_permissions(user_id):
-    db = get_db_connection()
-    cursor = db.cursor(dictionary=True)
-
-    # 处理权限操作
-    if request.method == 'POST':
-        # 添加新权限
-        if 'add_permission' in request.form:
-            code = request.form['code']
-            description = request.form['description']
-            cursor.execute('INSERT INTO permissions (code, description) VALUES (%s, %s)', (code, description))
-
-        # 添加新角色
-        elif 'add_role' in request.form:
-            name = request.form['name']
-            description = request.form['description']
-            cursor.execute('INSERT INTO roles (name, description) VALUES (%s, %s)', (name, description))
-
-        # 分配权限给角色
-        elif 'assign_permission' in request.form:
-            role_id = request.form['role_id']
-            permission_id = request.form['permission_id']
-            cursor.execute('INSERT IGNORE INTO role_permissions (role_id, permission_id) VALUES (%s, %s)',
-                           (role_id, permission_id))
-
-        # 分配角色给用户
-        elif 'assign_role' in request.form:
-            user_id = request.form['user_id']
-            role_id = request.form['role_id']
-            cursor.execute('INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (%s, %s)',
-                           (user_id, role_id))
-
-        db.commit()
-
-    # 获取所有数据
-    cursor.execute('SELECT * FROM permissions')
-    permissions = cursor.fetchall()
-
-    cursor.execute('SELECT * FROM roles')
-    roles = cursor.fetchall()
-
-    cursor.execute(
-        'SELECT u.id, u.username, GROUP_CONCAT(r.name) as roles FROM users u LEFT JOIN user_roles ur ON u.id = ur.user_id LEFT JOIN roles r ON ur.role_id = r.id GROUP BY u.id')
-    users = cursor.fetchall()
-
-    cursor.execute(
-        'SELECT r.id as role_id, r.name as role_name, GROUP_CONCAT(p.code) as permissions FROM roles r LEFT JOIN role_permissions rp ON r.id = rp.role_id LEFT JOIN permissions p ON rp.permission_id = p.id GROUP BY r.id')
-    role_permissions = cursor.fetchall()
-
-    cursor.close()
-    db.close()
-
-    return render_template('permissions.html',
-                           permissions=permissions,
-                           roles=roles,
-                           users=users,
-                           role_permissions=role_permissions)
 
 
 def filter_sensitive_words(comment_content):

@@ -142,58 +142,58 @@
 <div class="flex">
     <aside class="w-full md:w-64 bg-gradient-to-r from-blue-600 to-blue-400 shadow-lg md:h-screen" id="MenuZone">
         <div class="p-6">
-            <h2 class="text-3xl text-white font-bold"><img src="/static/favicon.ico"  alt="logo"/>管理面板
+            <h2 class="text-3xl text-white font-bold"><img src="/favicon.ico" alt="logo"/>管理面板
             </h2>
         </div>
         <nav>
             <ul>
                 <li class="hover:bg-blue-300">
-                    <a href="{{ url_for('m_overview') }}"
+                    <a href="{{ url_for('dashboard.m_overview') }}"
                        class="text-white block py-4 px-6 transition duration-300"><i
                             class="fa-solid fa-gauge-high"></i>&nbsp;仪表盘</a>
                 </li>
                 <li class="hover:bg-blue-300">
-                    <a href="{{ url_for('m_articles') }}"
+                    <a href="{{ url_for('dashboard.m_articles') }}"
                        class="text-white block py-4 px-6 transition duration-300"><i
                             class="fa-brands fa-markdown"></i>&nbsp;文章管理</a>
                 </li>
                 <li class="hover:bg-blue-300">
-                    <a href="{{ url_for('m_users') }}"
+                    <a href="{{ url_for('dashboard.m_users') }}"
                        class="text-white block py-4 px-6 transition duration-300"><i
                             class="fa-solid fa-users"></i>&nbsp;用户管理</a>
                 </li>
                 <li class="hover:bg-blue-300">
-                    <a href="{{ url_for('m_comments') }}"
+                    <a href="{{ url_for('dashboard.m_comments') }}"
                        class="text-white block py-4 px-6 transition duration-300"><i
                             class="fa-regular fa-comments"></i>&nbsp;评论管理</a>
                 </li>
                 <li class="hover:bg-blue-300">
-                    <a href="{{ url_for('m_media') }}"
+                    <a href="{{ url_for('dashboard.m_media') }}"
                        class="text-white block py-4 px-6 transition duration-300"><i
                             class="fa-solid fa-photo-film"></i>&nbsp;媒体管理</a>
                 </li>
                 <li class="hover:bg-blue-300">
-                    <a href="{{ url_for('m_activities') }}"
+                    <a href="{{ url_for('dashboard.m_activities') }}"
                        class="text-white block py-4 px-6 transition duration-300"><i
                             class="fa-solid fa-chart-line"></i> 活动管理</a>
                 </li>
                 <li class="hover:bg-blue-300">
-                    <a href="{{ url_for('m_notifications') }}"
+                    <a href="{{ url_for('dashboard.m_notifications') }}"
                        class="text-white block py-4 px-6 transition duration-300"><i
                             class="fa-regular fa-envelope-open"></i>&nbsp;通知管理</a>
                 </li>
                 <li class="hover:bg-blue-300">
-                    <a href="{{ url_for('m_reports') }}"
+                    <a href="{{ url_for('dashboard.m_reports') }}"
                        class="text-white block py-4 px-6 transition duration-300"><i
                             class="fa-regular fa-rectangle-list"></i>&nbsp;举报管理</a>
                 </li>
                 <li class="hover:bg-blue-300">
-                    <a href="{{ url_for('m_urls') }}"
+                    <a href="{{ url_for('dashboard.m_urls') }}"
                        class="text-white block py-4 px-6 transition duration-300"><i
                             class="fa-solid fa-link"></i>&nbsp;链接管理</a>
                 </li>
                 <li class="hover:bg-blue-300">
-                    <a href="{{ url_for('m_display') }}"
+                    <a href="{{ url_for('dashboard.m_display') }}"
                        class="text-white block py-4 px-6 transition duration-300"><i
                             class="fa-solid fa-shirt"></i>&nbsp;主题外观</a>
                 </li>
