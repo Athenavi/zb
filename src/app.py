@@ -1809,8 +1809,8 @@ def markdown_editor(user_id, aid):
         return error(message='您没有权限', status_code=503)
 
 
-@cache.memoize(120)
-def get_media_cahce(user_id, category, page=1, per_page=20):
+@cache.memoize(6)
+def get_media_cached(user_id, category, page=1, per_page=20):
     return get_media_db(user_id, category, page, per_page)
 
 
@@ -1820,7 +1820,7 @@ def media(user_id):
     media_type = request.args.get('type', default='img')
     page = request.args.get('page', default=1, type=int)
     if not media_type or media_type == 'img':
-        imgs, total_pages = get_media_cahce(user_id, category='image', page=page, per_page=20)
+        imgs, total_pages = get_media_cached(user_id, category='image', page=page, per_page=20)
         has_next_page = bool(total_pages - page)
         has_previous_page = bool(total_pages - 1)
         return render_template('Media_V2.html', imgs=imgs, url_for=url_for,
@@ -1828,7 +1828,7 @@ def media(user_id):
                                has_previous_page=has_previous_page, current_page=page,
                                domain=domain)
     if media_type == 'video':
-        videos, total_pages = get_media_cahce(user_id, category='video', page=1, per_page=20)
+        videos, total_pages = get_media_cached(user_id, category='video', page=1, per_page=20)
         has_next_page = bool(total_pages - page)
         has_previous_page = bool(total_pages - 1)
         return render_template('Media_V2.html', videos=videos, url_for=url_for,

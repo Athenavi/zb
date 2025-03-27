@@ -7,6 +7,7 @@ import flask_socketio
 from flask import Flask, request, jsonify
 from flask_caching import Cache
 
+from src.config.mail import zy_mail_conf
 from src.user.authz.core import secret_key, authenticate_jwt
 from src.database import get_db_connection
 
