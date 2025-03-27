@@ -1075,7 +1075,7 @@ def api_article_unlock(user_id):
         return jsonify({"message": "Authentication failed"}), 401
 
     if entered_password == passwd:
-        finger_md5 = gen_md5(user_finger)
+        finger_md5 = generate_md5_hash(user_finger)
         cache.set(f"temp-url_{user_finger}", aid, timeout=900)
         temp_url = f'{domain}tmpView?url={finger_md5}'
         response_data['temp_url'] = temp_url
@@ -1147,8 +1147,8 @@ def article_passwd(aid):
     return None
 
 
-@cache.cached(timeout=600, key_prefix='gen_md5')
-def gen_md5(text):
+@cache.cached(timeout=600, key_prefix='GENMD5')
+def generate_md5_hash(text):
     # 创建MD5哈希对象
     md5_hash = hashlib.md5()
     # 更新哈希对象
@@ -1159,7 +1159,7 @@ def gen_md5(text):
 
 @app.route('/api/article/PW', methods=['POST'])
 @user_id_required
-def api_article_pw(user_id):
+def api_article_password(user_id):
     try:
         aid = int(request.args.get('aid'))
     except (TypeError, ValueError):
@@ -1208,7 +1208,7 @@ def api_comment(user_id):
     user_agent = user_agent_info(user_agent)
 
     cache.set(f"CommentLock_{user_id}", aid, timeout=30)
-    result = comment_add(aid, user_id, pid, new_comment, masked_ip, user_agent)
+    result = create_comment(aid, user_id, pid, new_comment, masked_ip, user_agent)
 
     if result:
         return jsonify({'aid': aid, 'changed': True}), 201
@@ -1216,7 +1216,7 @@ def api_comment(user_id):
         return jsonify({"message": "评论失败"}), 500
 
 
-def comment_add(aid, user_id, pid, comment_content, ip, ua):
+def create_comment(aid, user_id, pid, comment_content, ip, ua):
     c_json = {'content': comment_content, 'pid': pid, 'ip': ip, 'ua': ua}
     comment_json = json.dumps(c_json)
     db = get_db_connection()
@@ -1338,7 +1338,7 @@ def report_add(user_id, reported_type, reported_id, reason):
 
 @app.route('/api/comment', methods=['delete'])
 @user_id_required
-def api_comment_delete(user_id):
+def api_delete_comment(user_id):
     try:
         comment_id = int(request.json.get('comment_id'))
     except (TypeError, ValueError):
@@ -1347,7 +1347,7 @@ def api_comment_delete(user_id):
     if comment_id == cache.get(f"deleteCommentLock_{user_id}"):
         return jsonify({"message": "操作过于频繁"}), 400
 
-    result = comment_del(user_id, comment_id)
+    result = delete_comment(user_id, comment_id)
 
     if result:
         cache.set(f"deleteCommentLock_{user_id}", comment_id, timeout=30)
@@ -1356,7 +1356,7 @@ def api_comment_delete(user_id):
         return jsonify({"message": "操作失败"}), 500
 
 
-def comment_del(user_id, comment_id):
+def delete_comment(user_id, comment_id):
     db = get_db_connection()
     comment_deleted = False
     try:
@@ -1870,7 +1870,7 @@ def get_avatar(user_identifier, identifier_type='id'):
 
 
 @app.route('/api/avatar/<avatar_uuid>.webp', methods=['GET'])
-def get_avatar_image(avatar_uuid):
+def api_avatar_image(avatar_uuid):
     return send_file(f'{base_dir}/avatar/{avatar_uuid}.webp', mimetype='image/webp')
 
 
@@ -1983,7 +1983,7 @@ def ueditor_plus_server(user_id):
 
 @app.route('/api/edit/<int:aid>', methods=['POST', 'PUT'])
 @jwt_required
-def markdown_editor2(user_id, aid):
+def api_edit(user_id, aid):
     a_name = request.form.get('title') or None
     user_name = get_username()
     if not user_name or not a_name:
@@ -2018,7 +2018,7 @@ def markdown_editor2(user_id, aid):
 
 @app.route('/api/edit/tag/<int:aid>', methods=['PUT'])
 @jwt_required
-def api_edit_tag(user_id, aid):
+def api_update_article_tags(user_id, aid):
     tags_input = request.get_json().get('tags')
     if not isinstance(tags_input, str):
         return jsonify({'show_edit': 'error', 'message': '标签输入不是字符串'})
@@ -2215,7 +2215,7 @@ def index_html():
         total_pages = (total_articles + page_size - 1) // page_size
     except Exception as e:
         return error(str(e), 500)
-    html_content, etag = handle_data(total_articles, article_info, page, total_pages)
+    html_content, etag = proces_page_data(total_articles, article_info, page, total_pages)
     # 设置响应头
     response = make_response(html_content)
     response.set_etag(etag)
@@ -2223,7 +2223,7 @@ def index_html():
     return response.make_conditional(request.environ)
 
 
-def handle_data(total_articles, article_info, page, total_pages):
+def proces_page_data(total_articles, article_info, page, total_pages):
     current_theme = get_current_theme()
     template_rel_path = f'theme/{current_theme}/index.html' if current_theme != 'default' else 'index.html'
 
@@ -2277,7 +2277,7 @@ def tag_page(tag_name):
     except Exception:
         return error("获取文章时发生错误。", status_code=500)
 
-    html_content, etag = handle_data(total_articles, article_info, page, total_pages)
+    html_content, etag = proces_page_data(total_articles, article_info, page, total_pages)
 
     # 设置响应头
     response = make_response(html_content)
@@ -2321,7 +2321,7 @@ def featured_page():
 
     except Exception:
         return error("获取文章时发生错误。", status_code=500)
-    html_content, etag = handle_data(total_articles, article_info, page, total_pages)
+    html_content, etag = proces_page_data(total_articles, article_info, page, total_pages)
     response = make_response(html_content)
     response.set_etag(etag)
     response.headers['Cache-Control'] = 'public, max-age=180'
@@ -2416,7 +2416,7 @@ def save_bulk_article_db(filename, author):
 @app.route('/newArticle', methods=['GET', 'POST'])
 @app.route('/new', methods=['GET', 'POST'])
 @jwt_required
-def new_article(user_id):
+def create_article(user_id):
     upload_locked = cache.get(f"upload_locked_{user_id}") or False
     if request.method == 'POST':
         if upload_locked:
@@ -2614,7 +2614,7 @@ def api_user_avatar():
 
 @cache.memoize(180)
 @app.route('/api/prev_<file_name>', methods=['GET', 'POST'])
-def temp_prev(file_name):
+def generate_temp_preview(file_name):
     author = get_username()
     prev = f"""
     ```xmind preview
