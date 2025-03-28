@@ -24,7 +24,7 @@ def jwt_required(f):
         user_id = authenticate_jwt(token)
         if user_id is None:
             callback_route = request.endpoint
-            return redirect(url_for('login', callback=callback_route))
+            return redirect(url_for('auth.login', callback=callback_route))
         return f(user_id, *args, **kwargs)
 
     return decorated_function

@@ -72,7 +72,7 @@
             <div class="space-y-4">
                 {% for article in Articles %}
                     <div class="bg-gray-200 p-4 rounded-lg flex justify-between items-center">
-                        <a href="{{ url_for('blog_detail', article=article[1]) }}"
+                        <a href="{{ url_for('website.blog_detail', article=article[1]) }}"
                            class="text-xl font-semibold text-blue-700">{{ article[1] }}</a>
                         <div class="flex items-center space-x-4">
                             {% if target_id == user_id %}
