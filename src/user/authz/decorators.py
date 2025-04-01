@@ -28,15 +28,3 @@ def jwt_required(f):
         return f(user_id, *args, **kwargs)
 
     return decorated_function
-
-
-def user_id_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        token = request.cookies.get('jwt')
-        user_id = authenticate_jwt(token)
-        if user_id is None:
-            user_id = 0
-        return f(user_id, *args, **kwargs)
-
-    return decorated_function

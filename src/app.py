@@ -50,7 +50,7 @@ from src.other.report import report_add
 from src.upload.admin_upload import admin_upload_file
 from src.upload.public_upload import handle_user_upload
 from src.user.authz.core import secret_key, get_username, authenticate_refresh_token, generate_jwt
-from src.user.authz.decorators import jwt_required, admin_required, user_id_required
+from src.user.authz.decorators import jwt_required, admin_required
 from src.user.authz.login import tp_mail_login
 from src.user.authz.password import update_password, validate_password
 from src.user.entities import query_blog_author, authorize_by_aid, get_user_sub_info, check_user_conflict, \
@@ -512,7 +512,7 @@ def api_mail(user_id):
 
 
 @app.route('/api/follow', methods=['GET', 'POST'])
-@user_id_required
+@jwt_required
 def follow_user(user_id):
     follow_id = request.args.get('fid')
 
@@ -563,7 +563,7 @@ def follow_user(user_id):
 
 
 @app.route('/api/unfollow', methods=['GET', 'POST'])
-@user_id_required
+@jwt_required
 def unfollow_user(user_id):
     unfollow_id = request.args.get('fid')
     if not user_id or not unfollow_id:
@@ -588,7 +588,7 @@ def unfollow_user(user_id):
 
 
 @app.route('/like', methods=['GET', 'POST'])
-@user_id_required
+@jwt_required
 def like(user_id):
     aid = request.args.get('aid')
     if request.method == 'POST':
@@ -895,7 +895,7 @@ def article_passwd(aid):
 
 
 @app.route('/api/article/unlock', methods=['GET', 'POST'])
-@user_id_required
+@jwt_required
 def api_article_unlock(user_id):
     try:
         aid = int(request.args.get('aid'))
@@ -982,7 +982,7 @@ def generate_md5_hash(text):
 
 
 @app.route('/api/article/PW', methods=['POST'])
-@user_id_required
+@jwt_required
 def api_article_password(user_id):
     try:
         aid = int(request.args.get('aid'))
@@ -1103,7 +1103,7 @@ def get_friends_link():
 
 
 @app.route('/api/report', methods=['POST'])
-@user_id_required
+@jwt_required
 def api_report(user_id):
     try:
         report_id = int(request.json.get('report-id'))
@@ -1126,7 +1126,7 @@ def api_report(user_id):
 
 
 @app.route('/api/comment', methods=['delete'])
-@user_id_required
+@jwt_required
 def api_delete_comment(user_id):
     try:
         comment_id = int(request.json.get('comment_id'))
@@ -1161,7 +1161,7 @@ def json_filter(value):
 
 
 @app.route('/static/music/music.json', methods=['GET'])
-@user_id_required
+@jwt_required
 def music_json(user_id):
     referrer = request.referrer
     if referrer and "@" in referrer:
@@ -1181,7 +1181,7 @@ def music_json(user_id):
 
 
 @app.route('/static/music/music.json', methods=['PUT'])
-@user_id_required
+@jwt_required
 def music_json_change(user_id):
     if not user_id:
         return jsonify({'error': 'User ID is required'}), 503
@@ -1755,7 +1755,7 @@ def fans_fans(user_id):
 
 
 @app.route('/space/<target_id>', methods=['GET', 'POST'])
-@user_id_required
+@jwt_required
 def user_space(user_id, target_id):
     user_bio = get_user_bio(user_id=target_id)
     can_followed = 1
@@ -1977,7 +1977,7 @@ def media_delete(user_id):
 
 
 @app.route('/setting/profiles', methods=['GET'])
-@user_id_required
+@jwt_required
 def setting_profiles(user_id):
     user_info = cache.get(f"{user_id}_userInfo") or get_profiles(user_id=user_id)
     print(user_info)
@@ -2005,7 +2005,7 @@ def setting_profiles(user_id):
 
 
 @app.route('/setting/profiles', methods=['PUT'])
-@user_id_required
+@jwt_required
 def change_profiles(user_id):
     change_type = request.args.get('change_type')
     if not change_type:
