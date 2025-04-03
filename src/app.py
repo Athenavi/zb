@@ -694,7 +694,7 @@ def success_scan():
 
 @app.route("/api/phone/scan")
 @jwt_required
-def phone_scan():
+def phone_scan(user_id):
     # 用户扫码调用此接口
     token = request.args.get('login_token')
     phone_token = request.cookies.get('jwt')
@@ -715,24 +715,6 @@ def phone_scan():
         return jsonify(token_json)
 
 
-@app.route('/finger', methods=['GET', 'POST'])
-@jwt_required
-def finger(user_id):
-    if request.method == 'POST':
-        data = request.json
-        chrome_fingerprint = data.get('fingerprint')
-        if user_id and chrome_fingerprint:
-            cached_finger = cache.get(f'fingerprint_{user_id}') or []
-            if chrome_fingerprint not in cached_finger:
-                cached_finger.append(chrome_fingerprint)
-                cache.set(f'fingerprint_{user_id}', cached_finger)
-                return jsonify({"msg": "Fingerprint saved successfully"}), 200
-            return jsonify({"msg": "Fingerprint Auth"}), 200
-        return jsonify({"msg": "Failed to save fingerprint"}), 400
-    if request.method == 'GET':
-        return render_template("Authentication.html", form='finger')
-
-
 @app.route('/api/notice', methods=['GET'])
 @jwt_required
 def user_notification(user_id):
@@ -744,14 +726,6 @@ def user_notification(user_id):
 def read_user_notification():
     read_content = read_notification()
     return jsonify(read_content), 200
-
-
-@app.route('/xmind/<user_name>/thumbs/<xmind>.png', methods=['GET', 'POST'])
-def api_xmind(user_name, xmind):
-    if request.method == 'GET':
-        video_dir = Path(base_dir) / 'media' / user_name / xmind
-        if os.path.isfile(video_dir):
-            return send_file('../static/image/xmind.png', mimetype='image/jpeg')
 
 
 @app.route('/api/wx/blog_detail/<article>', methods=['GET'])
@@ -813,63 +787,6 @@ def api_wx_content(article, auth_key):
             return html_content
     finally:
         return html_content
-
-
-# wxapi主页
-def get_home_data(page, tag):
-    page = max(page, 1)  # 确保 page 至少为 1
-
-    articles, has_next_page, has_previous_page = get_a_list(chanel=2, page=page)
-
-    if not articles:
-        app.logger.warning('没有找到任何文章！')
-        return None, None, None, None, None, None  # 添加 None 用于 tags
-
-    notice = get_sys_notice(0) if (notice := get_sys_notice(0)) else ''
-
-    tags = []
-    try:
-        tags = get_unique_article_tags()
-    except Exception as e:
-        app.logger.error(f'获取标签出错: {e}')
-
-    if tag != 'None':
-        tag_articles = get_articles_by_tag(tag)
-        if tag_articles:
-            articles = tag_articles
-        else:
-            app.logger.warning(f'没有找到标签: {tag} 下的文章！')
-
-    info_list = get_article_info(articles)
-    if not info_list:
-        app.logger.warning('没有找到任何文章！')
-        return None, None, None, None, None, None
-
-    summary_list = get_summary(articles)
-    compressed_list = list(zip(articles, summary_list, info_list))
-    friends_links = get_friends_link()
-
-    return compressed_list, notice, has_next_page, has_previous_page, friends_links, tags
-
-
-@app.route('/api/wx', methods=['GET'])
-def api_wx():
-    page = request.args.get('page', default=1, type=int)
-    tag = request.args.get('tag', default='None')
-
-    (compressed_list, notice, has_next_page, has_previous_page, friends_links, tags) = get_home_data(page, tag)
-
-    response_data = {
-        'articles': compressed_list,
-        'notice': notice,
-        'has_next_page': has_next_page,
-        'has_previous_page': has_previous_page,
-        'current_page': page,
-        'tags': tags,
-        'tag': tag,
-        'friends_links': friends_links
-    }
-    return jsonify(response_data)
 
 
 @cache.cached(timeout=600, key_prefix='article_passwd')
@@ -1094,12 +1011,7 @@ def api_delete_file(user_id, filename):
 
 @app.route('/links')
 def get_friends_link():
-    friends_links = {
-        '本站地址': domain,
-        'GitHub': "https://github.com/Athenavi",
-        '博客园': "https://cnblogs.com/Athenavi/",
-    }
-    return friends_links
+    return "区域还在建设中，敬请期待"
 
 
 @app.route('/api/report', methods=['POST'])
