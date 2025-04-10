@@ -1,21 +1,3 @@
--- 先创建无依赖的表
-CREATE TABLE IF NOT EXISTS activities
-(
-    activityId      INT AUTO_INCREMENT PRIMARY KEY,
-    title           VARCHAR(255)         NOT NULL COMMENT '活动标题',
-    cover_img       VARCHAR(255)         NOT NULL COMMENT '封面图URL',
-    start_time      BIGINT               NOT NULL COMMENT '开始时间（毫秒时间戳）',
-    end_time        BIGINT               NOT NULL COMMENT '结束时间（毫秒时间戳）',
-    list_address    VARCHAR(255)         NOT NULL COMMENT '列表展示地址',
-    detail_location VARCHAR(255)         NOT NULL COMMENT '详情页地点',
-    display_time    BIGINT               NULL COMMENT '前端展示时间（时间戳，毫秒单位）',
-    content         TEXT                 NOT NULL COMMENT '活动详情正文',
-    is_deleted      TINYINT(1) DEFAULT 0 NOT NULL COMMENT '软删除标记，0 为未删除，1 为已删除',
-    CONSTRAINT chk_time CHECK (`end_time` >= `start_time`)
-) ENGINE = InnoDB;
-
-CREATE INDEX idx_is_deleted ON activities (is_deleted);
-
 CREATE TABLE IF NOT EXISTS articles
 (
     ArticleID   INT AUTO_INCREMENT PRIMARY KEY,
