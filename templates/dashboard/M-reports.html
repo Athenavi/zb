@@ -1,0 +1,59 @@
+{% extends 'dashboard/dashboard-base.html' %}
+
+{% block content %}
+    <h1 class="text-2xl font-bold mb-5">管理举报</h1>
+    <div class="overflow-x-auto">
+        <table class="min-w-full table-light">
+            <thead class="bg-gray-200">
+            <tr>
+                <th class="py-2 px-4 border">举报ID</th>
+                <th class="py-2 px-4 border">举报人ID</th>
+                <th class="py-2 px-4 border">内容类型</th>
+                <th class="py-2 px-4 border">内容ID</th>
+                <th class="py-2 px-4 border">举报理由</th>
+                <th class="py-2 px-4 border">举报时间</th>
+                <th class="py-2 px-4 border">操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for report in reports %}
+                <tr class="border-b hover:bg-gray-100">
+                    <td class="py-2 px-4">{{ report['id'] }}</td>
+                    <td class="py-2 px-4">{{ report['reported_by'] }}</td>
+                    <td class="py-2 px-4">{{ report['content_type'] }}</td>
+                    <td class="py-2 px-4">{{ report['content_id'] }}</td>
+                    <td class="py-2 px-4">{{ report['reason'] }}</td>
+                    <td class="py-2 px-4">{{ report['created_at'] }}</td>
+                    <td class="py-2 px-4">
+                        <a href="#" class="text-red-500 hover:underline"
+                           onclick="deleteReports({{ report['id'] }})">删除</a>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <script>
+        function deleteReports(ReportsId) {
+            if (confirm("您确定要移除这条举报信息吗？")) {
+                fetch(`/dashboard/reports?rid=${ReportsId}`, {
+                    method: 'DELETE',
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('网络响应不正常');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        alert(data.message);
+                        location.reload();
+                    })
+                    .catch(error => {
+                        alert("删除失败: " + error.message);
+                    });
+            }
+        }
+    </script>
+
+{% endblock %}

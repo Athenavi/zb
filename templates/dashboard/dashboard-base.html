@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"/>
+    <title>后台管理页面</title>
+    <style>
+        body.light {
+            background-color: #f7fafc;
+            color: #1a202c;
+            font-family: Arial, sans-serif;
+        }
+
+        body.dark {
+            background-color: #1a202c;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+
+        /* Table Styles */
+        .table-light, .table-dark {
+            background-color: #ffffff;
+            color: #1a202c;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            font-family: Arial, sans-serif;
+        }
+
+        body.dark .table-dark {
+            background-color: #2d3748;
+            color: white;
+            border-color: #4a5568;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .table-light tr:hover, .table-dark tr:hover {
+            background-color: #ebf8ff;
+            transform: scale(1.02);
+        }
+
+        body.dark .table-light tr:hover {
+            background-color: #4a5568;
+        }
+
+        thead {
+            background-color: #edf2f7;
+            font-weight: bold;
+        }
+
+        body.dark thead {
+            background-color: #4a5568;
+        }
+
+        td {
+            position: relative;
+            cursor: pointer;
+        }
+
+        td::after {
+            content: attr(data-tooltip); /* 使用 data-tooltip 的值 */
+            position: absolute;
+            bottom: 100%; /* 在上方显示 */
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.75);
+            color: #fff;
+            padding: 5px;
+            border-radius: 5px;
+            white-space: nowrap;
+            visibility: hidden; /* 初始为不可见 */
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 10; /* 确保提示在其他元素之上 */
+        }
+
+        td:hover::after {
+            visibility: visible; /* 悬浮时可见 */
+            opacity: 1;
+        }
+
+        /* Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px; /* 垂直滚动条的宽度 */
+            height: 8px; /* 水平滚动条的高度 */
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: rgba(0, 0, 0, 0.2); /* 滚动条的颜色 */
+            border-radius: 10px; /* 滚动条的圆角 */
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent; /* 滚动条轨道的背景 */
+        }
+
+        /* Firefox Compatibility */
+        .custom-scrollbar {
+            scrollbar-width: thin; /* 在 Firefox 中设置为细的滚动条 */
+            scrollbar-color: rgba(0, 0, 0, 0.2) transparent; /* 滚动条颜色 */
+        }
+
+        /* Edit Modal */
+        #editModal {
+            display: none; /* 默认隐藏 */
+            position: fixed; /* 定位为固定 */
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5); /* 半透明背景 */
+            justify-content: center; /* 水平居中 */
+            align-items: center; /* 垂直居中 */
+            z-index: 1000; /* 确保在最上层 */
+        }
+
+        .modal-content {
+            color: #c08b30;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Main Zone */
+        #MainZone {
+            max-height: 100vh;
+            overflow-y: auto;
+        }
+
+        /* Menu Zone */
+        #MenuZone {
+            width: 12vw;
+            max-width: 22vw;
+            transition: width 0.3s;
+        }
+
+        /* Collapsed Menu Zone */
+        #MenuZone.collapsed {
+            width: 3rem !important;
+            overflow: hidden;
+            transition: width 0.3s ease;
+        }
+
+        #MenuZone.collapsed .p-6 {
+            padding: 1rem;
+        }
+
+        #MenuZone.collapsed h2 {
+            justify-content: center;
+        }
+
+        #MenuZone.collapsed nav ul li a {
+            justify-content: center;
+            padding: 1rem 0;
+        }
+
+        #MenuZone.collapsed nav ul li i {
+            margin: 0 auto;
+        }
+
+        #MenuZone.collapsed nav ul li span {
+            display: none !important;
+        }
+
+        /* Regular Menu Zone */
+        #MenuZone nav ul li span {
+            display: inline-block;
+            transition: opacity 0.3s ease;
+        }
+
+        /* Mobile Optimization */
+        @media (max-width: 768px) {
+            #MenuZone:not(.collapsed) nav ul li span {
+                display: inline-block !important;
+            }
+        }
+    </style>
+</head>
+<body id="body" class="light">
+<div class="flex">
+    <aside class="w-full md:w-64 bg-gradient-to-r from-blue-600 to-blue-400 shadow-lg md:h-screen" id="MenuZone">
+        <div class="p-6 flex items-center justify-between">
+            <h3 class="text-3xl text-white font-bold">
+                <img src="/favicon.ico" alt="logo"/>
+                <button id="toggleSidebarButton" class="text-white hidden md:block">
+                    <i class="fa-solid fa-toggle-on">
+                    </i></button>
+            </h3>
+        </div>
+        <nav>
+            <ul>
+                <li class="hover:bg-blue-300">
+                    <a href="{{ url_for('dashboard.m_overview') }}"
+                       class="text-white block py-4 px-6 transition duration-300 flex items-center space-x-2">
+                        <i class="fa-solid fa-gauge-high"></i>
+                        <span>总览</span>
+                    </a>
+                </li>
+                <li class="hover:bg-blue-300">
+                    <a href="{{ url_for('dashboard.m_articles') }}"
+                       class="text-white block py-4 px-6 transition duration-300 flex items-center space-x-2">
+                        <i class="fa-brands fa-markdown"></i>
+                        <span>文章</span>
+                    </a>
+                </li>
+                <li class="hover:bg-blue-300">
+                    <a href="{{ url_for('dashboard.m_users') }}"
+                       class="text-white block py-4 px-6 transition duration-300 flex items-center space-x-2">
+                        <i class="fa-solid fa-users"></i>
+                        <span>用户</span>
+                    </a>
+                </li>
+                <li class="hover:bg-blue-300">
+                    <a href="{{ url_for('dashboard.m_comments') }}"
+                       class="text-white block py-4 px-6 transition duration-300 flex items-center space-x-2">
+                        <i class="fa-regular fa-comments"></i>
+                        <span>评论</span>
+                    </a>
+                </li>
+                <li class="hover:bg-blue-300">
+                    <a href="{{ url_for('dashboard.m_media') }}"
+                       class="text-white block py-4 px-6 transition duration-300 flex items-center space-x-2">
+                        <i class="fa-solid fa-photo-film"></i>
+                        <span>媒体</span>
+                    </a>
+                </li>
+                <li class="hover:bg-blue-300">
+                    <a href="{{ url_for('dashboard.m_notifications') }}"
+                       class="text-white block py-4 px-6 transition duration-300 flex items-center space-x-2">
+                        <i class="fa-regular fa-envelope-open"></i>
+                        <span>通知</span>
+                    </a>
+                </li>
+                <li class="hover:bg-blue-300">
+                    <a href="{{ url_for('dashboard.m_reports') }}"
+                       class="text-white block py-4 px-6 transition duration-300 flex items-center space-x-2">
+                        <i class="fa-regular fa-rectangle-list"></i>
+                        <span>举报</span>
+                    </a>
+                </li>
+                <li class="hover:bg-blue-300">
+                    <a href="{{ url_for('dashboard.m_urls') }}"
+                       class="text-white block py-4 px-6 transition duration-300 flex items-center space-x-2">
+                        <i class="fa-solid fa-link"></i>
+                        <span>链接</span>
+                    </a>
+                </li>
+                <li class="hover:bg-blue-300">
+                    <a href="{{ url_for('dashboard.m_display') }}"
+                       class="text-white flex items-center py-4 px-6 transition duration-300 space-x-2">
+                        <i class="fa-solid fa-shirt"></i>
+                        <span>主题</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </aside>
+    <main class="flex-1 p-6 custom-scrollbar" id="MainZone">
+        {% block content %}{% endblock %}
+    </main>
+</div>
+</body>
+</html>
+<script>
+    window.onload = function () {
+        const sidebar = document.getElementById('MenuZone');
+        const toggleSidebarButton = document.getElementById('toggleSidebarButton');
+        const menuItems = document.querySelectorAll('#MenuZone nav ul li span');
+
+        // 从本地存储读取折叠状态
+        const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+
+        // 初始化状态
+        function initSidebar() {
+            if (isCollapsed) {
+                sidebar.classList.add('collapsed');
+                menuItems.forEach(span => span.classList.add('hidden'));
+            } else {
+                sidebar.classList.remove('collapsed');
+                menuItems.forEach(span => span.classList.remove('hidden'));
+            }
+        }
+
+        // 切换侧边栏状态
+        function toggleSidebar() {
+            const wasCollapsed = sidebar.classList.toggle('collapsed');
+            localStorage.setItem('sidebarCollapsed', wasCollapsed);
+
+            // 切换文字显示
+            menuItems.forEach(span => {
+                span.classList.toggle('hidden', wasCollapsed);
+            });
+        }
+
+        // 初始化
+        initSidebar();
+
+        // 事件监听
+        if (toggleSidebarButton) {
+            toggleSidebarButton.addEventListener('click', toggleSidebar);
+        }
+
+        // 响应式处理
+        function handleResponsive() {
+            const isMobile = window.innerWidth < 768;
+            if (isMobile) {
+                sidebar.classList.add('collapsed');
+                menuItems.forEach(span => span.classList.add('hidden'));
+            } else {
+                const savedState = localStorage.getItem('sidebarCollapsed') === 'true';
+                sidebar.classList.toggle('collapsed', savedState);
+                menuItems.forEach(span => span.classList.toggle('hidden', savedState));
+            }
+        }
+
+        handleResponsive();
+        window.addEventListener('resize', handleResponsive);
+    }
+
+    function closeEditModal() {
+        document.getElementById('editModal').style.display = 'none';
+    }
+</script>

@@ -1,0 +1,203 @@
+{% extends 'dashboard/dashboard-base.html' %}
+
+{% block content %}
+    <div id="display">
+        <h1 class="text-3xl font-bold text-gray-800 mb-8">主题与外观</h1>
+        <ul id="displayList">
+            <form method="POST" enctype="multipart/form-data" action="/Admin_upload" class="space-y-4">
+                <div class="mb-4">
+                    <label for="file-input" class="block text-lg font-semibold text-center mb-2"
+                           style="height: 150px">
+                        <span style="align-self: center">可拖动文件到这里</span>
+                    </label>
+                    <input type="file" name="file" id="file-input" accept=".zip"
+                           class="border border-gray-300 rounded-lg p-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300">
+                    <span id="file-label" class="block text-sm text-gray-600 mt-1 text-center"></span>
+                </div>
+                <div class="mb-4">
+                    <select name="type" class="form-control border border-gray-300 rounded-lg p-2 w-full focus:outline-none
+                   focus:ring-2 focus:ring-blue-500 transition duration-300">
+                        <option value="theme">外观包(.zip)</option>
+                    </select>
+                </div>
+                <div>
+                    <input type="submit" value="上传"
+                           class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-300 w-full">
+                </div>
+            </form>
+            {% for display in displayList %}
+                <li id="{{ display }}">
+                    {{ display }}
+                    <button class="btn btn-primary btn-block" onclick="showDetail('{{ display }}')">查看详情
+                    </button>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <!-- 弹出窗口 -->
+    <style>
+        #detailModal {
+            display: none; /* 初始隐藏 */
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #f9f9f9;
+            border: 1px solid #ccc;
+            padding: 20px;
+            z-index: 1000;
+        }
+    </style>
+    <div id="detailModal" class="modal" style="display: none;background: #7abaff">
+        <button id="closeButton" onclick="closeDetail()">关闭</button>
+        <div class="container">
+            <div class="row">
+                <div>
+                    <img id="screenshotImage" src="" alt="screenshot" style="max-width: 100%">
+                </div>
+                <div>
+                    <div id="themeInfo">
+                        <p id="themeId"></p>
+                        <p id="author"></p>
+                        <p id="authorWebsite"></p>
+                        <p id="title"></p>
+                        <p id="description"></p>
+                        <p id="version"></p>
+                        <p id="versionCode"></p>
+                        <p id="statu"></p>
+                        <button id="changeDisplay">应用此主题(预览)</button>
+                        <button id="deleteDisplay">删除此主题(预览)</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 关闭弹出窗口的函数
+        function closeDetail() {
+            document.getElementById("detailModal").style.display = "none";
+        }
+
+        // 关闭按钮的点击事件
+        document.getElementById("closeButton").addEventListener("click", closeDetail);
+
+        // 显示详情的函数
+        function showDetail(display) {
+            // 根据 display 发起请求并显示详情
+            fetch('/theme/' + display)
+                .then(response => response.json())
+                .then(data => {
+                    // 更新左半部分的图片URL
+                    document.getElementById("screenshotImage").src = "/theme/" + data.id + "/" + data.screenshot;
+                    // 更新右半部分的详细信息
+                    document.getElementById("author").textContent = "作者: " + data.author;
+                    document.getElementById("authorWebsite").textContent = "作者网站: " + data.authorWebsite;
+                    document.getElementById("themeId").textContent = data.id;
+                    document.getElementById("title").textContent = "标题: " + data.title;
+                    document.getElementById("description").innerHTML = "描述: " + data.description;
+                    document.getElementById("version").textContent = "适配版本: " + data.version;
+                    document.getElementById("versionCode").textContent = "主题版本代码（标识符）: " + data.versionCode;
+                    // 显示弹出窗口
+                    document.getElementById("detailModal").style.display = "block";
+                });
+        }
+
+        // 主题版本检查
+
+        //修改主题
+        document.getElementById("changeDisplay").addEventListener("click", function () {
+            var themeId = document.getElementById("themeId").innerText;
+            fetch('/api/theme?NT=' + themeId, {
+                method: 'PUT',
+                include: 'credentials',
+            })
+                .then(response => response.text())
+                .then(data => {
+                    if (data === 'success') {
+                        alert('主题应用成功！');
+                    } else if (data === 'failed001') {
+                        alert('当前已是该主题;请勿重复提交');
+                    } else {
+                        alert('主题应用失败！主题文件丢失或者主题没有适配当前程序版本');
+                    }
+                })
+                .catch(error => {
+                    console.error('请求出错:', error);
+                    alert('请求出错，请重试！');
+                });
+        });
+
+        document.getElementById("deleteDisplay").addEventListener("click", function () {
+            const themeId = document.getElementById("themeId").innerText;
+            if (!confirm(`确定要删除主题『${themeId}』吗？此操作不可恢复！`)) {
+                return;
+            }
+
+            fetch(`/api/theme?theme_id=${encodeURIComponent(themeId)}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            })
+                .then(response => {
+                    return response.json().then(data => ({
+                        status: response.status,
+                        data
+                    }));
+                })
+                .then(({status, data}) => {
+                    if (status === 200) {
+                        // 成功处理
+                        alert(data.message || '主题删除成功');
+                        document.getElementById("title").textContent = "标题: " + themeId + " (已删除)";
+                        const themeItem = document.getElementById(themeId);
+                        if (themeItem) themeItem.remove();
+                    } else {
+                        // 显示服务端返回的具体错误
+                        alert(`删除失败 (${status}): ${data.error || data.message || '未知错误'}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Delete request failed:', error);
+                    alert('请求发送失败，请检查网络连接');
+                });
+        });
+
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            function chooseFile() {
+                document.getElementById('file-input').click();
+            }
+
+            // 监听文件选择事件，并更新文件选择框的标签
+            document.getElementById('file-input').addEventListener('change', function (e) {
+                var fileLabel = document.getElementById('file-label');
+                fileLabel.textContent = e.target.value.split('\\').pop();
+            });
+
+            function handleDragOver(event) {
+                event.preventDefault();
+            }
+
+            function handleDrop(event) {
+                event.preventDefault();
+
+                const files = event.dataTransfer.files;
+                if (files.length > 0) {
+                    const fileInput = document.getElementById('file-input');
+                    fileInput.files = files;
+
+                    const fileLabel = document.getElementById('file-label');
+                    fileLabel.textContent = files[0].name;
+                }
+            }
+
+            // 将上述拖放功能的事件处理函数绑定到表单
+            const form = document.querySelector('form');
+            form.addEventListener('dragover', handleDragOver);
+            form.addEventListener('drop', handleDrop);
+        });
+
+    </script>
+{% endblock %}

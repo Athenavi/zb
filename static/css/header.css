@@ -1,0 +1,106 @@
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-content {
+    display: none;
+    position: absolute;
+    background-color: #ffffff;
+    min-width: 160px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    z-index: 1;
+    border-radius: 4px;
+}
+
+.dropdown-content a {
+    color: #333;
+    padding: 10px 12px;
+    text-decoration: none;
+    display: block;
+}
+
+.dropdown-content a:hover {
+    background-color: #f1f1f1;
+    color: #000;
+}
+
+.dropdown:hover .dropdown-content {
+    display: block;
+}
+
+.menu {
+    width: 180px;
+    background-color: #fff;
+    padding: 10px;
+    border-radius: 10px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 99;
+    /* 默认隐藏 */
+    opacity: 0;
+}
+
+.menu li {
+    list-style-type: none;
+    padding: 12px;
+    background-color: #fff;
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+.menu li:hover {
+    background-color: cornflowerblue;
+    color: #fff;
+}
+
+
+.loader {
+    height: 100vh; /* 使加载器的高度为视口高度 */
+    width: 100vw; /* 使加载器的宽度为视口宽度 */
+    /* 弹性布局 居中显示 */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    /* 渐变背景 */
+    background: linear-gradient(to top, #1e3c72, #2a5298);
+    position: relative; /* 为绝对定位的子元素提供参考 */
+}
+
+.loader::before,
+.loader::after {
+    content: "";
+    width: 50px;
+    height: 50px;
+    /* 默认透明背景色 */
+    background-color: transparent;
+    /* 绝对定位 */
+    position: absolute;
+    /* 执行动画：动画名 时长 慢速开始慢速结束中间加快 无限次播放 来回轮流 */
+    animation: jumping 0.5s ease infinite alternate;
+}
+
+.loader::before {
+    left: 45%; /* 调整位置，使其更居中 */
+}
+
+.loader::after {
+    right: 45%; /* 调整位置，使其更居中 */
+    /* 这一个设置动画延迟 */
+    animation-delay: 0.35s;
+}
+
+/* 定义动画 */
+@keyframes jumping {
+    0% {
+        transform: scale(1) translateY(0) rotateX(0);
+        box-shadow: 0 0 0 transparent;
+    }
+    100% {
+        background-color: #fff;
+        transform: scale(1.2) translateY(-55px) rotateX(45deg);
+        box-shadow: 0 55px 100px #fff;
+    }
+}

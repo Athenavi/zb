@@ -1,0 +1,71 @@
+{
+    "imageActionName": "image",
+    "imageFieldName": "file",
+    "imageMaxSize": 10485760,
+    "imageAllowFiles": [
+        ".jpg",
+        ".png",
+        ".jpeg"
+    ],
+    "imageCompressEnable": true,
+    "imageCompressBorder": 5000,
+    "imageInsertAlign": "none",
+    "imageUrlPrefix": "",
+    "scrawlActionName": "scrawl",
+    "scrawlFieldName": "file",
+    "scrawlMaxSize": 10485760,
+    "scrawlUrlPrefix": "",
+    "scrawlInsertAlign": "none",
+    "snapscreenActionName": "snap",
+    "snapscreenUrlPrefix": "",
+    "snapscreenInsertAlign": "none",
+    "catcherActionName": "catch",
+    "catcherFieldName": "source",
+    "catcherLocalDomain": [
+        "127.0.0.1",
+        "localhost"
+    ],
+    "catcherUrlPrefix": "",
+    "catcherMaxSize": 10485760,
+    "catcherAllowFiles": [
+        ".jpg",
+        ".png",
+        ".jpeg"
+    ],
+    "videoActionName": "video",
+    "videoFieldName": "file",
+    "videoUrlPrefix": "",
+    "videoMaxSize": 104857600,
+    "videoAllowFiles": [
+        ".mp4"
+    ],
+    "fileActionName": "file",
+    "fileFieldName": "file",
+    "fileUrlPrefix": "",
+    "fileMaxSize": 104857600,
+    "fileAllowFiles": [
+        ".zip",
+        ".pdf",
+        ".doc"
+    ],
+    "imageManagerActionName": "listImage",
+    "imageManagerListSize": 20,
+    "imageManagerUrlPrefix": "",
+    "imageManagerInsertAlign": "none",
+    "imageManagerAllowFiles": [
+        ".jpg",
+        ".png",
+        ".jpeg"
+    ],
+    "fileManagerActionName": "listFile",
+    "fileManagerUrlPrefix": "",
+    "fileManagerListSize": 20,
+    "fileManagerAllowFiles": [
+        ".zip",
+        ".pdf",
+        ".doc"
+    ],
+    "formulaConfig": {
+        "imageUrlTemplate": "https://r.latexeasy.com/image.svg?{}"
+    }
+}

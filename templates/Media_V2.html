@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html dir="ltr" lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="description" content="">
+    <meta name="keywords" content=""/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="author" content="">
+    <title>{{ title }}</title>
+    <link rel="shortcut icon" type="image/ico" href="/favicon.ico">
+    <script src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/jquery-mousewheel/3.1.9/jquery.mousewheel.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.5.7/jquery.fancybox.js"></script>
+    <link rel="stylesheet" href="/static/css/dropzone.css">
+    <link href="https://cdn.bootcdn.net/ajax/libs/fancybox/3.5.7/jquery.fancybox.css" rel="stylesheet">
+    <link href="https://cdn.bootcdn.net/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.bootcdn.net/ajax/libs/normalize/8.0.1/normalize.css" rel="stylesheet">
+    <style>
+        .checkbox-container {
+            z-index: 10;
+        }
+
+        .file-checkbox:checked {
+            accent-color: #3b82f6;
+        }
+
+        /* 可选：添加过渡效果 */
+        li {
+            transition: opacity 0.3s ease;
+        }
+
+        li[style*="display: none"] {
+            display: none !important;
+            opacity: 0;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100">
+<!-- Navigation Bar -->
+{% from 'header.html' import SimpleHeader %}
+{{ SimpleHeader(title) }}
+
+<header class="bg-white rounded-lg shadow mb-6 p-4">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold"><a href="/">🏠</a> 媒体文件</h1>
+        <div class="flex items-center space-x-4">
+            <!-- 添加编辑模式切换按钮 -->
+            <button id="edit-mode-btn" class="text-white px-4 py-2 rounded hover:bg-blue-600"
+                    onclick="toggleEditMode()">编辑模式
+            </button>
+            <!-- 添加批量删除按钮 (默认隐藏) -->
+            <button id="batch-delete-btn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 hidden"
+                    onclick="batchDelete()">删除选中项
+            </button>
+        </div>
+        {# 添加切换按钮 #}
+        <div class="flex gap-2 mb-4">
+            <button
+                    class="filter-btn px-4 py-2 rounded-lg bg-blue-500 text-white"
+                    data-filter="all"
+                    onclick="filterMedia(this, 'all')"
+            >全部
+            </button>
+            <button
+                    class="filter-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300"
+                    data-filter="image"
+                    onclick="filterMedia(this, 'image')"
+            >仅图片
+            </button>
+            <button
+                    class="filter-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300"
+                    data-filter="video"
+                    onclick="filterMedia(this, 'video')"
+            >仅视频
+            </button>
+        </div>
+    </div>
+</header>
+<div id="result-message" class="hidden fixed top-4 right-4 p-4 rounded-lg shadow-lg"></div>
+<main class="content bg-white rounded-lg shadow p-4">
+    <!-- File Upload Section -->
+    <form action="/upload_file" class="dropzone border-dashed border-2 border-gray-400 rounded-lg p-8 mb-6"
+          method="POST" enctype="multipart/form-data" id="myDropzone"></form>
+    <script src="/static/js/dropzone.js"></script>
+    <script>
+        // Initialize Dropzone
+        Dropzone.options.myDropzone = {
+            acceptedFiles: '.jpg, .png, .webp, .jfif, .pjpeg, .jpeg, .pjp, .mp4, .xmind',
+            maxFilesize: 60,
+            maxFiles: 3,
+            dictFileTooBig: '超出文件大小限制 ({{filesize}}MB). 最大文件大小: {{maxFilesize}}MB.',
+            dictInvalidFileType: '无效的文件类型. 仅支持 JPG, PNG, WEBP, JFIF, PJPEG, JPEG, PJP, MP4 文件。',
+            init: function () {
+                this.on('success', function (file, response) {
+                    console.log('文件上传成功');
+                });
+                this.on('error', function (file, errorMessage) {
+                    console.log('文件上传错误: ' + errorMessage);
+                });
+            },
+            withCredentials: true,
+        };
+    </script>
+    <hr class="my-4">
+    <!-- Media Display Section -->
+    <section>
+        <ul class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {% for id, img,hash in imgs %}
+                <li class="group relative" data-type="{{ 'video' if img.endswith('.mp4') else 'image' }}">
+                    <div class="checkbox-container absolute top-2 left-2 hidden">
+                        <input type="checkbox" class="file-checkbox w-5 h-5"
+                               data-file-id="{{ id }}"
+                               onchange="updateSelectionCount()">
+                    </div>
+                    {% if not img.endswith('.mp4') %}
+                        <div class="bg-gray-200 rounded-lg overflow-hidden shadow">
+                            <a href="/shared?data={{ hash }}" class="fancybox" data-fancybox="gallery"
+                               title="{{ img }}">
+                                <img src="/thumbnail?data={{ hash }}" alt=""
+                                     class="w-full h-40 object-cover"/>
+                            </a>
+                        </div>
+                    {% else %}
+                        <div class="bg-gray-200 rounded-lg overflow-hidden shadow">
+                            <a class="card-link"
+                               onclick="startVideo('{{ hash }}')">
+                                <img src="/thumbnail?data={{ hash }}&type=video" alt=""
+                                     class="w-full h-40 object-cover" title="{{ img }}"/>
+                            </a>
+                        </div>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    </section>
+    <!-- Pagination Section -->
+    <div class="pagination my-4">
+        <div class="flex justify-between my-4">
+            {% if has_previous_page and mediaType %}
+                <a href="{{ url_for('media.media', user_name=username, page=current_page-1, type=mediaType) }}"
+                   class="btn btn-secondary">Previous</a>
+            {% endif %}
+            {% if has_next_page and mediaType %}
+                <a href="{{ url_for('media.media', user_name=username, page=current_page+1, type=mediaType) }}"
+                   class="btn btn-secondary">Next</a>
+            {% endif %}
+        </div>
+    </div>
+</main>
+
+<!-- Footer -->
+{% from 'footer.html' import SimpleFooter %}
+{{ SimpleFooter(title, beian) }}
+
+<!-- Video Popup -->
+<div id="video-popup" class="hidden fixed inset-0 z-50 bg-black bg-opacity-80 flex items-center justify-center">
+    <div class="video-wrapper">
+        <video id="video-image" src="" controls class="max-w-80 max-h-80 border-2 border-white rounded"></video>
+        <button class="btn btn-primary mt-2" onclick="closeVideo()">关闭</button>
+    </div>
+</div>
+
+<!-- Xmind Popup -->
+<div id="xmind-popup" class="hidden fixed inset-0 z-50 bg-black bg-opacity-80 flex items-center justify-center">
+    <div class="xmind-wrapper">
+        <button class="btn btn-primary" onclick="closeXmind()">关闭预览</button>
+    </div>
+</div>
+
+<script src="/static/js/media.js"></script>
+<script src="/static/js/prewXmind.js"></script>
+<script>
+    // 过滤媒体类型
+    function filterMedia(btn, type) {
+        // 移除所有按钮的激活样式
+        document.querySelectorAll('.filter-btn').forEach(button => {
+            button.classList.remove('bg-blue-500', 'text-white');
+            button.classList.add('bg-gray-200');
+        });
+
+        // 添加当前按钮的激活样式
+        btn.classList.add('bg-blue-500', 'text-white');
+        btn.classList.remove('bg-gray-200');
+
+        // 遍历所有媒体项
+        document.querySelectorAll('li[data-type]').forEach(item => {
+            const itemType = item.getAttribute('data-type');
+            if (type === 'all') {
+                item.style.display = 'block'; // 显示所有
+            } else {
+                item.style.display = itemType === type ? 'block' : 'none'; // 按类型过滤
+            }
+        });
+
+        // 更新复选框计数（如果有需要）
+        updateSelectionCount && updateSelectionCount();
+    }
+
+    function startVideo(hash) {
+        const videoSrc = `/shared?data=${hash}`;
+        document.getElementById("video-image").src = videoSrc;
+        document.getElementById("video-popup").classList.remove("hidden");
+    }
+</script>
+<script>
+    // 新增JavaScript逻辑
+    let editMode = false;
+
+    function toggleEditMode() {
+        editMode = !editMode;
+        const checkboxes = document.querySelectorAll('.checkbox-container');
+        const batchBtn = document.getElementById('batch-delete-btn');
+        const editBtn = document.getElementById('edit-mode-btn');
+
+        checkboxes.forEach(checkbox => {
+            checkbox.style.display = editMode ? 'block' : 'none';
+        });
+        batchBtn.classList.toggle('hidden', !editMode);
+        editBtn.textContent = editMode ? '退出编辑' : '编辑模式';
+    }
+
+    function updateSelectionCount() {
+        const selected = document.querySelectorAll('.file-checkbox:checked');
+        const batchBtn = document.getElementById('batch-delete-btn');
+        batchBtn.textContent = `删除选中项 (${selected.length})`;
+    }
+
+    async function batchDelete() {
+        const ids = Array.from(document.querySelectorAll('.file-checkbox:checked'))
+            .map(checkbox => checkbox.dataset.fileId);
+
+        // 检查是否选择了文件
+        if (ids.length === 0) {
+            showResultMessage('请先选择要删除的文件', 'yellow');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/media?file-id-list=${ids.join(',')}`, {
+                method: 'DELETE',
+                credentials: 'include',
+            });
+
+            const result = await response.json();
+            if (response.ok) {
+                showResultMessage(`成功删除 ${result.deleted_count} 个文件`, 'green');
+                // 刷新页面以更新列表
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showResultMessage(result.message || '删除失败', 'red');
+            }
+        } catch (error) {
+            showResultMessage('网络请求失败: ' + error.message, 'red');
+        }
+    }
+
+    function showResultMessage(text, colorClass) {
+        const div = document.getElementById('result-message');
+        div.className = `${colorClass} bg-${colorClass}-100 border-${colorClass}-400 text-${colorClass}-700`;
+        div.textContent = text;
+        div.classList.remove('hidden');
+        setTimeout(() => div.classList.add('hidden'), 3000);
+    }
+</script>
+</body>
+</html>

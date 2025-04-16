@@ -1,0 +1,120 @@
+{% extends 'dashboard/dashboard-base.html' %}
+
+{% block content %}
+    <h1 class="text-2xl font-bold mb-5">管理媒体文件</h1>
+    <div class="overflow-x-auto">
+        <table class="min-w-full table-light">
+            <thead class="bg-gray-200">
+            <tr>
+                <th class="py-2 px-4 border">媒体ID</th>
+                <th class="py-2 px-4 border">用户ID</th>
+                <th class="py-2 px-4 border">文件路径</th>
+                <th class="py-2 px-4 border">文件类型</th>
+                <th class="py-2 px-4 border">操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for media in media_items %}
+                <tr class="border-b hover:bg-gray-100">
+                    <td class="py-2 px-4">{{ media['id'] }}</td>
+                    <td class="py-2 px-4">{{ media['user_id'] }}</td>
+                    <td class="py-2 px-4">{{ media['file_path'] }}</td>
+                    <td class="py-2 px-4">{{ media['file_type'] }}</td>
+                    <td class="py-2 px-4">
+                        <a href="#" class="preview text-blue-500 hover:underline"
+                           data-hidden="{{ domain }}{{ media['file_path'] }}?preview=1">预览</a> |
+                        <a href="#" class="text-red-500 hover:underline"
+                           onclick="deleteFile({{ media['id'] }})">删除</a>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <style>
+        .img-tooltip {
+            position: absolute;
+            bottom: 100%; /* 在上方显示 */
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.75);
+            color: #fff;
+            padding: 5px;
+            border-radius: 5px;
+            white-space: nowrap;
+            visibility: hidden; /* 初始为不可见 */
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 10; /* 确保提示在其他元素之上 */
+            pointer-events: none; /* 避免对鼠标事件的干扰 */
+        }
+
+        .img-tooltip img {
+            max-width: 200px; /* 设置预览图片的最大宽度 */
+            max-height: 150px; /* 设置预览图片的最大高度 */
+            border-radius: 5px; /* 圆角效果 */
+        }
+    </style>
+    <div class="img-tooltip" id="image-tooltip"></div>
+    <script>
+        function deleteFile(FileId) {
+            if (confirm("您确定要移除这个文件吗？")) {
+                fetch(`/dashboard/media?file-id=${FileId}`, {
+                    method: 'DELETE',
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('网络响应不正常');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        alert(data.message);
+                        location.reload();
+                    })
+                    .catch(error => {
+                        alert("删除失败: " + error.message);
+                    });
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const previewLinks = document.querySelectorAll('.preview');
+            const tooltip = document.getElementById('image-tooltip');
+
+            previewLinks.forEach(link => {
+                link.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    const imageUrl = link.getAttribute('data-hidden');
+
+                    // 清空上一个内容，设置新内容
+                    tooltip.innerHTML = `<img src="${imageUrl}" alt="Image Preview" />`;
+                    tooltip.style.visibility = 'visible';
+                    tooltip.style.opacity = '1';
+                    const rect = link.getBoundingClientRect();
+                    tooltip.style.top = `${rect.top - tooltip.offsetHeight}px`;
+                    tooltip.style.left = `${rect.left + (link.offsetWidth / 2) - (tooltip.offsetWidth / 2)}px`;
+
+                    // 如果 tooltip 当前是可见的，隐藏它; 否则显示它
+                    if (!tooltip.classList.contains('hidden')) {
+                        tooltip.classList.add('hidden');
+                        tooltip.style.opacity = '0';
+                    } else {
+                        tooltip.classList.remove('hidden');
+                        tooltip.style.visibility = 'visible';
+                        tooltip.style.opacity = '1';
+                    }
+                });
+            });
+
+            // 点击文档其他地方隐藏 tooltip
+            document.addEventListener('click', function (event) {
+                if (!event.target.classList.contains('preview')) {
+                    tooltip.classList.add('hidden');
+                    tooltip.style.opacity = '0';
+                }
+            });
+        });
+    </script>
+
+{% endblock %}

@@ -1,0 +1,188 @@
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="icon" href="/static/favicon.ico" type="image/x-icon"/>
+    <title>{{ title }} - 安全中心</title>
+</head>
+
+<body>
+<div class="go-wild-box">
+    <div class="go-wild-container">
+        <a href="{{ domain }}">
+            <img alt="{{ title }}" src="/static/favicon.ico" class="logo-img"/>
+        </a>
+        {% if not aid %}
+            {% if status_code %}
+                <div class="tips-title">{{ status_code }}</div>
+                <div class="tips-subtitle"><h2 id="message">{{ message }}</h2></div>
+                <div class="btn-groups">
+                    <button onclick="window.history.back()" type="button"
+                            class="ant-btn ant-btn-default">返回上一级页面
+                    </button>
+                    <a href="/" rel="nofollow">
+                        <button type="button" class="ant-btn ant-btn-primary">返回主页</button>
+                    </a>
+                </div>
+            {% else %}
+                <div class="tips-title">您即将离开本站博客，跳转到第三方链接</div>
+                <div class="address">{{ url }}</div>
+                <div class="tips-subtitle">请注意您的账号和财产安全</div>
+                <div class="btn-groups">
+                    <button onclick="try { window.close(); } catch(e) { alert('请手动关闭此页面'); }" type="button"
+                            class="ant-btn ant-btn-default">取消访问
+                    </button>
+                    <a href="{{ url }}" rel="nofollow">
+                        <button type="button" class="ant-btn ant-btn-primary">继续访问</button>
+                    </a>
+                </div>
+            {% endif %}
+        {% endif %}
+        {% if aid %}
+            <div class="tips-title" id="pwTips">您访问的页面需要输入密码</div>
+            <div class="address" id="response" style="display: none;"></div>
+            <input type="password" id="passwd" maxlength="4" required
+                   style="padding: 0.5rem; border: 2px solid #28a745; border-radius: 0.375rem; color: #28a745; font-size: 1rem; width: 200px; transition: border-color 0.3s ease;"
+                   onfocus="this.style.borderColor='#007bff'"
+                   onblur="this.style.borderColor='#28a745'">
+            <div class="btn-groups">
+                <button onclick="window.history.back()" type="button"
+                        class="ant-btn ant-btn-default">返回上一级页面
+                </button>
+                <a href="#" rel="nofollow">
+                    <button type="button" class="ant-btn ant-btn-primary" onclick="unlockArticle()">Unlock</button>
+                </a>
+            </div>
+            <script>
+                async function unlockArticle() {
+                    const aid = '{{ aid }}';
+                    const passwd = document.getElementById('passwd').value;
+
+                    const response = await fetch(`/api/article/unlock?aid=${aid}&passwd=${passwd}`, {
+                        method: 'POST',
+                        credentials: 'include',
+                    });
+
+                    const data = await response.json();
+                    const responseElement = document.getElementById('response');
+                    const passwdElement = document.getElementById('passwd');
+
+                    if (response.ok) {
+                        responseElement.innerHTML = `<a href="${data.temp_url}">${data.temp_url}</a>`;
+                        responseElement.style.display = "block"; // 显示响应元素
+                        passwdElement.style.display = "none"; // 隐藏密码输入框
+                        document.getElementById('pwTips').textContent = '成功创建您的临时访问链接！';
+                    } else {
+                        responseElement.textContent = `Error: ${data.message}`;
+                        responseElement.style.display = "block";
+                    }
+                }
+            </script>
+        {% endif %}
+    </div>
+</div>
+</body>
+</html>
+<style>
+    body {
+        margin: 0;
+        font-family: 'PingFangSC', sans-serif;
+        background-color: #EFF4FA;
+    }
+
+    .go-wild-box {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+    }
+
+    .go-wild-container {
+        width: 770px;
+        height: 330px;
+        max-width: 90%;
+        padding: 90px 15px;
+        background-color: #fff;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        text-align: center;
+    }
+
+    .logo-img {
+        width: 120px;
+        height: auto;
+    }
+
+    .tips-title {
+        margin: 20px 0;
+        font-size: 22px;
+        color: #2a3c59;
+        font-weight: 500;
+    }
+
+    .address {
+        margin: 0 20px 0 0;
+        padding: 15px;
+        background-color: #EFF4FA;
+        border-radius: 8px;
+        color: #2a3c59;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        width: 80%;
+        max-width: 600px;
+    }
+
+    .tips-subtitle {
+        font-size: 14px;
+        color: #2a3c59;
+        margin-bottom: 30px;
+        margin-top: 20px;
+    }
+
+    .btn-groups {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 60px;
+    }
+
+    .ant-btn {
+        width: 152px;
+        height: 44px;
+        line-height: 44px;
+        border-radius: 20px;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.3s ease;
+    }
+
+    .ant-btn-primary {
+        background: linear-gradient(152deg, #07C160 0%, #07c183 100%);
+        color: #fff;
+    }
+
+    .ant-btn-default {
+        background-color: #fff;
+        color: #2a3c59;
+        border: 1px solid #ccc;
+    }
+
+    .ant-btn-default:hover {
+        background-color: #fff;
+        border-color: #07C160;
+        color: #07C160;
+    }
+</style>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var h2 = document.getElementById('message');
+        if (h2 && h2.innerHTML.includes('你可以关闭此页面')) {
+            setTimeout(function () {
+                window.close();
+            }, 3000);
+        }
+    });
+</script>

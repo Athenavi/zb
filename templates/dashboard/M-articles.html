@@ -1,0 +1,119 @@
+{% extends 'dashboard/dashboard-base.html' %}
+
+{% block content %}
+    <h1 class="text-2xl font-bold mb-5">管理文章</h1>
+    <div class="overflow-x-auto">
+        <table class="min-w-full table-light">
+            <thead class="bg-gray-200">
+            <tr>
+                <th class="py-2 px-4 border">文章ID</th>
+                <th class="py-2 px-4 border">标题</th>
+                <th class="py-2 px-4 border">作者</th>
+                <th class="py-2 px-4 border">是否隐藏</th>
+                <th class="py-2 px-4 border">推荐</th>
+                <th class="py-2 px-4 border">阅读</th>
+                <th class="py-2 px-4 border">点赞</th>
+                <th class="py-2 px-4 border">状态</th>
+                <th class="py-2 px-4 border">标签</th>
+                <th class="py-2 px-4 border">操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for article in articles %}
+                <tr class="border-b hover:bg-gray-100">
+                    <td class="py-2 px-4">{{ article['article_id'] }}</td>
+                    <td class="py-2 px-4" id="title-{{ article['article_id'] }}">{{ article['title'] }}</td>
+                    <td class="py-2 px-4">{{ article['user_id'] }}</td>
+                    <td class="py-2 px-4">{{ article['hidden'] }}</td>
+                    <td class="py-2 px-4">{{ article['is_featured'] }}</td>
+                    <td class="py-2 px-4">{{ article['views'] }}</td>
+                    <td class="py-2 px-4">{{ article['likes'] }}</td>
+                    <td class="py-2 px-4">{{ article['status'] }}</td>
+                    <td class="py-2 px-4">{{ article['tags'] }}</td>
+                    <td class="py-2 px-4">
+                        <a href="#" class="text-blue-500 hover:underline"
+                           onclick="editArticle({{ article['ArticleID'] }})">编辑</a> |
+                        <a href="#" class="text-red-500 hover:underline"
+                           onclick="deleteArticle({{ article['ArticleID'] }})">删除</a>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <!-- 编辑表单模态框 -->
+    <div id="editModal">
+        <div class="modal-content">
+            <h2>编辑文章</h2>
+            <input type="hidden" id="edit-article-id">
+            <label for="edit-title">标题:</label>
+            <input type="text" id="edit-title"><br>
+            <select name="type" class="form-control focus:outline-none
+                   focus:ring-2 focus:ring-blue-500" id="edit-status">
+                <option value="Draft">草稿</option>
+                <option value="Published">已发布</option>
+                <option value="Deleted">删除</option>
+            </select>
+            <button onclick="saveEdit()">保存</button>
+            <button onclick="closeEditModal()">取消</button>
+        </div>
+    </div>
+
+    <script>
+        function deleteArticle(articleId) {
+            if (confirm("您确定要删除这篇文章吗？")) {
+                fetch(`/dashboard/articles?aid=${articleId}`, {
+                    method: 'DELETE',
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('网络响应不正常');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        alert(data.message);
+                        location.reload();
+                    })
+                    .catch(error => {
+                        alert("删除失败: " + error.message);
+                    });
+            }
+        }
+
+        function editArticle(articleId) {
+            console.log("Editing Article ID:", articleId); // 调试信息
+            const title = document.getElementById(`title-${articleId}`).innerText;
+            document.getElementById('edit-article-id').value = articleId;
+            document.getElementById('edit-title').value = title;
+            document.getElementById('editModal').style.display = 'flex';
+        }
+
+        function saveEdit() {
+            const articleId = document.getElementById('edit-article-id').value;
+            const updatedTitle = document.getElementById('edit-title').value;
+            const updatedStatus = document.getElementById('edit-status').value;
+
+            fetch(`/dashboard/articles`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ArticleID: articleId, Title: updatedTitle, Status: updatedStatus}),
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('网络响应不正常');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    alert(data.message);
+                    location.reload(); // Refresh the page to see the updated article
+                })
+                .catch(error => {
+                    alert("编辑失败: " + error.message);
+                });
+        }
+    </script>
+{% endblock %}

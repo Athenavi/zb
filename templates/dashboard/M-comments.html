@@ -1,0 +1,65 @@
+{% extends 'dashboard/dashboard-base.html' %}
+
+{% block content %}
+    <h1 class="text-2xl font-bold mb-5">管理评论</h1>
+    <div class="overflow-x-auto">
+        <table class="min-w-full table-light">
+            <thead class="bg-gray-200">
+            <tr>
+                <th class="py-2 px-4 border">评论ID</th>
+                <th class="py-2 px-4 border">文章ID</th>
+                <th class="py-2 px-4 border">用户ID</th>
+                <th class="py-2 px-4 border">PID</th>
+                <th class="py-2 px-4 border">评论内容</th>
+                <th class="py-2 px-4 border">设备信息</th>
+                <th class="py-2 px-4 border">IP</th>
+                <th class="py-2 px-4 border">创建时间</th>
+                <th class="py-2 px-4 border">操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for comment in comments %}
+                {% set content = comment['content'] | fromjson %}
+                <tr class="border-b hover:bg-gray-100">
+                    <td class="py-2 px-4">{{ comment['id'] }}</td>
+                    <td class="py-2 px-4">{{ comment['article_id'] }}</td>
+                    <td class="py-2 px-4">{{ comment['user_id'] }}</td>
+                    <td class="py-2 px-4">{{ content['pid'] if content['pid'] else 0 }}</td>
+                    <td class="py-2 px-4"
+                        style="max-width: 300px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">{{ content['content'] | e }}
+                    </td>
+                    <td class="py-2 px-4">{{ content['ua'] if content['ua'] else 'N/A' }}</td>
+                    <td class="py-2 px-4">{{ content['ip'] if content['ip'] else 'N/A' }}</td>
+                    <td class="py-2 px-4">{{ comment['created_at'] }}</td>
+                    <td class="py-2 px-4">
+                        <a href="#" class="text-red-500 hover:underline"
+                           onclick="deleteComment({{ comment['id'] }})">删除</a>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <script>
+        function deleteComment(CommentId) {
+            if (confirm("您确定要移除这条评论吗？")) {
+                fetch(`/dashboard/comments?cid=${CommentId}`, {
+                    method: 'DELETE',
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('网络响应不正常');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        alert(data.message);
+                        location.reload();
+                    })
+                    .catch(error => {
+                        alert("删除失败: " + error.message);
+                    });
+            }
+        }
+    </script>
+{% endblock %}

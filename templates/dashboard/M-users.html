@@ -1,0 +1,160 @@
+{% extends 'dashboard/dashboard-base.html' %}
+
+{% block content %}
+    <style>
+        #bigPic {
+            display: none;
+            position: absolute;
+            z-index: 100;
+            border: 1px solid #ccc;
+            background-color: white;
+        }
+    </style>
+    <div id="bigPic">
+        <img id="pre_view" src="" alt="Preview" style="width: 200px;">
+    </div>
+    <h1 class="text-2xl font-bold mb-5">管理用户</h1>
+    <div class="overflow-x-auto">
+        <table class="min-w-full table-light">
+            <thead class="bg-gray-200">
+            <tr>
+                <th class="py-2 px-4 border">用户ID</th>
+                <th class="py-2 px-4 border">用户名</th>
+                <th class="py-2 px-4 border">邮箱</th>
+                <th class="py-2 px-4 border">头像</th>
+                <th class="py-2 px-4 border">简介</th>
+                <th class="py-2 px-4 border">角色</th>
+                <th class="py-2 px-4 border">注册时间</th>
+                <th class="py-2 px-4 border">注册IP</th>
+                <th class="py-2 px-4 border">操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for user in users %}
+                <tr>
+                    <td class="py-2 px-4">{{ user['id'] }}</td>
+                    <td class="py-2 px-4">{{ user['username'] }}</td>
+                    <td class="py-2 px-4">{{ user['email'] }}</td>
+                    <td class="py-2 px-4">
+                        {% if user['profile_picture'] %}
+                            <img width="50" height="50"
+                                 src="{{ domain +'api/avatar/' + user['profile_picture'] + '.webp' }}"
+                                 onmousemove="showBigPic(event, this.src)"
+                                 onmouseout="closeimg()" alt=""/>
+                        {% else %}
+                            暂无头像
+                        {% endif %}
+                    </td>
+                    <td class="py-2 px-4">{{ user['bio'] }}</td>
+                    <td class="py-2 px-4">{{ user['role'] }}</td>
+                    <td class="py-2 px-4">{{ user['created_at'] }}</td>
+                    <td class="py-2 px-4">{{ user['register_ip'] }}</td>
+                    <td class="py-2 px-4">
+                        <a href="#" class="text-blue-500 hover:underline"
+                           onclick="editUser({{ user['id'] }},'{{ user['username'] }}')">编辑</a> |
+                        {% if user['id'] != 1 %}<a href="#" class="text-red-500 hover:underline"
+                                                   onclick="deleteUser({{ user['id'] }})">删除</a>{% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 编辑表单模态框 -->
+    <div id="editModal">
+        <div class="modal-content">
+            <h2>编辑用户</h2>
+            <input type="hidden" id="edit-user-id">
+            <label for="edit-username">用户名:</label>
+            <input type="text" id="edit-username"><br>
+            <label for="edit-user-role"></label><select name="type" class="form-control focus:outline-none
+                   focus:ring-2 focus:ring-blue-500" id="edit-user-role">
+            <option value="Subscriber">订阅者</option>
+            <option value="Editor">编者</option>
+        </select>
+            <button onclick="saveEdit()">保存</button>
+            <button onclick="closeEditModal()">取消</button>
+        </div>
+    </div>
+
+    <script>
+        function deleteUser(UserId) {
+            if (confirm("您确定要移除这个用户吗？")) {
+                fetch(`/dashboard/users?uid=${UserId}`, {
+                    method: 'DELETE',
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('网络响应不正常');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        alert(data.message);
+                        location.reload();
+                    })
+                    .catch(error => {
+                        alert("删除失败: " + error.message);
+                    });
+            }
+        }
+
+        function editUser(UserId, UserName) {
+            document.getElementById('edit-user-id').value = UserId;
+            document.getElementById('edit-username').value = UserName;
+            document.getElementById('editModal').style.display = 'flex';
+        }
+
+
+        function saveEdit() {
+            const UserId = document.getElementById('edit-user-id').value;
+            const updatedUName = document.getElementById('edit-username').value;
+            const updatedURole = document.getElementById('edit-user-role').value;
+
+            fetch(`/dashboard/users`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({UId: UserId, UName: updatedUName, URole: updatedURole}),
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('网络响应不正常');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    alert(data.message);
+                    location.reload();
+                })
+                .catch(error => {
+                    alert("编辑失败: " + error.message);
+                });
+        }
+    </script>
+    <script>
+        function showBigPic(event, filepath) {
+            console.log(filepath);
+            //将文件路径传给img大图
+            document.getElementById('pre_view').src = filepath;
+
+            //获取大图div
+            var div = document.getElementById("bigPic");
+            if (!div) {
+                return;
+            }
+
+            //设置大图左上角起点位置
+            div.style.left = event.clientX + 10 + "px";
+            div.style.top = event.clientY + 10 + "px"; // 使用 top 而不是 bottom
+            div.style.display = "block"; // 展示大图
+        }
+
+        //隐藏
+        function closeimg() {
+            document.getElementById("bigPic").style.display = "none";
+        }
+    </script>
+{% endblock %}
