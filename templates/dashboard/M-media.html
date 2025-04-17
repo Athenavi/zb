@@ -8,8 +8,8 @@
             <tr>
                 <th class="py-2 px-4 border">媒体ID</th>
                 <th class="py-2 px-4 border">用户ID</th>
-                <th class="py-2 px-4 border">文件路径</th>
-                <th class="py-2 px-4 border">文件类型</th>
+                <th class="py-2 px-4 border">文件名</th>
+                <th class="py-2 px-4 border">创建时间</th>
                 <th class="py-2 px-4 border">操作</th>
             </tr>
             </thead>
@@ -18,11 +18,11 @@
                 <tr class="border-b hover:bg-gray-100">
                     <td class="py-2 px-4">{{ media['id'] }}</td>
                     <td class="py-2 px-4">{{ media['user_id'] }}</td>
-                    <td class="py-2 px-4">{{ media['file_path'] }}</td>
-                    <td class="py-2 px-4">{{ media['file_type'] }}</td>
+                    <td class="py-2 px-4">{{ media['original_filename'] }}</td>
+                    <td class="py-2 px-4">{{ media['created_at'] }}</td>
                     <td class="py-2 px-4">
                         <a href="#" class="preview text-blue-500 hover:underline"
-                           data-hidden="{{ domain }}{{ media['file_path'] }}?preview=1">预览</a> |
+                           data-hidden="/thumbnail?data={{ media['hash'] }}">预览</a> |
                         <a href="#" class="text-red-500 hover:underline"
                            onclick="deleteFile({{ media['id'] }})">删除</a>
                     </td>
