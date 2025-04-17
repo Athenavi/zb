@@ -2,6 +2,7 @@ import random
 import re
 import string
 
+
 def run_security_checks(url):
     pattern = r"^(https?://)?([a-zA-Z0-9-]+\.)*[a-zA-Z]{2,}(\/)$"
     if re.match(pattern, url):
@@ -25,5 +26,26 @@ def filter_sensitive_words(comment_content):
 
     return True
 
+
 def random_string(param):
     return ''.join(random.sample(string.ascii_letters + string.digits, param))
+
+
+def is_valid_hash(length, f_hash):
+    """
+    验证哈希值是否为指定长度的十六进制字符串
+    :param length: 哈希值的预期长度
+    :param f_hash: 哈希值字符串
+    :return: 如果哈希值有效则返回 True，否则返回 False
+    """
+    if f_hash is None or not isinstance(f_hash, str) or len(f_hash) != length or not all(
+            c in '0123456789abcdef' for c in f_hash.lower()):
+        return False
+    return True
+
+
+def generate_random_text():
+    # 生成随机的验证码文本
+    characters = list('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789')
+    captcha_text = ''.join(random.choices(characters, k=4))
+    return captcha_text

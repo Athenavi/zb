@@ -1,6 +1,4 @@
 import os
-import random
-
 
 def get_list_intersection(list1, list2):
     intersection = list(set(list1) & set(list2))
@@ -34,25 +32,5 @@ def get_media_list(username, category, page=1, per_page=10):
     return files, has_next_page, has_previous_page
 
 
-def get_all_img(username, page=1, per_page=10):
-    imgs, has_next_page, has_previous_page = get_media_list(username, category='img', page=page, per_page=per_page)
-    return imgs, has_next_page, has_previous_page
-
-
-def get_all_video(username, page=1, per_page=10):
-    videos, has_next_page, has_previous_page = get_media_list(username, category='video', page=page, per_page=per_page)
-    return videos, has_next_page, has_previous_page
-
-
-def get_all_xmind(username, page=1, per_page=10):
-    videos, has_next_page, has_previous_page = get_media_list(username, category='xmind', page=page, per_page=per_page)
-    return videos, has_next_page, has_previous_page
-
-
-def generate_random_text():
-    # 生成随机的验证码文本
-    characters = list('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789')
-    captcha_text = ''.join(random.choices(characters, k=4))
-    return captcha_text
 
 

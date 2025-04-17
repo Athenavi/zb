@@ -1,6 +1,6 @@
-import concurrent
 import os
 from pathlib import Path
+from threading import Thread
 
 from flask import Blueprint, request, render_template, url_for, abort, jsonify, send_file
 
@@ -8,6 +8,7 @@ from src.database import get_db_connection
 from src.media.permissions import get_media_db
 from src.media.processing import generate_video_thumbnail, generate_thumbnail
 from src.user.authz.decorators import jwt_required
+from src.utils.security.safe import is_valid_hash
 
 media_bp = Blueprint('media', __name__, template_folder='templates')
 
@@ -21,6 +22,8 @@ def create_media_blueprint(cache_instance, domain, base_dir):
     def media_thumbnail():
         f_hash = request.args.get('data')
         f_type = request.args.get('type')
+        if not is_valid_hash(64, f_hash):
+            return "Invalid file hash", 400
         thumb_path = Path(base_dir) / f"thumbnails/{f_hash}.jpg"
         thumb_dir = Path(base_dir) / "thumbnails"
         if not thumb_dir.exists():
@@ -55,7 +58,9 @@ def create_media_blueprint(cache_instance, domain, base_dir):
         if f_hash is None:
             f_hash = request.args.get('data')
         if f_hash is None:
-            return "File hash not provided", 400  # 如果没有提供hash，则返回错误信息
+            return "File hash not provided", 400
+        if not is_valid_hash(64, f_hash):
+            return "Invalid file hash", 400
         try:
             db = get_db_connection()
             cursor = db.cursor()
@@ -99,19 +104,17 @@ def create_media_blueprint(cache_instance, domain, base_dir):
 
             with get_db_connection() as conn:
                 with conn.cursor() as cursor:
-                    # 开启事务
                     conn.autocommit = False
-                    pending_file_deletions = []
 
                     try:
-                        # 1. 先查询要删除的文件信息
+                        # 1. 查询要删除的文件信息（加锁）
                         placeholders = ', '.join(['%s'] * len(id_list))
                         cursor.execute(f"""
                             SELECT m.id, m.hash, fh.storage_path 
                             FROM media m
                             JOIN file_hashes fh ON m.hash = fh.hash
                             WHERE m.id IN ({placeholders}) AND m.user_id = %s
-                            FOR UPDATE  # 加锁防止并发修改
+                            FOR UPDATE
                         """, id_list + [user_id])
 
                         target_files = cursor.fetchall()
@@ -126,7 +129,7 @@ def create_media_blueprint(cache_instance, domain, base_dir):
                         """, id_list + [user_id])
                         deleted_count = cursor.rowcount
 
-                        # 3. 处理文件引用计数
+                        # 3. 减少引用计数（不等待检查结果）
                         file_hashes_to_check = set()
                         for file in target_files:
                             file_id, file_hash, storage_path = file
@@ -137,40 +140,18 @@ def create_media_blueprint(cache_instance, domain, base_dir):
                             """, (file_hash,))
                             file_hashes_to_check.add((file_hash, storage_path))
 
-                        # 4. 检查需要物理删除的文件
-                        for file_hash, storage_path in file_hashes_to_check:
-                            cursor.execute("""
-                                SELECT reference_count 
-                                FROM file_hashes 
-                                WHERE hash = %s
-                            """, (file_hash,))
-                            result = cursor.fetchone()
-
-                            if result and result[0] == 0:
-                                cursor.execute("""
-                                    DELETE FROM file_hashes 
-                                    WHERE hash = %s
-                                """, (file_hash,))
-                                pending_file_deletions.append(storage_path)
-
-                        # 5. 提交事务
+                        # 提交主事务
                         conn.commit()
 
-                        # 6. 物理删除文件（事务成功后）
-                        actually_deleted_files = []
-                        for file_path in pending_file_deletions:
-                            try:
-                                if os.path.exists(file_path):
-                                    os.remove(file_path)
-                                    actually_deleted_files.append(file_path)
-                            except Exception as e:
-                                print(f"文件删除失败: {file_path} - {str(e)}")
+                        # 启动后台清理线程
+                        if file_hashes_to_check:
+                            Thread(target=async_file_cleanup, args=(file_hashes_to_check,)).start()
 
                         return jsonify({
-                            "message": "操作成功",
+                            "message": "删除请求已接受",
                             "deleted_records": deleted_count,
-                            "deleted_files": actually_deleted_files
-                        }), 200
+                            "note": "文件清理将在后台执行"
+                        }), 202  # 202 Accepted
 
                     except Exception as e:
                         conn.rollback()
@@ -180,5 +161,41 @@ def create_media_blueprint(cache_instance, domain, base_dir):
         except Exception as e:
             print(f"请求处理异常: {str(e)}")
             return jsonify({"message": "服务器错误", "error": str(e)}), 500
+
+    def async_file_cleanup(file_hashes_to_check):
+        """后台线程执行的清理任务"""
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cursor:
+                    pending_file_deletions = []
+
+                    # 检查需要物理删除的文件
+                    for file_hash, storage_path in file_hashes_to_check:
+                        cursor.execute("""
+                            SELECT reference_count 
+                            FROM file_hashes 
+                            WHERE hash = %s
+                        """, (file_hash,))
+                        result = cursor.fetchone()
+
+                        if result and result[0] == 0:
+                            cursor.execute("""
+                                DELETE FROM file_hashes 
+                                WHERE hash = %s
+                            """, (file_hash,))
+                            pending_file_deletions.append(storage_path)
+
+                    conn.commit()
+
+                    # 物理删除文件
+                    for file_path in pending_file_deletions:
+                        try:
+                            if os.path.exists(file_path):
+                                os.remove(file_path)
+                        except Exception as e:
+                            print(f"后台文件删除失败: {file_path} - {str(e)}")
+
+        except Exception as e:
+            print(f"后台清理任务失败: {str(e)}")
 
     return media_bp
