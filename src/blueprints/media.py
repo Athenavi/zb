@@ -47,7 +47,7 @@ def create_media_blueprint(cache_instance, domain, base_dir):
                     else:
                         generate_thumbnail(file_path, thumb_path)
             finally:
-                return send_file(thumb_path, as_attachment=False, mimetype='image/jpeg', max_age=360)
+                return send_file(thumb_path, as_attachment=False, mimetype='image/jpeg', max_age=2592000)
         return send_file(thumb_path)
 
     @media_bp.route('/shared')
@@ -69,7 +69,7 @@ def create_media_blueprint(cache_instance, domain, base_dir):
                 print("No result found for the given f_hash")
                 return "File not found", 404
             file_path = Path(base_dir) / result[3]
-            return send_file(file_path, as_attachment=False, mimetype=result[2], max_age=360)
+            return send_file(file_path, as_attachment=False, mimetype=result[2], max_age=2592000)
         except FileNotFoundError:
             abort(404)
 
@@ -99,51 +99,86 @@ def create_media_blueprint(cache_instance, domain, base_dir):
 
             with get_db_connection() as conn:
                 with conn.cursor() as cursor:
-                    # 1. 获取待删除文件的哈希和存储路径
-                    placeholders = ', '.join(['%s'] * len(id_list))
-                    cursor.execute(f"""
-                        SELECT m.id, m.hash, fh.storage_path 
-                        FROM media m
-                        JOIN file_hashes fh ON m.hash = fh.hash
-                        WHERE m.id IN ({placeholders}) AND m.user_id = %s
-                    """, id_list + [user_id])
+                    # 开启事务
+                    conn.autocommit = False
+                    pending_file_deletions = []
 
-                    target_files = cursor.fetchall()
-                    if len(target_files) != len(id_list):
-                        return jsonify({"message": "部分文件不存在或无权操作"}), 400
+                    try:
+                        # 1. 先查询要删除的文件信息
+                        placeholders = ', '.join(['%s'] * len(id_list))
+                        cursor.execute(f"""
+                            SELECT m.id, m.hash, fh.storage_path 
+                            FROM media m
+                            JOIN file_hashes fh ON m.hash = fh.hash
+                            WHERE m.id IN ({placeholders}) AND m.user_id = %s
+                            FOR UPDATE  # 加锁防止并发修改
+                        """, id_list + [user_id])
 
-                    # 2. 删除媒体记录
-                    cursor.execute(f"""
-                        DELETE FROM media 
-                        WHERE id IN ({placeholders}) AND user_id = %s
-                    """, id_list + [user_id])
-                    deleted_count = cursor.rowcount
+                        target_files = cursor.fetchall()
+                        if len(target_files) != len(id_list):
+                            conn.rollback()
+                            return jsonify({"message": "部分文件不存在或无权操作"}), 400
 
-                    # 3. 提交事务使触发器生效
-                    conn.commit()
+                        # 2. 执行删除操作
+                        cursor.execute(f"""
+                            DELETE FROM media 
+                            WHERE id IN ({placeholders}) AND user_id = %s
+                        """, id_list + [user_id])
+                        deleted_count = cursor.rowcount
 
-                    # 4. 检查哪些文件需要物理删除
-                    deleted_files = []
-                    for file in target_files:
-                        cursor.execute("""
-                            SELECT 1 FROM file_hashes 
-                            WHERE hash = %s LIMIT 1
-                        """, (file[1],))
-                        if not cursor.fetchone():
+                        # 3. 处理文件引用计数
+                        file_hashes_to_check = set()
+                        for file in target_files:
+                            file_id, file_hash, storage_path = file
+                            cursor.execute("""
+                                UPDATE file_hashes 
+                                SET reference_count = GREATEST(0, reference_count - 1)
+                                WHERE hash = %s
+                            """, (file_hash,))
+                            file_hashes_to_check.add((file_hash, storage_path))
+
+                        # 4. 检查需要物理删除的文件
+                        for file_hash, storage_path in file_hashes_to_check:
+                            cursor.execute("""
+                                SELECT reference_count 
+                                FROM file_hashes 
+                                WHERE hash = %s
+                            """, (file_hash,))
+                            result = cursor.fetchone()
+
+                            if result and result[0] == 0:
+                                cursor.execute("""
+                                    DELETE FROM file_hashes 
+                                    WHERE hash = %s
+                                """, (file_hash,))
+                                pending_file_deletions.append(storage_path)
+
+                        # 5. 提交事务
+                        conn.commit()
+
+                        # 6. 物理删除文件（事务成功后）
+                        actually_deleted_files = []
+                        for file_path in pending_file_deletions:
                             try:
-                                if os.path.exists(file[2]):
-                                    os.remove(file[2])
-                                    deleted_files.append(file[2])
+                                if os.path.exists(file_path):
+                                    os.remove(file_path)
+                                    actually_deleted_files.append(file_path)
                             except Exception as e:
-                                print(f"文件删除失败: {file[2]} - {str(e)}")
+                                print(f"文件删除失败: {file_path} - {str(e)}")
 
-                    return jsonify({
-                        "message": "操作成功",
-                        "deleted_records": deleted_count,
-                        "deleted_files": deleted_files
-                    }), 200
+                        return jsonify({
+                            "message": "操作成功",
+                            "deleted_records": deleted_count,
+                            "deleted_files": actually_deleted_files
+                        }), 200
+
+                    except Exception as e:
+                        conn.rollback()
+                        print(f"数据库操作失败: {str(e)}")
+                        return jsonify({"message": "服务器错误", "error": str(e)}), 500
+
         except Exception as e:
-            print(f"删除异常: {str(e)}")
+            print(f"请求处理异常: {str(e)}")
             return jsonify({"message": "服务器错误", "error": str(e)}), 500
 
     return media_bp

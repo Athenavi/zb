@@ -71,6 +71,13 @@ def handle_user_upload(user_id, allowed_size, allowed_mimes, check_existing=Fals
                     # 复用已有文件
                     storage_path = existing_file[1]
                     print(f'Reuse existing file: {storage_path}')
+                    # 增加引用计数
+                    cursor.execute(
+                        """UPDATE file_hashes 
+                           SET reference_count = reference_count + 1
+                           WHERE hash = %s AND mime_type = %s""",
+                        (file_hash, mime_type)
+                    )
                 else:
                     # 生成存储路径（哈希分片目录）
                     hash_prefix = file_hash[:2]
@@ -86,8 +93,8 @@ def handle_user_upload(user_id, allowed_size, allowed_mimes, check_existing=Fals
                     # 插入文件哈希记录
                     cursor.execute(
                         """INSERT INTO file_hashes 
-                           (hash, filename, file_size, mime_type, storage_path)
-                           VALUES (%s, %s, %s, %s, %s)
+                           (hash, filename, file_size, mime_type, storage_path, reference_count)
+                           VALUES (%s, %s, %s, %s, %s, 1)
                            ON DUPLICATE KEY UPDATE reference_count = reference_count + 1""",
                         (file_hash, filename, len(file_data), mime_type, storage_path)
                     )
