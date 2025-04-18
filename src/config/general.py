@@ -30,8 +30,11 @@ def zy_safe_conf():
 
 def cloudflare_turnstile_conf():
     load_dotenv()
-    site_key = os.getenv('SITE_KEY')
+    site_key = os.getenv('TURNSTILE_SITE_KEY')
     turnstile_secret_key = os.getenv('TURNSTILE_SECRET_KEY')
+    if os.getenv('TURNSTILE_OPEN').lower() == 'false':
+        site_key = None
+        turnstile_secret_key = None
     return site_key, turnstile_secret_key
 
 

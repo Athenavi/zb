@@ -83,12 +83,13 @@
                     </div>
                 </div>
                 <!-- Turnstile 验证容器 -->
-                <div class="cf-turnstile"
-                     data-sitekey="{{ site_key }}"
-                     data-callback="onTurnstileSuccess"
-                     data-error-callback="onTurnstileError"
-                     data-expired-callback="onTurnstileExpire"></div>
-
+                {% if site_key %}
+                    <div class="cf-turnstile"
+                         data-sitekey="{{ site_key }}"
+                         data-callback="onTurnstileSuccess"
+                         data-error-callback="onTurnstileError"
+                         data-expired-callback="onTurnstileExpire"></div>
+                {% endif %}
                 <div class="relative h-16">
                     <!-- 等待状态 -->
                     <button type="button" id="wait-btn"
@@ -375,6 +376,10 @@
 
     // 检查登录状态
     document.getElementById('checkStatus').addEventListener('click', async function () {
+        const checkbox = document.querySelector('input[type="checkbox"]');
+        if (!checkbox.checked) {
+            return alert('您还未同意本站的法律声明以及隐私协议');
+        }
         // 确保 token 已经被成功设置
         if (!token) {
             alert("请先扫码")
@@ -443,6 +448,9 @@
     // 初始化
     window.onload = () => {
         document.getElementById('login-btn').classList.add('invisible');
+        {% if not site_key %}
+            onTurnstileSuccess();
+        {% endif %}
     };
 
     function onTurnstileExpire() {

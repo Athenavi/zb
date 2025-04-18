@@ -29,7 +29,7 @@ def main():
         print("从浏览器打开: http://127.0.0.1:9421")
         from waitress import serve
         # 运行 Waitress
-        serve(app, host='0.0.0.0', port=9421)
+        serve(app, host='0.0.0.0', port=9421, threads=8, channel_timeout=60)
 
 
 if __name__ == '__main__':
