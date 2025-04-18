@@ -14,39 +14,39 @@ from src.database import get_db_connection
 def user_login(callback_route, site_key):
     input_value = bleach.clean(request.form['username'])  # 用户输入的用户名或邮箱
     password = bleach.clean(request.form['password'])
-    with get_db_connection() as db:
-        cursor = db.cursor()
-        try:
-            query = "SELECT * FROM users WHERE (username = %s OR email = %s) AND username <> 'guest@7trees.cn'"
-            cursor.execute(query, (input_value, input_value))
-            result = cursor.fetchone()
+    db = get_db_connection()
+    cursor = db.cursor()
+    try:
+        query = "SELECT * FROM users WHERE (username = %s OR email = %s) AND username <> 'guest@7trees.cn'"
+        cursor.execute(query, (input_value, input_value))
+        result = cursor.fetchone()
 
-            if result is not None and bcrypt.checkpw(password.encode('utf-8'), result[2].encode('utf-8')):
-                # 登录成功，生成 JWT 和刷新令牌
-                user_id = result[0]  # 假设 result[0] 是用户ID
-                user_name = result[1]
-                token = generate_jwt(user_id, user_name)  # 生成 JWT
-                refresh_token = generate_refresh_token(user_id, user_name)  # 生成刷新令牌
+        if result is not None and bcrypt.checkpw(password.encode('utf-8'), result[2].encode('utf-8')):
+            # 登录成功，生成 JWT 和刷新令牌
+            user_id = result[0]  # 假设 result[0] 是用户ID
+            user_name = result[1]
+            token = generate_jwt(user_id, user_name)  # 生成 JWT
+            refresh_token = generate_refresh_token(user_id, user_name)  # 生成刷新令牌
 
-                response = make_response(redirect(url_for(callback_route)))
+            response = make_response(redirect(url_for(callback_route)))
 
-                # 设置 Cookie 的过期时间为 7 天
-                expires = datetime.now() + timedelta(seconds=21600)
-                refresh_expires = datetime.now() + timedelta(days=7)
+            # 设置 Cookie 的过期时间为 7 天
+            expires = datetime.now() + timedelta(seconds=21600)
+            refresh_expires = datetime.now() + timedelta(days=7)
 
-                response.set_cookie('jwt', token, httponly=True, expires=expires)
-                response.set_cookie('refresh_token', refresh_token, httponly=True, expires=refresh_expires)
-                return response
-            else:
-                return render_template('LoginRegister.html', error="Invalid username or password", site_key=site_key)
+            response.set_cookie('jwt', token, httponly=True, expires=expires)
+            response.set_cookie('refresh_token', refresh_token, httponly=True, expires=refresh_expires)
+            return response
+        else:
+            return render_template('LoginRegister.html', error="Invalid username or password", site_key=site_key)
 
-        except Exception as e:
-            logging.error(f"Error logging in: {e}")
-            return "登录失败"
+    except Exception as e:
+        logging.error(f"Error logging in: {e}")
+        return "登录失败"
 
-        finally:
-            cursor.close()
-            db.close()
+    finally:
+        cursor.close()
+        db.close()
 
 
 def create_user(ip, site_key):
