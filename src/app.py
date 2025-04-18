@@ -1170,23 +1170,11 @@ def api_update_article_tags(user_id, aid):
     # 更新缓存中的标签哈希值
     cache.set(f"{aid}:tag_hash", current_tag_hash, timeout=28800)
     # 写入更新后的标签到数据库
+    auth = authorize_by_aid(aid, user_id)
+    if auth is False:
+        return jsonify({'show_edit': 'failed'}), 403
     update_article_tags(aid, tags_list)
     return jsonify({'show_edit': "success"})
-
-
-@app.route('/api/edit/hidden/<int:aid>', methods=['PUT'])
-@jwt_required
-def api_edit_hidden(user_id, aid):
-    hidden_status = request.get_json().get('hiddenStatus')
-    try:
-        with get_db_connection() as db:
-            with db.cursor() as cursor:
-                cursor.execute("UPDATE `articles` SET `Hidden`=%s WHERE `article_id`=%s", (hidden_status, aid))
-                db.commit()
-            return jsonify({'show_edit': "success"}), 201
-    except Exception as e:
-        app.logger.error(f"Error updating hidden status: {e} by user {user_id} ")
-        return jsonify({'show_edit': 'error', 'message': '更新隐藏状态失败'}), 500
 
 
 @app.route('/api/cover/<cover_img>', methods=['GET'])

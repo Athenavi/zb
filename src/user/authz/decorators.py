@@ -33,7 +33,7 @@ def jwt_required(f):
 
 domain, title, beian, version, api_host, app_id, app_key, default_key = get_general_config()
 # 定义白名单
-allowed_origins = [domain.split(',')]
+allowed_origins = [domain]
 
 
 def origin_required(f):

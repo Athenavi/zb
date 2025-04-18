@@ -1,37 +1,38 @@
 import os
-from configparser import ConfigParser
 
-from flask import render_template
+from dotenv import load_dotenv
 
-config = ConfigParser()
-try:
-    config.read('config.ini', encoding='utf-8')
-except UnicodeDecodeError:
-    config.read('config.ini', encoding='gbk')
+from src.other.random import generate_random_text
 
 
 def get_general_config():
-    sys_config = ConfigParser()
-    sys_config.read('config.ini', encoding='utf-8')
-    domain = config.get('general', 'domain', fallback='error').strip("'")
-    title = config.get('general', 'title', fallback='error').strip("'")
-    beian = config.get('general', 'beian', fallback='error').strip("'")
-    version = config.get('general', 'version', fallback='error').strip("'")
-    api_host = config.get('general', 'api_host', fallback='error').strip("'")
-    app_id = config.get('general', 'app_id', fallback='error').strip("'")
-    app_key = config.get('general', 'app_key', fallback='error').strip("'")
-    default_key = config.get('security', 'default_key').strip("'")
+    load_dotenv()
+
+    domain = os.getenv('DOMAIN')
+    title = os.getenv('TITLE') or 'zyblog'
+    beian = os.getenv('BEIAN') or '京ICP备12345678号'
+    version = os.getenv('VERSION') or '2.0'
+    api_host = os.getenv('API_HOST')
+    app_id = os.getenv('APP_ID')
+    app_key = os.getenv('APP_KEY')
+    default_key = os.getenv('DEFAULT_KEY') or '237127'
 
     return domain, title, beian, version, api_host, app_id, app_key, default_key
 
 
 def zy_safe_conf():
-    sys_config = ConfigParser()
-    sys_config.read('config.ini', encoding='utf-8')
-    secret_key = config.get('security', 'secret_key').strip("'")
-    jwt_expiration_delta = config.get('security', 'JWT_EXPIRATION_DELTA').strip("'")
-    refresh_token_expiration_delta = config.get('security', 'REFRESH_TOKEN_EXPIRATION_DELTA').strip("'")
+    load_dotenv()
+    secret_key = os.getenv('SECRET_KEY') or generate_random_text(16)
+    jwt_expiration_delta = os.getenv('JWT_EXPIRATION_DELTA') or 64800
+    refresh_token_expiration_delta = os.getenv('REFRESH_TOKEN_EXPIRATION_DELTA') or 64800
     return secret_key, int(jwt_expiration_delta), int(refresh_token_expiration_delta)
+
+
+def cloudflare_turnstile_conf():
+    load_dotenv()
+    site_key = os.getenv('SITE_KEY')
+    turnstile_secret_key = os.getenv('TURNSTILE_SECRET_KEY')
+    return site_key, turnstile_secret_key
 
 
 def show_files(path):

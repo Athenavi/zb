@@ -2,7 +2,7 @@ import os
 
 
 def main():
-    if not os.path.isfile("config.ini"):
+    if not os.path.isfile(".env"):
         print('配置文件不存在！详情请阅读 README.md')
         return
     if not os.path.exists('./temp/app.log'):

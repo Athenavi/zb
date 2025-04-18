@@ -1,7 +1,6 @@
-from flask import Blueprint, request, render_template, redirect, url_for
+from flask import Blueprint, request, render_template
 from flask import jsonify
 
-from src.config.general import get_general_config
 from src.config.theme import get_all_themes
 from src.database import get_db_connection
 from src.error import error

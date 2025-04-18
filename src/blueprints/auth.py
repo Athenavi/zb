@@ -1,8 +1,10 @@
 from flask import Blueprint, request, redirect, url_for, render_template, make_response
 
+from src.config.general import cloudflare_turnstile_conf
 from src.user.authz.core import authenticate_jwt
 from src.user.authz.login import user_login, create_user
 from src.utils.security.ip_utils import get_client_ip
+from src.utils.security.safe import verify_api_request
 
 auth_bp = Blueprint('auth', __name__, template_folder='templates')
 
@@ -15,9 +17,15 @@ def login():
         user_id = authenticate_jwt(request.cookies.get('jwt'))
         if user_id:
             return redirect(url_for(callback_route))
+    site_key, turnstile_secret_key = cloudflare_turnstile_conf()
     if request.method == 'POST':
-        return user_login(callback_route)
-    return render_template('LoginRegister.html', title="登录")
+        captcha_result = verify_api_request(request)
+        if captcha_result == 'success':
+            return user_login(callback_route, site_key)
+        else:
+            return render_template('LoginRegister.html', title="登录", msg="验证失败，请重试", error=captcha_result,
+                                   site_key=site_key)
+    return render_template('LoginRegister.html', title="登录", site_key=site_key)
 
 
 # 登出路由
@@ -38,4 +46,5 @@ def register():
         if user_id:
             return redirect(url_for(callback_route))
     ip = get_client_ip(request)
-    return create_user(ip)
+    site_key, turnstile_secret_key = cloudflare_turnstile_conf()
+    return create_user(ip, site_key)

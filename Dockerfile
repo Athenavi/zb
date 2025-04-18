@@ -26,11 +26,11 @@ EXPOSE 9421,9422
 
 # 定义环境变量，用于数据库配置
 
-ENV db_host='host.docker.internal'
-ENV db_port='3306'
-ENV db_name='zb'
-ENV db_user='root'
-ENV db_password='123456'
+ENV DB_HOST='host.docker.internal'
+ENV DB_PORT='3306'
+ENV DB_NAME='zb'
+ENV DB_USER='root'
+ENV DB_PASSWORD='123456'
 
 # 创建日志文件并设置权限
 RUN mkdir -p /app/temp

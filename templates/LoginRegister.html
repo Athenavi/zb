@@ -6,6 +6,11 @@
     <title>{{ title }} - 账户</title>
     <link rel="stylesheet" href="/static/css/tailwind.min.css">
     <link href="/static/css/idcard.css" rel="stylesheet">
+    <!-- 显式渲染 Turnstile -->
+    <script
+            src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback"
+            defer
+    ></script>
     <style>
         @keyframes slideUp {
             0% {
@@ -77,11 +82,30 @@
                         </div>
                     </div>
                 </div>
+                <!-- Turnstile 验证容器 -->
+                <div class="cf-turnstile"
+                     data-sitekey="{{ site_key }}"
+                     data-callback="onTurnstileSuccess"
+                     data-error-callback="onTurnstileError"
+                     data-expired-callback="onTurnstileExpire"></div>
 
-                <button type="submit"
-                        class="w-full py-3.5 px-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-medium rounded-lg hover:from-blue-700 hover:to-blue-600 transition-all shadow-sm shadow-blue-100">
-                    立即登录
-                </button>
+                <div class="relative h-16">
+                    <!-- 等待状态 -->
+                    <button type="button" id="wait-btn"
+                            class="w-full h-full text-gray-600 font-semibold rounded-xl
+                   bg-gray-200/80 cursor-not-allowed
+                   flex items-center justify-center gap-3
+                   border-2 border-dashed border-gray-400
+                   animate-pulse">
+                        <div class="w-6 h-6 border-[3px] border-gray-500 border-t-transparent rounded-full animate-spin"></div>
+                        等待人机验证...
+                    </button>
+                    <button type="submit" id="login-btn"
+                            class="absolute inset-0 w-full h-full text-white font-bold rounded-xl
+                   bg-gradient-to-br from-blue-500">
+                        <span class="drop-shadow">安全登录</span>
+                    </button>
+                </div>
 
                 <div class="mt-6 text-center text-sm text-slate-500">
                     没有账户？
@@ -400,3 +424,28 @@
 </script>
 </body>
 </html>
+<script>
+    // 验证成功回调
+    function onTurnstileSuccess(token) {
+        const container = document.querySelector('.relative');
+        document.getElementById('wait-btn').classList.add('hidden');
+        document.getElementById('login-btn').classList.remove('invisible');
+        container.classList.add('verified');
+    }
+
+    // 验证失败回调
+    function onTurnstileError() {
+        const container = document.querySelector('.relative');
+        document.getElementById('wait-btn').classList.remove('hidden');
+        container.classList.remove('verified');
+    }
+
+    // 初始化
+    window.onload = () => {
+        document.getElementById('login-btn').classList.add('invisible');
+    };
+
+    function onTurnstileExpire() {
+        onTurnstileError();
+    }
+</script>

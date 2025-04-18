@@ -51,8 +51,8 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 # 配置数据库
-cp config_example.ini config.ini
-# 编辑config.ini中的数据库配置
+cp ./.env_example ./.env
+# 编辑.env文件，配置数据库等信息
 
 # 启动服务
 python wsgi.py
@@ -73,7 +73,6 @@ $ gunicorn --workers 4 --threads 2 --bind 0.0.0.0:9421 --timeout 60 --access-log
 
 1. 在浏览器中访问 `http://localhost:9421`，即可进入 zyBLOG。
 2. 管理后台 (/dashboard) 默认账号 'test'，默认密码 '123456'。
-
 
 ## 仍然无法运行？
 

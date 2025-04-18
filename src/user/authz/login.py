@@ -6,54 +6,50 @@ import bcrypt
 import bleach
 from flask import request, redirect, url_for, render_template, make_response
 
+from src.error import error
 from src.user.authz.core import generate_jwt, generate_refresh_token
 from src.database import get_db_connection
 
 
-def user_login(callback_route):
+def user_login(callback_route, site_key):
     input_value = bleach.clean(request.form['username'])  # 用户输入的用户名或邮箱
     password = bleach.clean(request.form['password'])
+    with get_db_connection() as db:
+        cursor = db.cursor()
+        try:
+            query = "SELECT * FROM users WHERE (username = %s OR email = %s) AND username <> 'guest@7trees.cn'"
+            cursor.execute(query, (input_value, input_value))
+            result = cursor.fetchone()
 
-    if input_value == 'guest@7trees.cn':
-        return render_template('LoginRegister.html', error="宾客账户仅能使用用户名登录")
+            if result is not None and bcrypt.checkpw(password.encode('utf-8'), result[2].encode('utf-8')):
+                # 登录成功，生成 JWT 和刷新令牌
+                user_id = result[0]  # 假设 result[0] 是用户ID
+                user_name = result[1]
+                token = generate_jwt(user_id, user_name)  # 生成 JWT
+                refresh_token = generate_refresh_token(user_id, user_name)  # 生成刷新令牌
 
-    db = get_db_connection()
-    cursor = db.cursor()
+                response = make_response(redirect(url_for(callback_route)))
 
-    try:
-        query = "SELECT * FROM users WHERE (username = %s OR email = %s) AND username <> 'guest@7trees.cn'"
-        cursor.execute(query, (input_value, input_value))
-        result = cursor.fetchone()
+                # 设置 Cookie 的过期时间为 7 天
+                expires = datetime.now() + timedelta(seconds=21600)
+                refresh_expires = datetime.now() + timedelta(days=7)
 
-        if result is not None and bcrypt.checkpw(password.encode('utf-8'), result[2].encode('utf-8')):
-            # 登录成功，生成 JWT 和刷新令牌
-            user_id = result[0]  # 假设 result[0] 是用户ID
-            user_name = result[1]
-            token = generate_jwt(user_id, user_name)  # 生成 JWT
-            refresh_token = generate_refresh_token(user_id, user_name)  # 生成刷新令牌
+                response.set_cookie('jwt', token, httponly=True, expires=expires)
+                response.set_cookie('refresh_token', refresh_token, httponly=True, expires=refresh_expires)
+                return response
+            else:
+                return render_template('LoginRegister.html', error="Invalid username or password", site_key=site_key)
 
-            response = make_response(redirect(url_for(callback_route)))
+        except Exception as e:
+            logging.error(f"Error logging in: {e}")
+            return "登录失败"
 
-            # 设置 Cookie 的过期时间为 7 天
-            expires = datetime.now() + timedelta(seconds=21600)
-            refresh_expires = datetime.now() + timedelta(days=7)
-
-            response.set_cookie('jwt', token, httponly=True, expires=expires)
-            response.set_cookie('refresh_token', refresh_token, httponly=True, expires=refresh_expires)
-            return response
-        else:
-            return render_template('LoginRegister.html', error="Invalid username or password")
-
-    except Exception as e:
-        logging.error(f"Error logging in: {e}")
-        return "登录失败"
-
-    finally:
-        cursor.close()
-        db.close()
+        finally:
+            cursor.close()
+            db.close()
 
 
-def create_user(ip):
+def create_user(ip, site_key):
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         invite_code = request.form.get('invite_code', '').strip()
@@ -69,7 +65,7 @@ def create_user(ip):
 
             if existing_user:
                 return render_template('LoginRegister.html', title="注册",
-                                       msg='该用户名已被注册，请选择其他用户名!', type="register")
+                                       msg='该用户名已被注册，请选择其他用户名!', type="register", site_key=site_key)
 
             # 执行用户注册的逻辑
             hashed_password = '$2b$12$kF4nZn6kESHtj0cjNeaoZugUlWXSgXp27iKAXHepyzSwUxrrhVTz2'
@@ -87,14 +83,13 @@ def create_user(ip):
             return render_template('inform.html', status_code='200', message=message)
 
         except Exception as e:
-            logging.error(f"Error registering user: {e}")
-            return render_template('LoginRegister.html', title="注册", msg='注册失败!', type="register")
+            return error(message=f"注册失败, {e}", status_code=500)
 
         finally:
             cursor.close()
             db.close()
 
-    return render_template('LoginRegister.html', title="注册", type="register")
+    return render_template('LoginRegister.html', title="注册", type="register", site_key=site_key)
 
 
 def tp_mail_login(user_email, ip):

@@ -1,7 +1,7 @@
-import configparser
 import os
 
 import mysql.connector
+from dotenv import load_dotenv
 from mysql.connector import pooling
 
 
@@ -10,27 +10,24 @@ def get_db_connection():
 
     # 如果连接池尚未初始化，则初始化之
     if db_pool is None:
+        # 加载 .env 文件
+        load_dotenv()
         print('initializing database pool...')
-        db_host = os.environ.get('db_host', '').strip("'")
-        db_port = int(os.environ.get('db_port', '3306').strip("'"))
-        db_name = os.environ.get('db_name', '').strip("'")
-        db_user = os.environ.get('db_user', '').strip("'")
-        db_password = os.environ.get('db_password', '').strip("'")
+        db_host = os.getenv('DATABASE_HOST')
+        db_port = os.getenv('DATABASE_PORT')
+        db_name = os.getenv('DATABASE_NAME')
+        db_user = os.getenv('DATABASE_USER')
+        db_password =os.getenv('DATABASE_PASSWORD')
 
         if not all([db_host, db_port, db_name, db_user, db_password]):
-            config = configparser.ConfigParser()
-            try:
-                config.read('config.ini', encoding='utf-8')
-            except UnicodeDecodeError:
-                config.read('config.ini', encoding='gbk')
+            db_host = os.environ.get('DB_HOST')
+            db_port = os.environ.get('DB_PORT')
+            db_name = os.environ.get('DB_NAME')
+            db_user = os.environ.get('DB_USER')
+            db_password = os.environ.get('DB_PASSWORD')
 
-            db_config = dict(config.items('database'))
-
-            db_host = db_config.get('host', '').strip("'")
-            db_port = int(db_config.get('port', '').strip("'"))
-            db_name = db_config.get('database', '').strip("'")
-            db_user = db_config.get('user', '').strip("'")
-            db_password = db_config.get('password', '').strip("'")
+        if not all([db_host, db_port, db_name, db_user, db_password]):
+            print('database connection failed.')
 
         db_pool = pooling.MySQLConnectionPool(
             pool_name="zb_pool",

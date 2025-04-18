@@ -2,6 +2,10 @@ import random
 import re
 import string
 
+import requests
+
+from src.config.general import cloudflare_turnstile_conf
+
 
 def run_security_checks(url):
     pattern = r"^(https?://)?([a-zA-Z0-9-]+\.)*[a-zA-Z]{2,}(\/)$"
@@ -44,8 +48,29 @@ def is_valid_hash(length, f_hash):
     return True
 
 
-def generate_random_text():
-    # 生成随机的验证码文本
-    characters = list('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789')
-    captcha_text = ''.join(random.choices(characters, k=4))
-    return captcha_text
+def verify_api_request(request):
+    token = request.form.get('cf-turnstile-response')
+    if not token:
+        return ['missing-input-response']
+
+    site_key, turnstile_secret_key = cloudflare_turnstile_conf()
+    client_ip = request.headers.get('CF-Connecting-IP') or request.remote_addr
+    verify_url = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+    data = {
+        'secret': turnstile_secret_key,
+        'response': token,
+        'remoteip': client_ip
+    }
+
+    try:
+        response = requests.post(verify_url, data=data, timeout=10)
+        result = response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"请求失败: {e}")
+        return ['internal-error']
+    if not result.get('success'):
+        error_codes = result.get('error-codes', ['unknown-error'])
+        print(f"验证失败，错误代码: {error_codes}")
+        return error_codes
+
+    return "success"
