@@ -27,12 +27,23 @@ def query_blog_author(title):
         db.close()
 
 
-
 def authorize_by_aid(article_id, user_id):
     try:
         with get_db_connection() as db:
             with db.cursor() as cursor:
                 query = "SELECT 1 FROM articles WHERE article_id = %s AND `Status` != 'Deleted' AND user_id = %s"
+                cursor.execute(query, (article_id, user_id))
+                return cursor.fetchone() is not None
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return False
+
+
+def authorize_by_aid_deleted(article_id, user_id):
+    try:
+        with get_db_connection() as db:
+            with db.cursor() as cursor:
+                query = "SELECT 1 FROM articles WHERE article_id = %s AND `Status` = 'Deleted' AND user_id = %s"
                 cursor.execute(query, (article_id, user_id))
                 return cursor.fetchone() is not None
     except Exception as e:

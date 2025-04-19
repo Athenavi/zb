@@ -26,7 +26,8 @@ from werkzeug.utils import secure_filename
 
 from src.blog.article.core.content import get_article_last_modified, get_file_summary, \
     delete_article, save_article_changes, edit_article_content
-from src.blog.article.core.crud import get_articles_by_owner, read_hidden_articles, delete_db_article, fetch_articles
+from src.blog.article.core.crud import get_articles_by_owner, read_hidden_articles, delete_db_article, fetch_articles, \
+    get_articles_recycle
 from src.blog.article.metadata.handlers import get_article_metadata, upsert_article_metadata
 from src.blog.article.security.password import update_article_password
 from src.blog.comment import get_comments, create_comment, delete_comment
@@ -53,7 +54,7 @@ from src.user.authz.decorators import jwt_required, admin_required, origin_requi
 from src.user.authz.login import tp_mail_login
 from src.user.authz.password import update_password, validate_password
 from src.user.entities import query_blog_author, authorize_by_aid, get_user_sub_info, check_user_conflict, \
-    db_save_avatar, db_save_bio, db_change_username, db_bind_email
+    db_save_avatar, db_save_bio, db_change_username, db_bind_email, authorize_by_aid_deleted
 from src.user.profile.social import get_following_count, get_can_followed, get_follower_count
 from src.utils.http.etag import generate_etag
 from src.utils.security.ip_utils import get_client_ip, anonymize_ip_address
@@ -1458,7 +1459,56 @@ def profile(user_id):
                            userBio=user_bio,
                            following=user_follow, follower=follower,
                            target_id=user_id, user_id=user_id,
-                           Articles=owner_articles)
+                           Articles=owner_articles, recycle_bin=False)
+
+
+@app.route('/profile/~recycle', methods=['GET', 'POST'])
+@jwt_required
+def recycle_bin(user_id):
+    avatar_url = get_avatar(user_id)
+    user_bio = get_user_bio(user_id) or "这人很懒，什么也没留下"
+    recycle_articles = get_articles_recycle(user_id=user_id) or []
+    user_follow = get_following_count(user_id=user_id) or 0
+    follower = get_follower_count(user_id=user_id) or 0
+    return render_template('Profile.html', url_for=url_for, avatar_url=avatar_url,
+                           userBio=user_bio,
+                           following=user_follow, follower=follower,
+                           target_id=user_id, user_id=user_id,
+                           Articles=recycle_articles, recycle_bin=True)
+
+
+@app.route('/delete/blog/<int:aid>', methods=['DELETE'])
+@jwt_required
+def delete_blog(user_id, aid):
+    auth = authorize_by_aid_deleted(aid, user_id)
+    if auth is False:
+        jsonify({"message": f"操作失败"}), 503
+    try:
+        with get_db_connection() as connection:
+            with connection.cursor(dictionary=True) as cursor:
+                query = "DELETE FROM `articles` WHERE `articles`.`article_id` = %s;"
+                cursor.execute(query, (aid,))
+                connection.commit()
+        return jsonify({"message": "操作成功"}), 200
+    except Exception as e:
+        return jsonify({"message": f"操作失败{e}"}), 500
+
+
+@app.route('/restore/blog/<int:aid>', methods=['POST'])
+@jwt_required
+def restore_blog(user_id, aid):
+    auth = authorize_by_aid_deleted(aid, user_id)
+    if auth is False:
+        return jsonify({"message": f"操作失败"}), 503
+    try:
+        with get_db_connection() as connection:
+            with connection.cursor(dictionary=True) as cursor:
+                query = "UPDATE `articles` SET `status` = 'Draft' WHERE `articles`.`article_id` = %s;"
+                cursor.execute(query, (aid,))
+                connection.commit()
+        return jsonify({"message": "操作成功"}), 200
+    except Exception as e:
+        return jsonify({"message": f"操作失败{e}"}), 500
 
 
 @app.route('/fans/follow')

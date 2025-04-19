@@ -49,13 +49,12 @@ def is_valid_hash(length, f_hash):
 
 
 def verify_api_request(request):
+    site_key, turnstile_secret_key = cloudflare_turnstile_conf()
+    if site_key is None:
+        return 'success'
     token = request.form.get('cf-turnstile-response')
     if not token:
         return ['missing-input-response']
-
-    site_key, turnstile_secret_key = cloudflare_turnstile_conf()
-    if (site_key and turnstile_secret_key) is None:
-        return 'success'
     client_ip = request.headers.get('CF-Connecting-IP') or request.remote_addr
     verify_url = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
     data = {

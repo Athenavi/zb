@@ -67,12 +67,17 @@
             <hr class="my-4">
             <div class="space-y-4" id="articles-container">
                 {% for article in Articles %}
-                    <div class="article-item bg-gray-200 p-4 rounded-lg flex justify-between items-center {% if loop.index0 >= 10 %}hidden{% endif %}">
+                    <div id="article-item-{{ article[0] }}"
+                         class="article-item bg-gray-200 p-4 rounded-lg flex justify-between items-center {% if loop.index0 >= 10 %}hidden{% endif %}">
                         <a href="{{ url_for('website.blog_detail', article=article[1]) }}"
                            class="text-xl font-semibold text-blue-700">{{ article[1] }}</a>
                         <div class="flex items-center space-x-4">
-                            {% if target_id == user_id %}
+                            {% if target_id == user_id and not recycle_bin %}
                                 <a href="/edit/blog/{{ article[0] }}" class="text-green-500">编辑</a>
+                            {% endif %}
+                            {% if recycle_bin %}
+                                <a href="#" class="text-blue-500" onclick="restoreBlog({{ article[0] }})">恢复</a>
+                                <a href="#" class="text-red-500" onclick="deleteBlog({{ article[0] }})">彻底删除</a>
                             {% endif %}
                         </div>
                     </div>
@@ -285,4 +290,43 @@
             }
         });
     });
+</script>
+<script>
+    function restoreBlog(articleId) {
+        fetch(`/restore/blog/${articleId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'include'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.message) alert(data.message);
+            document.getElementById(`article-item-${articleId}`).remove();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('操作失败: ' + error.message);
+        });
+    }
+
+    function deleteBlog(articleId) {
+        fetch(`/delete/blog/${articleId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.message) alert(data.message);
+            document.getElementById(`article-item-${articleId}`).remove();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('操作失败: ' + error.message);
+        });
+    }
 </script>
