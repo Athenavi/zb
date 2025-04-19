@@ -17,6 +17,7 @@ import markdown
 import qrcode
 import requests
 from PIL import Image
+from bs4 import BeautifulSoup
 from flask import Flask, render_template, redirect, request, url_for, jsonify, send_file, \
     make_response, send_from_directory
 from flask_caching import Cache
@@ -880,65 +881,6 @@ def json_filter(value):
         return None
 
 
-@app.route('/static/music/music.json', methods=['GET'])
-@jwt_required
-def music_json(user_id):
-    referrer = request.referrer
-    if referrer and "@" in referrer:
-        username_from_referrer = referrer.split('@')[-1]
-        user_dir = os.path.join('media', username_from_referrer)
-        # 确保 user_dir 是字符串类型
-        user_dir = base_dir + '\\' + str(user_dir)
-        return send_from_directory(user_dir, 'music.json')
-    if not user_id:
-        return send_from_directory(app.static_folder, 'music/music.json')
-    else:
-        user_name = get_username()
-        user_dir = os.path.join('media', user_name)
-        # 确保 user_dir 是字符串类型
-        user_dir = base_dir + '\\' + str(user_dir)
-        return send_from_directory(user_dir, 'music.json')
-
-
-@app.route('/static/music/music.json', methods=['PUT'])
-@jwt_required
-def music_json_change(user_id):
-    if not user_id:
-        return jsonify({'error': 'User ID is required'}), 503
-
-    json_data = request.get_json()
-    if json_data is None:
-        return jsonify({'error': 'Invalid JSON data'}), 400
-
-    # 检查JSON数据格式是否正确
-    if not isinstance(json_data, list):
-        return jsonify({'error': 'JSON data should be a list of music tracks'}), 400
-
-    for track in json_data:
-        # 检查每个track是否包含必要的键
-        required_keys = {'name', 'audio_url', 'singer', 'album', 'cover', 'time'}
-        if not required_keys.issubset(track.keys()):
-            return jsonify({
-                'error': '需要包含的属性name, audio_url, singer, album, cover, time'}), 400
-
-    user_name = get_username()
-    user_dir = os.path.join('media', user_name)
-
-    # 确保 user_dir 存在
-    if not os.path.exists(user_dir):
-        os.makedirs(user_dir)
-
-    # 构建保存路径
-    save_path = os.path.join(str(user_dir), 'music.json')
-
-    # 保存JSON数据
-    file: io.TextIOWrapper
-    with io.open(save_path, 'w', encoding=global_encoding) as file:
-        json.dump(json_data, file, ensure_ascii=False, indent=4)
-
-    return jsonify({'message': 'success'}), 200
-
-
 @cache.memoize(30)
 def get_avatar(user_identifier, identifier_type='id'):
     avatar = app.config['AVATAR_SERVER']  # 默认头像服务器地址
@@ -1672,6 +1614,121 @@ def change_profiles(user_id):
 @app.route('/api/theme', methods=['GET'])
 def get_current_theme():
     return db_get_theme()
+
+
+@app.route("/@<user_name>")
+def user_diy_space(user_name):
+    @cache.cached(timeout=300, key_prefix=f'current_{user_name}')
+    def _user_diy_space():
+        user_path = Path(base_dir) / 'media' / user_name / 'index.html'
+        if user_path.exists():
+            with user_path.open('r', encoding='utf-8') as f:
+                return f.read()
+        else:
+            return "用户主页未找到", 404
+
+    return _user_diy_space()
+
+
+@app.route('/diy/space', methods=['GET'])
+@jwt_required
+def diy_space(user_id):
+    avatar_url = get_avatar(user_id)
+    profiles = get_profiles(user_id=user_id)
+    user_bio = profiles[6] or "这人很懒，什么也没留下"
+    return render_template('diy_space.html', username=get_username(), user_id=user_id, avatar_url=avatar_url,
+                           profiles=profiles, userBio=user_bio)
+
+
+@app.route("/diy/space", methods=['PUT'])
+@jwt_required
+def diy_space_upload(user_id):
+    # 验证身份
+    user_name = get_username()
+    index_data = request.get_json()
+    if not index_data or 'html' not in index_data:
+        return jsonify({'error': '缺少 HTML 内容'}), 400
+    html_content = index_data['html']
+    soup = BeautifulSoup(html_content, 'html.parser')
+    # for tag in soup.find_all(['script', 'iframe', 'form']):
+    #    tag.decompose()
+    tailwind_css = soup.new_tag(
+        'link',
+        rel='stylesheet',
+        href='/static/css/tailwind.min.css'
+    )
+    if soup.head:
+        soup.head.append(tailwind_css)
+    else:
+        head = soup.new_tag('head')
+        head.append(tailwind_css)
+        if soup.html:
+            soup.html.insert(0, head)
+        else:
+            # 重建完整 HTML 结构
+            html = soup.new_tag('html')
+            html.append(head)
+            body = soup.new_tag('body')
+            html.append(body)
+            soup.append(html)
+    try:
+        user_dir = Path(base_dir) / 'media' / user_name
+        user_dir.mkdir(parents=True, exist_ok=True)
+        index_path = user_dir / 'index.html'
+        index_path.write_text(str(soup), encoding='utf-8')
+    except Exception as e:
+        return jsonify({'error': f'保存失败: {str(e)}'}), 500
+
+    return jsonify({'message': '主页更新成功'}), 200
+
+
+@app.route('/static/music/music.json', methods=['GET'])
+def music_json():
+    referrer = request.referrer
+    if referrer and "@" in referrer:
+        username_from_referrer = referrer.split('@')[-1]
+        user_dir = Path(base_dir) / 'media' / username_from_referrer
+        return send_from_directory(user_dir, 'music.json', max_age=300)
+    return jsonify({'error': 'Username not found'}), 404
+
+
+@app.route('/static/music/music.json', methods=['PUT'])
+@jwt_required
+def music_json_change(user_id):
+    if not user_id:
+        return jsonify({'error': 'User ID is required'}), 503
+
+    json_data = request.get_json()
+    if json_data is None:
+        return jsonify({'error': 'Invalid JSON data'}), 400
+
+    # 检查JSON数据格式是否正确
+    if not isinstance(json_data, list):
+        return jsonify({'error': 'JSON data should be a list of music tracks'}), 400
+
+    for track in json_data:
+        # 检查每个track是否包含必要的键
+        required_keys = {'name', 'audio_url', 'singer', 'album', 'cover', 'time'}
+        if not required_keys.issubset(track.keys()):
+            return jsonify({
+                'error': '需要包含的属性name, audio_url, singer, album, cover, time'}), 400
+
+    user_name = get_username()
+    user_dir = os.path.join('media', user_name)
+
+    # 确保 user_dir 存在
+    if not os.path.exists(user_dir):
+        os.makedirs(user_dir)
+
+    # 构建保存路径
+    save_path = os.path.join(str(user_dir), 'index.html')
+
+    # 保存JSON数据
+    file: io.TextIOWrapper
+    with io.open(save_path, 'w', encoding=global_encoding) as file:
+        json.dump(json_data, file, ensure_ascii=False, indent=4)
+
+    return jsonify({'message': 'success'}), 200
 
 
 @app.errorhandler(404)
