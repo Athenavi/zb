@@ -59,6 +59,13 @@ def create_user(ip, site_key):
 
         try:
             # 判断用户名是否已存在
+            query_invite_code = "SELECT * FROM permissions WHERE code = %s and description LIKE 'invite_code%%';"
+            cursor.execute(query_invite_code, (invite_code,))
+            existing_invite_code = cursor.fetchone()
+            if existing_invite_code is None:
+                return render_template('LoginRegister.html', title="注册",
+                                       msg='无效的邀请码!', type="register", site_key=site_key)
+            # 判断用户名是否已存在
             query_username = "SELECT * FROM users WHERE username = %s"
             cursor.execute(query_username, (username,))
             existing_user = cursor.fetchone()

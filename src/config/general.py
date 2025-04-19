@@ -2,7 +2,7 @@ import os
 
 from dotenv import load_dotenv
 
-from src.other.random import generate_random_text
+from src.other.rand import generate_random_text
 
 
 def get_general_config():
