@@ -36,15 +36,13 @@
         }
     </style>
 </head>
-
-<body class="bg-gray-100">
+<body class="bg-theme-gradient">
 <!-- Navigation Bar -->
-{% from 'header.html' import SimpleHeader %}
-{{ SimpleHeader(title) }}
-
-<header class="bg-white rounded-lg shadow mb-6 p-4">
+{% from 'header.html' import zytopbar %}
+{{ zytopbar() }}
+<header class="rounded-lg shadow mb-6 p-4">
     <div class="flex justify-between items-center">
-        <h1 class="text-2xl font-bold"><a href="/">🏠</a> 媒体文件</h1>
+        <h1 class="text-2xl font-bold text-theme-gradient"><a href="/">🏠</a> 媒体文件</h1>
         <div class="flex items-center space-x-4">
             <!-- 添加编辑模式切换按钮 -->
             <button id="edit-mode-btn" class="text-white px-4 py-2 rounded hover:bg-blue-600"
@@ -55,33 +53,15 @@
                     onclick="batchDelete()">删除选中项
             </button>
         </div>
-        {# 添加切换按钮 #}
-        <div class="flex gap-2 mb-4">
-            <button
-                    class="filter-btn px-4 py-2 rounded-lg bg-blue-500 text-white"
-                    data-filter="all"
-                    onclick="filterMedia(this, 'all')"
-            >全部
-            </button>
-            <button
-                    class="filter-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300"
-                    data-filter="image"
-                    onclick="filterMedia(this, 'image')"
-            >仅图片
-            </button>
-            <button
-                    class="filter-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300"
-                    data-filter="video"
-                    onclick="filterMedia(this, 'video')"
-            >仅视频
-            </button>
-        </div>
     </div>
 </header>
+<!-- 粒子效果容器 -->
+<div id="particles" class="fixed inset-0 pointer-events-none z-0"></div>
 <div id="result-message" class="hidden fixed top-4 right-4 p-4 rounded-lg shadow-lg"></div>
-<main class="content bg-white rounded-lg shadow p-4">
+<main class="content rounded-lg shadow p-4  bg-white/5 backdrop-blur-lg rounded-2xl p-6 sm:p-8 mb-8 border border-[var(--border)]/30 transition-transform duration-300 hover:scale-[1.02]">
     <!-- File Upload Section -->
-    <form action="/api/media/upload" class="dropzone border-dashed border-2 border-gray-400 rounded-lg p-8 mb-6"
+    <form action="/api/media/upload"
+          class="dropzone border-dashed border-2 border-gray-400 rounded-lg p-8 mb-6 text-theme-gradient"
           method="POST" enctype="multipart/form-data" id="myDropzone"></form>
     <script src="/static/js/dropzone.js"></script>
     <script>
@@ -103,9 +83,30 @@
             withCredentials: true,
         };
     </script>
-    <hr class="my-4">
     <!-- Media Display Section -->
-    <section>
+    <section
+            class=" bg-gradient-to-r from-[var(--accent)] to-pink-600 rounded-full animate-float shadow-lg shadow-[var(--accent)]/30">
+        {# 添加切换按钮 #}
+        <div class="flex gap-2 mb-4">
+            <button
+                    class="filter-btn bg-[var(--accent)] hover:bg-[var(--border)] text-white px-6 py-2 rounded-full transform transition-all duration-300 hover:scale-105 text-sm sm:text-base"
+                    data-filter="all"
+                    onclick="filterMedia(this, 'all')"
+            >全部
+            </button>
+            <button
+                    class="filter-btn bg-[var(--accent)] hover:bg-[var(--border)] text-white px-6 py-2 rounded-full transform transition-all duration-300 hover:scale-105 text-sm sm:text-base"
+                    data-filter="image"
+                    onclick="filterMedia(this, 'image')"
+            >仅图片
+            </button>
+            <button
+                    class="filter-btn bg-[var(--accent)] hover:bg-[var(--border)] text-white px-6 py-2 rounded-full transform transition-all duration-300 hover:scale-105 text-sm sm:text-base"
+                    data-filter="video"
+                    onclick="filterMedia(this, 'video')"
+            >仅视频
+            </button>
+        </div>
         <ul class="grid grid-cols-2 md:grid-cols-4 gap-4">
             {% for id, img,hash in imgs %}
                 <li class="group relative" data-type="{{ 'video' if img.endswith('.mp4') else 'image' }}">
