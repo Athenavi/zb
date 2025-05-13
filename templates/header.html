@@ -1,174 +1,322 @@
 {% macro zytopbar() -%}
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
-    <link href="/static/css/tailwind.min.css" rel="stylesheet">
-    <link href="/static/css/header.css" rel="stylesheet">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <!-- 资源预加载 -->
+        <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+              as="style">
+        <link rel="preload" href="/static/css/tailwind.min.css" as="style">
+        <link rel="preload" href="/static/css/header.css" as="style">
 
-    <div class="loader" id="loader"></div>
-    <header class="bg-blue-500 shadow-lg">
-        <div class="container mx-auto flex justify-between items-center py-6">
-            <h1 class="text-2xl font-bold text-gray-800" onclick="window.location.href = '/'"><img
-                    src="/static/favicon.ico" style="height: 32px" alt=""></h1>
-            <nav>
-                <ul class="flex space-x-6">
-                    <li>
-                        <div class="dropdown">
-                            <button class="text-white hover:bg-blue-600 px-4 py-2">🔻我的</button>
-                            <div class="dropdown-content">
-                                <a href="/profile">个人中心</a>
-                                <a href="/setting/profiles">设置</a>
-                                <a href="/media">媒体</a>
-                            </div>
-                        </div>
-                    </li>
-                    <li>
-                        <div class="dropdown">
-                            <button class="text-white hover:bg-blue-600 px-4 py-2">🔻更多</button>
-                            <div class="dropdown-content">
-                                <a href="/register">注册</a>
-                                <a href="/links">友链</a>
-                                <a href="/changelog">更新日志</a>
-                                <a href="/guestbook">留言</a>
-                            </div>
-                        </div>
-                    </li>
-                    <li>
-                        <button id="theme-toggle"
-                                class="text-white px-4 py-2 rounded hover:bg-blue-600 focus:outline-none">
-                            🌙
-                        </button>
-                    </li>
-                </ul>
-            </nav>
-        </div>
+        <!-- 样式表 -->
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+        <link rel="stylesheet" href="/static/css/tailwind.min.css">
+        <link rel="stylesheet" href="/static/css/header.css">
+        <style>
+            @keyframes float {
+                0%, 100% {
+                    transform: translateY(0);
+                }
+                50% {
+                    transform: translateY(-20px);
+                }
+            }
+
+            .animate-float {
+                animation: float 3s ease-in-out infinite;
+            }
+
+            @keyframes themeTransition {
+                0% {
+                    opacity: 0;
+                    transform: scale(0.5) translate(-50%, -50%);
+                }
+                100% {
+                    opacity: 1;
+                    transform: scale(4) translate(-50%, -50%);
+                }
+            }
+
+            .theme-transition {
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                width: 100vmax;
+                height: 100vmax;
+                background: radial-gradient(circle, var(--theme-transition-color) 0%, transparent 70%);
+                pointer-events: none;
+                animation: themeTransition 0.8s ease-out;
+                z-index: 9999;
+            }
+
+            /* 主题变量定义 */
+            :root {
+                --primary: #0a0f2c;
+                --secondary: #020617;
+                --accent: #3b82f6;
+                --border: #1e3a8a;
+                --text-gradient: linear-gradient(to right, #3b82f6, #ec4899);
+            }
+
+            [data-theme="twilight-gem"] {
+                --primary: #1a1a1a;
+                --secondary: #2d1a36;
+                --accent: #10b981;
+                --border: #065f46;
+                --text-gradient: linear-gradient(to right, #10b981, #3b82f6);
+            }
+
+            [data-theme="crimson-dynasty"] {
+                --primary: #2b0c18;
+                --secondary: #1a0a0f;
+                --accent: #ef4444;
+                --border: #7f1d1d;
+                --text-gradient: linear-gradient(to right, #ef4444, #f97316);
+            }
+
+            [data-theme="golden-flow"] {
+                --primary: #1f2937;
+                --secondary: #111827;
+                --accent: #d97706;
+                --border: #78350f;
+                --text-gradient: linear-gradient(to right, #d97706, #f59e0b);
+            }
+
+            [data-theme="aurora-dream"] {
+                --primary: #0c1a2c;
+                --secondary: #04111f;
+                --accent: #8b5cf6;
+                --border: #4c1d95;
+                --text-gradient: linear-gradient(to right, #8b5cf6, #10b981);
+            }
+
+            .bg-theme-gradient {
+                background: linear-gradient(to bottom, var(--primary), var(--secondary));
+            }
+
+            .text-theme-gradient {
+                background-image: var(--text-gradient);
+                -webkit-background-clip: text;
+                background-clip: text;
+                color: transparent;
+            }
+        </style>
+    </head>
+    <body class="theme-transition">
+    <!-- 导航栏结构优化 -->
+    <header class="bg-theme-gradient from-primary to-secondary shadow-lg">
+        <nav class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <a href="/" class="flex items-center space-x-2 hover:opacity-80 transition-opacity">
+                <img src="/favicon.ico" alt="Logo" class="h-8 w-8">
+            </a>
+
+            <div class="hidden md:flex space-x-4">
+                <!-- 我的 导航组 -->
+                <div class="dropdown-group relative">
+                    <button class="px-4 py-2 text-text hover:bg-accent/20 rounded-lg text-theme-gradient">
+                        我的 ▼
+                    </button>
+                    <div class="dropdown-content absolute right-0 mt-2 w-48 origin-top-right scale-95 opacity-0
+                  bg-secondary rounded-lg shadow-xl transition-all duration-200">
+                        <a href="/profile"
+                           class="block px-4 py-3 text-text hover:bg-accent/10 text-theme-gradient first:rounded-t-lg">
+                            个人中心
+                        </a>
+                        <a href="/setting/profiles"
+                           class="block px-4 py-3 text-text hover:bg-accent/10 text-theme-gradient">
+                            设置
+                        </a>
+                        <a href="/media"
+                           class="block px-4 py-3 text-text hover:bg-accent/10 text-theme-gradient last:rounded-b-lg">
+                            媒体
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 更多 导航组 -->
+                <div class="dropdown-group relative">
+                    <button class="px-4 py-2 text-text hover:bg-accent/20 rounded-lg text-theme-gradient">
+                        更多 ▼
+                    </button>
+                    <div class="dropdown-content absolute right-0 mt-2 w-48 origin-top-right scale-95 opacity-0
+                  bg-secondary rounded-lg shadow-xl transition-all duration-200">
+                        <a href="/links" class="block px-4 py-3 text-text hover:bg-accent/10 text-theme-gradient">
+                            友链
+                        </a>
+                        <a href="/changelog" class="block px-4 py-3 text-text hover:bg-accent/10 text-theme-gradient">
+                            更新日志
+                        </a>
+                        <a href="/guestbook"
+                           class="block px-4 py-3 text-text hover:bg-accent/10 text-theme-gradient last:rounded-b-lg">
+                            留言
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </nav>
     </header>
 
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.1/umd/popper.min.js"></script>
-    <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            document.getElementById("loader").style.display = "none";
-        });
-        window.addEventListener('contextmenu', function (e) {
-            e.preventDefault();
-        }, false);
-    </script>
-
-    <div class="fixed bottom-4 right-4">
-
+    <!-- 右键菜单优化 -->
+    <div id="context-menu" class="fixed hidden min-w-[160px] bg-secondary/95 backdrop-blur-sm
+                                border border-accent rounded-xl shadow-2xl overflow-hidden
+                                transition-opacity duration-150">
+        <ul class="py-2">
+            <li class="menu-item">
+                <button class="p-2 text-text hover:bg-accent/20 rounded-full text-theme-gradient">
+                    🎨
+                </button>
+                <div class="flex space-x-2">
+                    <button data-theme="dark-space"
+                            class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-400 hover:scale-110 transition-transform shadow-lg ring-2 ring-white"
+                            onclick="changeTheme(this)"></button>
+                    <button data-theme="twilight-gem"
+                            class="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-300 hover:scale-110 transition-transform shadow-lg"
+                            onclick="changeTheme(this)"></button>
+                    <button data-theme="crimson-dynasty"
+                            class="w-8 h-8 rounded-full bg-gradient-to-br from-rose-600 to-pink-500 hover:scale-110 transition-transform shadow-lg"
+                            onclick="changeTheme(this)"></button>
+                    <button data-theme="golden-flow"
+                            class="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-yellow-400 hover:scale-110 transition-transform shadow-lg"
+                            onclick="changeTheme(this)"></button>
+                    <button data-theme="aurora-dream"
+                            class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-green-400 hover:scale-110 transition-transform shadow-lg"
+                            onclick="changeTheme(this)"></button>
+                </div>
+            </li>
+            <li class="menu-item" data-action="home">🏠 主页</li>
+            <li class="menu-item" data-action="refresh">🔄 刷新</li>
+            <li class="menu-item" data-action="search">🔍 搜索</li>
+            <li class="menu-item" data-action="travel">🎲 随机文章</li>
+            <li class="menu-item" data-action="guestbook">📝 留言板</li>
+        </ul>
     </div>
 
-    <ul class="menu">
-        <li id="home">主页</li>
-        <li id="refresh">刷新</li>
-        <li id="search">搜索</li>
-        <li id="travel">随机文章</li>
-        <li id="guestbook">留言板</li>
-    </ul>
-
+    <!-- 脚本优化 -->
     <script>
-        // 获取菜单项
-        const home = document.getElementById('home');
-        const search = document.getElementById('search');
-        const refresh = document.getElementById('refresh');
-        const travel = document.getElementById('travel');
-        const guestbook = document.getElementById('guestbook');
+        // 主题切换函数
+        function changeTheme(btn) {
+            const theme = btn.dataset.theme;
 
-        guestbook.addEventListener('click', function () {
-            window.location.href = '/guestbook';
-        });
+            // 保存主题到localStorage
+            localStorage.setItem('vipTheme', theme);
 
-        travel.addEventListener('click', function () {
-            window.location.href = '/travel';
-        });
+            // 应用新主题
+            document.documentElement.setAttribute('data-theme', theme);
 
-        home.addEventListener('click', function () {
-            console.log('执行主页功能');
-            window.location.href = '/';
-        });
-
-        search.addEventListener('click', function () {
-            console.log('执行搜索功能');
-            window.location.href = '/search';
-        });
-
-        refresh.addEventListener('click', function () {
-            console.log('执行刷新功能');
-            // 在这里添加刷新页面的相关功能
-            location.reload(); // 刷新页面
-        });
-
-        document.addEventListener("DOMContentLoaded", function () {
-            const button = document.getElementById('theme-toggle');
-
-            const currentTheme = localStorage.getItem('theme');
-            let isDark = currentTheme === 'dark';
-
-            document.body.setAttribute('data-theme', isDark ? 'dark' : 'light');
-            button.textContent = isDark ? '☀' : '🌙';
-
-            button.addEventListener('click', () => {
-                isDark = !isDark;
-
-                document.body.setAttribute('data-theme', isDark ? 'dark' : 'light');
-                button.textContent = isDark ? '☀' : '🌙';
-
-                localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            // 更新按钮激活状态
+            document.querySelectorAll('[data-theme]').forEach(b => {
+                b.classList.toggle('ring-2', b.dataset.theme === theme);
             });
+
+            // 更新粒子效果
+            updateParticles(theme);
+
+            // 添加过渡动画
+            const transition = document.createElement('div');
+            transition.className = 'theme-transition';
+            transition.style.setProperty('--theme-transition-color',
+                getComputedStyle(btn).backgroundImage.match(/rgba?$[^)]+$/)[0]);
+            document.body.appendChild(transition);
+            setTimeout(() => transition.remove(), 800);
+        }
+
+        // 通用组件初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            // 下拉菜单交互
+            document.querySelectorAll('.dropdown-group').forEach(group => {
+                const button = group.querySelector('button');
+                const menu = group.querySelector('.dropdown-content');
+
+                const toggleMenu = () => {
+                    const isOpen = menu.classList.contains('opacity-100');
+                    menu.classList.toggle('opacity-0', isOpen);
+                    menu.classList.toggle('opacity-100', !isOpen);
+                    menu.classList.toggle('scale-95', !isOpen);
+                    menu.classList.toggle('scale-100', !isOpen);
+                }
+
+                button.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleMenu();
+                });
+
+                document.addEventListener('click', (e) => {
+                    if (!group.contains(e.target)) {
+                        menu.classList.add('opacity-0', 'scale-95');
+                        menu.classList.remove('opacity-100', 'scale-100');
+                    }
+                });
+            });
+
+            // 右键菜单
+            const contextMenu = document.getElementById('context-menu');
+            const menuActions = {
+                home: () => window.location.href = '/',
+                refresh: () => location.reload(),
+                search: () => window.location.href = '/search',
+                travel: () => window.location.href = '/travel',
+                guestbook: () => window.location.href = '/guestbook'
+            };
+
+            document.addEventListener('contextmenu', e => {
+                e.preventDefault();
+                contextMenu.style.left = `${Math.min(e.clientX, innerWidth - 180)}px`;
+                contextMenu.style.top = `${Math.min(e.clientY, innerHeight - 200)}px`;
+                contextMenu.classList.remove('hidden');
+            });
+
+            document.addEventListener('click', () => contextMenu.classList.add('hidden'));
+            contextMenu.querySelectorAll('.menu-item').forEach(item => {
+                item.addEventListener('click', () => menuActions[item.dataset.action]());
+            });
+
+            // 主题初始化函数
+            function initializeTheme() {
+                // 从localStorage读取保存的主题
+                const savedTheme = localStorage.getItem('vipTheme') || 'dark-space';
+                document.documentElement.setAttribute('data-theme', savedTheme);
+                updateParticles(savedTheme);
+
+                // 设置当前激活的主题按钮
+                document.querySelectorAll('[data-theme]').forEach(btn => {
+                    btn.classList.toggle('ring-2', btn.dataset.theme === savedTheme);
+                });
+            }
+
+            // 粒子效果生成器
+            function updateParticles(theme) {
+                const container = document.getElementById('particles');
+                container.innerHTML = '';
+
+                const colors = {
+                    'dark-space': ['#3b82f6', '#60a5fa', '#93c5fd'],
+                    'twilight-gem': ['#10b981', '#34d399', '#6ee7b7'],
+                    'crimson-dynasty': ['#ef4444', '#f87171', '#fca5a5'],
+                    'golden-flow': ['#d97706', '#f59e0b', '#fbbf24'],
+                    'aurora-dream': ['#8b5cf6', '#a78bfa', '#c4b5fd']
+                }[theme];
+
+                for (let i = 0; i < 30; i++) {
+                    const particle = document.createElement('div');
+                    particle.className = `absolute rounded-full animate-float`;
+                    particle.style.cssText = `
+                    width: ${1 + Math.random() * 3}px;
+                    height: ${1 + Math.random() * 3}px;
+                    top: ${Math.random() * 100}%;
+                    left: ${Math.random() * 100}%;
+                    background: ${colors[i % 3]};
+                    animation-duration: ${2 + Math.random() * 3}s;
+                    animation-delay: ${Math.random() * 2}s;
+                    opacity: ${0.3 + Math.random() * 0.7};
+                `;
+                    container.appendChild(particle);
+                }
+            }
+
+            initializeTheme();
         });
-
-        // 菜单
-        const menu = document.querySelector('.menu');
-
-        // 绑定右键事件
-        document.addEventListener('contextmenu', function (e) {
-            // 取消默认的浏览器自带右键
-            e.preventDefault();
-            // 窗口宽高
-            let winWidth = window.innerWidth;
-            let winHeight = window.innerHeight;
-            // 鼠标点击的位置
-            let posX = e.pageX;
-            let posY = e.pageY;
-            // 菜单宽高
-            let menuWidth = menu.getBoundingClientRect().width;
-            let menuHeight = menu.getBoundingClientRect().height;
-            // 菜单要显示的位置
-            let posLeft = 0, posTop = 0;
-            // 菜单显示时可能遇到的几种情况：
-            // 右边和底部同时超出
-            if (posX + menuWidth >= winWidth && posY + menuHeight >= winHeight) {
-                posLeft = posX - menuWidth;
-                posTop = posY - menuHeight;
-            }
-            // 右侧超出
-            else if (posX + menuWidth >= winWidth) {
-                posLeft = posX - menuWidth;
-                posTop = posY;
-            }
-            // 底部超出
-            else if (posY + menuHeight >= winHeight) {
-                posLeft = posX;
-                posTop = posY - menuHeight;
-            }
-            // 默认情况，都不超出
-            else {
-                posLeft = posX;
-                posTop = posY;
-            }
-            // 设置菜单的位置并显示
-            menu.style.left = posLeft + 'px';
-            menu.style.top = posTop + 'px';
-            menu.style.opacity = 1;
-            menu.style.zIndex = 99;
-        })
-
-        // 最后，加个单击其他地方关闭菜单
-        document.addEventListener('click', function () {
-            menu.style.opacity = 0;
-            menu.style.zIndex = -1;
-        })
     </script>
-{% endmacro %}
+{%- endmacro %}
 {% macro SimpleHeader(SiteName) -%}
     <style>
         body {

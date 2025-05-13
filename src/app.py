@@ -932,8 +932,7 @@ def index_html():
             WHERE `Hidden` = 0
               AND `Status` = 'Published'
             ORDER BY `article_id` DESC
-                LIMIT %s
-            OFFSET %s \
+            LIMIT %s OFFSET %s \
             """
 
     try:
@@ -992,8 +991,7 @@ def tag_page(tag_name):
               AND `Status` = 'Published'
               AND `tags` LIKE %s
             ORDER BY `article_id` DESC
-                LIMIT %s
-            OFFSET %s \
+            LIMIT %s OFFSET %s \
             """
 
     try:
@@ -1040,8 +1038,7 @@ def featured_page():
               AND `Status` = 'Published'
               AND `is_featured` >= 127
             ORDER BY `article_id` DESC
-                LIMIT %s
-            OFFSET %s \
+            LIMIT %s OFFSET %s \
             """
 
     try:
@@ -1565,7 +1562,8 @@ def api_media_file(username, filename):
                                          FROM `media`
                                          WHERE `user_id` = %s
                                            AND `original_filename` = %s
-                                         ORDER BY `id` DESC LIMIT 1) m ON f.`hash` = m.`hash`; \
+                                         ORDER BY `id` DESC
+                                         LIMIT 1) m ON f.`hash` = m.`hash`; \
                     """
             params = (user_id, filename)
             cursor.execute(query, params)
@@ -1669,6 +1667,34 @@ def mark_all_as_read(user_id):
     response = jsonify({"success": success, "updated_count": cursor.rowcount if success else 0})
     response.headers.add("Access-Control-Allow-Origin", "*")
     return response
+
+
+@app.route('/vip', methods=['GET'])
+@jwt_required
+def vip_page(user_id):
+    return render_template('vip.html',
+                           title="会员中心",
+                           vip_status=True,
+                           username="开发者",
+                           expire_date="2026-12-31",
+                           benefits=[
+                               {
+                                   "icon": "🎮",
+                                   "title": "游戏加速",
+                                   "description": "专属服务器加速通道",
+                                   "available": True
+                               },
+                               # 其他权益数据...
+                           ],
+                           exclusive_gifts=[
+                               {
+                                   "image": "/static/gift1.jpg",
+                                   "title": "限定皮肤套装",
+                                   "subtitle": "2024夏季限定"
+                               },
+                               # 其他福利数据...
+                           ]
+                           )
 
 
 @app.errorhandler(404)
