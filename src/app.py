@@ -1549,9 +1549,10 @@ def api_user_profile(user_id):
 
 @app.route('/media/<username>/<filename>', methods=['GET'])
 def api_media_file(username, filename):
-    user_id = api_username_check(username)
+    user_id = int(api_username_check(username))
     if not user_id:
         return jsonify({"message": "file not found"}), 404
+
     db = get_db_connection()
     try:
         with db.cursor() as cursor:
@@ -1563,23 +1564,25 @@ def api_media_file(username, filename):
                                          WHERE `user_id` = %s
                                            AND `original_filename` = %s
                                          ORDER BY `id` DESC
-                                         LIMIT 1) m ON f.`hash` = m.`hash`; \
+                                         LIMIT 1) m ON f.`hash` = m.`hash`;
                     """
             params = (user_id, filename)
             cursor.execute(query, params)
+            # print(query, params)
             file_info = cursor.fetchone()
 
             if file_info:
+                # print(file_info)
                 storage_path = Path(base_dir) / file_info[1]
                 return send_file(storage_path, mimetype=file_info[0], as_attachment=False, max_age=3600)
             else:
                 return jsonify({"message": "Media not found"}), 404
+
     except Exception as e:
         app.logger.error(f"An error occurred: {e}")
         return jsonify({"message": "Internal Server Error"}), 500
     finally:
         db.close()
-        return None
 
 
 @cache.cached(timeout=600, key_prefix='username_check')
@@ -1591,7 +1594,9 @@ def api_username_check(username):
             query = "SELECT `id` FROM `users` WHERE `username` = %s;"
             params = (username,)
             cursor.execute(query, params)
-            user_id = cursor.fetchone()
+            result = cursor.fetchone()
+            if result:
+                user_id = str(result[0])
     except Exception as e:
         app.logger.error(f"An error occurred: {e}")
     finally:
