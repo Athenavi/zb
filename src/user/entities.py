@@ -1,32 +1,6 @@
 from src.database import get_db_connection
 
 
-def query_blog_author(title):
-    db = get_db_connection()
-
-    try:
-        with db.cursor() as cursor:
-            # 使用联合查询简化步骤
-            query = """
-            SELECT users.id, users.username 
-            FROM articles 
-            JOIN users ON articles.user_id = users.id 
-            WHERE articles.Title = %s
-            """
-            cursor.execute(query, (title,))
-            author = cursor.fetchone()
-
-            if author:
-                return author[0], author[1]
-            else:
-                return None, None
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return None, None
-    finally:
-        db.close()
-
-
 def authorize_by_aid(article_id, user_id):
     try:
         with get_db_connection() as db:

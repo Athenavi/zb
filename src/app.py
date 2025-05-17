@@ -9,7 +9,7 @@ import time
 import uuid
 from datetime import timedelta
 from pathlib import Path
-
+from functools import lru_cache
 import markdown
 import qrcode
 import requests
@@ -23,13 +23,13 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
 
 from src.blog.article.core.content import delete_article, save_article_changes, \
-    edit_article_content
+    edit_article_content, get_a_list, get_article_last_modified
 from src.blog.article.core.crud import get_articles_by_owner, read_hidden_articles, delete_db_article, fetch_articles, \
     get_articles_recycle
 from src.blog.article.metadata.handlers import get_article_metadata, upsert_article_metadata
 from src.blog.article.security.password import update_article_password
 from src.blog.comment import get_comments, create_comment, delete_comment
-from src.blog.tag import update_article_tags
+from src.blog.tag import update_article_tags, query_article_tags
 from src.blueprints.auth import auth_bp
 from src.blueprints.dashboard import dashboard_bp
 from src.blueprints.media import create_media_blueprint
@@ -50,7 +50,7 @@ from src.user.authz.core import secret_key, get_username
 from src.user.authz.decorators import jwt_required, admin_required, origin_required
 from src.user.authz.login import tp_mail_login
 from src.user.authz.password import update_password, validate_password
-from src.user.entities import query_blog_author, authorize_by_aid, get_user_sub_info, check_user_conflict, \
+from src.user.entities import authorize_by_aid, get_user_sub_info, check_user_conflict, \
     db_save_avatar, db_save_bio, db_change_username, db_bind_email, authorize_by_aid_deleted
 from src.user.profile.social import get_following_count, get_can_followed, get_follower_count
 from src.utils.http.etag import generate_etag
@@ -232,14 +232,62 @@ def favicon():
     return send_file('../static/favicon.ico', mimetype='image/png', max_age=3600)
 
 
-@cache.cached(timeout=3 * 3600, key_prefix='article_img')
-@app.route('/blog/<article_name>/images/<image_name>', methods=['GET'])
-def article_img(article_name, image_name):
-    author_uid, author = query_blog_author(article_name)
-    if author is None:
-        author = 'test'
-    articles_img_dir = os.path.join(base_dir, 'media', str(author))
-    return send_from_directory(articles_img_dir, image_name)
+@cache.memoize(180)
+@app.route('/blog/<article>', methods=['GET', 'POST'])
+def blog_detail(article):
+    try:
+        article_names = get_a_list(chanel=1)
+        hidden_articles = read_hidden_articles()
+        if article not in article_names:
+            pass
+
+        aid, article_tags = query_article_tags(article)
+        if article in hidden_articles:
+            return render_template('inform.html', aid=aid)
+
+        update_date = get_article_last_modified(article)
+
+        response = make_response(render_template('zyDetail.html',
+                                                 article_content=1,
+                                                 aid=aid,
+                                                 articleName=article,
+                                                 blogDate=update_date,
+                                                 domain=domain,
+                                                 url_for=url_for,
+                                                 article_tags=article_tags))
+
+        # 只设置缓存的 max_age
+        response.cache_control.max_age = 180
+
+        return response
+
+    except FileNotFoundError:
+        return error(message="页面不见了", status_code=404)
+
+
+@cache.cached(timeout=3 * 3600, key_prefix='aid')
+@app.route('/<article_id>.html', methods=['GET', 'POST'])
+def id_find_article(article_id):
+    if not re.match(r'^\d{1,4}$', article_id):
+        return error(message='无效的文章', status_code=404)
+    try:
+        with get_db_connection() as db:
+            with db.cursor() as cursor:
+                query = "SELECT long_url FROM urls WHERE id = %s"
+                cursor.execute(query, (article_id,))
+                result = cursor.fetchone()
+                if result:
+                    long_url = result[0]
+                    last_slash_index = long_url.rfind("/")
+                    article = long_url[last_slash_index + 1:]
+                    return blog_detail(article)
+                else:
+                    return error(message='没有找到文章', status_code=404)
+    except Exception as e:
+        db.rollback()
+        return error(message=f'服务器内部错误{e}', status_code=500)
+    finally:
+        return None
 
 
 @app.route('/preview', methods=['GET'])
@@ -630,9 +678,6 @@ def api_comment(user_id):
 @app.route("/Comment")
 @jwt_required
 def comment(user_id):
-    from jinja2 import Environment, FileSystemLoader
-    env = Environment(loader=FileSystemLoader('templates'))
-    env.filters['fromjson'] = json_filter
     aid = request.args.get('aid')
     if not aid:
         pass
@@ -642,10 +687,8 @@ def comment(user_id):
         page = 1
 
     comments, has_next_page, has_previous_page = get_comments(aid, page=page, per_page=30)
-    template = env.get_template('Comment.html')
-    rendered = template.render(aid=aid, user_id=user_id, comments=comments,
-                               has_next_page=has_next_page, has_previous_page=has_previous_page, current_page=page)
-    return rendered
+    return render_template('Comment.html', aid=aid, user_id=user_id, comments=comments,
+                           has_next_page=has_next_page, has_previous_page=has_previous_page, current_page=page)
 
 
 @app.route('/api/delete/<filename>', methods=['DELETE'])
@@ -736,6 +779,24 @@ def json_filter(value):
     except (ValueError, TypeError) as e:
         app.logger.error(f"Error parsing JSON: {e}, Value: {value}")
         return None
+
+
+@app.template_filter('Author')
+@lru_cache(maxsize=128)  # 设置缓存大小为128
+def article_author(user_id):
+    """通过 user_id 搜索作者名称"""
+    author_name = '未知作者'
+    try:
+        with get_db_connection() as db:
+            with db.cursor() as cursor:
+                cursor.execute("SELECT `username` FROM `users` WHERE `id` = %s", (user_id,))
+                result = cursor.fetchone()
+                if result:
+                    author_name = result[0]
+    except (ValueError, TypeError) as e:
+        app.logger.error(f"Error getting author name for user_id {user_id}: {e}")
+    finally:
+        return author_name
 
 
 @cache.memoize(120)

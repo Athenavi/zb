@@ -1,15 +1,11 @@
-import re
 import urllib
 from datetime import datetime
 
-from flask import Blueprint, Response, request, render_template, redirect, make_response, url_for
+from flask import Blueprint, Response, request, render_template, redirect
 
 from src.blog.article.core.content import get_article_content, get_article_last_modified, get_a_list
 from src.blog.article.core.crud import read_hidden_articles
-from src.blog.tag import query_article_tags
 from src.database import get_db_connection
-from src.error import error
-from src.user.entities import query_blog_author
 from src.utils.shortener.links import create_special_url, redirect_to_long_url
 
 website_bp = Blueprint('website', __name__, template_folder='templates')
@@ -38,7 +34,8 @@ def create_website_blueprint(cache_instance, domain, sitename):
                            FROM `articles`
                            WHERE `Hidden` = 0
                              AND `Status` = 'Published'
-                           ORDER BY `article_id` DESC LIMIT 40"""
+                           ORDER BY `article_id` DESC
+                           LIMIT 40"""
                 cursor.execute(query)
                 results = cursor.fetchall()
                 article_titles = [item[0] for item in results]
@@ -132,73 +129,6 @@ def create_website_blueprint(cache_instance, domain, sitename):
             return redirect(long_url, code=302)
         else:
             return "短网址无效"
-
-    @cache_instance.cached(timeout=3 * 3600, key_prefix='aid')
-    @website_bp.route('/<article_id>.html', methods=['GET', 'POST'])
-    def id_find_article(article_id):
-        if not re.match(r'^\d{1,4}$', article_id):
-            return error(message='无效的文章', status_code=404)
-        db = get_db_connection()
-        cursor = db.cursor()
-        try:
-            query = "SELECT long_url FROM urls WHERE id = %s"
-            cursor.execute(query, (article_id,))
-            result = cursor.fetchone()
-
-            if result:
-                long_url = result[0]
-                last_slash_index = long_url.rfind("/")
-                article = long_url[last_slash_index + 1:]
-                return blog_detail(article)
-            else:
-
-                return error(message='没有找到文章', status_code=404)
-        except Exception as e:
-            db.rollback()
-            return error(message=f'服务器内部错误{e}', status_code=500)
-        finally:
-            cursor.close()
-            db.close()
-
-    @website_bp.route('/blog/<article>', methods=['GET', 'POST'])
-    @cache_instance.memoize(180)
-    def blog_detail(article):
-        try:
-            article_names = get_a_list(chanel=1)
-            hidden_articles = read_hidden_articles()
-            if article not in article_names:
-                pass
-
-            aid, article_tags = query_article_tags(article)
-            if article in hidden_articles:
-                return render_template('inform.html', aid=aid)
-
-            author_uid, author = query_blog_author(article)
-            update_date = get_article_last_modified(article)
-
-            response = make_response(render_template('zyDetail.html',
-                                                     article_content=1,
-                                                     aid=aid,
-                                                     articleName=article,
-                                                     author=author,
-                                                     authorUID=str(author_uid),
-                                                     blogDate=update_date,
-                                                     domain=domain,
-                                                     url_for=url_for,
-                                                     # article_Surl=article_surl,
-                                                     article_tags=article_tags))
-
-            # 只设置缓存的 max_age
-            response.cache_control.max_age = 180
-
-            return response
-
-        except FileNotFoundError:
-            return error(message="页面不见了", status_code=404)
-
-    @website_bp.route('/travel', methods=['GET'])
-    def travel():
-        return '此接口暂时弃用'
 
     @website_bp.route('/guestbook', methods=['GET', 'POST'])
     def guestbook():
