@@ -21,9 +21,9 @@
     {% if article_info %}
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {% for article in article_info %}{% set ArticleID = article[0] %}{% set Title = article[1] %}
-                {% set Author = article[2] %}
-                {% set Views = article[3] %}{% set Likes = article[4] %}{% set Comments = article[5] %}{% set CoverImage = article[6] %}
-                {% set Excerpt = article[8] %}{% set tags = article[10].split(';') %}
+                {% set author = article[2] %}
+                {% set views = article[3] %}{% set likes = article[4] %}{% set Comments = article[5] %}{% set CoverImage = article[6] %}
+                {% set excerpt = article[8] %}{% set tags = article[10].split(';') %}
                 <div class="bg-white rounded-lg shadow-md overflow-hidden">
                     {% if CoverImage %}
                         <img src="/api/{{ CoverImage }}?format=webp" alt="{{ Title }}"
@@ -33,12 +33,12 @@
                         <a href="/blog/{{ Title }}">
                             <h2 class="text-xl font-semibold">{{ Title }}</h2></a>
                         <p class="text-gray-600 mt-2">
-                            <strong>作者:</strong> {{ Author }} |
-                            <strong>阅读:</strong> {{ Views }} |
-                            <strong>喜欢:</strong> {{ Likes }} |
+                            <strong>作者:</strong><a href="/space/{{ author }}">{{ author | Author }}</a> |
+                            <strong>阅读:</strong> {{ views }} |
+                            <strong>喜欢:</strong> {{ likes }} |
                             <strong>评论:</strong> {{ Comments }}
                         </p>
-                        {% if Excerpt %}<p class="mt-4 text-gray-800">{{ Excerpt }}</p>{% endif %}
+                        {% if Excerpt %}<p class="mt-4 text-gray-800">{{ excerpt }}</p>{% endif %}
                         {% if tags %}
                             <div class="mt-4">
                                 {% for tag in tags %}

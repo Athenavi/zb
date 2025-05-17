@@ -101,7 +101,7 @@
                              class="article-item group p-4 rounded-lg hover:bg-gray-50 transition-colors duration-200
             {% if loop.index0 >= 10 %}hidden{% endif %}">
                             <div class="flex items-center justify-between">
-                                <a href="{{ url_for('website.blog_detail', article=article[1]) }}"
+                                <a href="{{ url_for('blog_detail', article=article[1]) }}"
                                    class="text-lg font-medium text-gray-800 hover:text-blue-600">
                                     {{ article[1] }}
                                 </a>

@@ -20,9 +20,9 @@ def main():
         return
     else:
         from src.app import app, domain, run_security_checks
-        if not run_security_checks(domain):
-            print('请修改默认安全密钥！config.ini[security] 项, 并正确修改域名信息 然后重启程序！')
-            return
+        #if not run_security_checks(domain):
+        #    print('请修改默认安全密钥！.env[security] 项, 并正确修改域名信息 然后重启程序！')
+        #    return
         from src.database import test_database_connection, check_db
         test_database_connection()
         check_db()

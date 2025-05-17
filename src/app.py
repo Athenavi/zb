@@ -9,7 +9,7 @@ import time
 import uuid
 from datetime import timedelta
 from pathlib import Path
-
+from functools import lru_cache
 import markdown
 import qrcode
 import requests
@@ -23,13 +23,13 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
 
 from src.blog.article.core.content import delete_article, save_article_changes, \
-    edit_article_content
+    edit_article_content, get_a_list, get_article_last_modified
 from src.blog.article.core.crud import get_articles_by_owner, read_hidden_articles, delete_db_article, fetch_articles, \
     get_articles_recycle
 from src.blog.article.metadata.handlers import get_article_metadata, upsert_article_metadata
 from src.blog.article.security.password import update_article_password
 from src.blog.comment import get_comments, create_comment, delete_comment
-from src.blog.tag import update_article_tags
+from src.blog.tag import update_article_tags, query_article_tags
 from src.blueprints.auth import auth_bp
 from src.blueprints.dashboard import dashboard_bp
 from src.blueprints.media import create_media_blueprint
@@ -50,7 +50,7 @@ from src.user.authz.core import secret_key, get_username
 from src.user.authz.decorators import jwt_required, admin_required, origin_required
 from src.user.authz.login import tp_mail_login
 from src.user.authz.password import update_password, validate_password
-from src.user.entities import query_blog_author, authorize_by_aid, get_user_sub_info, check_user_conflict, \
+from src.user.entities import authorize_by_aid, get_user_sub_info, check_user_conflict, \
     db_save_avatar, db_save_bio, db_change_username, db_bind_email, authorize_by_aid_deleted
 from src.user.profile.social import get_following_count, get_can_followed, get_follower_count
 from src.utils.http.etag import generate_etag
@@ -232,14 +232,109 @@ def favicon():
     return send_file('../static/favicon.ico', mimetype='image/png', max_age=3600)
 
 
-@cache.cached(timeout=3 * 3600, key_prefix='article_img')
-@app.route('/blog/<article_name>/images/<image_name>', methods=['GET'])
-def article_img(article_name, image_name):
-    author_uid, author = query_blog_author(article_name)
-    if author is None:
-        author = 'test'
-    articles_img_dir = os.path.join(base_dir, 'media', str(author))
-    return send_from_directory(articles_img_dir, image_name)
+@cache.memoize(180)
+@app.route('/blog/<title>', methods=['GET', 'POST'])
+def blog_detail(title):
+    if request.method == 'POST':
+        query = """
+                SELECT *
+                FROM `articles`
+                WHERE `Hidden` = 0
+                  AND `Status` = 'Published'
+                  AND `title` = %s
+                ORDER BY `article_id` DESC
+                LIMIT 1;
+                """
+        try:
+            with get_db_connection() as db:
+                with db.cursor() as cursor:
+                    cursor.execute(query, (title,))
+                    result = cursor.fetchone()
+                    if result:
+                        return jsonify(result)
+                    else:
+                        return jsonify({"error": "Article not found"}), 404
+        except Exception as e:
+            app.logger.error(e)
+            return jsonify({"error": "Internal server error"}), 500
+
+    # 处理GET请求
+    try:
+        article_names = get_a_list(chanel=1)
+        hidden_articles = read_hidden_articles()
+
+        # 处理不存在的文章标题
+        if title not in article_names:
+            return error(message="页面不见了", status_code=404)
+
+        aid, article_tags = query_article_tags(title)
+
+        if title in hidden_articles:
+            return render_template('inform.html', aid=aid)
+
+        update_date = get_article_last_modified(title)
+
+        response = make_response(render_template(
+            'zyDetail.html',
+            article_content=1,
+            aid=aid,
+            articleName=title,
+            blogDate=update_date,
+            domain=domain,
+            url_for=url_for,
+            article_tags=article_tags
+        ))
+        response.cache_control.max_age = 180
+        return response
+
+    except FileNotFoundError:
+        return error(message="页面不见了", status_code=404)
+
+
+@cache.memoize(180)
+@app.route('/blog/<title>/images/<file_name>', methods=['GET'])
+def blog_file(title, file_name):
+    try:
+        with get_db_connection() as db:
+            with db.cursor() as cursor:
+                # 1. 通过文章标题获取用户ID（元组索引访问）
+                cursor.execute(
+                    "SELECT user_id FROM articles WHERE title = %s LIMIT 1",
+                    (title,)
+                )
+                article = cursor.fetchone()
+                if not article or not article[0]:  # 使用索引[0]访问user_id
+                    return jsonify({"error": "Article not found"}), 404
+
+                # 2. 通过用户ID+文件名获取hash（元组索引访问）
+                cursor.execute(
+                    """SELECT hash
+                       FROM media
+                       WHERE user_id = %s
+                         AND original_filename = %s
+                       ORDER BY id DESC
+                       LIMIT 1""",
+                    (article[0], file_name)  # 使用article[0]
+                )
+                media = cursor.fetchone()
+                if not media:
+                    return jsonify({"error": "File not found"}), 404
+
+                # 3. 通过hash获取文件路径（元组索引访问）
+                cursor.execute(
+                    "SELECT storage_path, mime_type FROM file_hashes WHERE hash = %s LIMIT 1",
+                    (media[0],)  # 使用media[0]
+                )
+                file_record = cursor.fetchone()
+                if not file_record:
+                    return jsonify({"error": "File path not found"}), 404
+
+                file_path = Path(base_dir) / file_record[0]
+                return send_file(file_path, mimetype=file_record[1], max_age=7200)  # mime_type在索引1
+
+    except Exception as e:
+        app.logger.error(e)
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @app.route('/preview', methods=['GET'])
@@ -630,9 +725,6 @@ def api_comment(user_id):
 @app.route("/Comment")
 @jwt_required
 def comment(user_id):
-    from jinja2 import Environment, FileSystemLoader
-    env = Environment(loader=FileSystemLoader('templates'))
-    env.filters['fromjson'] = json_filter
     aid = request.args.get('aid')
     if not aid:
         pass
@@ -642,10 +734,8 @@ def comment(user_id):
         page = 1
 
     comments, has_next_page, has_previous_page = get_comments(aid, page=page, per_page=30)
-    template = env.get_template('Comment.html')
-    rendered = template.render(aid=aid, user_id=user_id, comments=comments,
-                               has_next_page=has_next_page, has_previous_page=has_previous_page, current_page=page)
-    return rendered
+    return render_template('Comment.html', aid=aid, user_id=user_id, comments=comments,
+                           has_next_page=has_next_page, has_previous_page=has_previous_page, current_page=page)
 
 
 @app.route('/api/delete/<filename>', methods=['DELETE'])
@@ -736,6 +826,24 @@ def json_filter(value):
     except (ValueError, TypeError) as e:
         app.logger.error(f"Error parsing JSON: {e}, Value: {value}")
         return None
+
+
+@app.template_filter('Author')
+@lru_cache(maxsize=128)  # 设置缓存大小为128
+def article_author(user_id):
+    """通过 user_id 搜索作者名称"""
+    author_name = '未知作者'
+    try:
+        with get_db_connection() as db:
+            with db.cursor() as cursor:
+                cursor.execute("SELECT `username` FROM `users` WHERE `id` = %s", (user_id,))
+                result = cursor.fetchone()
+                if result:
+                    author_name = result[0]
+    except (ValueError, TypeError) as e:
+        app.logger.error(f"Error getting author name for user_id {user_id}: {e}")
+    finally:
+        return author_name
 
 
 @cache.memoize(120)
@@ -1549,9 +1657,10 @@ def api_user_profile(user_id):
 
 @app.route('/media/<username>/<filename>', methods=['GET'])
 def api_media_file(username, filename):
-    user_id = api_username_check(username)
+    user_id = int(api_username_check(username))
     if not user_id:
         return jsonify({"message": "file not found"}), 404
+
     db = get_db_connection()
     try:
         with db.cursor() as cursor:
@@ -1563,23 +1672,25 @@ def api_media_file(username, filename):
                                          WHERE `user_id` = %s
                                            AND `original_filename` = %s
                                          ORDER BY `id` DESC
-                                         LIMIT 1) m ON f.`hash` = m.`hash`; \
+                                         LIMIT 1) m ON f.`hash` = m.`hash`;
                     """
             params = (user_id, filename)
             cursor.execute(query, params)
+            # print(query, params)
             file_info = cursor.fetchone()
 
             if file_info:
+                # print(file_info)
                 storage_path = Path(base_dir) / file_info[1]
                 return send_file(storage_path, mimetype=file_info[0], as_attachment=False, max_age=3600)
             else:
                 return jsonify({"message": "Media not found"}), 404
+
     except Exception as e:
         app.logger.error(f"An error occurred: {e}")
         return jsonify({"message": "Internal Server Error"}), 500
     finally:
         db.close()
-        return None
 
 
 @cache.cached(timeout=600, key_prefix='username_check')
@@ -1591,7 +1702,9 @@ def api_username_check(username):
             query = "SELECT `id` FROM `users` WHERE `username` = %s;"
             params = (username,)
             cursor.execute(query, params)
-            user_id = cursor.fetchone()
+            result = cursor.fetchone()
+            if result:
+                user_id = str(result[0])
     except Exception as e:
         app.logger.error(f"An error occurred: {e}")
     finally:
@@ -1669,32 +1782,69 @@ def mark_all_as_read(user_id):
     return response
 
 
-@app.route('/vip', methods=['GET'])
-@jwt_required
-def vip_page(user_id):
-    return render_template('vip.html',
-                           title="会员中心",
-                           vip_status=True,
-                           username="开发者",
-                           expire_date="2026-12-31",
-                           benefits=[
-                               {
-                                   "icon": "🎮",
-                                   "title": "游戏加速",
-                                   "description": "专属服务器加速通道",
-                                   "available": True
-                               },
-                               # 其他权益数据...
-                           ],
-                           exclusive_gifts=[
-                               {
-                                   "image": "/static/gift1.jpg",
-                                   "title": "限定皮肤套装",
-                                   "subtitle": "2024夏季限定"
-                               },
-                               # 其他福利数据...
-                           ]
-                           )
+class HashCoder:
+    def __init__(self):
+        self.char_set = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+        self.block_size = 16  # 每个压缩块处理16字节
+
+    def compress(self, hex_hash: str) -> str:
+        # 将64字符HEX转换为32字节二进制
+        byte_data = bytes.fromhex(hex_hash)
+        # 转换为更紧凑的Base62格式
+        return self._base10_to_base62(int.from_bytes(byte_data, 'big'))
+
+    def restore(self, code: str) -> str:
+        # Base62转回原始数值
+        num = self._base62_to_base10(code)
+        # 转换回字节数据
+        byte_data = num.to_bytes(32, 'big')
+
+        return byte_data.hex()
+
+    def _base10_to_base62(self, number: int) -> str:
+        if number == 0:
+            return self.char_set[0]
+
+        base = len(self.char_set)
+        digits = []
+        while number > 0:
+            number, rem = divmod(number, base)
+            digits.append(self.char_set[rem])
+        return ''.join(reversed(digits))
+
+    def _base62_to_base10(self, code: str) -> int:
+        base = len(self.char_set)
+        num = 0
+        for i, c in enumerate(reversed(code)):
+            num += self.char_set.index(c) * (base ** i)
+        return num
+
+
+coder = HashCoder()
+
+
+@app.route('/hash/compress', methods=['GET', 'POST'])
+def compress_route():
+    hex_hash = request.args.get('hex_hash') or (request.json and request.json.get('hex_hash'))
+    if not hex_hash:
+        return jsonify({"status": "error", "message": "Missing hex_hash parameter"}), 400
+    try:
+        compressed = coder.compress(hex_hash.lower())
+        return jsonify({"status": "success", "compressed": compressed})
+    except ValueError as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+
+
+@app.route('/hash/restore', methods=['GET', 'POST'])
+def restore_route():
+    code = request.args.get('code') or (request.json and request.json.get('code'))
+    if not code:
+        return jsonify({"status": "error", "message": "Missing code parameter"}), 400
+    try:
+        restored = coder.restore(code)
+        return jsonify({"status": "success", "restored": restored})
+    except ValueError as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
 
 
 @app.errorhandler(404)
