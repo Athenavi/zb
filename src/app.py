@@ -667,12 +667,10 @@ def article_passwd(aid):
         pass
     finally:
         db.close()
-        return None
 
 
 @app.route('/api/article/unlock', methods=['GET', 'POST'])
-@jwt_required
-def api_article_unlock(user_id):
+def api_article_unlock():
     try:
         aid = int(request.args.get('aid'))
     except (TypeError, ValueError):
@@ -692,6 +690,7 @@ def api_article_unlock(user_id):
         return jsonify({"message": "Invalid Password"}), 400
 
     passwd = article_passwd(aid) or None
+    #print(passwd)
 
     if passwd is None:
         return jsonify({"message": "Authentication failed"}), 401
@@ -703,7 +702,7 @@ def api_article_unlock(user_id):
         return jsonify(response_data), 200
     else:
         referrer = request.referrer
-        app.logger.error(f"{referrer} Failed access attempt {view_uuid} :  {user_id}")
+        app.logger.error(f"{referrer} Failed access attempt {view_uuid}")
         return jsonify({"message": "Authentication failed"}), 401
 
 
