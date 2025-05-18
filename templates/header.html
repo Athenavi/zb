@@ -6,12 +6,6 @@
         <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
               as="style">
         <link rel="preload" href="/static/css/tailwind.min.css" as="style">
-        <link rel="preload" href="/static/css/header.css" as="style">
-
-        <!-- 样式表 -->
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-        <link rel="stylesheet" href="/static/css/tailwind.min.css">
-        <link rel="stylesheet" href="/static/css/header.css">
         <style>
             @keyframes float {
                 0%, 100% {
@@ -109,85 +103,54 @@
             <a href="/" class="flex items-center space-x-2 hover:opacity-80 transition-opacity">
                 <img src="/favicon.ico" alt="Logo" class="h-8 w-8">
             </a>
-
             <div class="hidden md:flex space-x-4">
                 <!-- 我的 导航组 -->
-                <div class="dropdown-group relative">
-                    <button class="px-4 py-2 text-text hover:bg-accent/20 rounded-lg text-theme-gradient">
-                        我的 ▼
-                    </button>
-                    <div class="dropdown-content absolute right-0 mt-2 w-48 origin-top-right scale-95 opacity-0
-                  bg-secondary rounded-lg shadow-xl transition-all duration-200">
-                        <a href="/profile"
-                           class="block px-4 py-3 text-text hover:bg-accent/10 text-theme-gradient first:rounded-t-lg">
-                            个人中心
-                        </a>
-                        <a href="/setting/profiles"
-                           class="block px-4 py-3 text-text hover:bg-accent/10 text-theme-gradient">
-                            设置
-                        </a>
-                        <a href="/media"
-                           class="block px-4 py-3 text-text hover:bg-accent/10 text-theme-gradient last:rounded-b-lg">
-                            媒体
-                        </a>
-                    </div>
-                </div>
-
-                <!-- 更多 导航组 -->
-                <div class="dropdown-group relative">
-                    <button class="px-4 py-2 text-text hover:bg-accent/20 rounded-lg text-theme-gradient">
-                        更多 ▼
-                    </button>
-                    <div class="dropdown-content absolute right-0 mt-2 w-48 origin-top-right scale-95 opacity-0
-                  bg-secondary rounded-lg shadow-xl transition-all duration-200">
-                        <a href="/links" class="block px-4 py-3 text-text hover:bg-accent/10 text-theme-gradient">
-                            友链
-                        </a>
-                        <a href="/changelog" class="block px-4 py-3 text-text hover:bg-accent/10 text-theme-gradient">
-                            更新日志
-                        </a>
-                        <a href="/guestbook"
-                           class="block px-4 py-3 text-text hover:bg-accent/10 text-theme-gradient last:rounded-b-lg">
-                            留言
-                        </a>
-                    </div>
-                </div>
+                <a href="/profile"
+                   class="block px-4 py-3 text-text hover:bg-accent/10 text-theme-gradient first:rounded-t-lg">
+                    个人中心
+                </a>
+                <a href="/setting/profiles"
+                   class="block px-4 py-3 text-text hover:bg-accent/10 text-theme-gradient">
+                    设置
+                </a>
             </div>
         </nav>
     </header>
-
     <!-- 右键菜单优化 -->
     <div id="context-menu" class="fixed hidden min-w-[160px] bg-secondary/95 backdrop-blur-sm
                                 border border-accent rounded-xl shadow-2xl overflow-hidden
                                 transition-opacity duration-150">
         <ul class="py-2">
-            <li class="menu-item">
-                <button class="p-2 text-text hover:bg-accent/20 rounded-full text-theme-gradient">
+            <li>
+                <button class="p-2 text-text  rounded-full text-theme-gradient">
                     🎨
                 </button>
                 <div class="flex space-x-2">
                     <button data-theme="dark-space"
                             class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-400 hover:scale-110 transition-transform shadow-lg ring-2 ring-white"
-                            onclick="changeTheme(this)"></button>
+                            onclick="changeTheme(this)"
+                            title="暗夜星河"></button>
                     <button data-theme="twilight-gem"
                             class="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-300 hover:scale-110 transition-transform shadow-lg"
-                            onclick="changeTheme(this)"></button>
+                            onclick="changeTheme(this)"
+                            title="黄昏宝石"></button>
                     <button data-theme="crimson-dynasty"
                             class="w-8 h-8 rounded-full bg-gradient-to-br from-rose-600 to-pink-500 hover:scale-110 transition-transform shadow-lg"
-                            onclick="changeTheme(this)"></button>
+                            onclick="changeTheme(this)"
+                            title="绯红王朝"></button>
                     <button data-theme="golden-flow"
                             class="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-yellow-400 hover:scale-110 transition-transform shadow-lg"
-                            onclick="changeTheme(this)"></button>
+                            onclick="changeTheme(this)"
+                            title="金色流光"></button>
                     <button data-theme="aurora-dream"
                             class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-green-400 hover:scale-110 transition-transform shadow-lg"
-                            onclick="changeTheme(this)"></button>
+                            onclick="changeTheme(this)"
+                            title="极光之梦"></button>
                 </div>
             </li>
-            <li class="menu-item" data-action="home">🏠 主页</li>
-            <li class="menu-item" data-action="refresh">🔄 刷新</li>
-            <li class="menu-item" data-action="search">🔍 搜索</li>
-            <li class="menu-item" data-action="travel">🎲 随机文章</li>
-            <li class="menu-item" data-action="guestbook">📝 留言板</li>
+            <li class="text-gray-700 hover:text-red-600" data-action="home">🏠 主页</li>
+            <li class="text-gray-700 hover:text-red-600" data-action="refresh">🔄 刷新</li>
+            <li class="text-gray-700 hover:text-red-600" data-action="search">🔍 搜索</li>
         </ul>
     </div>
 
@@ -222,32 +185,6 @@
 
         // 通用组件初始化
         document.addEventListener('DOMContentLoaded', () => {
-            // 下拉菜单交互
-            document.querySelectorAll('.dropdown-group').forEach(group => {
-                const button = group.querySelector('button');
-                const menu = group.querySelector('.dropdown-content');
-
-                const toggleMenu = () => {
-                    const isOpen = menu.classList.contains('opacity-100');
-                    menu.classList.toggle('opacity-0', isOpen);
-                    menu.classList.toggle('opacity-100', !isOpen);
-                    menu.classList.toggle('scale-95', !isOpen);
-                    menu.classList.toggle('scale-100', !isOpen);
-                }
-
-                button.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    toggleMenu();
-                });
-
-                document.addEventListener('click', (e) => {
-                    if (!group.contains(e.target)) {
-                        menu.classList.add('opacity-0', 'scale-95');
-                        menu.classList.remove('opacity-100', 'scale-100');
-                    }
-                });
-            });
-
             // 右键菜单
             const contextMenu = document.getElementById('context-menu');
             const menuActions = {
