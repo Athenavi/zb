@@ -96,7 +96,6 @@ create table articles
     hidden       tinyint(1)                             default 0                 not null comment '是否隐藏 1 隐藏 0 不隐藏',
     views        bigint unsigned                        default '0'               not null comment '浏览次数',
     likes        bigint unsigned                        default '0'               not null comment '点赞数',
-    comments     bigint unsigned                        default '0'               not null comment '评论数',
     status       enum ('Draft', 'Published', 'Deleted') default 'Draft'           null comment '文章状态: 草稿/已发布/已删除',
     cover_image  varchar(255)                                                     null comment '封面图片路径',
     article_type varchar(50)                                                      null comment '文章类型',
