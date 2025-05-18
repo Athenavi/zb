@@ -1464,9 +1464,8 @@ def markdown_editor(user_id, aid):
         all_info = get_article_metadata(aid)
         if request.method == 'GET':
             edit_html = edit_article_content(all_info[1], max_line=app.config['MAX_LINE'])
-            return render_template('editor.html', edit_html=edit_html, aid=aid, articleName=all_info[1],
-                                   tags=all_info[12], user_id=user_id, article_surl=None,
-                                   coverImage=f"/api/cover/{aid}.png",
+            return render_template('editor.html', edit_html=edit_html, aid=aid,
+                                   user_id=user_id, coverImage=f"/api/cover/{aid}.png",
                                    all_info=all_info)
         elif request.method == 'POST':
             content = request.json['content']
