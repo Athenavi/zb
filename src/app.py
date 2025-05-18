@@ -9,7 +9,7 @@ import time
 import uuid
 from datetime import timedelta
 from pathlib import Path
-from functools import lru_cache
+
 import markdown
 import qrcode
 import requests
@@ -366,83 +366,168 @@ def api_mail(user_id):
     return 'success'
 
 
+from functools import lru_cache
+from threading import Lock
+
+# 用线程锁保证缓存操作的原子性
+cache_lock = Lock()
+
+
+# 自定义LRU缓存管理器
+class FollowCache:
+    def __init__(self, max_size=2048):
+        self.max_size = max_size
+        self.cache = {}
+
+    def get(self, user_id):
+        with cache_lock:
+            # 获取并更新最近使用
+            if user_id in self.cache:
+                value = self.cache.pop(user_id)
+                self.cache[user_id] = value
+                return value.copy()  # 返回副本防止外部修改
+            return None
+
+    def set(self, user_id, value):
+        with cache_lock:
+            if len(self.cache) >= self.max_size:
+                # 移除最久未使用的条目
+                self.cache.pop(next(iter(self.cache)))
+            self.cache[user_id] = set(value) if value else set()
+
+    def delete(self, user_id):
+        with cache_lock:
+            if user_id in self.cache:
+                del self.cache[user_id]
+
+
+# 初始化缓存（示例设置为最多缓存512个用户的关注列表）
+follow_cache = FollowCache(max_size=512)
+
+
 @app.route('/api/follow', methods=['GET', 'POST'])
 @jwt_required
 def follow_user(user_id):
     follow_id = request.args.get('fid')
+    if not follow_id:
+        return jsonify({'follow_code': 'failed', 'message': '参数错误'})
+    # 确保ID类型一致
+    user_id = int(user_id)
+    follow_id = int(follow_id)
+    # GET请求处理（检查关注状态）
+    if request.method == 'GET':
+        # 尝试从缓存获取
+        cached_follows = follow_cache.get(user_id)
 
-    if not user_id or not follow_id:
-        return jsonify({'follow_code': 'failed', 'message': '用户ID或关注ID不能为空'})
+        if cached_follows is not None:
+            is_following = follow_id in cached_follows
+            return jsonify({'follow_code': 'success' if is_following else 'not_followed'})
 
-    # 首次尝试从缓存中读取用户的关注列表
-    user_followed = cache.get(f'{user_id}_followed')
-
-    # 如果缓存为空，则从数据库中获取所有关注并缓存
-    if user_followed is None:
+        # 缓存未命中，查询数据库
         db = get_db_connection()
         try:
             with db.cursor() as cursor:
-                cursor.execute("SELECT `subscribed_user_id` FROM `user_subscriptions` WHERE `subscriber_id` = %s",
-                               (int(user_id),))
-                user_followed = [row[0] for row in cursor.fetchall()]  # 获取所有关注ID
-                cache.set(f'{user_id}_followed', user_followed)  # 更新缓存
+                cursor.execute(
+                    "SELECT subscribed_user_id FROM user_subscriptions WHERE subscriber_id = %s",
+                    (user_id,)
+                )
+                follows = {row[0] for row in cursor.fetchall()}
+                # 更新缓存（空集合也缓存）
+                follow_cache.set(user_id, follows)
+                return jsonify({'follow_code': 'success' if follow_id in follows else 'not_followed'})
         except Exception as e:
-            app.logger.error(f"Exception occurred when loading from DB: {e}")
-            return jsonify({'follow_code': 'failed', 'message': "error"})
+            app.logger.error(f"数据库查询失败: {e}")
+            return jsonify({'follow_code': 'failed', 'message': '服务异常'})
         finally:
             db.close()
-            return None
 
-    # 检查是否已经关注过
-    if follow_id in user_followed:
-        return jsonify({'follow_code': 'success', 'message': '已关注'})
+    # POST请求处理（执行关注）
+    elif request.method == 'POST':
+        db = get_db_connection()
+        try:
+            with db.cursor() as cursor:
+                # 检查现有关系
+                cursor.execute(
+                    "SELECT 1 FROM user_subscriptions WHERE subscriber_id = %s AND subscribed_user_id = %s",
+                    (user_id, follow_id)
+                )
+                if cursor.fetchone():
+                    return jsonify({'follow_code': 'success', 'message': '已关注'})
 
-    db = get_db_connection()
-    try:
-        with db.cursor() as cursor:
-            # 进行关注操作
-            insert_query = ("INSERT INTO `user_subscriptions` (`subscriber_id`, `subscribed_user_id`) VALUES "
-                            "(%s, %s)")
-            cursor.execute(insert_query, (int(user_id), int(follow_id)))
-            db.commit()
+                # 插入新关系
+                cursor.execute(
+                    "INSERT INTO user_subscriptions (subscriber_id, subscribed_user_id) VALUES (%s, %s)",
+                    (user_id, follow_id)
+                )
+                db.commit()
 
-            user_followed.append(follow_id)  # 更新列表
-            cache.set(f'{user_id}_followed', user_followed)  # 更新缓存
-            return jsonify({'follow_code': 'success'})
+                # 更新缓存
+                cached = follow_cache.get(user_id)
+                if cached is not None:
+                    cached.add(follow_id)
+                else:
+                    follow_cache.delete(user_id)  # 使缓存失效
 
-    except Exception as e:
-        app.logger.error(f"Exception occurred: {e}")
-        return jsonify({'follow_code': 'failed', 'message': "error"})
+                return jsonify({'follow_code': 'success'})
 
-    finally:
-        db.close()
-        return None
+        except Exception as e:
+            db.rollback()
+            app.logger.error(f"关注失败: {e}")
+            return jsonify({'follow_code': 'failed', 'message': '操作失败'})
+        finally:
+            db.close()
 
 
-@app.route('/api/unfollow', methods=['GET', 'POST'])
+@app.route('/api/unfollow', methods=['POST'])
 @jwt_required
 def unfollow_user(user_id):
     unfollow_id = request.args.get('fid')
-    if not user_id or not unfollow_id:
-        return jsonify({'unfollow_code': 'failed', 'message': '操作无效'})
+
+    if not unfollow_id:
+        return jsonify({'code': 'failed', 'message': '参数错误'})
+
+    try:
+        user_id = int(user_id)
+        unfollow_id = int(unfollow_id)
+    except ValueError as e:
+        app.logger.error(f"ID类型转换失败: {e}")
+        return jsonify({'code': 'failed', 'message': '非法用户ID'})
 
     db = get_db_connection()
-    unfollow_code = 'failed'
-    message = 'error'
     try:
         with db.cursor() as cursor:
-            # 进行取关操作
-            delete_query = "DELETE FROM `user_subscriptions` WHERE `subscriber_id` = %s AND `subscribed_user_id` = %s"
+            delete_query = """
+                           DELETE \
+                           FROM user_subscriptions
+                           WHERE subscriber_id = %s \
+                             AND subscribed_user_id = %s \
+                           """
             cursor.execute(delete_query, (user_id, unfollow_id))
+            affected_rows = cursor.rowcount  # 正确获取影响行数
             db.commit()
-            cache.set(f'{user_id}_followed', None)
-            unfollow_code = 'success'
-            message = '成功取关'
+
+            if affected_rows > 0:
+                # 更新缓存
+                cached_data = follow_cache.get(user_id)
+                if cached_data is not None:
+                    try:
+                        cached_data.remove(unfollow_id)  # 使用remove确保数据一致性
+                        follow_cache.set(user_id, cached_data)
+                    except KeyError:
+                        pass
+                else:
+                    follow_cache.delete(user_id)
+
+                return jsonify({'code': 'success', 'message': '取关成功'})
+            else:
+                return jsonify({'code': 'failed', 'message': '未找到关注关系'})
+
     except Exception as e:
-        app.logger.error(f"Exception occurred during unfollow: {e}, user_id: {user_id}, unfollow_id: {unfollow_id}")
+        db.rollback()
+        app.logger.error(f"取关操作失败: {e}, 用户: {user_id}, 目标: {unfollow_id}")
+        return jsonify({'code': 'failed', 'message': '服务器错误'})
     finally:
         db.close()
-        return jsonify({'unfollow_code': unfollow_code, 'message': message})
 
 
 @app.route('/like', methods=['GET', 'POST'])
@@ -1370,7 +1455,7 @@ def user_space(user_id, target_id):
     owner_articles = get_articles_by_owner(owner_id=target_id) or []
     target_username = api_user_profile(user_id=target_id)[1] or "佚名"
     return render_template('Profile.html', url_for=url_for, avatar_url=api_user_avatar(target_id, 'id'),
-                           username=target_username,
+                           target_username=target_username,
                            userBio=user_bio, follower=get_follower_count(user_id=target_id, subscribe_type='User'),
                            following=get_following_count(user_id=target_id, subscribe_type='User'),
                            target_id=target_id, user_id=user_id,
@@ -1785,7 +1870,7 @@ def mark_all_as_read(user_id):
 class HashCoder:
     def __init__(self):
         self.char_set = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-        self.block_size = 16  # 每个压缩块处理16字节
+        self.block_size = 16  # 每个压缩块处理16个字节
 
     def compress(self, hex_hash: str) -> str:
         # 将64字符HEX转换为32字节二进制

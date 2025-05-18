@@ -26,7 +26,8 @@
                 <!-- 用户信息 -->
                 <div class="flex-1 w-full">
                     <div class="flex items-baseline justify-between">
-                        <h2 class="text-2xl font-bold text-gray-800">{{ username }}</h2>
+                        <h2 class="text-2xl font-bold text-gray-800">
+                            {% if target_username %}{{ target_username }}{% else %}{{ username }}{% endif %}</h2>
                         <div class="flex items-center space-x-2">
                             <a href="/message" class="text-gray-500 hover:text-blue-600">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
@@ -101,7 +102,7 @@
                              class="article-item group p-4 rounded-lg hover:bg-gray-50 transition-colors duration-200
             {% if loop.index0 >= 10 %}hidden{% endif %}">
                             <div class="flex items-center justify-between">
-                                <a href="{{ url_for('blog_detail', article=article[1]) }}"
+                                <a href="{{ url_for('blog_detail', title=article[1]) }}"
                                    class="text-lg font-medium text-gray-800 hover:text-blue-600">
                                     {{ article[1] }}
                                 </a>
