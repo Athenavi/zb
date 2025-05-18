@@ -401,8 +401,7 @@ class FollowCache:
                 del self.cache[user_id]
 
 
-# 初始化缓存（示例设置为最多缓存512个用户的关注列表）
-follow_cache = FollowCache(max_size=512)
+follow_cache = FollowCache(max_size=2048)
 
 
 @app.route('/api/follow', methods=['GET', 'POST'])
@@ -530,37 +529,35 @@ def unfollow_user(user_id):
         db.close()
 
 
-@app.route('/like', methods=['GET', 'POST'])
+@app.route('/like', methods=['POST'])
 @jwt_required
 def like(user_id):
     aid = request.args.get('aid')
-    if request.method == 'POST':
-        if not aid:
-            return jsonify({'like_code': 'failed', 'message': "error"})
-        if user_id == 0:
-            return jsonify({'like_code': 'failed', 'message': "请登录后操作"})
-        user_liked = cache.get(f'{user_id}_liked')
-        if user_liked is None:
-            user_liked = []
-        if aid in user_liked:
-            return jsonify({'like_code': 'failed', 'message': "你已经点赞过了!!"})
-        db = get_db_connection()
-        try:
-            with db.cursor() as cursor:
-                query = "UPDATE `articles` SET `Likes` = `Likes` + 1 WHERE `articles`.`article_id` = %s;"
-                cursor.execute(query, (int(aid),))
-                db.commit()
-                user_liked.append(aid)
-                cache.set(f'{user_id}_liked', user_liked)
-                return jsonify({'like_code': 'success'})
+    if not aid:
+        return jsonify({'like_code': 'failed', 'message': "error"})
+    if user_id == 0:
+        return jsonify({'like_code': 'failed', 'message': "请登录后操作"})
 
-        except Exception as e:
-            return jsonify({'like_code': 'failed', 'message': str(e)})
-        finally:
-            db.close()
-            return None
-    else:
-        return jsonify({'like_code': 'failed'})
+    user_liked = cache.get(f'{user_id}_liked')
+    if user_liked is None:
+        user_liked = []
+    if aid in user_liked:
+        return jsonify({'like_code': 'failed', 'message': "你已经点赞过了!!"})
+
+    db = get_db_connection()
+    try:
+        with db.cursor() as cursor:
+            query = "UPDATE `articles` SET `Likes` = `Likes` + 1 WHERE `articles`.`article_id` = %s;"
+            cursor.execute(query, (int(aid),))
+            db.commit()
+            user_liked.append(aid)
+            cache.set(f'{user_id}_liked', user_liked)
+            return jsonify({'like_code': 'success'})
+
+    except Exception as e:
+        return jsonify({'like_code': 'failed', 'message': str(e)})
+    finally:
+        db.close()
 
 
 @app.route("/qrlogin")
@@ -1115,7 +1112,6 @@ def index_html():
                    user_id,
                    Views,
                    Likes,
-                   Comments,
                    cover_image,
                    article_type,
                    excerpt,
@@ -1173,7 +1169,6 @@ def tag_page(tag_name):
                    user_id,
                    Views,
                    Likes,
-                   Comments,
                    cover_image,
                    article_type,
                    excerpt,
@@ -1220,7 +1215,6 @@ def featured_page():
                    user_id,
                    Views,
                    Likes,
-                   Comments,
                    cover_image,
                    article_type,
                    excerpt,
