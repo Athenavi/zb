@@ -60,8 +60,10 @@ def handle_user_upload(user_id, allowed_size, allowed_mimes, check_existing=Fals
 
                 # 检查哈希是否已存在
                 cursor.execute(
-                    """SELECT hash, storage_path FROM file_hashes 
-                       WHERE hash = %s AND mime_type = %s""",
+                    """SELECT hash, storage_path
+                       FROM file_hashes
+                       WHERE hash = %s
+                         AND mime_type = %s""",
                     (file_hash, mime_type)
                 )
                 existing_file = cursor.fetchone()
@@ -73,9 +75,10 @@ def handle_user_upload(user_id, allowed_size, allowed_mimes, check_existing=Fals
                     print(f'Reuse existing file: {storage_path}')
                     # 增加引用计数
                     cursor.execute(
-                        """UPDATE file_hashes 
+                        """UPDATE file_hashes
                            SET reference_count = reference_count + 1
-                           WHERE hash = %s AND mime_type = %s""",
+                           WHERE hash = %s
+                             AND mime_type = %s""",
                         (file_hash, mime_type)
                     )
                 else:
@@ -92,8 +95,8 @@ def handle_user_upload(user_id, allowed_size, allowed_mimes, check_existing=Fals
 
                     # 插入文件哈希记录
                     cursor.execute(
-                        """INSERT INTO file_hashes 
-                           (hash, filename, file_size, mime_type, storage_path, reference_count)
+                        """INSERT INTO file_hashes
+                               (hash, filename, file_size, mime_type, storage_path, reference_count)
                            VALUES (%s, %s, %s, %s, %s, 1)
                            ON DUPLICATE KEY UPDATE reference_count = reference_count + 1""",
                         (file_hash, filename, len(file_data), mime_type, storage_path)
@@ -102,8 +105,8 @@ def handle_user_upload(user_id, allowed_size, allowed_mimes, check_existing=Fals
                 # 插入媒体记录（即使文件已存在也需要记录用户关联）
                 try:
                     cursor.execute(
-                        """INSERT INTO media 
-                           (user_id, hash, original_filename)
+                        """INSERT INTO media
+                               (user_id, hash, original_filename)
                            VALUES (%s, %s, %s)""",
                         (user_id, file_hash, secure_filename(f.filename))
                     )
@@ -140,3 +143,77 @@ def save_bulk_article_db(filename, user_id):
     except Exception as e:
         print(f"Error in saving to database: {e}")
         return False
+
+
+def process_single_upload(f, user_id, allowed_size, allowed_mimes, db):
+    """
+    处理单个上传文件，返回 (storage_path, file_hash)
+    若出现异常，则抛出错误，让上层捕获记录错误信息。
+    """
+    # 检查文件大小（注意：有时 f.content_length 可能为空，因此以读取后的字节长度为准）
+    if f.content_length and f.content_length > allowed_size:
+        raise Exception(f"文件大小超过限制: {allowed_size / 1024 / 1024:.2f}MB")
+
+    file_data = f.read()
+    if len(file_data) > allowed_size:
+        raise Exception(f"文件大小超过限制: {allowed_size / 1024 / 1024:.2f}MB")
+
+    # 计算文件 SHA256 哈希
+    file_hash = hashlib.sha256(file_data).hexdigest()
+    f.seek(0)  # 重置文件指针（如后续需要重新读取）
+
+    # 校验 MIME 类型
+    mime_type = magic.from_buffer(file_data, mime=True)
+    if mime_type not in allowed_mimes:
+        raise Exception(f"无效的 MIME 类型: {mime_type}")
+
+    cursor = db.cursor()
+    # 检查该文件是否已存在
+    cursor.execute(
+        """SELECT hash, storage_path
+           FROM file_hashes
+           WHERE hash = %s
+             AND mime_type = %s""",
+        (file_hash, mime_type)
+    )
+    existing_file = cursor.fetchone()
+
+    if existing_file:
+        storage_path = existing_file[1]
+        # 已存在则增加引用计数
+        cursor.execute(
+            """UPDATE file_hashes
+               SET reference_count = reference_count + 1
+               WHERE hash = %s
+                 AND mime_type = %s""",
+            (file_hash, mime_type)
+        )
+    else:
+        # 生成存储路径：利用哈希前两位作为目录分片
+        hash_prefix = file_hash[:2]
+        hash_subdir = os.path.join('hashed_files', hash_prefix)
+        os.makedirs(hash_subdir, exist_ok=True)
+        storage_path = os.path.join(hash_subdir, file_hash)
+        with open(storage_path, 'wb') as dest:
+            dest.write(file_data)
+        cursor.execute(
+            """INSERT INTO file_hashes
+                   (hash, filename, file_size, mime_type, storage_path, reference_count)
+               VALUES (%s, %s, %s, %s, %s, 1)
+               ON DUPLICATE KEY UPDATE reference_count = reference_count + 1""",
+            (file_hash, f.filename, len(file_data), mime_type, storage_path)
+        )
+
+    # 插入媒体记录（即使文件复用也要记录用户关联）
+    try:
+        cursor.execute(
+            """INSERT INTO media
+                   (user_id, hash, original_filename)
+               VALUES (%s, %s, %s)""",
+            (user_id, file_hash, secure_filename(f.filename))
+        )
+    except Exception as e:
+        db.rollback()
+        raise Exception("插入媒体记录失败: " + str(e))
+
+    return storage_path, file_hash
