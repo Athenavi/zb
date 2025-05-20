@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>编辑文章</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/simplemde/latest/simplemde.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vditor/dist/index.css"/>
 </head>
 {% from 'header.html' import SimpleHeader %}
 {{ SimpleHeader(title) }}
@@ -117,7 +117,7 @@
         <!-- 编辑器 -->
         <div class="mt-8">
             <label class="block text-sm font-medium text-gray-700 mb-2">文章内容</label>
-            <textarea id="md-editor" class="w-full rounded-md border-gray-300 shadow-sm">{{ edit_html }}</textarea>
+            <div id="vditor" class="w-full rounded-md border-gray-300 shadow-sm">{{ edit_html }}</div>
         </div>
     </div>
 </div>
@@ -125,13 +125,65 @@
 {% from 'footer.html' import SimpleFooter %}
 {{ SimpleFooter(title,beian) }}
 </html>
-<!-- 引入 SimpleMDE JS -->
-<script src="https://cdn.jsdelivr.net/simplemde/latest/simplemde.min.js"></script>
+<!-- 引入 SimpleMDE JS<script src="https://cdn.jsdelivr.net/simplemde/latest/simplemde.min.js"></script> -->
+<script src="https://cdn.jsdelivr.net/npm/vditor/dist/index.min.js"></script>
 <script>
-    var simplemde = new SimpleMDE({element: document.getElementById("md-editor")});
+    const vditor = new Vditor('vditor', {
+        height: 600,
+        upload: {
+            url: '/api/upload/files',
+            fieldName: 'file',
+            withCredentials: true,
+            success: function (editor, msg) {
+                console.log('上传返回数据:', msg);
+
+                try {
+                    const response = JSON.parse(msg);
+                    if (response.code === 0) {
+                        let succMap = response.data.succMap;
+                        for (const fileName in succMap) {
+                            const url = succMap[fileName];
+                            // 直接插入 Markdown 图片语法
+                            vditor.insertValue(`\n![${fileName}](${url})\n`);
+                        }
+                    } else {
+                        console.error('上传成功但返回异常:', response.msg);
+                    }
+                } catch (e) {
+                    console.error('解析返回数据失败:', e);
+                }
+            },
+            format: function (files, responseText) {
+                console.log("服务器返回数据:", responseText);
+
+                try {
+                    const response = JSON.parse(responseText);
+                    if (response.code === 0) {
+                        return {
+                            "msg": "",
+                            "code": 0,
+                            "data": {
+                                "errFiles": response.data.errFiles || [],
+                                "succMap": response.data.succMap || {}
+                            }
+                        };
+                    }
+                } catch (e) {
+                    console.error('格式转换错误:', e);
+                }
+
+                return responseText;
+            }
+
+
+        }
+    });
+</script>
+
+<script>
     document.getElementById("save-button").addEventListener("click", function () {
         var title = `{{ articleName }}`;
-        var content = simplemde.value();
+        var content = vditor.getValue();
         var excerpt = document.getElementById("txtExcerpt").value;
         var status = document.querySelector('input[name="rStatus"]:checked').value;
         var hiddenStatus = document.querySelector('input[name="HiddenStatus"]:checked').value;

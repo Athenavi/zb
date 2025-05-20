@@ -104,7 +104,15 @@ app.config['ALLOWED_MIMES'] = [
     'video/x-flv',
     'video/webm',
     'video/x-m4v',
-    'video/3gpp'
+    'video/3gpp',
+
+    # 常见音频格式
+    'audio/wav',
+    'audio/mpeg',
+    'audio/ogg',
+    'audio/flac',
+    'audio/aac',
+    'audio/mp3'
 ]
 app.config['UPLOAD_LIMIT'] = 60 * 1024 * 1024
 # 定义文件最大可编辑的行数
