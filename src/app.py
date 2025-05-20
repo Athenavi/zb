@@ -412,77 +412,70 @@ class FollowCache:
 follow_cache = FollowCache(max_size=2048)
 
 
-@app.route('/api/follow', methods=['GET', 'POST'])
+@app.route('/api/follow', methods=['POST'])
 @jwt_required
 def follow_user(user_id):
+    current_user_id = user_id
     follow_id = request.args.get('fid')
-    if not follow_id:
-        return jsonify({'follow_code': 'failed', 'message': '参数错误'})
-    # 确保ID类型一致
-    user_id = int(user_id)
-    follow_id = int(follow_id)
-    # GET请求处理（检查关注状态）
-    if request.method == 'GET':
-        # 尝试从缓存获取
-        cached_follows = follow_cache.get(user_id)
 
+    # 参数校验
+    if not follow_id:
+        return jsonify({'code': 'failed', 'message': '参数错误'}), 400
+
+    try:
+        current_user_id = int(current_user_id)
+        follow_id = int(follow_id)
+    except ValueError:
+        return jsonify({'code': 'failed', 'message': '参数类型错误'}), 400
+
+    # 检查自我关注
+    if current_user_id == follow_id:
+        return jsonify({'code': 'failed', 'message': '不能关注自己'}), 400
+
+    db = None
+    try:
+        db = get_db_connection()
+        cursor = db.cursor()
+
+        # 检查是否已关注（缓存 -> 数据库）
+        cached_follows = follow_cache.get(current_user_id)
         if cached_follows is not None:
             is_following = follow_id in cached_follows
-            return jsonify({'follow_code': 'success' if is_following else 'not_followed'})
+        else:
+            cursor.execute(
+                "SELECT subscribed_user_id FROM user_subscriptions WHERE subscriber_id = %s",
+                (current_user_id,)
+            )
+            follows = {row[0] for row in cursor.fetchall()}
+            follow_cache.set(current_user_id, follows)
+            is_following = follow_id in follows
 
-        # 缓存未命中，查询数据库
-        db = get_db_connection()
-        try:
-            with db.cursor() as cursor:
-                cursor.execute(
-                    "SELECT subscribed_user_id FROM user_subscriptions WHERE subscriber_id = %s",
-                    (user_id,)
-                )
-                follows = {row[0] for row in cursor.fetchall()}
-                # 更新缓存（空集合也缓存）
-                follow_cache.set(user_id, follows)
-                return jsonify({'follow_code': 'success' if follow_id in follows else 'not_followed'})
-        except Exception as e:
-            app.logger.error(f"数据库查询失败: {e}")
-            return jsonify({'follow_code': 'failed', 'message': '服务异常'})
-        finally:
-            db.close()
+        # 如果已存在关注关系
+        if is_following:
+            return jsonify({'code': 'success', 'message': '已关注'})
 
-    # POST请求处理（执行关注）
-    elif request.method == 'POST':
-        db = get_db_connection()
-        try:
-            with db.cursor() as cursor:
-                # 检查现有关系
-                cursor.execute(
-                    "SELECT 1 FROM user_subscriptions WHERE subscriber_id = %s AND subscribed_user_id = %s",
-                    (user_id, follow_id)
-                )
-                if cursor.fetchone():
-                    return jsonify({'follow_code': 'success', 'message': '已关注'})
+        # 执行关注操作
+        cursor.execute(
+            "INSERT INTO user_subscriptions (subscriber_id, subscribed_user_id) VALUES (%s, %s)",
+            (current_user_id, follow_id)
+        )
+        db.commit()
 
-                # 插入新关系
-                cursor.execute(
-                    "INSERT INTO user_subscriptions (subscriber_id, subscribed_user_id) VALUES (%s, %s)",
-                    (user_id, follow_id)
-                )
-                db.commit()
+        # 更新缓存
+        if follow_cache.get(current_user_id) is not None:
+            follow_cache.get(current_user_id).add(follow_id)
+        else:
+            follow_cache.delete(current_user_id)
 
-                # 更新缓存
-                cached = follow_cache.get(user_id)
-                if cached is not None:
-                    cached.add(follow_id)
-                else:
-                    follow_cache.delete(user_id)  # 使缓存失效
+        return jsonify({'code': 'success'})
 
-                return jsonify({'follow_code': 'success'})
+    except Exception as e:
+        app.logger.error(f"系统异常: {e}")
+        if db: db.rollback()
+        return jsonify({'code': 'failed', 'message': '服务异常'}), 500
 
-        except Exception as e:
-            db.rollback()
-            app.logger.error(f"关注失败: {e}")
-            return jsonify({'follow_code': 'failed', 'message': '操作失败'})
-        finally:
-            db.close()
+    finally:
+        if db: db.close()
 
 
 @app.route('/api/unfollow', methods=['POST'])
