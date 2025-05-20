@@ -1,98 +1,94 @@
-function showImage(img) {
-    fetch('/media', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({img_name: img})
-    })
-        .then(response => response.blob())
-        .then(blob => {
-            const imageURL = URL.createObjectURL(blob);
-            document.getElementById('popup-image').src = imageURL;
-            document.getElementById('image-popup').style.display = 'block';
-        })
-        .catch(error => console.error(error));
-}
-
-function closeImage() {
-    document.getElementById('image-popup').style.display = 'none';
-}
-
 function closeVideo() {
     document.getElementById("video-image").src = ""; // 清空视频源
     document.getElementById("video-popup").classList.add("hidden"); // 隐藏弹窗
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-    const h3Elements = document.querySelectorAll('.card-title');
+let editMode = false;
 
-    h3Elements.forEach(element => {
-        if (element.textContent.trim().length > 12) {
-            const h6Element = document.createElement('h6');
-            h6Element.innerHTML = element.innerHTML;
-            element.parentNode.replaceChild(h6Element, element);
-        }
+function toggleEditMode() {
+    editMode = !editMode;
+    const checkboxes = document.querySelectorAll('.checkbox-container');
+    const batchBtn = document.getElementById('batch-delete-btn');
+    const editBtn = document.getElementById('edit-mode-btn');
+
+    checkboxes.forEach(checkbox => {
+        checkbox.style.display = editMode ? 'block' : 'none';
     });
-});
+    batchBtn.classList.toggle('hidden', !editMode);
+    editBtn.textContent = editMode ? '退出编辑' : '编辑模式';
+}
 
-async function deleteFile(filename) {
-    // 询问用户确认
-    const isConfirmed = confirm(`您确定要删除 ${filename} 吗？`);
+function updateSelectionCount() {
+    const selected = document.querySelectorAll('.file-checkbox:checked');
+    const batchBtn = document.getElementById('batch-delete-btn');
+    batchBtn.textContent = `删除选中项 (${selected.length})`;
+}
 
-    if (!isConfirmed) {
-        alert('取消删除操作。');
-        return; // 如果用户选择否，则退出函数
+async function batchDelete() {
+    const ids = Array.from(document.querySelectorAll('.file-checkbox:checked'))
+        .map(checkbox => checkbox.dataset.fileId);
+
+    // 检查是否选择了文件
+    if (ids.length === 0) {
+        showResultMessage('请先选择要删除的文件', 'yellow');
+        return;
     }
 
     try {
-        const response = await fetch(`/api/delete/${filename}`, {
+        const response = await fetch(`/media?file-id-list=${ids.join(',')}`, {
             method: 'DELETE',
             credentials: 'include',
         });
 
+        const result = await response.json();
         if (response.ok) {
-            const result = await response.json();
-            console.log('File deleted successfully:', result);
-            alert(filename + ' 删除成功！');
+            showResultMessage(`成功删除 ${result.deleted_count} 个文件`, 'green');
+            // 刷新页面以更新列表
+            setTimeout(() => location.reload(), 1500);
         } else {
-            console.error('Error deleting file:', response.statusText);
-            alert(filename + ' 失败！错误信息:' + response.statusText);
+            showResultMessage(result.message || '删除失败', 'red');
         }
     } catch (error) {
-        console.error('请求失败:', error);
+        showResultMessage('网络请求失败: ' + error.message, 'red');
     }
 }
 
-
-function setPreference(preference) {
-    document.cookie = `preference=${preference}; path=/; max-age=604800`;
-    document.getElementById('preferenceDiv').style.display = 'none';
-    document.getElementById('overlay').style.display = 'none';
-    window.location.reload();
+function showResultMessage(text, colorClass) {
+    const div = document.getElementById('result-message');
+    div.className = `${colorClass} bg-${colorClass}-100 border-${colorClass}-400 text-${colorClass}-700`;
+    div.textContent = text;
+    div.classList.remove('hidden');
+    setTimeout(() => div.classList.add('hidden'), 3000);
 }
 
-function getCookie(cname) {
-    const name = cname + "=";
-    const decodedCookie = decodeURIComponent(document.cookie);
-    const ca = decodedCookie.split(';');
-    for (let i = 0; i < ca.length; i++) {
-        let c = ca[i];
-        while (c.charAt(0) === ' ') {
-            c = c.substring(1);
+// 过滤媒体类型
+function filterMedia(btn, type) {
+    // 移除所有按钮的激活样式
+    document.querySelectorAll('.filter-btn').forEach(button => {
+        button.classList.remove('bg-blue-500', 'text-white');
+        button.classList.add('bg-gray-200');
+    });
+
+    // 添加当前按钮的激活样式
+    btn.classList.add('bg-blue-500', 'text-white');
+    btn.classList.remove('bg-gray-200');
+
+    // 遍历所有媒体项
+    document.querySelectorAll('li[data-type]').forEach(item => {
+        const itemType = item.getAttribute('data-type');
+        if (type === 'all') {
+            item.style.display = 'block'; // 显示所有
+        } else {
+            item.style.display = itemType === type ? 'block' : 'none'; // 按类型过滤
         }
-        if (c.indexOf(name) === 0) {
-            return c.substring(name.length, c.length);
-        }
-    }
-    return "";
+    });
+
+    // 更新复选框计数（如果有需要）
+    updateSelectionCount && updateSelectionCount();
 }
 
-window.onload = function () {
-    const preference = getCookie("preference");
-    if (!preference) {
-        document.getElementById('preferenceDiv').style.display = 'block';
-        document.getElementById('overlay').style.display = 'block';
-    }
-};
+function startVideo(hash) {
+    const videoSrc = `/shared?data=${hash}`;
+    document.getElementById("video-image").src = videoSrc;
+    document.getElementById("video-popup").classList.remove("hidden");
+}

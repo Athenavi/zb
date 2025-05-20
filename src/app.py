@@ -45,7 +45,7 @@ from src.media.processing import handle_cover_resize
 from src.other.report import report_add
 from src.other.search import search_handler
 from src.upload.admin_upload import admin_upload_file
-from src.upload.public_upload import handle_user_upload, save_bulk_article_db
+from src.upload.public_upload import handle_user_upload, save_bulk_article_db, process_single_upload
 from src.user.authz.core import secret_key, get_username
 from src.user.authz.decorators import jwt_required, admin_required, origin_required
 from src.user.authz.login import tp_mail_login
@@ -104,7 +104,15 @@ app.config['ALLOWED_MIMES'] = [
     'video/x-flv',
     'video/webm',
     'video/x-m4v',
-    'video/3gpp'
+    'video/3gpp',
+
+    # 常见音频格式
+    'audio/wav',
+    'audio/mpeg',
+    'audio/ogg',
+    'audio/flac',
+    'audio/aac',
+    'audio/mp3'
 ]
 app.config['UPLOAD_LIMIT'] = 60 * 1024 * 1024
 # 定义文件最大可编辑的行数
@@ -404,77 +412,70 @@ class FollowCache:
 follow_cache = FollowCache(max_size=2048)
 
 
-@app.route('/api/follow', methods=['GET', 'POST'])
+@app.route('/api/follow', methods=['POST'])
 @jwt_required
 def follow_user(user_id):
+    current_user_id = user_id
     follow_id = request.args.get('fid')
-    if not follow_id:
-        return jsonify({'follow_code': 'failed', 'message': '参数错误'})
-    # 确保ID类型一致
-    user_id = int(user_id)
-    follow_id = int(follow_id)
-    # GET请求处理（检查关注状态）
-    if request.method == 'GET':
-        # 尝试从缓存获取
-        cached_follows = follow_cache.get(user_id)
 
+    # 参数校验
+    if not follow_id:
+        return jsonify({'code': 'failed', 'message': '参数错误'}), 400
+
+    try:
+        current_user_id = int(current_user_id)
+        follow_id = int(follow_id)
+    except ValueError:
+        return jsonify({'code': 'failed', 'message': '参数类型错误'}), 400
+
+    # 检查自我关注
+    if current_user_id == follow_id:
+        return jsonify({'code': 'failed', 'message': '不能关注自己'}), 400
+
+    db = None
+    try:
+        db = get_db_connection()
+        cursor = db.cursor()
+
+        # 检查是否已关注（缓存 -> 数据库）
+        cached_follows = follow_cache.get(current_user_id)
         if cached_follows is not None:
             is_following = follow_id in cached_follows
-            return jsonify({'follow_code': 'success' if is_following else 'not_followed'})
+        else:
+            cursor.execute(
+                "SELECT subscribed_user_id FROM user_subscriptions WHERE subscriber_id = %s",
+                (current_user_id,)
+            )
+            follows = {row[0] for row in cursor.fetchall()}
+            follow_cache.set(current_user_id, follows)
+            is_following = follow_id in follows
 
-        # 缓存未命中，查询数据库
-        db = get_db_connection()
-        try:
-            with db.cursor() as cursor:
-                cursor.execute(
-                    "SELECT subscribed_user_id FROM user_subscriptions WHERE subscriber_id = %s",
-                    (user_id,)
-                )
-                follows = {row[0] for row in cursor.fetchall()}
-                # 更新缓存（空集合也缓存）
-                follow_cache.set(user_id, follows)
-                return jsonify({'follow_code': 'success' if follow_id in follows else 'not_followed'})
-        except Exception as e:
-            app.logger.error(f"数据库查询失败: {e}")
-            return jsonify({'follow_code': 'failed', 'message': '服务异常'})
-        finally:
-            db.close()
+        # 如果已存在关注关系
+        if is_following:
+            return jsonify({'code': 'success', 'message': '已关注'})
 
-    # POST请求处理（执行关注）
-    elif request.method == 'POST':
-        db = get_db_connection()
-        try:
-            with db.cursor() as cursor:
-                # 检查现有关系
-                cursor.execute(
-                    "SELECT 1 FROM user_subscriptions WHERE subscriber_id = %s AND subscribed_user_id = %s",
-                    (user_id, follow_id)
-                )
-                if cursor.fetchone():
-                    return jsonify({'follow_code': 'success', 'message': '已关注'})
+        # 执行关注操作
+        cursor.execute(
+            "INSERT INTO user_subscriptions (subscriber_id, subscribed_user_id) VALUES (%s, %s)",
+            (current_user_id, follow_id)
+        )
+        db.commit()
 
-                # 插入新关系
-                cursor.execute(
-                    "INSERT INTO user_subscriptions (subscriber_id, subscribed_user_id) VALUES (%s, %s)",
-                    (user_id, follow_id)
-                )
-                db.commit()
+        # 更新缓存
+        if follow_cache.get(current_user_id) is not None:
+            follow_cache.get(current_user_id).add(follow_id)
+        else:
+            follow_cache.delete(current_user_id)
 
-                # 更新缓存
-                cached = follow_cache.get(user_id)
-                if cached is not None:
-                    cached.add(follow_id)
-                else:
-                    follow_cache.delete(user_id)  # 使缓存失效
+        return jsonify({'code': 'success'})
 
-                return jsonify({'follow_code': 'success'})
+    except Exception as e:
+        app.logger.error(f"系统异常: {e}")
+        if db: db.rollback()
+        return jsonify({'code': 'failed', 'message': '服务异常'}), 500
 
-        except Exception as e:
-            db.rollback()
-            app.logger.error(f"关注失败: {e}")
-            return jsonify({'follow_code': 'failed', 'message': '操作失败'})
-        finally:
-            db.close()
+    finally:
+        if db: db.close()
 
 
 @app.route('/api/unfollow', methods=['POST'])
@@ -667,12 +668,10 @@ def article_passwd(aid):
         pass
     finally:
         db.close()
-        return None
 
 
 @app.route('/api/article/unlock', methods=['GET', 'POST'])
-@jwt_required
-def api_article_unlock(user_id):
+def api_article_unlock():
     try:
         aid = int(request.args.get('aid'))
     except (TypeError, ValueError):
@@ -692,6 +691,7 @@ def api_article_unlock(user_id):
         return jsonify({"message": "Invalid Password"}), 400
 
     passwd = article_passwd(aid) or None
+    # print(passwd)
 
     if passwd is None:
         return jsonify({"message": "Authentication failed"}), 401
@@ -703,7 +703,7 @@ def api_article_unlock(user_id):
         return jsonify(response_data), 200
     else:
         referrer = request.referrer
-        app.logger.error(f"{referrer} Failed access attempt {view_uuid} :  {user_id}")
+        app.logger.error(f"{referrer} Failed access attempt {view_uuid}")
         return jsonify({"message": "Authentication failed"}), 401
 
 
@@ -967,12 +967,6 @@ def api_avatar_image(avatar_uuid):
     return send_file(f'{base_dir}/avatar/{avatar_uuid}.webp', mimetype='image/webp')
 
 
-def get_outer_url(user_id):
-    f_hash = handle_user_upload(user_id=user_id, allowed_size=app.config['UPLOAD_LIMIT'],
-                                allowed_mimes=app.config['ALLOWED_MIMES'], check_existing=True)
-    return domain + 'shared/' + '?data=' + f_hash
-
-
 def zy_save_edit(aid, content, a_name):
     if content is None:
         raise ValueError("Content cannot be None")
@@ -1088,13 +1082,6 @@ def api_cover(cover_img):
     else:
         app.logger.warning("File not found, returning default image")
         return None
-
-
-@app.route('/api/media/upload', methods=['POST'])
-@jwt_required
-def upload_user_path(user_id):
-    return handle_user_upload(user_id=user_id, allowed_size=app.config['UPLOAD_LIMIT'],
-                              allowed_mimes=app.config['ALLOWED_MIMES'], check_existing=False)
 
 
 @app.route('/', methods=['GET'])
@@ -1860,69 +1847,85 @@ def mark_all_as_read(user_id):
     return response
 
 
-class HashCoder:
-    def __init__(self):
-        self.char_set = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-        self.block_size = 16  # 每个压缩块处理16个字节
-
-    def compress(self, hex_hash: str) -> str:
-        # 将64字符HEX转换为32字节二进制
-        byte_data = bytes.fromhex(hex_hash)
-        # 转换为更紧凑的Base62格式
-        return self._base10_to_base62(int.from_bytes(byte_data, 'big'))
-
-    def restore(self, code: str) -> str:
-        # Base62转回原始数值
-        num = self._base62_to_base10(code)
-        # 转换回字节数据
-        byte_data = num.to_bytes(32, 'big')
-
-        return byte_data.hex()
-
-    def _base10_to_base62(self, number: int) -> str:
-        if number == 0:
-            return self.char_set[0]
-
-        base = len(self.char_set)
-        digits = []
-        while number > 0:
-            number, rem = divmod(number, base)
-            digits.append(self.char_set[rem])
-        return ''.join(reversed(digits))
-
-    def _base62_to_base10(self, code: str) -> int:
-        base = len(self.char_set)
-        num = 0
-        for i, c in enumerate(reversed(code)):
-            num += self.char_set.index(c) * (base ** i)
-        return num
+@app.route('/api/media/upload', methods=['POST'])
+@jwt_required
+def upload_user_path(user_id):
+    return handle_user_upload(user_id=user_id, allowed_size=app.config['UPLOAD_LIMIT'],
+                              allowed_mimes=app.config['ALLOWED_MIMES'], check_existing=False)
 
 
-coder = HashCoder()
+def get_outer_url(file_hash):
+    """
+    根据文件哈希生成外链 URL
+    """
+    outer_url = domain + 'shared?data=' + file_hash
+    print(outer_url)
+    return outer_url
 
 
-@app.route('/hash/compress', methods=['GET', 'POST'])
-def compress_route():
-    hex_hash = request.args.get('hex_hash') or (request.json and request.json.get('hex_hash'))
-    if not hex_hash:
-        return jsonify({"status": "error", "message": "Missing hex_hash parameter"}), 400
+@app.route('/api/upload/files', methods=['POST'])
+@jwt_required
+def handle_file_upload(user_id):
+    """处理文件上传（严格匹配 Vditor 格式）"""
+    if 'file' not in request.files:
+        return jsonify({
+            "code": 400,
+            "msg": "未上传文件",
+            "data": {"errFiles": [], "succMap": {}}
+        }), 400
+
+    succ_map = {}
+    err_files = []
+    allowed_size = app.config['UPLOAD_LIMIT']
+    allowed_mimes = app.config['ALLOWED_MIMES']
+
     try:
-        compressed = coder.compress(hex_hash.lower())
-        return jsonify({"status": "success", "compressed": compressed})
-    except ValueError as e:
-        return jsonify({"status": "error", "message": str(e)}), 400
+        with get_db_connection() as db:
+            # 遍历所有上传的文件
+            for f in request.files.getlist('file'):
+                try:
+                    _, file_hash = process_single_upload(f, user_id, allowed_size, allowed_mimes, db)
+                    # 生成供外部访问的 URL
+                    file_url = get_outer_url(file_hash)
+                    succ_map[f.filename] = file_url
+                except Exception as e:
+                    err_files.append({
+                        "name": f.filename,
+                        "error": str(e)
+                    })
+            db.commit()
+    except Exception as e:
+        return jsonify({
+            "code": 500,
+            "msg": "服务器处理错误: " + str(e),
+            "data": {"errFiles": err_files, "succMap": succ_map}
+        }), 500
+
+    response_code = 0 if succ_map else 500
+    if succ_map and err_files:
+        response_msg = "部分成功"
+    elif succ_map:
+        response_msg = "成功"
+    else:
+        response_msg = "失败"
+
+    return jsonify({
+        "code": response_code,
+        "msg": response_msg,
+        "data": {
+            "errFiles": err_files,
+            "succMap": succ_map
+        }
+    })
 
 
-@app.route('/hash/restore', methods=['GET', 'POST'])
-def restore_route():
-    code = request.args.get('code') or (request.json and request.json.get('code'))
-    if not code:
-        return jsonify({"status": "error", "message": "Missing code parameter"}), 400
-    try:
-        restored = coder.restore(code)
-        return jsonify({"status": "success", "restored": restored})
-    except ValueError as e:
-        return jsonify({"status": "error", "message": str(e)}), 400
+@app.route('/test', methods=['GET'])
+@jwt_required
+def test_editor(user_id):
+    """
+    渲染测试页面，初始化 Vditor 编辑器以调试上传功能
+    """
+    return render_template("test_editor.html")
 
 
 @app.errorhandler(404)

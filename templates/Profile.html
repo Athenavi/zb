@@ -8,6 +8,8 @@
     <title>{{ title }} | zyBLOG</title>
     <!-- Tailwind CSS -->
     <link href="/static/css/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
 </head>
 
 <body class="bg-gray-50">
@@ -163,20 +165,34 @@
 
     function followed() {
         if (user_id === '0') {
-            alert('请登陆后操作');
-            return; // 直接返回
+            Swal.fire({
+                icon: 'warning',
+                title: '操作失败',
+                text: '请登陆后操作',
+            });
+            return;
         }
 
         if (fid === user_id) {
-            alert('不能对自己进行操作！！！');
-            hiddenFollow(1)
-            return; // 直接返回
+            Swal.fire({
+                icon: 'error',
+                title: '操作错误',
+                text: '不能对自己进行操作！！！',
+            });
+            hiddenFollow(1);
+            return;
         }
+
         if (!fid) {
-            alert('不能关注自己或无效的关注ID！！！');
-            hiddenFollow(1)
-            return; // 直接返回
+            Swal.fire({
+                icon: 'error',
+                title: '操作失败',
+                text: '不能关注自己或无效的关注ID！！！',
+            });
+            hiddenFollow(1);
+            return;
         }
+
         fetch(`/api/follow?fid=${fid}`, {
             method: 'POST',
             credentials: 'include'
@@ -188,33 +204,58 @@
                 return response.json();
             })
             .then(data => {
-                if (data.follow_code === 'success') {
-                    alert('成功关注');
+                if (data.code === 'success') {
+                    Swal.fire({
+                        icon: 'success',
+                        title: '关注成功',
+                        text: '你已成功关注该用户！',
+                    });
                     hiddenFollow(1);
-                    return 0;
                 } else {
-                    alert('关注失败！！: ' + data.message);
+                    Swal.fire({
+                        icon: 'error',
+                        title: '关注失败',
+                        text: data.message,
+                    });
                 }
             })
-            .catch(error => alert('关注失败！！: ' + error));
+            .catch(error => Swal.fire({
+                icon: 'error',
+                title: '关注失败',
+                text: error.toString(),
+            }));
     }
 
     function unfollowed() {
         if (user_id === '0') {
-            alert('请登陆后操作');
-            return; // 直接返回
+            Swal.fire({
+                icon: 'warning',
+                title: '操作失败',
+                text: '请登陆后操作',
+            });
+            return;
         }
 
         if (fid === user_id) {
-            alert('不能对自己进行操作');
-            hiddenFollow(2)
-            return; // 直接返回
-        }
-        if (!fid) {
-            alert('请登陆后操作');
-            hiddenFollow(2)
+            Swal.fire({
+                icon: 'error',
+                title: '操作错误',
+                text: '不能对自己进行操作',
+            });
+            hiddenFollow(2);
             return;
         }
+
+        if (!fid) {
+            Swal.fire({
+                icon: 'error',
+                title: '操作失败',
+                text: '请登陆后操作',
+            });
+            hiddenFollow(2);
+            return;
+        }
+
         fetch(`/api/unfollow?fid=${fid}`, {
             method: 'POST',
             credentials: 'include'
@@ -226,39 +267,57 @@
                 return response.json();
             })
             .then(data => {
-                if (data.unfollow_code === 'success') {
-                    alert('成功取消关注');
+                if (data.code === 'success') {
+                    Swal.fire({
+                        icon: 'success',
+                        title: '取消关注成功',
+                        text: '你已成功取消关注该用户。',
+                    });
                     hiddenFollow(2);
-                    return 0;
                 } else {
-                    alert(data.message);
+                    Swal.fire({
+                        icon: 'error',
+                        title: '取消关注失败',
+                        text: data.message,
+                    });
                 }
             })
-            .catch(error => alert('取消关注失败！！: ' + error));
+            .catch(error => Swal.fire({
+                icon: 'error',
+                title: '取消关注失败',
+                text: error.toString(),
+            }));
     }
+
 
     function hiddenFollow(type) {
-        var followBtn = document.getElementById('follow-btn');
-        var unfollowBtn = document.getElementById('unfollow-btn');
+        const followBtn = document.getElementById('follow-btn');
+        const unfollowBtn = document.getElementById('unfollow-btn');
+        switch (type) {
+            case 1:
+                if (!unfollowBtn) {
+                    const newUnfollowBtn = document.createElement('button');
+                    newUnfollowBtn.id = 'unfollow-btn';
+                    newUnfollowBtn.textContent = '取消关注';
+                    newUnfollowBtn.onclick = unfollowed;
+                }
+                // 隐藏关注按钮（如果存在）
+                if (followBtn) followBtn.style.display = 'none';
+                break;
 
-        if (type === 1) {
-            // 在id-actionBtn中插入取消关注按钮
-            if (!unfollowBtn) {
-                var idh2 = document.getElementById('id-actionBtn');
-                idh2.innerHTML += '<button onclick="unfollowed()" id="unfollow-btn">取消关注</button>';
-            }
-            if (followBtn) {
-                followBtn.style.display = 'none';
-            }
-        }
-        if (type === 2) {
-            if (unfollowBtn) {
-                unfollowBtn.style.display = 'none';
-            }
+            case 2: // 取消关注成功
+                // 如果关注按钮不存在则创建
+                if (!followBtn) {
+                    const newFollowBtn = document.createElement('button');
+                    newFollowBtn.id = 'follow-btn';
+                    newFollowBtn.textContent = '关注';
+                    newFollowBtn.onclick = followed;
+                }
+                if (unfollowBtn) unfollowBtn.style.display = 'none';
+                break;
         }
     }
 
-    // 修改后的加载更多逻辑
     document.addEventListener('DOMContentLoaded', function () {
         const articles = document.querySelectorAll('.article-item'); // 修正选择器
         const loadMoreBtn = document.getElementById('load-more');
@@ -308,12 +367,22 @@
         })
             .then(response => response.json())
             .then(data => {
-                if (data.message) alert(data.message);
+                if (data.message) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: '恢复成功',
+                        text: data.message,
+                    });
+                }
                 document.getElementById(`article-item-${articleId}`).remove();
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('操作失败: ' + error.message);
+                Swal.fire({
+                    icon: 'error',
+                    title: '操作失败',
+                    text: error.message,
+                });
             });
     }
 
@@ -327,12 +396,22 @@
         })
             .then(response => response.json())
             .then(data => {
-                if (data.message) alert(data.message);
+                if (data.message) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: '删除成功',
+                        text: data.message,
+                    });
+                }
                 document.getElementById(`article-item-${articleId}`).remove();
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('操作失败: ' + error.message);
+                Swal.fire({
+                    icon: 'error',
+                    title: '操作失败',
+                    text: error.message,
+                });
             });
     }
 </script>

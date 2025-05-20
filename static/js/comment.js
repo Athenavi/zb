@@ -156,11 +156,16 @@ function submitReport(event) {
     const reportReason = document.getElementById('reportReason').value;
     const commentId = document.getElementById('reportForm').dataset.commentId;
 
+    // 显示加载状态[6,10](@ref)
+    Swal.fire({
+        title: '提交中...',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+    });
+
     fetch('/api/report', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
+        headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
             'report-id': commentId,
             'report-reason': reportReason,
@@ -169,57 +174,91 @@ function submitReport(event) {
     })
         .then(response => {
             if (response.ok) {
-                alert('举报已提交');
-                cancelReport();
+                // 成功提示[1,6](@ref)
+                Swal.fire({
+                    icon: 'success',
+                    title: '举报已提交',
+                    showConfirmButton: false,
+                    timer: 1500
+                }).then(() => {
+                    cancelReport(); // 自动关闭弹窗后执行
+                });
             }
             return response.json();
         })
         .then(data => {
-            if (data.message) {
-                alert(data.message);
+            if (data.message && !response.ok) {
+                // 服务端返回的额外提示[9](@ref)
+                Swal.fire({
+                    icon: 'info',
+                    title: data.message,
+                    confirmButtonColor: '#3085d6'
+                });
             }
         })
         .catch(error => {
-            console.error('Error:', error);
-            alert('提交失败，请重试');
+            // 错误处理[6](@ref)
+            Swal.fire({
+                icon: 'error',
+                title: '提交失败',
+                text: '请检查网络后重试',
+                confirmButtonText: '知道了'
+            });
         });
 }
 
+
 function deleteThisComment(commentId, element) {
-    if (confirm('是否删除此评论？')) {
-        {
+    // 确认对话框升级[8,10](@ref)
+    Swal.fire({
+        title: '确定删除？',
+        text: "删除后将无法恢复此评论！",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: '永久删除',
+        cancelButtonText: '取消操作'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // 显示删除进度[6](@ref)
+            Swal.fire({
+                title: '删除中...',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
+
             fetch('/api/comment', {
                 method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    'comment_id': commentId
-                })
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({'comment_id': commentId})
             })
                 .then(response => {
                     if (response.ok) {
-                        return response.json();
-                    } else {
-                        throw new Error('Network response was not ok');
+                        // 删除成功动画[5,9](@ref)
+                        Swal.fire({
+                            icon: 'success',
+                            title: '评论已消失',
+                            showConfirmButton: false,
+                            timer: 1000
+                        }).then(() => {
+                            const commentElement = element.closest('.bg-white');
+                            commentElement?.classList.add('animate__animated', 'animate__fadeOut');
+                            setTimeout(() => commentElement?.remove(), 500);
+                        });
                     }
-                })
-                .then(data => {
-                    if (data.message) {
-                        alert(data.message);
-                        // 获取元素的父节点，从而选择整个评论的容器
-                        const commentElement = element.closest('.bg-white');
-                        if (commentElement) {
-                            commentElement.remove(); // 移除评论元素
-                        }
-                    }
+                    return response.json();
                 })
                 .catch(error => {
-                    console.error('Error:', error);
-                    alert('操作失败，请重试');
+                    Swal.fire({
+                        icon: 'error',
+                        title: '操作失败',
+                        text: '服务器连接异常',
+                        confirmButtonText: '重试'
+                    });
                 });
         }
-    }
+    });
 }
 
 // 更新后的字符计数函数

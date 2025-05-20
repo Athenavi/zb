@@ -47,46 +47,133 @@
         {% endif %}
 
         {% if aid %}
-            <div class="text-2xl text-[#2a3c59] font-medium mb-4" id="pwTips">您访问的页面需要输入密码</div>
-            <div class="bg-[#EFF4FA] rounded-lg p-4 mx-auto mb-4 w-4/5 max-w-[600px] truncate" id="response"
-                 style="display: none;"></div>
-            <input type="password" id="passwd" maxlength="4" required
-                   class="w-[200px] px-4 py-2 border-2 border-green-500 rounded-md text-green-500 focus:border-blue-500 transition-colors mb-8">
-            <div class="flex justify-center gap-4 mt-16">
-                <button onclick="window.history.back()"
-                        class="px-6 py-3 rounded-full border border-gray-300 bg-white text-[#2a3c59] hover:border-green-500 hover:text-green-500 transition-colors">
-                    返回上一级页面
-                </button>
-                <button onclick="unlockArticle()"
-                        class="px-6 py-3 rounded-full bg-gradient-to-r from-[#07C160] to-[#07c183] text-white hover:opacity-90 transition-opacity">
-                    Unlock
-                </button>
-            </div>
+            <form id="unlockForm" onsubmit="return handleSubmit(event)">
+                <div class="text-2xl text-[#2a3c59] font-medium mb-4" id="pwTips">您访问的页面需要输入密码</div>
+                <div class="bg-[#EFF4FA] rounded-lg p-4 mx-auto mb-4 w-4/5 max-w-[600px] truncate" id="response"
+                     style="display: none;"></div>
+                <input
+                        type="password"
+                        id="passwd"
+                        name="passwd"
+                        maxlength="4"
+                        required
+                        class="w-[200px] px-4 py-2 border-2 border-green-500 rounded-md text-green-500 focus:border-blue-500 transition-colors mb-8">
+                <div class="flex justify-center gap-4 mt-16">
+                    <button type="button" onclick="window.history.back()"
+                            class="px-6 py-3 rounded-full border border-gray-300 bg-white text-[#2a3c59] hover:border-green-500 hover:text-green-500 transition-colors">
+                        返回上一级页面
+                    </button>
+                    <button
+                            type="submit"
+                            id="submitBtn"
+                            class="px-6 py-3 rounded-full bg-gradient-to-r from-[#07C160] to-[#07c183] text-white hover:opacity-90 transition-opacity disabled:opacity-50">
+                        Unlock
+                    </button>
+                </div>
+            </form>
+
             <script>
-                // 保持原有 JavaScript 代码不变
-                async function unlockArticle() {
-                    const aid = '{{ aid }}';
-                    const passwd = document.getElementById('passwd').value;
+                let isSubmitting = false;
+                const form = document.getElementById('unlockForm');
+                const submitBtn = document.getElementById('submitBtn');
+                const passwdInput = document.getElementById('passwd');
 
-                    const response = await fetch(`/api/article/unlock?aid=${aid}&passwd=${passwd}`, {
-                        method: 'POST',
-                        credentials: 'include',
-                    });
+                // 防抖处理
+                const debounce = (fn, delay = 1000) => {
+                    let timer;
+                    return (...args) => {
+                        clearTimeout(timer);
+                        timer = setTimeout(() => fn.apply(this, args), delay);
+                    };
+                };
 
-                    const data = await response.json();
-                    const responseElement = document.getElementById('response');
-                    const passwdElement = document.getElementById('passwd');
+                // 实际提交函数
+                async function unlockArticle(aid, passwd) {
+                    try {
+                        const response = await fetch(`/api/article/unlock?aid=${aid}&passwd=${passwd}`, {
+                            method: 'POST',
+                            credentials: 'include',
+                        });
 
-                    if (response.ok) {
-                        responseElement.innerHTML = `<a href="${data.temp_url}">${data.temp_url}</a>`;
-                        responseElement.style.display = "block";
-                        passwdElement.style.display = "none";
-                        document.getElementById('pwTips').textContent = '成功创建您的临时访问链接！';
-                    } else {
-                        responseElement.textContent = `Error: ${data.message}`;
-                        responseElement.style.display = "block";
+                        const data = await response.json();
+                        const responseElement = document.getElementById('response');
+                        const passwdElement = document.getElementById('passwd');
+                        const submitBtn = document.getElementById('submitBtn');
+                        const backBtn = document.querySelector('[onclick="window.history.back()"]');
+
+                        if (response.ok) {
+                            // 仅隐藏输入相关元素
+                            passwdElement.style.display = "none";
+                            submitBtn.style.display = "none";
+                            backBtn.style.display = "none";
+
+                            // 显示结果
+                            responseElement.innerHTML = `
+                    <div class="text-green-500 mb-4">✅ 验证成功！</div>
+                    <a href="${data.temp_url}"
+                       class="text-blue-500 underline hover:text-blue-700 break-all"
+                       target="_blank">
+                        ${data.temp_url}
+                    </a>
+                `;
+                            responseElement.style.display = "block";
+
+                            // 更新提示文本
+                            document.getElementById('pwTips').innerHTML = `
+                    <span class="text-green-500">临时链接已生成，15分钟内有效</span>
+                    <div class="text-sm mt-2 text-gray-500">提示：链接将在新标签页打开</div>
+                `;
+                        } else {
+                            responseElement.innerHTML = `<span class="text-red-500">⚠️ ${data.message}</span>`;
+                            responseElement.style.display = "block";
+                        }
+                    } catch (error) {
+                        console.error('Request failed:', error);
+                        document.getElementById('response').innerHTML = `
+                <span class="text-red-500">⚠️ 网络请求失败，请稍后重试</span>
+            `;
+                    } finally {
+                        isSubmitting = false;
+                        submitBtn.disabled = false;
                     }
                 }
+
+                // 带防抖的提交处理
+                const debouncedSubmit = debounce((aid, passwd) => {
+                    unlockArticle(aid, passwd);
+                }, 800);
+
+                // 表单提交处理
+                function handleSubmit(event) {
+                    event.preventDefault();
+
+                    const aid = '{{ aid }}';
+                    const passwd = passwdInput.value;
+
+                    // 前端验证
+                    if (passwd.length !== 4) {
+                        document.getElementById('response').textContent = '密码必须为4位字符';
+                        document.getElementById('response').style.display = 'block';
+                        return false;
+                    }
+
+                    if (!isSubmitting) {
+                        isSubmitting = true;
+                        submitBtn.disabled = true;
+                        debouncedSubmit(aid, passwd);
+                    }
+
+                    return false; // 阻止表单默认提交
+                }
+
+                // 输入框实时验证
+                passwdInput.addEventListener('input', () => {
+                    if (passwdInput.value.length === 4) {
+                        submitBtn.disabled = false;
+                    } else {
+                        submitBtn.disabled = true;
+                    }
+                });
             </script>
         {% endif %}
     </div>
