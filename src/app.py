@@ -493,41 +493,39 @@ def unfollow_user(user_id):
         app.logger.error(f"ID类型转换失败: {e}")
         return jsonify({'code': 'failed', 'message': '非法用户ID'})
 
-    db = get_db_connection()
     try:
-        with db.cursor() as cursor:
-            delete_query = """
-                           DELETE \
-                           FROM user_subscriptions
-                           WHERE subscriber_id = %s \
-                             AND subscribed_user_id = %s \
-                           """
-            cursor.execute(delete_query, (user_id, unfollow_id))
-            affected_rows = cursor.rowcount  # 正确获取影响行数
-            db.commit()
+        with get_db_connection() as db:
+            with db.cursor() as cursor:
+                delete_query = """
+                               DELETE \
+                               FROM user_subscriptions
+                               WHERE subscriber_id = %s \
+                                 AND subscribed_user_id = %s \
+                               """
+                cursor.execute(delete_query, (user_id, unfollow_id))
+                affected_rows = cursor.rowcount  # 正确获取影响行数
+                db.commit()
 
-            if affected_rows > 0:
-                # 更新缓存
-                cached_data = follow_cache.get(user_id)
-                if cached_data is not None:
-                    try:
-                        cached_data.remove(unfollow_id)  # 使用remove确保数据一致性
-                        follow_cache.set(user_id, cached_data)
-                    except KeyError:
-                        pass
+                if affected_rows > 0:
+                    # 更新缓存
+                    cached_data = follow_cache.get(user_id)
+                    if cached_data is not None:
+                        try:
+                            cached_data.remove(unfollow_id)  # 使用remove确保数据一致性
+                            follow_cache.set(user_id, cached_data)
+                        except KeyError:
+                            pass
+                    else:
+                        follow_cache.delete(user_id)
+
+                    return jsonify({'code': 'success', 'message': '取关成功'})
                 else:
-                    follow_cache.delete(user_id)
-
-                return jsonify({'code': 'success', 'message': '取关成功'})
-            else:
-                return jsonify({'code': 'failed', 'message': '未找到关注关系'})
+                    return jsonify({'code': 'failed', 'message': '未找到关注关系'})
 
     except Exception as e:
         db.rollback()
         app.logger.error(f"取关操作失败: {e}, 用户: {user_id}, 目标: {unfollow_id}")
         return jsonify({'code': 'failed', 'message': '服务器错误'})
-    finally:
-        db.close()
 
 
 @app.route('/like', methods=['POST'])
@@ -544,21 +542,17 @@ def like(user_id):
         user_liked = []
     if aid in user_liked:
         return jsonify({'like_code': 'failed', 'message': "你已经点赞过了!!"})
-
-    db = get_db_connection()
     try:
-        with db.cursor() as cursor:
-            query = "UPDATE `articles` SET `Likes` = `Likes` + 1 WHERE `articles`.`article_id` = %s;"
-            cursor.execute(query, (int(aid),))
-            db.commit()
-            user_liked.append(aid)
-            cache.set(f'{user_id}_liked', user_liked)
+        with get_db_connection() as db:
+            with db.cursor() as cursor:
+                query = "UPDATE `articles` SET `Likes` = `Likes` + 1 WHERE `articles`.`article_id` = %s;"
+                cursor.execute(query, (int(aid),))
+                db.commit()
+                user_liked.append(aid)
+                cache.set(f'{user_id}_liked', user_liked)
             return jsonify({'like_code': 'success'})
-
     except Exception as e:
         return jsonify({'like_code': 'failed', 'message': str(e)})
-    finally:
-        db.close()
 
 
 @app.route("/qrlogin")
@@ -1643,10 +1637,9 @@ def dashboard_v2_user(user_id):
 
         except Exception as e:
             app.logger.error(f"Error in searching users: {e} by {user_id}")
-            return jsonify({"message": "操作失败", "error": str(e)}), 500
-        finally:
             referrer = request.referrer
             app.logger.info(f"{referrer}: queried all users")
+            return jsonify({"message": "操作失败", "error": str(e)}), 500
     return render_template('dashboardV2/user.html', menu_active='user')
 
 
@@ -1665,10 +1658,9 @@ def query_dashboard_data(route, template, table_name, menu_active=None):
                         return jsonify({"message": f"没有{table_name}数据"}), 404
             return jsonify(data), 200
         except Exception as e:
-            return jsonify({"message": "操作失败", "error": str(e)}), 500
-        finally:
             referrer = request.referrer
-            print(f"{referrer}: queried all {table_name}")
+            app.logger.error(f"{referrer}.user_{user_id}: queried all {table_name}")
+            return jsonify({"message": "操作失败", "error": str(e)}), 500
 
     # 为每个路由函数设置唯一的名称以避免端点冲突
     route_function.__name__ = f"route_function_{table_name}"
@@ -1718,44 +1710,6 @@ def api_user_profile(user_id):
     finally:
         db.close()
         return info_list
-
-
-@app.route('/media/<username>/<filename>', methods=['GET'])
-def api_media_file(username, filename):
-    user_id = int(api_username_check(username))
-    if not user_id:
-        return jsonify({"message": "file not found"}), 404
-
-    db = get_db_connection()
-    try:
-        with db.cursor() as cursor:
-            query = """
-                    SELECT f.`mime_type`, f.`storage_path`
-                    FROM `file_hashes` f
-                             INNER JOIN (SELECT `hash`
-                                         FROM `media`
-                                         WHERE `user_id` = %s
-                                           AND `original_filename` = %s
-                                         ORDER BY `id` DESC
-                                         LIMIT 1) m ON f.`hash` = m.`hash`;
-                    """
-            params = (user_id, filename)
-            cursor.execute(query, params)
-            # print(query, params)
-            file_info = cursor.fetchone()
-
-            if file_info:
-                # print(file_info)
-                storage_path = Path(base_dir) / file_info[1]
-                return send_file(storage_path, mimetype=file_info[0], as_attachment=False, max_age=3600)
-            else:
-                return jsonify({"message": "Media not found"}), 404
-
-    except Exception as e:
-        app.logger.error(f"An error occurred: {e}")
-        return jsonify({"message": "Internal Server Error"}), 500
-    finally:
-        db.close()
 
 
 @cache.cached(timeout=600, key_prefix='username_check')
