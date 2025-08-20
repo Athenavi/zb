@@ -278,7 +278,7 @@ def api_user_avatar(user_identifier=None, identifier_type='id'):
 @jwt_required
 def profile(user_id):
     """当前用户的个人资料页面"""
-    return user_space(user_id=user_id, target_user_id=user_id)
+    return redirect(f'/space/{user_id}')
 
 
 @app.route('/space/<int:target_user_id>')

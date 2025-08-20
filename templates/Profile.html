@@ -28,23 +28,18 @@
                     <a href="/" class="text-xl font-bold text-gray-900">
                         <i class="fas fa-home mr-2"></i>首页
                     </a>
-                    {% if current_user %}
+                    {% if target_user.username == username %}
                     <a href="{{ url_for('my.my_posts') }}" class="text-gray-600 hover:text-primary transition-colors">
                         <i class="fas fa-edit mr-1"></i>我的文章
                     </a>
                     <a href="{{ url_for('relation.fans_list') }}" class="text-gray-600 hover:text-primary transition-colors">
                         <i class="fas fa-users mr-1"></i>粉丝管理
                     </a>
+                        <a href="/setting/profiles" class="text-gray-600 hover:text-primary transition-colors">
+                        <i class="fas fa-users mr-1"></i>设置
+                    </a>
                     {% endif %}
                 </div>
-                {% if current_user %}
-                <div class="flex items-center space-x-3">
-                    <span class="text-sm text-gray-600">欢迎，{{ username }}</span>
-                    <a href="{{ url_for('profile') }}" class="text-primary hover:text-blue-700">
-                        <i class="fas fa-user-circle text-lg"></i>
-                    </a>
-                </div>
-                {% endif %}
             </div>
         </div>
     </nav>
@@ -198,7 +193,7 @@
                 </div>
                 <p class="text-gray-600">
                     {% if is_own_profile %}
-                    还没有发布任何文章，<a href="{{ url_for('my_posts') }}" class="text-primary hover:underline">去写第一篇文章</a>
+                    还没有发布任何文章，<a href="{{ url_for('my.my_posts') }}" class="text-primary hover:underline">去写第一篇文章</a>
                     {% else %}
                     {{ target_user.username }} 还没有发布任何文章
                     {% endif %}
