@@ -109,25 +109,23 @@
 
         <!-- 统计数据 -->
         <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-8">
-            <div class="bg-white rounded-lg shadow-sm border p-4 text-center">
+            <div class="bg-white rounded-lg shadow-sm border p-4 text-center" onclick="location.href='/my/posts'">
                 <div class="text-2xl font-bold text-primary">{{ stats.articles_count }}</div>
                 <div class="text-sm text-gray-600 mt-1">文章</div>
             </div>
-            <div class="bg-white rounded-lg shadow-sm border p-4 text-center">
+            <div class="bg-white rounded-lg shadow-sm border p-4 text-center" onclick="location.href='/fans/fans'">
                 <div class="text-2xl font-bold text-green-600">{{ stats.followers_count }}</div>
                 <div class="text-sm text-gray-600 mt-1">粉丝</div>
             </div>
-            <div class="bg-white rounded-lg shadow-sm border p-4 text-center">
+            <div class="bg-white rounded-lg shadow-sm border p-4 text-center" onclick="location.href='/fans/follow'">
                 <div class="text-2xl font-bold text-purple-600">{{ stats.following_count }}</div>
                 <div class="text-sm text-gray-600 mt-1">关注</div>
             </div>
-            <div class="bg-white rounded-lg shadow-sm border p-4 text-center">
-                <div class="text-2xl font-bold text-orange-600">{{ "{:,}".format(stats.total_views) }}</div>
-                <div class="text-sm text-gray-600 mt-1">阅读</div>
+            <div class="bg-white rounded-lg shadow-sm border p-4 text-center" onclick="location.href='/my/comments'">
+                <div class="text-sm text-gray-600 mt-1">我的评论</div>
             </div>
-            <div class="bg-white rounded-lg shadow-sm border p-4 text-center">
-                <div class="text-2xl font-bold text-red-600">{{ "{:,}".format(stats.total_likes) }}</div>
-                <div class="text-sm text-gray-600 mt-1">点赞</div>
+            <div class="bg-white rounded-lg shadow-sm border p-4 text-center" onclick="location.href='/my/urls'">
+                <div class="text-sm text-gray-600 mt-1">链接管理</div>
             </div>
         </div>
 
