@@ -3,6 +3,62 @@
 {% block title %}我的关注 - 粉丝管理系统{% endblock %}
 
 {% block content %}
+    <style>
+        .flex {
+            display: flex;
+        }
+
+        .items-center {
+            align-items: center;
+        }
+
+        .space-x-2 > *:not(:first-child) {
+            margin-left: 0.5rem;
+        }
+
+        .dropdown-toggle {
+            background: none;
+            border: none;
+            cursor: pointer;
+        }
+
+        .dropdown-menu {
+            display: none;
+            position: absolute;
+            background-color: #fff;
+            min-width: 160px;
+            margin: 0.125rem 0 0;
+            font-size: 1rem;
+            color: #212529;
+            text-align: left;
+            list-style: none;
+            background-clip: padding-box;
+            border: 1px solid rgba(0, 0, 0, 0.15);
+            border-radius: 0.25rem;
+            z-index: 1000;
+        }
+
+        .dropdown-menu.show {
+            display: block;
+        }
+
+        .dropdown-menu li {
+            padding: 8px 12px;
+        }
+
+        .dropdown-menu button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            text-align: left;
+        }
+
+        .dropdown-menu button:hover {
+            background-color: #e0e0e0;
+        }
+
+    </style>
     <div class="bg-white rounded-lg shadow">
         <!-- Header -->
         <div class="px-6 py-4 border-b border-gray-200">
@@ -48,7 +104,7 @@
                                             {{ user.username }}
                                         </h3>
                                         <span class="text-sm text-gray-500">
-                                    <i class="fas fa-at"></i>{{ user.email }}
+                                    <i class="fas fa-at" title="{{ user.email }}"></i>
                                 </span>
                                     </div>
                                     {% if user.bio %}
@@ -69,16 +125,21 @@
 
                             <!-- Actions -->
                             <div class="flex items-center space-x-2">
-                                <button onclick="toggleFollow({{ user.id }}, true)"
-                                        data-user-id="{{ user.id }}"
-                                        class="bg-red-100 text-red-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors duration-200">
-                                    <i class="fas fa-user-minus mr-1"></i>
-                                    取消关注
-                                </button>
-
-                                <button class="text-gray-400 hover:text-gray-600 p-2">
-                                    <i class="fas fa-ellipsis-h"></i>
-                                </button>
+                                <div class="dropdown">
+                                    <button class="text-gray-400 hover:text-gray-600 p-2 dropdown-toggle" type="button"
+                                            data-userid="{{ user.id }}" onclick="toggleDropdown(this)">
+                                        <i class="fas fa-ellipsis-h"></i>
+                                    </button>
+                                    <ul class="dropdown-menu" id="dropdownMenu-{{ user.id }}">
+                                        <li>
+                                            <button onclick="toggleFollow({{ user.id }}, false)"
+                                                    class="bg-red-100 text-red-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors duration-200">
+                                                <i class="fas fa-user-minus mr-1"></i>
+                                                取关
+                                            </button>
+                                        </li>
+                                    </ul>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -100,4 +161,33 @@
             {% endif %}
         </div>
     </div>
+    <script>
+        // 切换下拉菜单显示状态
+        function toggleDropdown(button) {
+            const userId = button.getAttribute('data-userid');
+            const dropdownMenu = document.getElementById(`dropdownMenu-${userId}`);
+
+            // 关闭所有其他下拉菜单
+            document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                if (menu.id !== `dropdownMenu-${userId}`) {
+                    menu.classList.remove('show');
+                }
+            });
+
+            // 切换当前下拉菜单
+            dropdownMenu.classList.toggle('show');
+
+            // 阻止事件冒泡，避免触发window.onclick事件
+            event.stopPropagation();
+        }
+
+        // 点击页面其他地方时关闭所有下拉菜单
+        document.addEventListener('click', function (event) {
+            if (!event.target.matches('.dropdown-toggle') && !event.target.closest('.dropdown-menu')) {
+                document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                    menu.classList.remove('show');
+                });
+            }
+        });
+    </script>
 {% endblock %}
