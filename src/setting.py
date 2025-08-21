@@ -1,5 +1,6 @@
 import os
 from datetime import timedelta
+
 from src.config.general import get_general_config
 from src.database import get_sqlalchemy_uri
 
@@ -8,7 +9,7 @@ class BaseConfig:
     """基础配置类"""
     global_encoding = 'utf-8'
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'your-secret-key-here-change-in-production'
     domain, sitename, beian, sys_version, api_host, app_id, app_key, DEFAULT_KEY = get_general_config()
 
     SQLALCHEMY_DATABASE_URI = get_sqlalchemy_uri()
@@ -55,4 +56,3 @@ class AppConfig(BaseConfig):
     """应用配置类，可以继承基础配置并进行覆盖或添加"""
 
     pass
-

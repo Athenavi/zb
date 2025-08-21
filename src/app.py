@@ -653,7 +653,6 @@ def mobile_login():
     return render_template('mobile/login.html')
 
 
-@app.errorhandler(404)
 @app.errorhandler(500)
 @app.errorhandler(Exception)
 def handle_error(e):
