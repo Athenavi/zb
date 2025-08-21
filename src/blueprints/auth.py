@@ -78,7 +78,7 @@ def register():
                 })
             else:
                 flash('注册成功！请登录。', 'success')
-                return redirect(url_for('login'))
+                return redirect(url_for('auth.login'))
 
         except Exception as e:
             db.session.rollback()
