@@ -27,6 +27,7 @@ from src.blueprints.role import role_bp
 from src.blueprints.theme import create_theme_blueprint
 from src.blueprints.website import create_website_blueprint
 from src.config.theme import db_get_theme
+from src.database import get_db_connection
 from src.error import error
 from src.notification import read_all_notifications, get_notifications, read_current_notification
 from src.other.diy import diy_space_put
@@ -41,7 +42,7 @@ from src.upload.views import upload_bulk_back
 from src.user.authz.decorators import jwt_required, admin_required, origin_required
 from src.user.authz.password import confirm_password_back, change_password_back
 from src.user.authz.qrlogin import qr_login, check_qr_login_back, phone_scan_back
-from src.user.entities import username_exists, get_avatar
+from src.user.entities import get_avatar
 from src.user.profile.social import get_user_info
 from src.user.views import setting_profiles_back, change_profiles_back, \
     diy_space_back, confirm_email_back
@@ -284,46 +285,43 @@ def profile(user_id):
 @app.route('/space/<int:target_user_id>')
 @jwt_required
 def user_space(user_id, target_user_id):
-    try:
-        """用户空间页面 - 显示用户资料和文章"""
-        target_user = User.query.get_or_404(target_user_id)
+    """用户空间页面 - 显示用户资料和文章"""
+    target_user = User.query.get_or_404(target_user_id)
 
-        # 判断是否为当前用户自己的空间
-        is_own_profile = user_id == target_user_id
+    # 判断是否为当前用户自己的空间
+    is_own_profile = user_id == target_user_id
 
-        # 获取用户统计数据
-        stats = {
-            'articles_count': Article.query.filter_by(user_id=target_user_id, status='Published').count(),
-            'followers_count': UserSubscription.query.filter_by(subscribed_user_id=target_user_id).count(),
-            'following_count': UserSubscription.query.filter_by(subscriber_id=target_user_id).count(),
-            'total_views': db.session.query(db.func.sum(Article.views)).filter_by(user_id=target_user_id,
-                                                                                  status='Published').scalar() or 0,
-            'total_likes': db.session.query(db.func.sum(Article.likes)).filter_by(user_id=target_user_id,
-                                                                                  status='Published').scalar() or 0
-        }
+    # 获取用户统计数据
+    stats = {
+        'articles_count': Article.query.filter_by(user_id=target_user_id, status='Published').count(),
+        'followers_count': UserSubscription.query.filter_by(subscribed_user_id=target_user_id).count(),
+        'following_count': UserSubscription.query.filter_by(subscriber_id=target_user_id).count(),
+        'total_views': db.session.query(db.func.sum(Article.views)).filter_by(user_id=target_user_id,
+                                                                              status='Published').scalar() or 0,
+        'total_likes': db.session.query(db.func.sum(Article.likes)).filter_by(user_id=target_user_id,
+                                                                              status='Published').scalar() or 0
+    }
 
-        # 获取用户最新发布的文章
-        recent_articles = Article.query.filter_by(
-            user_id=target_user_id,
-            status='Published'
-        ).order_by(Article.updated_at.desc()).limit(6).all()
+    # 获取用户最新发布的文章
+    recent_articles = Article.query.filter_by(
+        user_id=target_user_id,
+        status='Published'
+    ).order_by(Article.updated_at.desc()).limit(6).all()
 
-        # 检查当前用户是否已关注目标用户
-        is_following = False
-        if user_id != target_user_id:
-            is_following = UserSubscription.query.filter_by(
-                subscriber_id=user_id,
-                subscribed_user_id=target_user_id
-            ).first() is not None
+    # 检查当前用户是否已关注目标用户
+    is_following = False
+    if user_id != target_user_id:
+        is_following = UserSubscription.query.filter_by(
+            subscriber_id=user_id,
+            subscribed_user_id=target_user_id
+        ).first() is not None
 
-        return render_template('profile.html',
-                               target_user=target_user,
-                               is_own_profile=is_own_profile,
-                               is_following=is_following,
-                               stats=stats,
-                               recent_articles=recent_articles)
-    except Exception as e:
-        print(e)
+    return render_template('profile.html',
+                           target_user=target_user,
+                           is_own_profile=is_own_profile,
+                           is_following=is_following,
+                           stats=stats,
+                           recent_articles=recent_articles)
 
 
 @app.route('/api/tags/suggest', methods=['GET'])
@@ -418,6 +416,66 @@ def confirm_email_change(user_id, token):
 )
 def get_current_theme():
     return db_get_theme()
+
+
+@cache.cached(timeout=3600, key_prefix='all_users')
+def get_all_users():
+    all_users = {}
+    db = get_db_connection()
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT `username`, `id` FROM `users`;"
+            cursor.execute(query)
+            results = cursor.fetchall()
+            for result in results:
+                username = result[0]
+                user_id = str(result[1])
+                all_users[username] = user_id
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        db.close()
+        return all_users
+
+
+@cache.cached(timeout=3600, key_prefix='all_emails')
+def get_all_emails():
+    all_emails = []
+    db = get_db_connection()
+    try:
+        with db.cursor() as cursor:
+            query = "SELECT `email` FROM `users`;"
+            cursor.execute(query)
+            results = cursor.fetchall()
+            for result in results:
+                email = result[0]
+                all_emails.append(email)
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        db.close()
+        return all_emails
+
+
+@app.route('/api/email-exists', methods=['GET'])
+def email_exists_back():
+    email = request.args.get('email')
+    all_emails = cache.get('all_emails')
+    if all_emails is None:
+        # 如果缓存中没有所有用户的邮箱，重新获取并缓存
+        all_emails = get_all_emails()
+    return jsonify({"exists": bool(email in all_emails)})
+
+
+@app.route('/api/username-exists/<username>', methods=['GET'])
+def username_exists(username):
+    all_users = cache.get('all_users')
+    if all_users is None:
+        # 如果缓存中没有所有用户的信息，重新获取并缓存
+        all_users = get_all_users()
+    if request.referrer:
+        return jsonify({"exists": bool(all_users.get(username))})
+    return all_users.get(username)
 
 
 @app.route("/@<user_name>")
@@ -653,7 +711,6 @@ def mobile_login():
     return render_template('mobile/login.html')
 
 
-@app.errorhandler(404)
 @app.errorhandler(500)
 @app.errorhandler(Exception)
 def handle_error(e):

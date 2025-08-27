@@ -99,7 +99,7 @@
                                 个人资料
                             </div>
                         </a>
-                        <a href="#"
+                        <a href="#" onclick="showSection('private')"
                            class="block p-3 text-gray-700 rounded-lg transition-colors">
                             <div class="flex items-center">
                                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -121,18 +121,7 @@
                                 自定义空间
                             </div>
                         </a>
-                        <a href="#" onclick="window.open('/new', '_blank')"
-                           class="block p-3 text-gray-700 rounded-lg transition-colors">
-                            <div class="flex items-center">
-                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                     xmlns="http://www.w3.org/2000/svg">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                          d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-                                </svg>
-                                上传文章
-                            </div>
-                        </a>
-                        <a href="#" onclick="window.open('/change-password', '_blank')"
+                        <a href="#" onclick="showSection('c_password')"
                            class="block p-3 text-gray-700 rounded-lg transition-colors">
                             <div class="flex items-center">
                                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -268,6 +257,33 @@
                     </div>
                 </div>
             </div>
+            <!-- 隐私设置部分 -->
+            <div id="private" class="section hidden">
+                <div class="bg-white rounded-xl shadow-sm setting-card p-6">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-2">隐私设置</h2>
+                    <div class="space-y-6">
+                        <!-- 公开资料 -->
+                        <div class="bg-gray-50 rounded-xl p-5">
+                            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div class="flex-1">
+                                    <h3 class="font-medium text-gray-800 mb-1">公开资料</h3>
+                                    <p class="text-gray-500 text-sm">选择是否公开您的个人资料</p>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="publicProfileInput" class="form-checkbox"
+                                           {% if publicProfile %}checked{% endif %}>
+                                    <label for="publicProfileInput" class="ml-2 text-gray-500 text-sm">公开</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- 修改密码部分 -->
+            <div id="c_password" class="section hidden">
+                <iframe src="/change-password" frameborder="0" style="height: 85vh; width: 100%;"
+                        class="w-full h-full"></iframe>
+            </div>
         </div>
     </div>
 </div>
@@ -275,6 +291,32 @@
 {% from 'footer.html' import SimpleFooter %}
 {{ SimpleFooter(SiteName,beian) }}
 
+<script>
+    function showSection(section) {
+        // 获取所有的设置部分
+        const sections = document.querySelectorAll('.section');
+
+        // 遍历所有的设置部分，并隐藏他们
+        sections.forEach(sec => {
+            sec.classList.add('hidden');
+        });
+
+        // 显示指定的部分
+        const targetSection = document.getElementById(section);
+        if (targetSection) {
+            targetSection.classList.remove('hidden');
+        }
+
+        // 更新导航栏中active状态的链接
+        const links = document.querySelectorAll('.setting-nav a');
+        links.forEach(link => {
+            link.classList.remove('active');
+            if (link.getAttribute('onclick').includes(section)) {
+                link.classList.add('active');
+            }
+        });
+    }
+</script>
 <script>
     // 全局变量
     let cropper;

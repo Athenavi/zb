@@ -6,7 +6,6 @@
     <title>{% block title %}{% endblock %}</title>
     <link href="/static/css/tailwind.min.css" rel="stylesheet">
 </head>
-
 <body class="h-full bg-cover bg-no-repeat bg-fixed bg-center text-gray-900">
 <div class="min-h-screen flex flex-col">
     <main class="flex-grow container mx-auto px-4 py-8">
@@ -57,8 +56,6 @@
             {% endif %}
         </div>
     </main>
-    {% from 'footer.html' import SimpleFooter %}
-    {{ SimpleFooter(sitename,beian) }}
 </div>
 </body>
 </html>

@@ -38,13 +38,15 @@ def fans_list(user_id):
         ).filter(UserSubscription.subscribed_user_id == user_id).order_by(
             UserSubscription.created_at.desc()
         )
+        current_user = User.query.get(user_id)
 
         fans_list = fans_query.all()
         fans_count = fans_query.count()
 
         return render_template('fans/fans.html',
                                fans_list=fans_list,
-                               fans_count=fans_count)
+                               fans_count=fans_count,
+                               current_user=current_user)
     except Exception as e:
         print(e)
 
