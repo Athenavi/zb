@@ -8,7 +8,7 @@ def create_comment(user_id, article_id):
     data = request.get_json()
     print(data)
     user_agent_str = str(request.user_agent)
-    query = "INSERT INTO `comments` (`user_id`, `article_id`, `content`, `ip`, `user_agent`) VALUES (%s, %s, %s, %s, %s)"
+    query = "INSERT INTO comments (user_id, article_id, content, ip, user_agent) VALUES (%s, %s, %s, %s, %s)"
 
     try:
         with get_db_connection() as db:
@@ -27,7 +27,7 @@ def delete_comment(user_id, comment_id):
     comment_deleted = False
     try:
         with db.cursor() as cursor:
-            query = "DELETE FROM `comments` WHERE `id` = %s AND `user_id` = %s;"
+            query = "DELETE FROM comments WHERE id = %s AND user_id = %s;"
             cursor.execute(query, (int(comment_id), int(user_id)))
             db.commit()
             comment_deleted = True

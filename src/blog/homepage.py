@@ -45,10 +45,10 @@ def index_page_back():
                    is_featured,
                    tags,
                    slug
-            FROM `articles`
-            WHERE `Hidden` = 0
-              AND `Status` = 'Published'
-            ORDER BY `article_id` DESC
+            FROM articles
+            WHERE Hidden = FALSE
+              AND Status = 'Published'
+            ORDER BY article_id DESC
             LIMIT %s OFFSET %s \
             """
 
@@ -86,11 +86,11 @@ def tag_page_back(tag_name, encoding):
                    is_featured,
                    tags,
                    slug
-            FROM `articles`
-            WHERE `Hidden` = 0
-              AND `Status` = 'Published'
-              AND `tags` LIKE %s
-            ORDER BY `article_id` DESC
+            FROM articles
+            WHERE Hidden = FALSE
+              AND Status = 'Published'
+              AND tags LIKE %s
+            ORDER BY article_id DESC
             LIMIT %s OFFSET %s \
             """
 
@@ -131,11 +131,11 @@ def featured_page_back():
                    is_featured,
                    tags,
                    slug
-            FROM `articles`
-            WHERE `Hidden` = 0
-              AND `Status` = 'Published'
-              AND `is_featured` >= 127
-            ORDER BY `article_id` DESC
+            FROM articles
+            WHERE Hidden = FALSE
+              AND Status = 'Published'
+              AND is_featured >= 127
+            ORDER BY article_id DESC
             LIMIT %s OFFSET %s \
             """
 

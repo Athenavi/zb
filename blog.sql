@@ -1,349 +1,519 @@
-create table categories
+create table if not exists categories
 (
-    id         int auto_increment
+    id         serial
         primary key,
-    name       varchar(255)                        not null,
-    created_at timestamp default CURRENT_TIMESTAMP null,
-    updated_at timestamp default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP
-)
-    comment '内容分类表';
-
-create table events
-(
-    id          int auto_increment
-        primary key,
-    title       varchar(255)                        not null comment '事件标题',
-    description text                                not null comment '事件描述',
-    event_date  datetime                            not null comment '事件日期',
-    created_at  timestamp default CURRENT_TIMESTAMP not null comment '创建时间'
+    name       varchar(255) not null,
+    created_at timestamp default now(),
+    updated_at timestamp default now()
 );
 
-create table file_hashes
+comment on table categories is '内容分类表';
+
+alter table categories
+    owner to postgres;
+
+create table if not exists events
 (
-    id              bigint unsigned auto_increment
+    id          serial
         primary key,
-    hash            varchar(64)                            not null,
-    filename        varchar(255)                           not null,
-    created_at      timestamp    default CURRENT_TIMESTAMP null,
-    reference_count int unsigned default '1'               null,
-    file_size       bigint unsigned                        not null comment '文件大小（字节）',
-    mime_type       varchar(100)                           not null comment 'MIME 类型',
-    storage_path    varchar(512)                           not null comment '实际存储路径',
-    constraint hash
-        unique (hash)
+    title       varchar(255)            not null,
+    description text                    not null,
+    event_date  timestamp               not null,
+    created_at  timestamp default now() not null
 );
 
-create table permissions
+comment on column events.title is '事件标题';
+
+comment on column events.description is '事件描述';
+
+comment on column events.event_date is '事件日期';
+
+comment on column events.created_at is '创建时间';
+
+alter table events
+    owner to postgres;
+
+create table if not exists file_hashes
 (
-    id          int auto_increment
+    id              bigserial
         primary key,
-    code        varchar(50)  not null comment '权限代码（如 manage_users）',
-    description varchar(255) not null comment '权限描述',
-    constraint code
-        unique (code)
+    hash            varchar(64)  not null
+        unique,
+    filename        varchar(255) not null,
+    created_at      timestamp default now(),
+    reference_count integer   default 1
+        constraint file_hashes_reference_count_check
+            check (reference_count >= 0),
+    file_size       bigint       not null
+        constraint file_hashes_file_size_check
+            check (file_size >= 0),
+    mime_type       varchar(100) not null,
+    storage_path    varchar(512) not null,
+    constraint unique_hash_mime
+        unique (hash, mime_type)
 );
 
-create table roles
+comment on column file_hashes.file_size is '文件大小（字节）';
+
+comment on column file_hashes.mime_type is 'MIME 类型';
+
+comment on column file_hashes.storage_path is '实际存储路径';
+
+alter table file_hashes
+    owner to postgres;
+
+create table if not exists permissions
 (
-    id          int auto_increment
+    id          serial
         primary key,
-    name        varchar(50)  not null comment '角色名称',
-    description varchar(255) not null comment '角色描述',
-    constraint name
-        unique (name)
+    code        varchar(50)  not null
+        unique,
+    description varchar(255) not null
 );
 
-create table role_permissions
+comment on column permissions.code is '权限代码（如 manage_users）';
+
+comment on column permissions.description is '权限描述';
+
+alter table permissions
+    owner to postgres;
+
+create table if not exists roles
 (
-    role_id       int not null,
-    permission_id int not null,
-    primary key (role_id, permission_id),
-    constraint role_permissions_ibfk_1
-        foreign key (role_id) references roles (id)
+    id          serial
+        primary key,
+    name        varchar(50)  not null
+        unique,
+    description varchar(255) not null
+);
+
+comment on column roles.name is '角色名称';
+
+comment on column roles.description is '角色描述';
+
+alter table roles
+    owner to postgres;
+
+create table if not exists role_permissions
+(
+    role_id       integer not null
+        references roles
             on delete cascade,
-    constraint role_permissions_ibfk_2
-        foreign key (permission_id) references permissions (id)
-            on delete cascade
+    permission_id integer not null
+        references permissions
+            on delete cascade,
+    primary key (role_id, permission_id)
 );
 
-create index permission_id
+alter table role_permissions
+    owner to postgres;
+
+create index if not exists role_permissions_permission_id
     on role_permissions (permission_id);
 
-create table users
+create table if not exists users
 (
-    id              int auto_increment
+    id              serial
         primary key,
-    username        varchar(255)                        not null comment '用户名',
-    password        varchar(255)                        not null comment '用户密码',
-    email           varchar(255)                        not null comment '用户邮箱',
-    created_at      timestamp default CURRENT_TIMESTAMP not null,
-    updated_at      timestamp default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP,
-    profile_picture varchar(255)                        null comment '用户头像',
-    bio             text                                null comment '用户个人简介',
-    register_ip     varchar(45)                         not null comment '注册时IP',
-    constraint email
-        unique (email),
-    constraint username
-        unique (username)
+    username        varchar(255)            not null
+        unique,
+    password        varchar(255)            not null,
+    email           varchar(255)            not null
+        unique,
+    created_at      timestamp default now() not null,
+    updated_at      timestamp default now() not null,
+    profile_picture varchar(255),
+    bio             text,
+    register_ip     varchar(45)             not null
 );
 
-create table articles
+comment on column users.username is '用户名';
+
+comment on column users.password is '用户密码';
+
+comment on column users.email is '用户邮箱';
+
+comment on column users.profile_picture is '用户头像';
+
+comment on column users.bio is '用户个人简介';
+
+comment on column users.register_ip is '注册时IP';
+
+alter table users
+    owner to postgres;
+
+create table if not exists articles
 (
-    article_id   int auto_increment
+    article_id   serial
         primary key,
-    title        varchar(255)                                                     not null comment '文章标题',
-    slug         varchar(255)                                                     not null comment 'URL友好标识符',
-    user_id      int                                                              null comment '作者用户ID',
-    hidden       tinyint(1)                             default 0                 not null comment '是否隐藏 1 隐藏 0 不隐藏',
-    views        bigint unsigned                        default '0'               not null comment '浏览次数',
-    likes        bigint unsigned                        default '0'               not null comment '点赞数',
-    status       enum ('Draft', 'Published', 'Deleted') default 'Draft'           null comment '文章状态: 草稿/已发布/已删除',
-    cover_image  varchar(255)                                                     null comment '封面图片路径',
-    article_type varchar(50)                                                      null comment '文章类型',
-    excerpt      text                                                             null comment '文章摘要',
-    is_featured  tinyint(1)                             default 0                 null comment '是否为推荐文章',
-    tags         varchar(255)                                                     not null,
-    created_at   timestamp                              default CURRENT_TIMESTAMP null,
-    updated_at   timestamp                              default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
-    constraint idx_slug_unique
-        unique (slug),
+    title        varchar(255)            not null,
+    slug         varchar(255)            not null
+        constraint idx_slug_unique
+            unique,
+    user_id      integer
+                                         references users
+                                             on delete set null,
+    hidden       boolean   default false not null,
+    views        bigint    default 0     not null
+        constraint articles_views_check
+            check (views >= 0),
+    likes        bigint    default 0     not null
+        constraint articles_likes_check
+            check (likes >= 0),
+    status       text      default 'Draft'::text
+        constraint articles_status_check
+            check (status = ANY (ARRAY ['Draft'::text, 'Published'::text, 'Deleted'::text])),
+    cover_image  varchar(255),
+    article_type varchar(50),
+    excerpt      text,
+    is_featured  boolean   default false,
+    tags         varchar(255)            not null,
+    created_at   timestamp default now(),
+    updated_at   timestamp default now(),
     constraint idx_user_title_unique
-        unique (user_id, title),
-    constraint fk_article_user
-        foreign key (user_id) references users (id)
-            on delete set null
+        unique (user_id, title)
 );
 
-create table article_content
+comment on column articles.title is '文章标题';
+
+comment on column articles.slug is 'URL友好标识符';
+
+comment on column articles.user_id is '作者用户ID';
+
+comment on column articles.hidden is '是否隐藏 1 隐藏 0 不隐藏';
+
+comment on column articles.views is '浏览次数';
+
+comment on column articles.likes is '点赞数';
+
+comment on column articles.status is '文章状态: 草稿/已发布/已删除';
+
+comment on column articles.cover_image is '封面图片路径';
+
+comment on column articles.article_type is '文章类型';
+
+comment on column articles.excerpt is '文章摘要';
+
+comment on column articles.is_featured is '是否为推荐文章';
+
+alter table articles
+    owner to postgres;
+
+create index if not exists idx_views
+    on articles (views);
+
+create table if not exists article_content
 (
-    aid           int                                   not null
-        primary key,
-    passwd        varchar(128)                          null,
-    content       text                                  null,
-    updated_at    timestamp   default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
-    language_code varchar(10) default 'zh-CN'           not null comment '内容语言代码',
-    constraint fk_article_content
-        foreign key (aid) references articles (article_id)
-            on delete cascade
+    aid           integer                                        not null
+        primary key
+        references articles
+            on delete cascade,
+    passwd        varchar(128),
+    content       text,
+    updated_at    timestamp   default now(),
+    language_code varchar(10) default 'zh-CN'::character varying not null
 );
 
-create table article_i18n
+comment on column article_content.language_code is '内容语言代码';
+
+alter table article_content
+    owner to postgres;
+
+create table if not exists article_i18n
 (
-    i18n_id       int auto_increment
+    i18n_id       serial
         primary key,
-    article_id    int                                 not null comment '原始文章ID',
-    language_code varchar(10)                         not null comment 'ISO语言代码(如zh-CN, en-US)',
-    title         varchar(255)                        not null comment '本地化标题',
-    slug          varchar(255)                        not null comment '本地化URL标识符',
-    content       text                                not null comment '本地化内容',
-    excerpt       text                                null comment '本地化摘要',
-    created_at    timestamp default CURRENT_TIMESTAMP null comment '创建时间',
-    updated_at    timestamp default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP comment '更新时间',
+    article_id    integer      not null
+        references articles
+            on delete cascade,
+    language_code varchar(10)  not null,
+    title         varchar(255) not null,
+    slug          varchar(255) not null,
+    content       text         not null,
+    excerpt       text,
+    created_at    timestamp default now(),
+    updated_at    timestamp default now(),
     constraint idx_article_lang_slug
         unique (article_id, language_code, slug),
     constraint uq_article_language
-        unique (article_id, language_code),
-    constraint fk_article_i18n
-        foreign key (article_id) references articles (article_id)
-            on delete cascade
-)
-    comment '文章多语言内容表';
+        unique (article_id, language_code)
+);
 
-create index idx_views
-    on articles (views);
+comment on table article_i18n is '文章多语言内容表';
 
-create table category_subscriptions
+comment on column article_i18n.article_id is '原始文章ID';
+
+comment on column article_i18n.language_code is 'ISO语言代码(如zh-CN, en-US)';
+
+comment on column article_i18n.title is '本地化标题';
+
+comment on column article_i18n.slug is '本地化URL标识符';
+
+comment on column article_i18n.content is '本地化内容';
+
+comment on column article_i18n.excerpt is '本地化摘要';
+
+comment on column article_i18n.created_at is '创建时间';
+
+comment on column article_i18n.updated_at is '更新时间';
+
+alter table article_i18n
+    owner to postgres;
+
+create table if not exists category_subscriptions
 (
-    id            int auto_increment
+    id            serial
         primary key,
-    subscriber_id int                                 not null comment '订阅者ID',
-    category_id   int                                 not null comment '被订阅分类ID',
-    created_at    timestamp default CURRENT_TIMESTAMP null,
-    constraint fk_subscriber_category
-        foreign key (subscriber_id) references users (id)
+    subscriber_id integer not null
+        references users
             on delete cascade,
-    constraint fk_target_category
-        foreign key (category_id) references categories (id)
-            on delete cascade
-)
-    comment '分类订阅关系';
+    category_id   integer not null
+        references categories
+            on delete cascade,
+    created_at    timestamp default now()
+);
 
-create index idx_category
+comment on table category_subscriptions is '分类订阅关系';
+
+comment on column category_subscriptions.subscriber_id is '订阅者ID';
+
+comment on column category_subscriptions.category_id is '被订阅分类ID';
+
+alter table category_subscriptions
+    owner to postgres;
+
+create index if not exists idx_category
     on category_subscriptions (category_id);
 
-create index idx_subscriber
+create index if not exists idx_subscriber
     on category_subscriptions (subscriber_id);
 
-create table comments
+create table if not exists comments
 (
-    id         int auto_increment
+    id         serial
         primary key,
-    article_id int                                not null,
-    user_id    int                                not null,
-    parent_id  int                                null,
-    content    text                               not null,
-    ip         varchar(50)                        null,
-    user_agent varchar(255)                       null,
-    created_at datetime default CURRENT_TIMESTAMP null,
-    updated_at datetime default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
-    constraint comments_ibfk_1
-        foreign key (article_id) references articles (article_id),
-    constraint comments_ibfk_2
-        foreign key (user_id) references users (id),
-    constraint comments_ibfk_3
-        foreign key (parent_id) references comments (id)
+    article_id integer not null
+        references articles,
+    user_id    integer not null
+        references users,
+    parent_id  integer
+        references comments,
+    content    text    not null,
+    ip         varchar(50),
+    user_agent varchar(255),
+    created_at timestamp default now(),
+    updated_at timestamp default now()
 );
 
-create index idx_article_created
+alter table comments
+    owner to postgres;
+
+create index if not exists idx_article_created
     on comments (article_id, created_at);
 
-create index idx_parent_created
+create index if not exists idx_parent_created
     on comments (parent_id, created_at);
 
-create index user_id
+create index if not exists comments_user_id
     on comments (user_id);
 
-create table custom_fields
+create table if not exists custom_fields
 (
-    id          int auto_increment
+    id          serial
         primary key,
-    user_id     int          not null comment '用户ID',
-    field_name  varchar(100) not null comment '自定义字段名称',
-    field_value text         not null comment '自定义字段值',
-    constraint custom_fields_ibfk_1
-        foreign key (user_id) references users (id)
-            on delete cascade
+    user_id     integer      not null
+        references users
+            on delete cascade,
+    field_name  varchar(100) not null,
+    field_value text         not null
 );
 
-create index idx_user_id
+comment on column custom_fields.user_id is '用户ID';
+
+comment on column custom_fields.field_name is '自定义字段名称';
+
+comment on column custom_fields.field_value is '自定义字段值';
+
+alter table custom_fields
+    owner to postgres;
+
+create index if not exists idx_user_id
     on custom_fields (user_id);
 
-create table email_subscriptions
+create table if not exists email_subscriptions
 (
-    id         int auto_increment
+    id         serial
         primary key,
-    user_id    int                                  not null comment '用户ID',
-    subscribed tinyint(1) default 1                 not null comment '是否订阅邮件',
-    created_at timestamp  default CURRENT_TIMESTAMP not null comment '订阅时间',
-    constraint unique_user_subscription
-        unique (user_id),
-    constraint email_subscriptions_ibfk_1
-        foreign key (user_id) references users (id)
-            on delete cascade
+    user_id    integer                 not null
+        unique
+        references users
+            on delete cascade,
+    subscribed boolean   default true  not null,
+    created_at timestamp default now() not null
 );
 
-create index idx_user_id
+comment on column email_subscriptions.user_id is '用户ID';
+
+comment on column email_subscriptions.subscribed is '是否订阅邮件';
+
+comment on column email_subscriptions.created_at is '订阅时间';
+
+alter table email_subscriptions
+    owner to postgres;
+
+create index if not exists email_subscriptions_user_id
     on email_subscriptions (user_id);
 
-create table media
+create table if not exists media
 (
-    id                int auto_increment
+    id                serial
         primary key,
-    user_id           int                                 not null comment '上传用户ID',
-    created_at        timestamp default CURRENT_TIMESTAMP not null comment '创建时间',
-    updated_at        timestamp default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
-    hash              varchar(64)                         not null comment '文件哈希',
-    original_filename varchar(255)                        not null comment '原始文件名',
-    constraint fk_media_file_hash
-        foreign key (hash) references file_hashes (hash),
-    constraint media_ibfk_1
-        foreign key (user_id) references users (id)
-            on delete cascade
+    user_id           integer                 not null
+        references users
+            on delete cascade,
+    created_at        timestamp default now() not null,
+    updated_at        timestamp default now() not null,
+    hash              varchar(64)             not null
+        references file_hashes (hash),
+    original_filename varchar(255)            not null
 );
 
-create table notifications
+comment on column media.user_id is '上传用户ID';
+
+comment on column media.created_at is '创建时间';
+
+comment on column media.updated_at is '更新时间';
+
+comment on column media.hash is '文件哈希';
+
+comment on column media.original_filename is '原始文件名';
+
+alter table media
+    owner to postgres;
+
+create table if not exists notifications
 (
-    id         int auto_increment
+    id         serial
         primary key,
-    user_id    int                                  not null comment '接收者用户ID',
-    type       varchar(100)                         not null comment '通知类型',
-    message    text                                 not null comment '通知内容',
-    is_read    tinyint(1) default 0                 not null comment '是否已阅读',
-    created_at timestamp  default CURRENT_TIMESTAMP not null comment '创建时间',
-    updated_at timestamp  default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
-    constraint notifications_ibfk_1
-        foreign key (user_id) references users (id)
-            on delete cascade
+    user_id    integer                 not null
+        references users
+            on delete cascade,
+    type       varchar(100)            not null,
+    message    text                    not null,
+    is_read    boolean   default false not null,
+    created_at timestamp default now() not null,
+    updated_at timestamp default now() not null
 );
 
-create index idx_user_id
-    on notifications (user_id);
+comment on column notifications.user_id is '接收者用户ID';
 
-create table reports
+comment on column notifications.type is '通知类型';
+
+comment on column notifications.message is '通知内容';
+
+comment on column notifications.is_read is '是否已阅读';
+
+comment on column notifications.created_at is '创建时间';
+
+comment on column notifications.updated_at is '更新时间';
+
+alter table notifications
+    owner to postgres;
+
+create table if not exists reports
 (
-    id           int auto_increment
+    id           serial
         primary key,
-    reported_by  int                                 not null comment '举报用户ID',
-    content_type enum ('Article', 'Comment')         not null comment '内容类型: 文章/评论',
-    content_id   int                                 not null comment '内容ID',
-    reason       text                                not null comment '举报理由',
-    created_at   timestamp default CURRENT_TIMESTAMP not null comment '举报时间',
-    constraint reports_ibfk_1
-        foreign key (reported_by) references users (id)
-            on delete cascade
+    reported_by  integer                 not null
+        references users
+            on delete cascade,
+    content_type text                    not null
+        constraint reports_content_type_check
+            check (content_type = ANY (ARRAY ['Article'::text, 'Comment'::text])),
+    content_id   integer                 not null,
+    reason       text                    not null,
+    created_at   timestamp default now() not null
 );
 
-create index idx_reported_by
+comment on column reports.reported_by is '举报用户ID';
+
+comment on column reports.content_type is '内容类型: 文章/评论';
+
+comment on column reports.content_id is '内容ID';
+
+comment on column reports.reason is '举报理由';
+
+comment on column reports.created_at is '举报时间';
+
+alter table reports
+    owner to postgres;
+
+create index if not exists idx_reported_by
     on reports (reported_by);
 
-create table urls
+create table if not exists urls
 (
-    id         int auto_increment
+    id         serial
         primary key,
-    long_url   varchar(255)                        not null comment '长链接',
-    short_url  varchar(10)                         not null comment '短链接',
-    created_at timestamp default CURRENT_TIMESTAMP not null comment '创建时间',
-    user_id    int                                 not null comment '用户ID',
-    constraint uniq_short_url
-        unique (short_url),
-    constraint fk_urls_user
-        foreign key (user_id) references users (id)
+    long_url   varchar(255)            not null,
+    short_url  varchar(10)             not null
+        unique,
+    created_at timestamp default now() not null,
+    user_id    integer                 not null
+        references users
             on delete cascade
 );
 
-create table user_roles
+comment on column urls.long_url is '长链接';
+
+comment on column urls.short_url is '短链接';
+
+comment on column urls.created_at is '创建时间';
+
+comment on column urls.user_id is '用户ID';
+
+alter table urls
+    owner to postgres;
+
+create table if not exists user_roles
 (
-    user_id int not null,
-    role_id int not null,
-    primary key (user_id, role_id),
-    constraint user_roles_ibfk_1
-        foreign key (user_id) references users (id)
+    user_id integer not null
+        references users
             on delete cascade,
-    constraint user_roles_ibfk_2
-        foreign key (role_id) references roles (id)
-            on delete cascade
+    role_id integer not null
+        references roles
+            on delete cascade,
+    primary key (user_id, role_id)
 );
 
-create index idx_role_id
+alter table user_roles
+    owner to postgres;
+
+create index if not exists idx_role_id
     on user_roles (role_id);
 
-create table user_subscriptions
+create table if not exists user_subscriptions
 (
-    id                 int auto_increment
+    id                 serial
         primary key,
-    subscriber_id      int                                 not null comment '订阅者ID',
-    subscribed_user_id int                                 not null comment '被订阅用户ID',
-    created_at         timestamp default CURRENT_TIMESTAMP null,
-    constraint fk_subscribed_user
-        foreign key (subscribed_user_id) references users (id)
+    subscriber_id      integer not null
+        references users
             on delete cascade,
-    constraint fk_subscriber_user
-        foreign key (subscriber_id) references users (id)
-            on delete cascade
-)
-    comment '用户订阅关系';
+    subscribed_user_id integer not null
+        references users
+            on delete cascade,
+    created_at         timestamp default now()
+);
 
-create index idx_subscribed_user
+comment on table user_subscriptions is '用户订阅关系';
+
+comment on column user_subscriptions.subscriber_id is '订阅者ID';
+
+comment on column user_subscriptions.subscribed_user_id is '被订阅用户ID';
+
+alter table user_subscriptions
+    owner to postgres;
+
+create index if not exists idx_subscribed_user
     on user_subscriptions (subscribed_user_id);
 
-create index idx_subscriber
-    on user_subscriptions (subscriber_id);
--- --------------------------------------------------------
---
--- 转存表中的数据 `users`
---
-
-INSERT INTO `users` (`id`, `username`, `password`, `email`, `created_at`, `updated_at`, `profile_picture`, `bio`,
-                     `register_ip`)
-VALUES (1, 'test', '$2b$12$kF4nZn6kESHtj0cjNeaoZugUlWXSgXp27iKAXHepyzSwUxrrhVTz2', 'support@7trees.cn',
-        '2025-04-16 07:38:59', '2025-04-16 07:38:59', NULL, NULL, '');

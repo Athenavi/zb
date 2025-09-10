@@ -9,7 +9,7 @@ def update_password(user_id, new_password, confirm_password, ip):
     # 查询当前密码
     db = get_db_connection()
     cursor = db.cursor()
-    query = "SELECT password FROM users WHERE `id` = %s"
+    query = "SELECT password FROM users WHERE id = %s"
     cursor.execute(query, (user_id,))
     result = cursor.fetchone()
 
@@ -18,12 +18,12 @@ def update_password(user_id, new_password, confirm_password, ip):
 
         if new_password == confirm_password and len(new_password) >= 6:
             # 更新密码
-            update_query = "UPDATE users SET password = %s WHERE `id` = %s"
+            update_query = "UPDATE users SET password = %s WHERE id = %s"
             cursor.execute(update_query, (hashed_password.decode('utf-8'), user_id))
             db.commit()
 
-            notice_query = ("INSERT INTO `notifications` (`id`, `user_id`, `type`, `message`, `is_read`, "
-                            "`created_at`, `updated_at`) VALUES (NULL, %s, 'safe', %s, '0', CURRENT_TIMESTAMP, "
+            notice_query = ("INSERT INTO notifications (id, user_id, type, message, is_read, "
+                            "created_at, updated_at) VALUES (NULL, %s, 'safe', %s, '0', CURRENT_TIMESTAMP, "
                             "CURRENT_TIMESTAMP);")
             cursor.execute(notice_query, (user_id, f"{ip} changed password"))
             db.commit()
@@ -41,7 +41,7 @@ def validate_password(user_id):
     db = get_db_connection()
     cursor = db.cursor()
 
-    query = "SELECT password FROM users WHERE `id` = %s"
+    query = "SELECT password FROM users WHERE id = %s"
     cursor.execute(query, (user_id,))
     result = cursor.fetchone()
 

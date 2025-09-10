@@ -39,10 +39,10 @@ def get_following_count(user_id, subscribe_type='User'):
     try:
         with db.cursor() as cursor:
             if subscribe_type == 'User':
-                query = "SELECT COUNT(*) FROM user_subscriptions WHERE `subscriber_id` = %s;"
+                query = "SELECT COUNT(*) FROM user_subscriptions WHERE subscriber_id = %s;"
                 cursor.execute(query, (int(user_id),))
             else:
-                query = "SELECT COUNT(*) FROM category_subscriptions WHERE `subscriber_id` = %s;"
+                query = "SELECT COUNT(*) FROM category_subscriptions WHERE subscriber_id = %s;"
                 cursor.execute(query, (int(user_id),))
 
             count = cursor.fetchone()[0]
@@ -59,10 +59,10 @@ def get_follower_count(user_id, subscribe_type='User'):
     try:
         with db.cursor() as cursor:
             if subscribe_type == 'User':
-                query = "SELECT COUNT(*) FROM user_subscriptions WHERE `subscribed_user_id` = %s;"
+                query = "SELECT COUNT(*) FROM user_subscriptions WHERE subscribed_user_id = %s;"
                 cursor.execute(query, (int(user_id),))
             else:
-                query = "SELECT COUNT(*) FROM category_subscriptions WHERE `category_id` = %s;"
+                query = "SELECT COUNT(*) FROM category_subscriptions WHERE category_id = %s;"
                 cursor.execute(query, (int(user_id),))
 
             count = cursor.fetchone()[0]
@@ -78,7 +78,7 @@ def can_follow_user(user_id, target_id):
     can_follow = 1
     try:
         with db.cursor() as cursor:
-            query = "SELECT COUNT(*) FROM `user_subscriptions` WHERE `subscriber_id` = %s AND `subscribed_user_id` = %s;"
+            query = "SELECT COUNT(*) FROM user_subscriptions WHERE subscriber_id = %s AND subscribed_user_id = %s;"
             cursor.execute(query, (int(user_id), int(target_id)))
             count = cursor.fetchone()[0]
             if count:
@@ -97,7 +97,7 @@ def get_user_info(user_id):
     db = get_db_connection()
     try:
         with db.cursor() as cursor:
-            query = "SELECT * FROM users WHERE `id` = %s;"
+            query = "SELECT * FROM users WHERE id = %s;"
             params = (user_id,)
             cursor.execute(query, params)
             info = cursor.fetchone()
@@ -119,7 +119,7 @@ def get_user_name_by_id(user_id):
     try:
         with get_db_connection() as db:
             with db.cursor() as cursor:
-                cursor.execute("SELECT `username` FROM `users` WHERE `id` = %s", (user_id,))
+                cursor.execute("SELECT username FROM users WHERE id = %s", (user_id,))
                 result = cursor.fetchone()
                 if result:
                     author_name = result[0]

@@ -424,7 +424,7 @@ def get_all_users():
     db = get_db_connection()
     try:
         with db.cursor() as cursor:
-            query = "SELECT `username`, `id` FROM `users`;"
+            query = "SELECT username, id FROM users;"
             cursor.execute(query)
             results = cursor.fetchall()
             for result in results:
@@ -444,7 +444,7 @@ def get_all_emails():
     db = get_db_connection()
     try:
         with db.cursor() as cursor:
-            query = "SELECT `email` FROM `users`;"
+            query = "SELECT email FROM users;"
             cursor.execute(query)
             results = cursor.fetchall()
             for result in results:

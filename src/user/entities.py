@@ -5,7 +5,7 @@ def auth_by_uid(article_id, user_id):
     try:
         with get_db_connection() as db:
             with db.cursor() as cursor:
-                query = "SELECT 1 FROM articles WHERE article_id = %s AND `Status` != 'Deleted' AND user_id = %s"
+                query = "SELECT 1 FROM articles WHERE article_id = %s AND Status != 'Deleted' AND user_id = %s"
                 cursor.execute(query, (article_id, user_id))
                 return cursor.fetchone() is not None
     except Exception as e:
@@ -17,7 +17,7 @@ def authorize_by_aid_deleted(article_id, user_id):
     try:
         with get_db_connection() as db:
             with db.cursor() as cursor:
-                query = "SELECT 1 FROM articles WHERE article_id = %s AND `Status` = 'Deleted' AND user_id = %s"
+                query = "SELECT 1 FROM articles WHERE article_id = %s AND Status = 'Deleted' AND user_id = %s"
                 cursor.execute(query, (article_id, user_id))
                 return cursor.fetchone() is not None
     except Exception as e:
@@ -29,7 +29,7 @@ def get_user_id(user_name):
     try:
         with get_db_connection() as db:
             with db.cursor() as cursor:
-                query = "SELECT `id` FROM `users` WHERE `username` = %s;"
+                query = "SELECT id FROM users WHERE username = %s;"
                 cursor.execute(query, (user_name,))
                 result = cursor.fetchone()
                 if result:
@@ -51,7 +51,7 @@ def get_user_sub_info(query, user_id):
             subscribe_ids = [sub[0] for sub in user_sub]
             if subscribe_ids:
                 placeholders = ', '.join(['%s'] * len(subscribe_ids))
-                query = f"SELECT `id`, `username` FROM `users` WHERE `id` IN ({placeholders});"
+                query = f"SELECT id, username FROM users WHERE id IN ({placeholders});"
                 cursor.execute(query, tuple(subscribe_ids))
                 user_sub_info = cursor.fetchall()
     except Exception as e:

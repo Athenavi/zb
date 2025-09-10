@@ -54,16 +54,16 @@ def handle_user_upload(user_id, allowed_size, allowed_mimes, check_existing=Fals
 
                 if check_existing:
                     try:
-                        with cursor.execute(
-                                """SELECT hash
-                                   FROM media
-                                   WHERE hash = %s
-                                     and user_id = %s""",
-                                (file_hash, user_id)
-                        ) as cursor:
-                            existing_file = cursor.fetchone()
-                            if existing_file:
-                                pass
+                        cursor.execute(
+                            """SELECT hash
+                               FROM media
+                               WHERE hash = %s
+                                 and user_id = %s""",
+                            (file_hash, user_id)
+                        )
+                        existing_file = cursor.fetchone()
+                        if existing_file:
+                            pass
                     except Exception as e:
                         return jsonify({'message': 'failed', 'error': str(e)}), 500
 
@@ -113,7 +113,7 @@ def handle_user_upload(user_id, allowed_size, allowed_mimes, check_existing=Fals
                         """INSERT INTO file_hashes
                                (hash, filename, file_size, mime_type, storage_path, reference_count)
                            VALUES (%s, %s, %s, %s, %s, 1)
-                           ON DUPLICATE KEY UPDATE reference_count = reference_count + 1""",
+                           ON CONFLICT (hash, mime_type) DO UPDATE SET reference_count = file_hashes.reference_count + 1""",
                         (file_hash, filename, len(file_data), mime_type, storage_path)
                     )
 
@@ -211,11 +211,13 @@ def process_single_upload(f, user_id, allowed_size, allowed_mimes, db):
         storage_path = os.path.join(hash_subdir, file_hash)
         with open(storage_path, 'wb') as dest:
             dest.write(file_data)
+
+        # 插入文件哈希记录，使用 PostgreSQL 的 ON CONFLICT 语法
         cursor.execute(
             """INSERT INTO file_hashes
                    (hash, filename, file_size, mime_type, storage_path, reference_count)
                VALUES (%s, %s, %s, %s, %s, 1)
-               ON DUPLICATE KEY UPDATE reference_count = reference_count + 1""",
+               ON CONFLICT (hash) DO UPDATE SET reference_count = file_hashes.reference_count + 1""",
             (file_hash, f.filename, len(file_data), mime_type, storage_path)
         )
 

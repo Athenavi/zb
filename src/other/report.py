@@ -8,7 +8,7 @@ def report_add(user_id, reported_type, reported_id, reason):
     db = get_db_connection()
     try:
         with db.cursor() as cursor:
-            query = ("INSERT INTO `reports` (`reported_by`, `content_type`, `content_id`,`reason`) VALUES (%s, %s, %s,"
+            query = ("INSERT INTO reports (reported_by, content_type, content_id,reason) VALUES (%s, %s, %s,"
                      "%s);")
             cursor.execute(query, (int(user_id), reported_type, reported_id, reason))
             db.commit()

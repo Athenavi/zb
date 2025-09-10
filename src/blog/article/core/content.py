@@ -114,7 +114,7 @@ def get_i18n_content_by_aid(iso, aid):
     try:
         with get_db_connection() as db:
             with db.cursor() as cursor:
-                query = 'SELECT `content` FROM `article_i18n` WHERE `article_id` = %s AND `language_code` = %s'
+                query = 'SELECT content FROM article_i18n WHERE article_id = %s AND language_code = %s'
                 cursor.execute(query, (aid, iso))
                 result = cursor.fetchone()
                 if result:
@@ -130,7 +130,7 @@ def get_i18n_title(aid, iso):
     try:
         with get_db_connection() as db:
             with db.cursor() as cursor:
-                query = 'SELECT `title` FROM `article_i18n` WHERE `article_id` = %s and `language_code` = %s'
+                query = 'SELECT title FROM article_i18n WHERE article_id = %s and language_code = %s'
                 cursor.execute(query, (aid, iso))
                 return cursor.fetchone()[0]
     except Exception as e:

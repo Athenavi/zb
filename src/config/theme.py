@@ -71,7 +71,7 @@ def db_change_theme(user_id, theme_id):
     try:
         with get_db_connection() as db:
             with db.cursor() as cursor:
-                query = "INSERT INTO `custom_fields` (`user_id`, `field_name`, `field_value`) VALUES (%s, %s, %s)"
+                query = "INSERT INTO custom_fields (user_id, field_name, field_value) VALUES (%s, %s, %s)"
                 cursor.execute(query, (user_id, "theme", theme_id))
                 db.commit()
                 return True

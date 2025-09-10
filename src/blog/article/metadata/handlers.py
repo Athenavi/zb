@@ -33,9 +33,9 @@ def persist_views():
                     with db.cursor() as cursor:
                         for blog_id, count in counts_snapshot.items():
                             query = """
-                                    UPDATE `articles`
-                                    SET `views` = `views` + %s
-                                    WHERE `article_id` = %s \
+                                    UPDATE articles
+                                    SET views = views + %s
+                                    WHERE article_id = %s \
                                     """
                             cursor.execute(query, (count, blog_id))
                         db.commit()
@@ -73,7 +73,7 @@ def final_persist():
             with db.cursor() as cursor:
                 for blog_id, count in counts_snapshot.items():
                     cursor.execute(
-                        "UPDATE `articles` SET `views` = `views` + %s WHERE `article_id` = %s",
+                        "UPDATE articles SET views = views + %s WHERE article_id = %s",
                         (count, blog_id)
                     )
                 db.commit()
