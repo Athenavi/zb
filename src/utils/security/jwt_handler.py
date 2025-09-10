@@ -16,7 +16,7 @@ class JWTHandler:
     @staticmethod
     def generate_token(user_id, username, expires_in=3600):
         """生成基于UTC时区的JWT"""
-        now_utc = datetime.utcnow()
+        now_utc = datetime.now(shanghai_tz)
         expiration_time = now_utc + timedelta(seconds=expires_in)
 
         payload = {

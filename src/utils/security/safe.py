@@ -120,7 +120,7 @@ def is_valid_iso_language_code(iso_code: str) -> bool:
         bool: 如果代码有效返回True，否则False
     """
     # 所有有效的语言代码集合(基于提供的对照表)
-    VALID_LANGUAGE_CODES = {
+    valid_language_codes = {
         'af', 'af-ZA', 'sq', 'sq-AL', 'ar', 'ar-DZ', 'ar-BH', 'ar-EG', 'ar-IQ',
         'ar-JO', 'ar-KW', 'ar-LB', 'ar-LY', 'ar-MA', 'ar-OM', 'ar-QA', 'ar-SA',
         'ar-SY', 'ar-TN', 'ar-AE', 'ar-YE', 'hy', 'hy-AM', 'az', 'az-AZ-Cyrl',
@@ -155,7 +155,7 @@ def is_valid_iso_language_code(iso_code: str) -> bool:
     }
 
     # 检查代码是否在有效集合中
-    return iso_code in VALID_LANGUAGE_CODES
+    return iso_code in valid_language_codes
 
 
 

@@ -517,3 +517,7 @@ alter table user_subscriptions
 create index if not exists idx_subscribed_user
     on user_subscriptions (subscribed_user_id);
 
+INSERT INTO users (username, password, email, created_at, updated_at, profile_picture, bio, register_ip)
+VALUES ('test', '$2b$12$kF4nZn6kESHtj0cjNeaoZugUlWXSgXp27iKAXHepyzSwUxrrhVTz2', 'support@7trees.cn',
+        '2025-09-10 17:09:13', '2025-04-16 07:38:59', NULL, NULL, '');
+
