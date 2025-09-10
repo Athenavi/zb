@@ -108,7 +108,7 @@ def create_website_blueprint(cache_instance, domain, sitename):
 
     @website_bp.route('/message')
     def message_page():
-        return render_template('message.html')
+        return render_template('Message.html')
 
     @website_bp.route('/links')
     def get_friends_link():

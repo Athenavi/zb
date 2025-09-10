@@ -62,13 +62,13 @@ def comment_page_get(user_id, article_id):
                 if parent:
                     parent["replies"].append(comments_map[comment.id])
         # print(comments_tree)
-        return render_template('comment.html',
+        return render_template('Comment.html',
                                article=article,
                                comments_tree=comments_tree)
 
     except Exception as e:
         current_app.logger.error(f"加载评论失败: {str(e)}")
-        return render_template('comment.html',
+        return render_template('Comment.html',
                                article=article,
                                comments_tree=[],
                                error="加载评论失败")

@@ -23,6 +23,7 @@ def setting_profiles_back(user_id, user_info, cache_instance, avatar_url_api):
         limit_username_lock=cache_instance.get(f'limit_username_lock_{user_id}'),
         Bio=bio,
         userEmail=user_email,
+        publicProfile=True,
     )
 
 
