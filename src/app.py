@@ -10,7 +10,7 @@ from jinja2 import select_autoescape
 from werkzeug.exceptions import NotFound
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from src.blog.article.core.content import get_content, get_i18n_content_by_aid
+from src.blog.article.core.content import get_i18n_content_by_aid
 from src.blog.article.core.crud import get_aid_by_title
 from src.blog.article.core.views import blog_tmp_url, blog_detail_back, \
     blog_detail_aid_back, blog_detail_i18n, edit_article_back, new_article_back, blog_detail_i18n_list, contribute_back
@@ -174,14 +174,6 @@ def api_theme_upload(user_id):
 @app.route('/favicon.ico', methods=['GET'])
 def favicon():
     return send_file('../static/favicon.ico', mimetype='image/png', max_age=3600)
-
-
-@cache.memoize(1800)
-@origin_required
-@app.route('/api/blog/<int:aid>', methods=['GET'])
-def api_blog_content(aid):
-    content, _ = get_content(identifier=aid, is_title=False, limit=9999)
-    return send_chunk_md(content, aid)
 
 
 @cache.memoize(1800)

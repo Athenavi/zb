@@ -1,17 +1,21 @@
 import os
+import re
 import time
-import xml.etree.ElementTree as ElementTree
+from xml.etree import ElementTree as ET
 
 from flask import request, render_template
 
-from src.blog.article.core.content import get_article_titles, get_content
-from src.utils.security.safe import clean_html_format
-
-from datetime import datetime
+from src.models import db, Article, ArticleContent
 
 
 def search_handler(user_id, domain, global_encoding, max_cache_timestamp):
     matched_content = []
+
+    def strip_html_tags(text):
+        """去除HTML标签"""
+        if text is None:
+            return ''
+        return re.sub('<[^<]+?>', '', text)
 
     if request.method == 'POST':
         keyword = request.form.get('keyword')  # 获取搜索关键词
@@ -26,34 +30,48 @@ def search_handler(user_id, domain, global_encoding, max_cache_timestamp):
             with open(cache_path, 'r', encoding=global_encoding) as cache_file:
                 match_data = cache_file.read()
         else:
-            markdown_files, *_ = get_article_titles()
-            root = ElementTree.Element('root')
+            # 查询公开的文章（只索引已发布、非隐藏的文章）
+            articles = db.session.query(Article, ArticleContent).join(
+                ArticleContent, Article.article_id == ArticleContent.aid
+            ).filter(
+                Article.status == 'Published',
+                Article.hidden == False
+            ).all()
 
-            for title in markdown_files:
-                article_url = domain + 'blog/' + title
-                describe, date = get_content(identifier=title, is_title=True, limit=50)
-                describe = clean_html_format(describe)
+            # 创建XML根元素
+            root = ET.Element('rss')
+            root.set('version', '2.0')
 
-                # 将 datetime 对象转换为字符串
-                if isinstance(date, datetime):
-                    date = date.strftime('%Y-%m-%dT%H:%M:%SZ')
+            # 为每个匹配的文章创建XML条目
+            for article, content in articles:
+                # 检查文章是否包含关键词（在标题或内容中）
+                if (keyword.lower() in article.title.lower() or
+                        keyword.lower() in strip_html_tags(content.content).lower()):
+                    item = ET.SubElement(root, 'item')
 
-                if keyword.lower() in title.lower() or keyword.lower() in describe.lower():
-                    item = ElementTree.SubElement(root, 'item')
-                    ElementTree.SubElement(item, 'title').text = title
-                    ElementTree.SubElement(item, 'link').text = article_url
-                    ElementTree.SubElement(item, 'pubDate').text = date
-                    ElementTree.SubElement(item, 'description').text = describe
+                    title_elem = ET.SubElement(item, 'title')
+                    title_elem.text = article.title
+
+                    link_elem = ET.SubElement(item, 'link')
+                    link_elem.text = f"{domain}p/{article.slug}"
+
+                    pubDate_elem = ET.SubElement(item, 'pubDate')
+                    pubDate_elem.text = article.created_at.strftime('%a, %d %b %Y %H:%M:%S GMT')
+
+                    description_elem = ET.SubElement(item, 'description')
+                    # 使用摘要或截取的内容前200字符
+                    desc_text = article.excerpt if article.excerpt else strip_html_tags(content.content)[:200] + '...'
+                    description_elem.text = desc_text
 
             # 创建XML树并写入缓存
-            tree = ElementTree.ElementTree(root)
-            match_data = ElementTree.tostring(tree.getroot(), encoding="unicode", method='xml')
+            tree = ET.ElementTree(root)
+            match_data = ET.tostring(tree.getroot(), encoding="unicode", method='xml')
 
             with open(cache_path, 'w', encoding=global_encoding) as cache_file:
                 cache_file.write(match_data)
 
         # 解析XML数据
-        parsed_data = ElementTree.fromstring(match_data)
+        parsed_data = ET.fromstring(match_data)
         for item in parsed_data.findall('item'):
             content = {
                 'title': item.find('title').text,
