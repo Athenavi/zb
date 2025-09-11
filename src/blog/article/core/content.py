@@ -1,53 +1,6 @@
 from src.database import get_db_connection
 
 
-def get_article_titles(per_page=30, page=1):
-    # 连接到MySQL数据库
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    # 计算查询的起始和结束索引
-    start_index = (page - 1) * per_page
-
-    # 执行查询，获取仅公开且未隐藏的文章标题
-    query = """
-            SELECT title
-            FROM articles
-            WHERE status = 'Published'
-              AND hidden is false
-            ORDER BY updated_at DESC
-            LIMIT %s OFFSET %s \
-            """
-    cursor.execute(query, (per_page, start_index))
-    articles = [row[0] for row in cursor.fetchall()]
-
-    # 关闭数据库连接
-    cursor.close()
-    conn.close()
-
-    # 计算是否有下一页和上一页
-    # 这里我们再次查询总的公开且未隐藏的文章数量，以确定是否有下一页和上一页
-    count_query = """
-                  SELECT COUNT(*)
-                  FROM articles
-                  WHERE status = 'Published'
-                    AND hidden = 0 \
-                  """
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute(count_query)
-    total_articles = cursor.fetchone()[0]
-
-    has_next_page = (start_index + per_page) < total_articles
-    has_previous_page = start_index > 0
-
-    # 关闭数据库连接
-    cursor.close()
-    conn.close()
-
-    return articles, has_next_page, has_previous_page
-
-
 def get_article_slugs():
     # 连接到MySQL数据库
     conn = get_db_connection()
