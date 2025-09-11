@@ -13,7 +13,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from src.blog.article.core.content import get_content, get_i18n_content_by_aid
 from src.blog.article.core.crud import get_aid_by_title
 from src.blog.article.core.views import blog_tmp_url, blog_detail_back, \
-    blog_detail_aid_back, blog_detail_i18n, edit_article_back, new_article_back
+    blog_detail_aid_back, blog_detail_i18n, edit_article_back, new_article_back, blog_detail_i18n_list
 from src.blog.article.metadata.handlers import persist_views
 from src.blog.article.security.password import get_apw_form, check_apw_form
 from src.blog.comment import create_comment, comment_page_get
@@ -202,6 +202,11 @@ def blog_detail(slug_name):
 @app.route('/<int:aid>.html/<string:iso>/<string:slug_name>', methods=['GET', 'POST'])
 def blog_detail_i18n_route(aid, iso, slug_name):
     return blog_detail_i18n(aid=aid, blog_slug=slug_name, i18n_code=iso)
+
+
+@app.route('/<int:aid>.html/<string:iso>', methods=['GET'])
+def blog_detail_i18n_list_route(aid, iso):
+    return blog_detail_i18n_list(aid=aid, i18n_code=iso)
 
 
 @app.route('/<int:aid>.html', methods=['GET', 'POST'])

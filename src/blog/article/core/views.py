@@ -4,7 +4,7 @@ from src.blog.article.security.password import get_article_password
 from src.error import error
 from src.models import db, Article, ArticleContent, ArticleI18n, User
 from src.user.entities import auth_by_uid
-from src.utils.security.safe import random_string
+from src.utils.security.safe import random_string, is_valid_iso_language_code
 
 
 def blog_detail_back(blog_slug, safeMode=True):
@@ -48,6 +48,30 @@ def blog_detail_i18n(aid, blog_slug, i18n_code):
         return render_template('zyDetail.html', articleName=blog_slug, url_for=url_for,
                                i18n_code=i18n_code, aid=aid)
     return error(message='Invalid request', status_code=400)
+
+
+def blog_detail_i18n_list(aid, i18n_code):
+    if not is_valid_iso_language_code(i18n_code):
+        return error(message='Invalid request', status_code=400)
+    article = Article.query.filter_by(article_id=aid).first()
+    if not article:
+        return error(message='Article not found', status_code=404)
+    if article.status != 'Published':
+        return error(message='Article not published', status_code=403)
+    articleI18n = ArticleI18n.query.filter_by(article_id=aid, language_code=i18n_code).all()
+    if not articleI18n:
+        return error(message=f'Article not found for language {i18n_code}', status_code=404)
+
+    # 生成包含链接的HTML代码
+    html_links = "<ul>"
+    for i in articleI18n:
+        link = f"/{aid}.html/{i18n_code}/{i.slug}"
+        html_links += f"<li><a href='{link}'>{i.language_code}: {i.title}-{i.slug}</a></li>"
+    html_links += "</ul>"
+
+    return render_template('inform.html',
+                           status_code=f"This article contains {len(articleI18n)} international translations.（{i18n_code}）",
+                           message=html_links)
 
 
 def blog_detail_aid_back(aid, safeMode=True):
