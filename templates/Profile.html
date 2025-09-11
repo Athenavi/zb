@@ -144,7 +144,8 @@
                 <div class="px-6 py-4 hover:bg-gray-50 transition-colors">
                     <div class="flex items-start justify-between">
                         <div class="flex-1">
-                            <h3 class="text-lg font-medium text-gray-900 hover:text-primary cursor-pointer">
+                            <h3 class="text-lg font-medium text-gray-900 hover:text-primary cursor-pointer"
+                            onclick="location.href='/p/{{ article.slug }}'">
                                 {{ article.title }}
                             </h3>
                             {% if article.excerpt %}
@@ -153,7 +154,7 @@
                             <div class="flex items-center space-x-4 mt-3 text-sm text-gray-500">
                                 <span><i class="fas fa-eye mr-1"></i>{{ "{:,}".format(article.views) }}</span>
                                 <span><i class="fas fa-heart mr-1"></i>{{ "{:,}".format(article.likes) }}</span>
-                                <span><i class="fas fa-clock mr-1"></i>{{ article.updated_at.strftime('%Y-%m-%d') }}</span>
+                                <span><i class="fas fa-clock mr-1"></i>{{ article.updated_at| relative_time }}</span>
                                 {% if article.tags %}
                                 <div class="flex space-x-1">
                                     {% for tag in article.tags.split(',')[:3] %}

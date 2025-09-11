@@ -134,7 +134,7 @@ def featured_page_back():
             FROM articles
             WHERE Hidden = FALSE
               AND Status = 'Published'
-              AND is_featured >= 127
+              AND is_featured = TRUE
             ORDER BY article_id DESC
             LIMIT %s OFFSET %s \
             """

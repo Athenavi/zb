@@ -6,6 +6,32 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon"/>
     <title>{{ title }} - 安全中心</title>
+    <style>
+        ul {
+            list-style-type: none; /* 去掉默认的项目符号 */
+            padding: 0; /* 去掉默认的内边距 */
+            margin: 0; /* 去掉默认的外边距 */
+        }
+
+        ul li {
+            background-color: #f0f0f0; /* 设置列表项的背景颜色 */
+            margin: 5px 0; /* 设置列表项之间的垂直间距 */
+            padding: 10px; /* 设置列表项的内边距 */
+            border-radius: 5px; /* 设置列表项的圆角 */
+            transition: background-color 0.3s ease; /* 添加背景颜色过渡效果 */
+        }
+
+        ul li a {
+            text-decoration: none; /* 去掉链接的下划线 */
+            color: #333; /* 设置链接文字的颜色 */
+            display: block; /* 使链接块级显示，以便背景颜色填充整个项目 */
+        }
+
+        ul li a:hover {
+            background-color: #e0e0e0; /* 鼠标悬停时改变背景颜色 */
+            color: #007BFF; /* 鼠标悬停时改变文字颜色 */
+        }
+    </style>
 </head>
 
 <body class="bg-[#EFF4FA] font-sans">
@@ -18,7 +44,7 @@
         {% if not aid %}
             {% if status_code %}
                 <div class="text-2xl text-[#2a3c59] font-medium mb-4">{{ status_code }}</div>
-                <div class="text-[#2a3c59] mb-8"><h2 id="message">{{ message }}</h2></div>
+                <div class="text-[#2a3c59] mb-8"><h2 id="message">{{ message | safe }}</h2></div>
                 <div class="flex justify-center gap-4 mt-16">
                     <button onclick="window.history.back()"
                             class="px-6 py-3 rounded-full border border-gray-300 bg-white text-[#2a3c59] hover:border-green-500 hover:text-green-500 transition-colors">

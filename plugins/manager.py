@@ -21,8 +21,9 @@ class PluginManager:
         off_file = os.path.join(plugin_path, "__off__")
         return not os.path.exists(off_file)
 
-    def load_plugins(self, plugin_dir="plugins"):
+    def load_plugins(self):
         """动态加载所有插件，并根据__off__文件判断是否启用"""
+        plugin_dir = "plugins"
         plugin_path = os.path.join(os.path.dirname(__file__))
         print(f"🔍 正在扫描插件目录: {plugin_path}")
 
@@ -31,8 +32,8 @@ class PluginManager:
             return
 
         for plugin_name in os.listdir(plugin_path):
-            # 跳过非目录文件
-            if not os.path.isdir(os.path.join(plugin_path, plugin_name)):
+            # 跳过非目录文件和 __pycache__ 目录
+            if not os.path.isdir(os.path.join(plugin_path, plugin_name)) or plugin_name == "__pycache__":
                 continue
 
             # 检查插件是否启用
