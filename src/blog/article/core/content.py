@@ -14,7 +14,7 @@ def get_article_titles(per_page=30, page=1):
             SELECT title
             FROM articles
             WHERE status = 'Published'
-              AND hidden = 0
+              AND hidden is false
             ORDER BY updated_at DESC
             LIMIT %s OFFSET %s \
             """
@@ -48,66 +48,27 @@ def get_article_titles(per_page=30, page=1):
     return articles, has_next_page, has_previous_page
 
 
-import html
+def get_article_slugs():
+    # 连接到MySQL数据库
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
+    query = """
+            SELECT article_id, slug
+            FROM articles
+            WHERE status = 'Published'
+              AND hidden is false
+            """
+    cursor.execute(query)
+    results = cursor.fetchall()
 
-def get_content(identifier, is_title=True, limit=10):
-    try:
-        db = get_db_connection()
-        cursor = db.cursor()
+    # 关闭数据库连接
+    cursor.close()
+    conn.close()
 
-        if is_title:
-            query = """
-                    SELECT ac.content, ac.updated_at
-                    FROM articles a
-                             JOIN article_content ac ON a.article_id = ac.aid
-                    WHERE a.title = %s
-                      and a.status = 'Published'
-                      and a.hidden = 0
-                    """
-            cursor.execute(query, (identifier,))
-        else:
-            query = """
-                    SELECT ac.content, ac.updated_at
-                    FROM articles a
-                             JOIN article_content ac ON a.article_id = ac.aid
-                    WHERE ac.aid = %s
-                      and a.status = 'Published'
-                      and a.hidden = 0
-                    """
-            cursor.execute(query, (identifier,))
-
-        result = cursor.fetchone()
-        cursor.close()
-        db.close()
-
-        if not result:
-            print(f"No article found with {'title' if is_title else 'article_id'}:", identifier)
-            return None, None
-
-        content, date = result
-        unescaped_content = html.unescape(content)
-
-        # 按行分割Markdown内容
-        lines = unescaped_content.splitlines()
-
-        # 处理空内容的情况
-        if not lines:
-            return "这是一篇空白文章", date
-
-        # 截取指定行数并保留行结构
-        truncated_lines = lines[:limit]
-        truncated_content = "\n".join(truncated_lines)
-
-        # 添加省略号指示截断（如果实际行数超过限制）
-        if len(lines) > limit:
-            truncated_content += "\n..."
-
-        return truncated_content, date
-
-    except Exception as e:
-        print(f"Error fetching content: {str(e)}")
-        return None, None
+    # 组合成字典返回
+    article_dict = {row[0]: row[1] for row in results}
+    return article_dict
 
 
 def get_i18n_content_by_aid(iso, aid):
