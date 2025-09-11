@@ -1,9 +1,10 @@
-from flask import Blueprint, Response, request  # 使用Flask的request对象
-import requests
 import threading
 import time
 
+from flask import Blueprint
+
 from plugins.kuaiMD.kuaiMD import start_server
+from plugins.tools import proxy_request
 
 kuaiMD_bp = Blueprint('kuaiMD', __name__)
 
@@ -49,47 +50,4 @@ def register_plugin(app):
 @kuaiMD_bp.route('/kuaiMD', methods=['GET', 'POST', 'PUT', 'DELETE'])
 @kuaiMD_bp.route('/kuaiMD/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE'])
 def index(path=''):
-    target_url = f'http://localhost:{kuaiMD_port}/{path}'
-
-    try:
-        # 根据请求方法转发请求
-        if request.method == 'GET':
-            response = requests.get(
-                target_url,
-                params=request.args,
-                headers=dict(request.headers)
-            )
-        elif request.method == 'POST':
-            response = requests.post(
-                target_url,
-                data=request.get_data(),
-                headers=dict(request.headers),
-                params=request.args
-            )
-        elif request.method == 'PUT':
-            response = requests.put(
-                target_url,
-                data=request.get_data(),
-                headers=dict(request.headers),
-                params=request.args
-            )
-        elif request.method == 'DELETE':
-            response = requests.delete(
-                target_url,
-                headers=dict(request.headers),
-                params=request.args
-            )
-        else:
-            return Response("Method not allowed", status=405)
-
-        # 返回代理响应
-        return Response(
-            response.content,
-            status=response.status_code,
-            headers=dict(response.headers)
-        )
-
-    except requests.exceptions.ConnectionError:
-        return Response("Backend server is not responding", status=502)
-    except Exception as e:
-        return Response(f"Proxy error: {str(e)}", status=500)
+    return proxy_request(target_url=f'http://localhost:{kuaiMD_port}/{path}')
