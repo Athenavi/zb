@@ -90,23 +90,27 @@
                         </div>
                         <div class="flex items-center space-x-4">
                             <!-- 多语言切换 -->
-                            {% if i18n_versions and i18n_versions|length >= 1 %}
-                                <div class="relative group">
-                                    <button class="flex items-center text-gray-600 hover:text-primary">
-                                        <i class="fas fa-language mr-1"></i>
-                                        语言
-                                    </button>
-                                    <div class="absolute right-0 bottom-0 mb-2 w-48 bg-white shadow-lg rounded-md py-1 hidden group-hover:block z-10">
+
+                            <div class="relative group">
+                                <button class="flex items-center text-gray-600 hover:text-primary">
+                                    <i class="fas fa-language mr-1"></i>
+                                    语言
+                                </button>
+                                <div class="absolute right-0 bottom-0 mb-2 w-48 bg-white shadow-lg rounded-md py-1 hidden group-hover:block z-10">
+                                    {% if i18n_versions and i18n_versions|length >= 1 %}
                                         {% for version in i18n_versions %}
                                             <a href="/{{ article.article_id }}.html/{{ version.language_code }}/{{ version.slug }}"
                                                class="block px-4 py-2 hover:bg-gray-100">
                                                 {{ version.language_code }} - {{ version.title }}
                                             </a>
                                         {% endfor %}
-                                    </div>
+                                    {% endif %}
+                                    <a href="/contribute?aid={{ article.article_id }}"
+                                       class="block px-4 py-2 hover:bg-gray-100">
+                                        Contributed Translation
+                                    </a>
                                 </div>
-                            {% endif %}
-
+                            </div>
                             <button class="flex items-center text-gray-600 hover:text-green-500"
                                     onclick="window.open('/p/{{ article.slug }}.md/fullscreen', '_blank');">
                                 <i class="fa-brands fa-readme mr-1"></i>

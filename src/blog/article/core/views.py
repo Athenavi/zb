@@ -1,10 +1,12 @@
+import re
+
 from flask import request, render_template, url_for, jsonify, current_app, flash, redirect
 
 from src.blog.article.security.password import get_article_password
 from src.error import error
 from src.models import db, Article, ArticleContent, ArticleI18n, User
 from src.user.entities import auth_by_uid
-from src.utils.security.safe import random_string, is_valid_iso_language_code
+from src.utils.security.safe import random_string, is_valid_iso_language_code, valid_language_codes
 
 
 def blog_detail_back(blog_slug, safeMode=True):
@@ -72,6 +74,96 @@ def blog_detail_i18n_list(aid, i18n_code):
     return render_template('inform.html',
                            status_code=f"This article contains {len(articleI18n)} international translations.（{i18n_code}）",
                            message=html_links)
+
+
+def contribute_back(aid):
+    if request.method == 'GET':
+        # 获取现有翻译信息用于展示
+        existing_translations = db.session.query(ArticleI18n.language_code).filter(
+            ArticleI18n.article_id == aid
+        ).all()
+        existing_languages = [t.language_code for t in existing_translations]
+
+        return render_template('contribute.html',
+                               aid=aid,
+                               existing_languages=existing_languages,
+                               valid_language_codes=sorted(valid_language_codes))
+
+    if request.method == 'POST':
+        # 确保请求是JSON格式
+        if not request.is_json:
+            return jsonify({'success': False, 'message': 'Request must be JSON'}), 400
+
+        data = request.get_json()
+
+        # 处理表单提交
+        contribute_type = data.get('contribute_type')
+        contribute_content = data.get('contribute_content')
+        contribute_language = data.get('contribute_language')
+        contribute_title = data.get('contribute_title')
+        contribute_slug = data.get('contribute_slug')
+
+        # 验证必填字段
+        if not all([contribute_type, contribute_content, contribute_language,
+                    contribute_title, contribute_slug]):
+            return jsonify({'success': False, 'message': 'All fields are required'}), 400
+
+        # 处理slug
+        contribute_slug = re.sub(r'[^\w\s]', '', contribute_slug)  # 移除非字母数字和下划线的字符
+        contribute_slug = re.sub(r'\s+', '_', contribute_slug)
+
+        # 验证语言代码
+        if not is_valid_iso_language_code(contribute_language):
+            return jsonify({'success': False, 'message': 'Invalid language code'}), 400
+
+        # 验证文章是否存在
+        article = db.session.query(Article).filter(
+            Article.article_id == aid,
+            Article.status == 'Published'
+        ).first()
+        if not article:
+            return jsonify({'success': False, 'message': 'Article not found'}), 404
+
+        # 检查是否已存在相同语言版本的翻译
+        existing_i18n = ArticleI18n.query.filter_by(
+            article_id=aid,
+            language_code=contribute_language
+        ).first()
+
+        try:
+            if existing_i18n:
+                # 更新现有翻译
+                existing_i18n.title = contribute_title
+                existing_i18n.slug = contribute_slug
+                existing_i18n.content = contribute_content
+                db.session.commit()
+                return jsonify({
+                    'success': True,
+                    'message': 'Translation updated successfully',
+                    'i18n_id': existing_i18n.i18n_id
+                })
+            else:
+                # 创建新翻译
+                new_i18n = ArticleI18n(
+                    article_id=aid,
+                    language_code=contribute_language,
+                    title=contribute_title,
+                    slug=contribute_slug,
+                    content=contribute_content,
+                    excerpt=contribute_content[:200]  # 简单截取作为摘要
+                )
+                db.session.add(new_i18n)
+                db.session.commit()
+                return jsonify({
+                    'success': True,
+                    'message': 'Translation submitted successfully',
+                    'i18n_id': new_i18n.i18n_id
+                })
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': f'Database error: {str(e)}'}), 500
+
+    return jsonify({'success': False, 'message': 'Invalid request method'}), 400
 
 
 def blog_detail_aid_back(aid, safeMode=True):
@@ -165,6 +257,9 @@ def edit_article_back(user_id, article_id):
         article.status = request.form.get('status')
         article.article_type = request.form.get('article_type')
         article.cover_image = request.form.get('cover_image')
+
+        article.slug = re.sub(r'[^\w\s]', '', article.slug)  # 移除非字母数字和下划线的字符
+        article.slug = re.sub(r'\s+', '_', article.slug)
 
         # 更新内容
         if content_obj:
