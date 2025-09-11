@@ -3,8 +3,9 @@ import time
 
 from flask import Blueprint
 
-from plugins.kuaiMD.kuaiMD import start_server
+from plugins.kuaiMD.kuaiMD import start_server, convert_markdown_to_html, get_main_page
 from plugins.tools import proxy_request
+from src.models import Article, db, ArticleContent, ArticleI18n, User
 
 kuaiMD_bp = Blueprint('kuaiMD', __name__)
 
@@ -51,3 +52,28 @@ def register_plugin(app):
 @kuaiMD_bp.route('/kuaiMD/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE'])
 def index(path=''):
     return proxy_request(target_url=f'http://localhost:{kuaiMD_port}/{path}')
+
+
+@kuaiMD_bp.route('/p/<slug>.md/fullscreen', methods=['GET', 'POST'])
+def fullscreen(slug=''):
+    article = db.session.query(Article).filter(
+        Article.slug == slug,
+        Article.status == 'Published',
+    ).first()
+
+    print(f'0. {article}')
+
+    if article:
+        # 获取文章内容
+        content = db.session.query(ArticleContent).filter_by(aid=article.article_id).first()
+
+        # 获取多语言版本
+        # i18n_versions = db.session.query(ArticleI18n).filter_by(article_id=article.article_id).all()
+
+        # 获取作者信息
+        # author = db.session.query(User).get(article.user_id)
+        # print(f'1. author: {author}')
+        # print(f'2. content: {content}')
+        # print(f'3. i18n: {i18n_versions}')
+        return get_main_page(your_content=content.content)
+    return None

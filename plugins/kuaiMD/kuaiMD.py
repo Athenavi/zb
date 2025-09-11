@@ -14,13 +14,9 @@ description: 专业的Markdown转HTML转换工具，支持实时预览和多种�
 input_description: 通过Web界面输入Markdown文本和转换参数
 output_description: 实时HTML预览，支持复制、下载HTML和浏览器打印
 """
-import argparse
 import json
-import webbrowser
-import threading
-import time
-from urllib.parse import quote, unquote
 from http.server import HTTPServer, BaseHTTPRequestHandler
+
 import markdown
 
 
@@ -492,7 +488,7 @@ def get_css_style(theme):
     return styles.get(theme, styles['github'])
 
 
-def get_main_page():
+def get_main_page(your_content=''):
     """生成主页面HTML"""
     kuaiMD_api_url = '/kuaiMD/convert'
     js_code = f'''
@@ -686,45 +682,6 @@ def get_main_page():
             updatePreview();
         }}
         
-        function loadTemplate() {{
-            const templates = [
-                {{ name: 'blog', desc: '博客文章模板', content: '# 📝 我的博客文章\\n\\n## 前言\\n\\n这是一篇使用Markdown编写的博客文章示例。\\n\\n## 正文内容\\n\\n在这里写入您的博客内容...\\n\\n### 子标题\\n\\n- 列表项1\\n- 列表项2\\n\\n## 总结\\n\\n文章总结内容。' }},
-                {{ name: 'readme', desc: 'README文档模板', content: '# 🎯 项目名称\\n\\n简短的项目描述\\n\\n## 🚀 快速开始\\n\\n### 安装\\n\\n```bash\\npip install project-name\\n```\\n\\n### 使用示例\\n\\n```python\\n# 示例代码\\nresult = function()\\nprint(result)\\n```\\n\\n## 📖 文档\\n\\n详细文档请访问项目主页\\n\\n## 🤝 贡献\\n\\n欢迎提交PR和Issue！' }},
-                {{ name: 'toc', desc: '带目录的文档模板', content: '# 📚 带目录的文档\\n\\n本文档演示如何使用目录功能。\\n\\n[TOC]\\n\\n## 第一章 介绍\\n\\n这是第一章的内容。\\n\\n### 1.1 概述\\n\\n第一章第一节的内容。\\n\\n### 1.2 特性\\n\\n第一章第二节的内容。\\n\\n## 第二章 使用方法\\n\\n这是第二章的内容。\\n\\n### 2.1 基础用法\\n\\n第二章第一节的内容。\\n\\n### 2.2 高级功能\\n\\n第二章第二节的内容。\\n\\n#### 2.2.1 详细说明\\n\\n更深层级的标题。\\n\\n## 第三章 总结\\n\\n这是第三章的内容。' }}
-            ];
-            
-            let promptText = '请选择模板（输入序号）：\\n';
-            for (let i = 0; i < templates.length; i++) {{
-                promptText += (i + 1) + '. ' + templates[i].desc + '\\n';
-            }}
-            
-            const input = prompt(promptText);
-            const templateIndex = parseInt(input) - 1;
-            
-            if (templateIndex >= 0 && templateIndex < templates.length) {{
-                document.getElementById('markdown-input').value = templates[templateIndex].content;
-                updatePreview();
-            }} else if (input) {{
-                alert('输入的序号无效，请输入1-' + templates.length + '之间的数字');
-            }}
-        }}
-        
-        function clearContent() {{
-            if (confirm('确定要清空所有内容吗？')) {{
-                document.getElementById('markdown-input').value = '';
-                
-                const previewArea = document.getElementById('preview-area');
-                const emptyMessage = '<div style="text-align: center; color: #999; padding: 50px;">请在左侧输入Markdown内容</div>';
-                
-                previewArea.innerHTML = '<div class="preview-content" id="preview-content">' + emptyMessage + '</div>';
-                
-                currentHtml = '';
-                updateStats('');
-                document.getElementById('html-size').textContent = 'HTML大小: 0 字节';
-                document.getElementById('conversion-time').textContent = '转换耗时: 0ms';
-            }}
-        }}
-        
         document.addEventListener('DOMContentLoaded', function() {{
             // 设置默认主题
             const themeMapping = {{
@@ -745,7 +702,7 @@ def get_main_page():
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Markdown转HTML转换器</title>
+    <title>阅读模式</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; }}
@@ -839,20 +796,18 @@ def get_main_page():
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>📝 专业Markdown转HTML转换器</h1>
-            <p>基于Python-Markdown和PyMdown扩展的专业转换工具</p>
-        </div>
-        
         <div class="options-panel">
-            <div class="options-row">
-                <button class="option-button" onclick="showOptionsPanel('theme-panel')">🎨 主题设置</button>
-                <button class="option-button" onclick="showOptionsPanel('basic-panel')">🔧 基础扩展</button>
+                    <div class="panel-buttons">
+                        <button class="option-button" onclick="showOptionsPanel('theme-panel')">🎨 主题设置</button>
+                <!--<button class="option-button" onclick="showOptionsPanel('basic-panel')">🔧 基础扩展</button>-->
                 <button class="option-button" onclick="showOptionsPanel('code-panel')">💻 代码高亮</button>
-                <button class="option-button" onclick="showOptionsPanel('advanced-panel')">🚀 高级功能</button>
-                <button class="option-button" onclick="showOptionsPanel('other-panel')">⚙️ 其他选项</button>
-            </div>
-            
+                <!--<button class="option-button" onclick="showOptionsPanel('advanced-panel')">🚀 高级功能</button>-->
+                <!--<button class="option-button" onclick="showOptionsPanel('other-panel')">⚙️ 其他选项</button>-->
+                        <button class="panel-btn btn-info" onclick="forceReconvert()">🔄 重新转换</button>
+                        <button class="panel-btn btn-primary" onclick="copyHtml()">📋 复制</button>
+                        <button class="panel-btn btn-success" onclick="downloadHtml()">💾 下载</button>
+                        <button class="panel-btn btn-secondary" onclick="previewInNewWindow()">👁️ 预览</button>
+                    </div>
             <!-- 浮动面板 -->
             <div id="theme-panel" class="floating-panel">
                 <div class="panel-title">🎨 主题设置</div>
@@ -961,69 +916,14 @@ def get_main_page():
         </div>
 
         <div class="main-content">
-            <div class="input-panel">
+            <div class="input-panel" style="display: None">
                 <div class="panel-header">
                     <span class="panel-title-text">📝 Markdown输入</span>
                     <div class="panel-buttons">
-                        <button class="panel-btn btn-warning" onclick="loadTemplate()">📄 模板</button>
-                        <button class="panel-btn btn-danger" onclick="clearContent()">🗑️ 清空</button>
                     </div>
                 </div>
                 <div class="panel-content">
-                    <textarea id="markdown-input" placeholder="在此输入您的Markdown内容..." oninput="updatePreview()"># 🚀 专业Markdown转HTML转换器
-
-欢迎使用基于 **Python-Markdown** 和 **PyMdown扩展** 的专业转换工具！
-
-## 📑 文档目录
-
-[TOC]
-
-## ✨ 功能特性
-
-- [x] **实时预览** - 输入即转换，无延迟响应
-- [x] **代码高亮** - 支持100+编程语言语法高亮  
-- [x] **表格支持** - 完整的GitHub风格表格
-- [x] **任务列表** - 交互式复选框列表
-- [x] **多种主题** - 5种精美预设主题
-- [x] **PDF导出** - 浏览器打印功能，零依赖
-- [x] **自动目录** - 根据标题自动生成导航目录
-
-## 💻 代码高亮示例
-
-```python
-def hello_world():
-    print("Hello, Markdown!")
-    return "转换成功"
-```
-
-## 📊 表格演示
-
-| 主题名称 | 风格特点 | 推荐度 |
-|----------|----------|--------|
-| GitHub | 简洁专业 | ⭐⭐⭐⭐⭐ |
-| 深色主题 | 护眼舒适 | ⭐⭐⭐⭐⭐ |
-| 学术风格 | 正式严谨 | ⭐⭐⭐⭐⭐ |
-
-## 🎯 引用示例
-
-> 💡 这个转换器的设计目标是提供专业级的markdown转换体验。
-
-### 📝 使用说明
-
-1. **选择主题**：点击"🎨 主题设置"选择您喜欢的样式
-2. **配置功能**：根据需要开启各种扩展功能
-3. **输入内容**：在左侧输入您的Markdown文本
-4. **实时预览**：右侧会实时显示转换效果
-
-### ⚠️ 注意事项
-
-- 目录功能需要在文档中添加 `[TOC]` 标记
-- 支持点击跳转到对应章节  
-- 可以复制、下载或打印生成的HTML
-
-## 🚀 开始使用
-
-清空这些示例内容，输入您自己的Markdown文本开始转换吧！</textarea>
+                    <textarea id="markdown-input" placeholder="在此输入您的Markdown内容..." oninput="updatePreview()">{your_content}</textarea>
                 </div>
                 <div class="stats">
                     <div>
@@ -1036,19 +936,10 @@ def hello_world():
             </div>
             
             <div class="output-panel">
-                <div class="panel-header">
-                    <span class="panel-title-text">🌐 HTML预览</span>
-                    <div class="panel-buttons">
-                        <button class="panel-btn btn-info" onclick="forceReconvert()">🔄 重新转换</button>
-                        <button class="panel-btn btn-primary" onclick="copyHtml()">📋 复制</button>
-                        <button class="panel-btn btn-success" onclick="downloadHtml()">💾 下载</button>
-                        <button class="panel-btn btn-secondary" onclick="previewInNewWindow()">👁️ 预览</button>
-                    </div>
-                </div>
                 <div class="panel-content">
                     <div id="preview-area" class="preview-area">
                         <div id="preview-content" class="preview-content">
-                            <div style="text-align: center; color: #999; padding: 50px;">请在左侧输入Markdown内容</div>
+                            <div style="text-align: center; color: #999; padding: 50px;"><h1>正在加载中...请稍候</h1></div>
                         </div>
                     </div>
                 </div>
@@ -1072,7 +963,7 @@ def start_server(port=12001):
     try:
         server = HTTPServer(('localhost', port), MarkdownHandler)
         print(f"🚀 Markdown转HTML服务器已启动")
-        print(f"📡 访问地址: http://localhost:{port}")
+        print(f"📡 已代理端口: {port},可通过 /kuaiMD 访问")
         print(f"🎨 默认主题: {params.default_theme}")
         server.serve_forever()
 
