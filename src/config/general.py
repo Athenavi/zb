@@ -12,12 +12,8 @@ def get_general_config():
     title = os.getenv('TITLE') or 'zyblog'
     beian = os.getenv('BEIAN') or '京ICP备12345678号'
     version = os.getenv('VERSION') or '2.0'
-    api_host = os.getenv('API_HOST')
-    app_id = os.getenv('APP_ID')
-    app_key = os.getenv('APP_KEY')
-    default_key = os.getenv('DEFAULT_KEY') or '237127'
 
-    return domain, title, beian, version, api_host, app_id, app_key, default_key
+    return domain, title, beian, version
 
 
 def zy_safe_conf():

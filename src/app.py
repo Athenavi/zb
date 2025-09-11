@@ -66,7 +66,12 @@ print(f"running at: {AppConfig.base_dir}")
 print("sys information")
 print("++++++++++==========================++++++++++")
 print(
-    f'\n domain: {AppConfig.domain} \n title: {AppConfig.sitename} \n beian: {AppConfig.beian} \n Version: {AppConfig.sys_version} \n 三方登录api: {AppConfig.api_host} \n')
+    f'\n domain: {AppConfig.domain} \n title: {AppConfig.sitename} \n beian: {AppConfig.beian} \n Version: {AppConfig.sys_version} \n')
+if AppConfig.SECRET_KEY == 'your-secret-key-here':
+    print("WARNING: 应用存在被破解的风险，请修改 SECRET_KEY 变量的值")
+    print("WARNING: 请修改 SECRET_KEY 变量的值")
+    print("WARNING: 请修改 SECRET_KEY 变量的值")
+    print("WARNING: 请修改 SECRET_KEY 变量的值")
 print("++++++++++==========================++++++++++")
 
 # 初始化 SiwaDoc
@@ -418,7 +423,7 @@ def get_current_theme():
     return db_get_theme()
 
 
-@cache.cached(timeout=3600, key_prefix='all_users')
+@cache.cached(timeout=300, key_prefix='all_users')
 def get_all_users():
     all_users = {}
     db = get_db_connection()
