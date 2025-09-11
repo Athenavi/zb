@@ -803,10 +803,10 @@ def get_main_page(your_content=''):
                 <button class="option-button" onclick="showOptionsPanel('code-panel')">💻 代码高亮</button>
                 <!--<button class="option-button" onclick="showOptionsPanel('advanced-panel')">🚀 高级功能</button>-->
                 <!--<button class="option-button" onclick="showOptionsPanel('other-panel')">⚙️ 其他选项</button>-->
-                        <button class="panel-btn btn-info" onclick="forceReconvert()">🔄 重新转换</button>
-                        <button class="panel-btn btn-primary" onclick="copyHtml()">📋 复制</button>
-                        <button class="panel-btn btn-success" onclick="downloadHtml()">💾 下载</button>
-                        <button class="panel-btn btn-secondary" onclick="previewInNewWindow()">👁️ 预览</button>
+                        <!--<button class="panel-btn btn-info" onclick="forceReconvert()">🔄 重新转换</button>-->
+                        <!--<button class="panel-btn btn-primary" onclick="copyHtml()">📋 复制</button>-->
+                        <!--<button class="panel-btn btn-success" onclick="downloadHtml()">💾 下载</button>-->
+                        <button class="panel-btn btn-secondary" onclick="previewInNewWindow()">👁️ 沉浸式</button>
                     </div>
             <!-- 浮动面板 -->
             <div id="theme-panel" class="floating-panel">
@@ -918,7 +918,7 @@ def get_main_page(your_content=''):
         <div class="main-content">
             <div class="input-panel" style="display: None">
                 <div class="panel-header">
-                    <span class="panel-title-text">📝 Markdown输入</span>
+                    <span class="panel-title-text">📝 Markdown格式原文</span>
                     <div class="panel-buttons">
                     </div>
                 </div>
