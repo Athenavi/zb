@@ -5,7 +5,7 @@ from flask import Blueprint
 
 from plugins.kuaiMD.kuaiMD import start_server, convert_markdown_to_html, get_main_page
 from plugins.tools import proxy_request
-from src.models import Article, db, ArticleContent, ArticleI18n, User
+from src.models import Article, db, ArticleContent
 
 kuaiMD_bp = Blueprint('kuaiMD', __name__)
 
