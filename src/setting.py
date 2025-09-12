@@ -11,7 +11,7 @@ class BaseConfig:
     global_encoding = 'utf-8'
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     SECRET_KEY = os.environ.get('SECRET_KEY') or generate_random_text(32)
-    domain, sitename, beian, sys_version = get_general_config()
+    domain, sitename, beian = get_general_config()
 
     SQLALCHEMY_DATABASE_URI = get_sqlalchemy_uri()
     SQLALCHEMY_TRACK_MODIFICATIONS = False

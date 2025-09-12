@@ -47,7 +47,7 @@ def jwt_required(f):
     return decorated_function
 
 
-domain, title, beian, version = get_general_config()
+domain, title, beian = get_general_config()
 # 定义白名单
 allowed_origins = [domain]
 
