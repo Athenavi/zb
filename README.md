@@ -26,7 +26,7 @@
 - **主题系统** - 支持在线切换主题、主题开发API
 - **插件架构** - 模块化插件系统，支持功能扩展
 - **数据统计** - 访问量统计、用户行为分析
-- **安全防护** - Cloudflare人机验证、SQL注入防护、XSS过滤
+- **安全防护** - SQL注入防护、XSS过滤
 - **API接口** - RESTful API设计，支持第三方集成
 
 ### 技术特性
@@ -40,31 +40,11 @@
 ### 系统要求
 
 - Python 3.12+ [5](#0-4) 
-- MySQL 8.0+
+- Postgres 17.4+
 - 2GB+ 内存推荐
 
-### 方式一：宝塔面板部署（推荐新手）
 
-1. **安装宝塔面板**
-```bash
-curl -sSO https://download.bt.cn/install/install_lts.sh && bash install_lts.sh ed8484bec
-```
-
-2. **在宝塔面板中操作**
-   - 创建Python项目（选择3.12.x版本）
-   - 导入GitHub仓库：`https://github.com/Athenavi/zb.git`
-   - 在软件商店安装MySQL 8.0
-   - 创建数据库和用户
-
-3. **配置应用**
-```bash
-pip install -r requirements.txt
-cp .env_example .env
-# 编辑.env文件配置数据库信息
-python wsgi.py
-```
-
-### 方式二：手动部署
+### 方式一：手动部署
 
 ```bash
 # 1. 克隆项目
@@ -89,7 +69,7 @@ mysql -u root -p < blog.sql
 python wsgi.py
 ```
 
-### 方式三：Docker部署
+### 方式二：Docker部署
 
 ```bash
 # 构建并运行
@@ -124,12 +104,6 @@ MAIL_PORT=465               # SMTP端口
 MAIL_USER=your@email.com    # 发件邮箱
 ```
 
-### 安全配置 [9](#0-8) 
-```env
-TURNSTILE_OPEN=TRUE         # 开启人机验证
-TURNSTILE_SITE_KEY=xxx      # Cloudflare站点密钥
-```
-
 ## 📁 项目结构
 
 ```
@@ -150,15 +124,6 @@ zb/
 ```
 
 ## 🛠️ 开发指南
-
-### 本地开发环境
-
-```bash
-# 开发模式启动（支持热重载）
-export FLASK_ENV=development
-python -m flask run --host=0.0.0.0 --port=5000
-```
-
 ### 主题开发
 
 主题文件结构： [10](#0-9) 
@@ -184,24 +149,6 @@ plugins/myplugin/
 ### API接口
 
 应用提供RESTful API接口，详细文档请访问：`/api/docs`
-
-## 🚀 生产部署
-
-### 使用Gunicorn
-
-```bash
-# 创建日志目录
-mkdir -p temp
-touch temp/access.log temp/error.log
-
-# 启动生产服务
-gunicorn --workers 4 --threads 2 \
-  --bind 0.0.0.0:9421 \
-  --timeout 60 \
-  --access-logfile ./temp/access.log \
-  --error-logfile ./temp/error.log \
-  --daemon src.app:app
-```
 
 ## 🤝 贡献指南
 

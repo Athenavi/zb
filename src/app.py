@@ -66,7 +66,7 @@ print(f"running at: {AppConfig.base_dir}")
 print("sys information")
 print("++++++++++==========================++++++++++")
 print(
-    f'\n domain: {AppConfig.domain} \n title: {AppConfig.sitename} \n beian: {AppConfig.beian} \n Version: {AppConfig.sys_version} \n')
+    f'\n domain: {AppConfig.domain} \n title: {AppConfig.sitename} \n beian: {AppConfig.beian} \n')
 if AppConfig.SECRET_KEY == 'your-secret-key-here':
     print("WARNING: 应用存在被破解的风险，请修改 SECRET_KEY 变量的值")
     print("WARNING: 请修改 SECRET_KEY 变量的值")
@@ -78,14 +78,13 @@ print("++++++++++==========================++++++++++")
 siwa = SiwaDoc(
     app,
     title=f'{AppConfig.sitename} API 文档',
-    version=AppConfig.sys_version,
-    description=f'系统版本: {AppConfig.sys_version} | 备案号: {AppConfig.beian}'
+    description=f'备案号: {AppConfig.beian}'
 )
 
 # 注册蓝图
 app.register_blueprint(auth_bp)
 app.register_blueprint(create_website_blueprint(cache, AppConfig.domain, AppConfig.sitename))
-app.register_blueprint(create_theme_blueprint(cache, AppConfig.domain, AppConfig.sys_version, AppConfig.base_dir))
+app.register_blueprint(create_theme_blueprint(cache, AppConfig.domain, AppConfig.base_dir))
 app.register_blueprint(create_media_blueprint(cache, AppConfig.domain, AppConfig.base_dir))
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(my_bp)
