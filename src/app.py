@@ -64,6 +64,7 @@ print(f"此密钥仅在单次运行中生效: {ADMIN_KEY}")
 # 打印运行信息
 print(f"running at: {AppConfig.base_dir}")
 print("sys information")
+AppConfig.domain = AppConfig.domain.rstrip('/') + '/'
 print("++++++++++==========================++++++++++")
 print(
     f'\n domain: {AppConfig.domain} \n title: {AppConfig.sitename} \n beian: {AppConfig.beian} \n')

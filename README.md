@@ -32,7 +32,7 @@
 ### 技术特性
 - **高性能** - 数据库连接池、缓存机制、静态文件优化
 - **可扩展** - 微服务架构、蓝图模块化设计
-- **易部署** - 支持Docker、宝塔面板一键部署
+- **易部署** - 支持Docker、宝塔面板部署
 - **多平台** - 完美适配桌面和移动设备
 
 ## 🚀 快速开始
@@ -83,11 +83,11 @@ docker run -d -p 9421:9421 --name zyblog-app zyblog
 
 ### 数据库配置 [6](#0-5) 
 ```env
-DATABASE_HOST=127.0.0.1      # 数据库主机
-DATABASE_PORT=3306           # 数据库端口
-DATABASE_USER=root           # 数据库用户名
-DATABASE_PASSWORD=123456     # 数据库密码
-DATABASE_NAME=zb             # 数据库名称
+DB_HOST=127.0.0.1      # 数据库主机
+DB_PORT=3306           # 数据库端口
+DB_USER=postgres       # 数据库用户名
+DB_PASSWORD=123456     # 数据库密码
+DB_NAME=flaskblog      # 数据库名称
 ```
 
 ### 应用配置 [7](#0-6) 

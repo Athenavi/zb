@@ -265,6 +265,34 @@ def do_update():
     return jsonify({'status': 'success', 'message': '更新已开始'})
 
 
+def main():
+    """更新主函数"""
+    print("开始更新检查...")
+
+    update, latest_version, changelog = check_for_update()
+    if not update:
+        print("当前已是最新版本")
+        return True
+
+    print(f"发现新版本: {latest_version}")
+    user_input = input("是否立即更新? (y/N): ")
+    if user_input.lower() != 'y':
+        print("取消更新")
+        return False
+
+    if not download_release(update):
+        print("下载更新失败")
+        return False
+
+    if not do_update():
+        print("应用更新失败")
+        return False
+
+    print("更新成功完成!")
+    print("请重启应用程序以使更新生效")
+    return True
+
+
 @app.route('/update_status')
 def get_update_status():
     return jsonify({
