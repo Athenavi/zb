@@ -4,11 +4,11 @@ import threading
 import time
 import zipfile
 from pathlib import Path
-from packaging import version
 
 import markdown
 import requests
 from flask import Flask, render_template, jsonify
+from packaging import version
 
 base_dir = os.path.dirname(os.path.abspath(__file__))  # 项目根目录
 

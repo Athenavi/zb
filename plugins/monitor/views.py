@@ -1,10 +1,9 @@
 import datetime as dt
 import os
+import platform
 import socket
 import threading
 from collections import deque
-
-import platform
 
 import psutil
 from flask import Blueprint, render_template_string

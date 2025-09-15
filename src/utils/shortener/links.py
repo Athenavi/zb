@@ -1,9 +1,10 @@
-import string
 import random
-
-#from pymysql.err import DatabaseError
+import string
 
 from src.database import get_db_connection
+
+
+# from pymysql.err import DatabaseError
 
 
 def generate_short_url():

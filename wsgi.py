@@ -1,7 +1,8 @@
 # wsgi.py
+import argparse
 import os
 import sys
-import argparse
+
 from src.logger_config import init_optimized_logger
 
 
