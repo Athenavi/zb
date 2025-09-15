@@ -103,7 +103,7 @@ def unfollow_user(user_id, target_user_id):
 def users_list(user_id):
     """用户列表页面，用于发现和关注新用户"""
     # 获取所有用户（除了当前用户）
-    users = User.query.filter(User.id != user_id).all()
+    users = User.query.filter(User.id != user_id and User.profile_private == False).all()
 
     # 获取当前用户已关注的用户ID列表
     following_ids = [sub.subscribed_user_id for sub in

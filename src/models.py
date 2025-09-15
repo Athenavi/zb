@@ -98,23 +98,24 @@ class RolePermission(db.Model):
         db.Index('permission_id', 'permission_id'),
     )
 
+
 class OAuthConnection(db.Model):
     __tablename__ = 'oauth_connections'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    provider = db.Column(db.String(50), nullable=False)  # 例如：google, github
-    provider_user_id = db.Column(db.String(255), nullable=False)  # 第三方平台的用户ID
-    access_token = db.Column(db.String(512))  # 加密存储
-    refresh_token = db.Column(db.String(512))  # 加密存储（可选）
-    expires_at = db.Column(db.DateTime)  # Token过期时间
+    provider = db.Column(db.String(50), nullable=False)
+    provider_user_id = db.Column(db.String(255), nullable=False)
+    access_token = db.Column(db.String(512))
+    refresh_token = db.Column(db.String(512))
+    expires_at = db.Column(db.DateTime)
 
-    # 关系
-    user = db.relationship('User', backref=db.backref('oauth_connections', lazy='dynamic'))
+    user = db.relationship('User', back_populates='oauth_connections')
 
     __table_args__ = (
-        db.UniqueConstraint('provider', 'provider_user_id'),  # 同一平台ID唯一
-        db.Index('idx_oauth_user', 'user_id', 'provider')  # 查询优化
+        db.UniqueConstraint('provider', 'provider_user_id'),
+        db.Index('idx_oauth_user', 'user_id', 'provider')
     )
+
 
 class Event(db.Model):
     __tablename__ = 'events'
