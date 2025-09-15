@@ -304,6 +304,9 @@ def user_space(user_id, target_user_id):
     # 判断是否为当前用户自己的空间
     is_own_profile = user_id == target_user_id
 
+    if target_user.profile_private and not is_own_profile:
+        return render_template('inform.html', status_code=503, message='<h1>该用户未公开资料</h1><UNK>')
+
     # 获取用户统计数据
     stats = {
         'articles_count': Article.query.filter_by(user_id=target_user_id, status='Published').count(),
