@@ -124,7 +124,11 @@ create table if not exists users
     updated_at      timestamp default now() not null,
     profile_picture varchar(255),
     bio             text,
-    register_ip     varchar(45)             not null
+    register_ip     varchar(45)             not null,
+    is_2fa_enabled  boolean   default false,
+    totp_secret     varchar(32),
+    backup_codes    text,
+    profile_private boolean   default false
 );
 
 comment on column users.username is '用户名';
@@ -517,7 +521,28 @@ alter table user_subscriptions
 create index if not exists idx_subscribed_user
     on user_subscriptions (subscribed_user_id);
 
+create table if not exists oauth_connections
+(
+    id               serial
+        primary key,
+    user_id          integer      not null
+        references users
+            on delete cascade,
+    provider         varchar(50)  not null,
+    provider_user_id varchar(255) not null,
+    access_token     varchar(512),
+    refresh_token    varchar(512),
+    expires_at       timestamp,
+    unique (provider, provider_user_id)
+);
+
+alter table oauth_connections
+    owner to postgres;
+
+create index if not exists idx_oauth_user
+    on oauth_connections (user_id, provider);
+
+-- 插入默认数据
 INSERT INTO users (username, password, email, created_at, updated_at, profile_picture, bio, register_ip)
 VALUES ('test', '$2b$12$kF4nZn6kESHtj0cjNeaoZugUlWXSgXp27iKAXHepyzSwUxrrhVTz2', 'support@7trees.cn',
         '2025-09-10 17:09:13', '2025-04-16 07:38:59', NULL, NULL, '');
-

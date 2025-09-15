@@ -17,6 +17,10 @@ class User(db.Model):
     profile_picture = db.Column(db.String(255))
     bio = db.Column(db.Text)
     register_ip = db.Column(db.String(45), nullable=False)
+    is_2fa_enabled = db.Column(db.Boolean, default=False)  # 是否启用2FA
+    totp_secret = db.Column(db.String(32))  # TOTP密钥（Base32编码，通常16字节）
+    backup_codes = db.Column(db.Text)  # 备份代码（JSON字符串或加密存储）
+    profile_private = db.Column(db.Boolean, default=False)
 
     # 关系定义
     media = db.relationship('Media', back_populates='user', lazy=True)
@@ -37,6 +41,8 @@ class User(db.Model):
 
     # 角色关系
     roles = db.relationship('Role', secondary='user_roles', back_populates='users')
+
+    oauth_connections = db.relationship('OAuthConnection', back_populates='user', lazy='dynamic')
 
     def __repr__(self):
         return f'<User {self.username}>'
@@ -92,6 +98,23 @@ class RolePermission(db.Model):
         db.Index('permission_id', 'permission_id'),
     )
 
+class OAuthConnection(db.Model):
+    __tablename__ = 'oauth_connections'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    provider = db.Column(db.String(50), nullable=False)  # 例如：google, github
+    provider_user_id = db.Column(db.String(255), nullable=False)  # 第三方平台的用户ID
+    access_token = db.Column(db.String(512))  # 加密存储
+    refresh_token = db.Column(db.String(512))  # 加密存储（可选）
+    expires_at = db.Column(db.DateTime)  # Token过期时间
+
+    # 关系
+    user = db.relationship('User', backref=db.backref('oauth_connections', lazy='dynamic'))
+
+    __table_args__ = (
+        db.UniqueConstraint('provider', 'provider_user_id'),  # 同一平台ID唯一
+        db.Index('idx_oauth_user', 'user_id', 'provider')  # 查询优化
+    )
 
 class Event(db.Model):
     __tablename__ = 'events'
