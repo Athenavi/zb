@@ -2,29 +2,36 @@ import re
 
 from flask import render_template, request, jsonify, current_app
 
+from src.models import User
 from src.other.sendEmail import request_email_change
 from src.user.entities import check_user_conflict, change_username, bind_email
 from src.user.profile.edit import edit_profile
 
 
 def setting_profiles_back(user_id, user_info, cache_instance, avatar_url_api):
-    if user_info is None:
-        # 处理未找到用户信息的情况
-        return "用户信息未找到", 404
-    avatar_url = user_info[5] if len(user_info) > 5 and user_info[5] else avatar_url_api
-    bio = user_info[6] if len(user_info) > 6 and user_info[6] else "这人很懒，什么也没留下"
-    user_name = user_info[1] if len(user_info) > 1 else "匿名用户"
-    user_email = user_info[2] if len(user_info) > 2 else "未绑定邮箱"
+    try:
+        if user_info is None:
+            # 处理未找到用户信息的情况
+            return "用户信息未找到", 404
+        avatar_url = user_info[5] if len(user_info) > 5 and user_info[5] else avatar_url_api
+        bio = user_info[6] if len(user_info) > 6 and user_info[6] else "这人很懒，什么也没留下"
+        user_name = user_info[1] if len(user_info) > 1 else "匿名用户"
+        user_email = user_info[2] if len(user_info) > 2 else "未绑定邮箱"
+        profile_private = User.query.filter(User.id == user_id).first().profile_private
+        print(profile_private)
 
-    return render_template(
-        'setting.html',
-        avatar_url=avatar_url,
-        username=user_name,
-        limit_username_lock=cache_instance.get(f'limit_username_lock_{user_id}'),
-        Bio=bio,
-        userEmail=user_email,
-        publicProfile=True,
-    )
+        return render_template(
+            'setting.html',
+            avatar_url=avatar_url,
+            username=user_name,
+            limit_username_lock=cache_instance.get(f'limit_username_lock_{user_id}'),
+            Bio=bio,
+            userEmail=user_email,
+            ProfilePrivate=profile_private,
+        )
+    except Exception as e:
+        print(e)
+
 
 
 def change_profiles_back(user_id, cache_instance, domain):

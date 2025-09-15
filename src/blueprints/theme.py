@@ -9,7 +9,7 @@ from src.user.authz.decorators import admin_required
 theme_bp = Blueprint('theme', __name__, template_folder='templates')
 
 
-def create_theme_blueprint(cache_instance, domain, sys_version, base_dir):
+def create_theme_blueprint(cache_instance, domain, base_dir):
     @theme_bp.route('/theme/<theme_id>')
     @cache_instance.cached(timeout=300, key_prefix='display_detail')
     def get_theme_detail(theme_id):
@@ -19,7 +19,7 @@ def create_theme_blueprint(cache_instance, domain, sys_version, base_dir):
                 'author': "系统默认",
                 'title': "恢复系统默认",
                 'authorWebsite': domain,
-                'version': sys_version,
+                'version': '0.3.0',
                 'versionCode': "None",
                 'updateUrl': "None",
                 'screenshot': "None",

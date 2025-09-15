@@ -17,6 +17,10 @@ class User(db.Model):
     profile_picture = db.Column(db.String(255))
     bio = db.Column(db.Text)
     register_ip = db.Column(db.String(45), nullable=False)
+    is_2fa_enabled = db.Column(db.Boolean, default=False)  # 是否启用2FA
+    totp_secret = db.Column(db.String(32))  # TOTP密钥（Base32编码，通常16字节）
+    backup_codes = db.Column(db.Text)  # 备份代码（JSON字符串或加密存储）
+    profile_private = db.Column(db.Boolean, default=False)
 
     # 关系定义
     media = db.relationship('Media', back_populates='user', lazy=True)
@@ -37,6 +41,8 @@ class User(db.Model):
 
     # 角色关系
     roles = db.relationship('Role', secondary='user_roles', back_populates='users')
+
+    oauth_connections = db.relationship('OAuthConnection', back_populates='user', lazy='dynamic')
 
     def __repr__(self):
         return f'<User {self.username}>'
@@ -90,6 +96,24 @@ class RolePermission(db.Model):
 
     __table_args__ = (
         db.Index('permission_id', 'permission_id'),
+    )
+
+
+class OAuthConnection(db.Model):
+    __tablename__ = 'oauth_connections'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    provider = db.Column(db.String(50), nullable=False)
+    provider_user_id = db.Column(db.String(255), nullable=False)
+    access_token = db.Column(db.String(512))
+    refresh_token = db.Column(db.String(512))
+    expires_at = db.Column(db.DateTime)
+
+    user = db.relationship('User', back_populates='oauth_connections')
+
+    __table_args__ = (
+        db.UniqueConstraint('provider', 'provider_user_id'),
+        db.Index('idx_oauth_user', 'user_id', 'provider')
     )
 
 

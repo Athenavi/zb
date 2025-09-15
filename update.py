@@ -8,6 +8,7 @@ from pathlib import Path
 import markdown
 import requests
 from flask import Flask, render_template, jsonify
+from packaging import version
 
 base_dir = os.path.dirname(os.path.abspath(__file__))  # 项目根目录
 
@@ -80,8 +81,11 @@ def check_for_update():
     changelog = latest_release.get('body', '')
     changelog = markdown.markdown(changelog, extensions=['markdown.extensions.fenced_code', 'toc'])
 
-    # 简单比较版本号
-    if latest_version != CONFIG['current_version']:
+    # 使用packaging.version进行精确版本比较:cite[1]:cite[9]
+    current_ver = version.parse(CONFIG['current_version'])
+    latest_ver = version.parse(latest_version)
+
+    if latest_ver > current_ver:
         return True, latest_version, changelog
     else:
         return False, latest_version, changelog
@@ -263,6 +267,34 @@ def do_update():
     thread.start()
 
     return jsonify({'status': 'success', 'message': '更新已开始'})
+
+
+def main():
+    """更新主函数"""
+    print("开始更新检查...")
+
+    update, latest_version, changelog = check_for_update()
+    if not update:
+        print("当前已是最新版本")
+        return True
+
+    print(f"发现新版本: {latest_version}")
+    user_input = input("是否立即更新? (y/N): ")
+    if user_input.lower() != 'y':
+        print("取消更新")
+        return False
+
+    if not download_release(update):
+        print("下载更新失败")
+        return False
+
+    if not do_update():
+        print("应用更新失败")
+        return False
+
+    print("更新成功完成!")
+    print("请重启应用程序以使更新生效")
+    return True
 
 
 @app.route('/update_status')

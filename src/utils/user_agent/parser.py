@@ -1,5 +1,7 @@
-from user_agents import parse
 import re
+
+from user_agents import parse
+
 
 def parse_user_agent(user_agent):
     # 解析 User-Agent 字符串

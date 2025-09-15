@@ -64,9 +64,10 @@ print(f"此密钥仅在单次运行中生效: {ADMIN_KEY}")
 # 打印运行信息
 print(f"running at: {AppConfig.base_dir}")
 print("sys information")
+AppConfig.domain = AppConfig.domain.rstrip('/') + '/'
 print("++++++++++==========================++++++++++")
 print(
-    f'\n domain: {AppConfig.domain} \n title: {AppConfig.sitename} \n beian: {AppConfig.beian} \n Version: {AppConfig.sys_version} \n')
+    f'\n domain: {AppConfig.domain} \n title: {AppConfig.sitename} \n beian: {AppConfig.beian} \n')
 if AppConfig.SECRET_KEY == 'your-secret-key-here':
     print("WARNING: 应用存在被破解的风险，请修改 SECRET_KEY 变量的值")
     print("WARNING: 请修改 SECRET_KEY 变量的值")
@@ -78,14 +79,13 @@ print("++++++++++==========================++++++++++")
 siwa = SiwaDoc(
     app,
     title=f'{AppConfig.sitename} API 文档',
-    version=AppConfig.sys_version,
-    description=f'系统版本: {AppConfig.sys_version} | 备案号: {AppConfig.beian}'
+    description=f'备案号: {AppConfig.beian}'
 )
 
 # 注册蓝图
 app.register_blueprint(auth_bp)
 app.register_blueprint(create_website_blueprint(cache, AppConfig.domain, AppConfig.sitename))
-app.register_blueprint(create_theme_blueprint(cache, AppConfig.domain, AppConfig.sys_version, AppConfig.base_dir))
+app.register_blueprint(create_theme_blueprint(cache, AppConfig.domain, AppConfig.base_dir))
 app.register_blueprint(create_media_blueprint(cache, AppConfig.domain, AppConfig.base_dir))
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(my_bp)
@@ -303,6 +303,9 @@ def user_space(user_id, target_user_id):
 
     # 判断是否为当前用户自己的空间
     is_own_profile = user_id == target_user_id
+
+    if target_user.profile_private and not is_own_profile:
+        return render_template('inform.html', status_code=503, message='<h1>该用户未公开资料</h1><UNK>')
 
     # 获取用户统计数据
     stats = {

@@ -1,9 +1,10 @@
 import re
 from datetime import datetime, timedelta, timezone
 
+import bcrypt
 from flask import Blueprint, make_response
 from flask import render_template, request, jsonify, redirect, url_for, flash
-from flask_bcrypt import check_password_hash, generate_password_hash
+from flask_bcrypt import check_password_hash
 
 from src.models import User, db
 from src.utils.security.jwt_handler import JWTHandler, JWT_EXPIRATION_DELTA, REFRESH_TOKEN_EXPIRATION_DELTA
@@ -58,7 +59,7 @@ def register():
                 return render_template('auth/register.html')
 
         # 创建新用户
-        hashed_password = generate_password_hash(password)
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         new_user = User(
             username=username,
             email=email,

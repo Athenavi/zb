@@ -27,7 +27,7 @@
                         <div class="flex items-center justify-between">
                             <div class="flex items-center space-x-4">
                                 <!-- Avatar -->
-                                <div class="flex-shrink-0">
+                                <div class="flex-shrink-0"  onclick="window.location.href='/space/{{ fan.id }}'">
                                     {% if fan.profile_picture %}
                                         <img class="h-12 w-12 rounded-full object-cover"
                                              src="/static/avatar/{{ fan.profile_picture }}.webp"
