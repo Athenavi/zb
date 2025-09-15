@@ -4,6 +4,7 @@ import threading
 import time
 import zipfile
 from pathlib import Path
+from packaging import version
 
 import markdown
 import requests
@@ -80,8 +81,11 @@ def check_for_update():
     changelog = latest_release.get('body', '')
     changelog = markdown.markdown(changelog, extensions=['markdown.extensions.fenced_code', 'toc'])
 
-    # 简单比较版本号
-    if latest_version != CONFIG['current_version']:
+    # 使用packaging.version进行精确版本比较:cite[1]:cite[9]
+    current_ver = version.parse(CONFIG['current_version'])
+    latest_ver = version.parse(latest_version)
+
+    if latest_ver > current_ver:
         return True, latest_version, changelog
     else:
         return False, latest_version, changelog
