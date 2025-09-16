@@ -11,28 +11,6 @@ from werkzeug.utils import secure_filename
 from src.database import get_db_connection
 
 
-def upload_article(file, upload_folder, allowed_size):
-    # 验证文件格式和大小
-    if not file.filename.endswith('.md') or file.content_length > allowed_size:
-        return 'Invalid file format or file too large.', 400
-
-    # 使用 pathlib 创建上传文件夹
-    upload_path = Path(upload_folder)
-    upload_path.mkdir(parents=True, exist_ok=True)
-
-    # 构建文件路径
-    file_path = upload_path / file.filename
-
-    # 避免文件名冲突
-    if file_path.is_file():
-        return 'Upload failed, the file already exists.', 400
-
-    # 保存文件
-    file.save(str(file_path))  # 确保转换为字符串
-    # shutil.copy(str(file_path), str(Path('articles') / file.filename))
-    return None
-
-
 def handle_user_upload(user_id, allowed_size, allowed_mimes, check_existing=False):
     if not request.files.getlist('file'):
         return jsonify({'message': 'no files uploaded'}), 400
@@ -323,33 +301,6 @@ def handle_editor_upload(domain, user_id, allowed_size, allowed_mimes):
             "succMap": succ_map
         }
     })
-
-
-def handle_file_upload_v2(user_id, domain, base_path):
-    if 'file' not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
-
-    file = request.files['file']
-    # 文件类型验证 :cite[4]
-    allowed_mimes = {'image/jpeg', 'image/png', 'image/gif', 'video/mp4', 'video/webm'}
-    if file.mimetype not in allowed_mimes:
-        return jsonify({"error": f"Unsupported file type: {file.mimetype}"}), 415
-
-    # 文件大小验证 :cite[8]
-    max_size = 10 * 1024 * 1024  # 10MB
-    if len(file.read()) > max_size:
-        return jsonify({"error": "File exceeds 10MB limit"}), 413
-    file.seek(0)  # 重置文件指针
-
-    filename = f"{file.filename}"
-    upload_dir = os.path.join(base_path, 'media', str(user_id))
-    os.makedirs(upload_dir, exist_ok=True)
-    file.save(os.path.join(upload_dir, filename))
-
-    return jsonify({
-        "url": f"{domain}uploads/{filename}",
-        "mime": file.mimetype
-    }), 200
 
 
 def upload_cover_back(user_id, base_path):

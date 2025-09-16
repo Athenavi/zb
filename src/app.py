@@ -37,7 +37,7 @@ from src.other.search import search_handler
 from src.plugin import plugin_bp, init_plugin_manager
 from src.setting import AppConfig
 from src.upload.admin_upload import admin_upload_file
-from src.upload.public_upload import handle_user_upload, handle_editor_upload, handle_file_upload_v2, upload_cover_back
+from src.upload.public_upload import handle_user_upload, handle_editor_upload, upload_cover_back
 from src.upload.views import upload_bulk_back
 from src.user.authz.decorators import jwt_required, admin_required, origin_required
 from src.user.authz.password import confirm_password_back, change_password_back
@@ -629,12 +629,6 @@ def upload_user_path(user_id):
 def handle_file_upload(user_id):
     return handle_editor_upload(domain=domain, user_id=user_id, allowed_size=app.config['UPLOAD_LIMIT'],
                                 allowed_mimes=app.config['ALLOWED_MIMES'])
-
-
-@app.route('/api/upload/files/v2', methods=['POST'])
-@jwt_required
-def handle_file_upload_v2_test(user_id):
-    return handle_file_upload_v2(user_id=user_id, domain=domain, base_path=base_dir)
 
 
 @app.route('/api/upload/cover', methods=['POST'])
