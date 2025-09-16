@@ -1,6 +1,6 @@
-from flask import request, jsonify, render_template, current_app, abort
+from flask import render_template, current_app, abort
+from flask import request, jsonify
 
-from src.database import get_db_connection
 from src.models import Comment, db, Article
 
 
@@ -8,33 +8,37 @@ def create_comment(user_id, article_id):
     data = request.get_json()
     print(data)
     user_agent_str = str(request.user_agent)
-    query = "INSERT INTO comments (user_id, article_id, content, ip, user_agent) VALUES (%s, %s, %s, %s, %s)"
 
     try:
-        with get_db_connection() as db:
-            with db.cursor() as cursor:
-                cursor.execute(query,
-                               (int(user_id), int(article_id), data['content'], request.remote_addr, user_agent_str))
-                db.commit()
-                return jsonify({"message": "评论成功"}), 201
+        new_comment = Comment(
+            user_id=int(user_id),
+            article_id=int(article_id),
+            content=data['content'],
+            ip=request.remote_addr,
+            user_agent=user_agent_str
+        )
+        db.session.add(new_comment)
+        db.session.commit()
+        return jsonify({"message": "评论成功"}), 201
     except Exception as e:
         print(f'Error: {e}')
+        db.session.rollback()
         return jsonify({"message": "评论失败"}), 500
 
 
 def delete_comment(user_id, comment_id):
-    db = get_db_connection()
     comment_deleted = False
     try:
-        with db.cursor() as cursor:
-            query = "DELETE FROM comments WHERE id = %s AND user_id = %s;"
-            cursor.execute(query, (int(comment_id), int(user_id)))
-            db.commit()
+        # 查询要删除的评论
+        comment = Comment.query.filter_by(id=int(comment_id), user_id=int(user_id)).first()
+        if comment:
+            db.session.delete(comment)
+            db.session.commit()
             comment_deleted = True
     except Exception as e:
         print(f'Error: {e}')
+        db.session.rollback()
     finally:
-        db.close()
         return comment_deleted
 
 

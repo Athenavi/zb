@@ -1,59 +1,52 @@
 import bcrypt
-from flask import request, redirect, render_template
+from flask import redirect, render_template
+from flask import request
 
-from src.database import get_db_connection
+from src.models import User, db, Notification
 from src.utils.security.ip_utils import get_client_ip
 
 
 def update_password(user_id, new_password, confirm_password, ip):
-    # 查询当前密码
-    db = get_db_connection()
-    cursor = db.cursor()
-    query = "SELECT password FROM users WHERE id = %s"
-    cursor.execute(query, (user_id,))
-    result = cursor.fetchone()
+    # 查询用户
+    user = db.session.query(User).filter_by(id=user_id).first()
 
-    if result:
-        hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
-
+    if user:
+        # 验证新密码和确认密码是否一致，并且长度是否符合要求
         if new_password == confirm_password and len(new_password) >= 6:
+            # 哈希新密码
+            hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
+
             # 更新密码
-            update_query = "UPDATE users SET password = %s WHERE id = %s"
-            cursor.execute(update_query, (hashed_password.decode('utf-8'), user_id))
-            db.commit()
+            user.password = hashed_password.decode('utf-8')
 
-            notice_query = ("INSERT INTO notifications (id, user_id, type, message, is_read, "
-                            "created_at, updated_at) VALUES (NULL, %s, 'safe', %s, '0', CURRENT_TIMESTAMP, "
-                            "CURRENT_TIMESTAMP);")
-            cursor.execute(notice_query, (user_id, f"{ip} changed password"))
-            db.commit()
+            # 创建通知
+            notice = Notification(
+                user_id=user_id,
+                type='safe',
+                message=f"{ip} changed password"
+            )
 
-            cursor.close()
-            db.close()
+            # 添加通知到会话
+            db.session.add(notice)
+
+            # 提交会话
+            db.session.commit()
+
             return True
 
     return False
 
-
 def validate_password(user_id):
     password = request.form.get('password')
-    # 验证密码是否正确
-    db = get_db_connection()
-    cursor = db.cursor()
 
-    query = "SELECT password FROM users WHERE id = %s"
-    cursor.execute(query, (user_id,))
-    result = cursor.fetchone()
+    # 查询用户
+    user = db.session.query(User).filter_by(id=user_id).first()
 
-    if result and bcrypt.checkpw(password.encode('utf-8'), result[0].encode('utf-8')):
-        # session['password_confirmed'] = True
-        cursor.close()
-        db.close()
+    if user and bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
         return True
     else:
-        cursor.close()
-        db.close()
         return False
+
 
 def confirm_password_back(user_id,cache_instance):
     if request.method == 'POST':
