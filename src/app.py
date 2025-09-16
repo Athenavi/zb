@@ -37,7 +37,7 @@ from src.other.search import search_handler
 from src.plugin import plugin_bp, init_plugin_manager
 from src.setting import AppConfig
 from src.upload.admin_upload import admin_upload_file
-from src.upload.public_upload import handle_user_upload, handle_editor_upload, upload_cover_back
+from src.upload.public_upload import handle_user_upload, upload_cover_back
 from src.user.authz.decorators import jwt_required, admin_required, origin_required
 from src.user.authz.password import confirm_password_back, change_password_back
 from src.user.authz.qrlogin import qr_login, check_qr_login_back, phone_scan_back
@@ -606,18 +606,6 @@ def mark_all_as_read(user_id):
 def upload_user_path(user_id):
     return handle_user_upload(user_id=user_id, allowed_size=app.config['UPLOAD_LIMIT'],
                               allowed_mimes=app.config['ALLOWED_MIMES'], check_existing=False)
-
-
-@app.route('/api/upload/files', methods=['POST'])
-@siwa.doc(
-    summary="编辑时上传文件",
-    description="上传文件，返回外链 URL。",
-    tags=["文件"]
-)
-@jwt_required
-def handle_file_upload(user_id):
-    return handle_editor_upload(domain=domain, user_id=user_id, allowed_size=app.config['UPLOAD_LIMIT'],
-                                allowed_mimes=app.config['ALLOWED_MIMES'])
 
 
 @app.route('/api/upload/cover', methods=['POST'])
