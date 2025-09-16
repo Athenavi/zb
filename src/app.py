@@ -11,7 +11,6 @@ from werkzeug.exceptions import NotFound
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from src.blog.article.core.content import get_i18n_content_by_aid
-from src.blog.article.core.crud import get_aid_by_title
 from src.blog.article.core.views import blog_tmp_url, blog_detail_back, \
     blog_detail_aid_back, blog_detail_i18n, edit_article_back, new_article_back, blog_detail_i18n_list, contribute_back
 from src.blog.article.metadata.handlers import persist_views
@@ -175,11 +174,6 @@ import threading
 # 启动持久化线程
 persist_thread = threading.Thread(target=persist_views, daemon=True)
 persist_thread.start()
-
-
-@cache.memoize(7200)
-def get_aid(title):
-    return get_aid_by_title(title)
 
 
 @app.route('/confirm-password', methods=['GET', 'POST'])

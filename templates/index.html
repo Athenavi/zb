@@ -55,53 +55,50 @@
 <!-- 页面内容 -->
 <div class="container mx-auto mt-8 px-4 sm:px-6">
     <!-- 文章网格 -->
-    {% if article_info %}
+    {% if articles %}
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {% for article in article_info %}{% set ArticleID = article[0] %}{% set Title = article[1] %}
-                {% set author = article[2] %}{% set views = article[3] %}{% set likes = article[4] %}
-                {% set CoverImage = article[5] %}{% set excerpt = article[7] %}{% set tags = article[9].split(';') %}
-                {% set slug = article[10] %}
+            {% for article in articles %}
                 <div class="article-card bg-white rounded-xl overflow-hidden shadow-md">
                     <div class="relative">
-                        {% if CoverImage %}
-                            <img src="{{ CoverImage }}"
-                                 alt="{{ Title }}"
+                        {% if article.cover_image %}
+                            <img src="{{ article.cover_image }}"
+                                 alt="{{ article.title }}"
                                  class="w-full h-52 object-cover">
                         {% else %}
                             <div class="bg-gray-200 border-2 border-dashed rounded-xl w-full h-52"></div>
                         {% endif %}
                         <div class="absolute top-4 right-4 bg-amber-600 text-white px-3 py-1 rounded-full text-sm font-medium">
-                            {{ tags[0] if tags else '未分类' }}
+                            {{ article.tags[0] if article.tags else '未分类' }}
                         </div>
                     </div>
                     <div class="p-6">
                         <div class="flex items-center text-sm text-gray-500 mb-3">
                             <span class="flex items-center mr-4">
-                                <i class="far fa-user mr-1"></i> {{ author | Author }}
+                                <i class="far fa-user mr-1"></i> {{ article.user_id | Author }}
                             </span>
                         </div>
-                        <a {% if slug %}href="/p/{{ slug }}"{% else %}href="/blog/{{ ArticleID }}.html"{% endif %}
-                           class="text-xl font-bold text-gray-800 hover:text-indigo-600 mb-3 block">{{ Title }}</a>
-                        {% if excerpt %}
-                            <p class="text-gray-600 mb-4">{{ excerpt | truncate(100) }}...</p>
+                        <a {% if article.slug %}href="/p/{{ article.slug }}"{% else %}href="/blog/{{ article.article_id }}.html"{% endif %}
+                           class="text-xl font-bold text-gray-800 hover:text-indigo-600 mb-3 block">{{ article.title }}</a>
+                        {% if article.excerpt %}
+                            <p class="text-gray-600 mb-4">{{ article.excerpt | truncate(100) }}...</p>
                         {% endif %}
                         <div class="flex justify-between items-center">
                             <div class="flex">
                                 <span class="flex items-center text-gray-500 mr-4">
-                                    <i class="far fa-eye mr-1"></i> {{ views }}
+                                    <i class="far fa-eye mr-1"></i> {{ article.views }}
                                 </span>
                                 <span class="flex items-center text-gray-500">
-                                    <i class="far fa-heart mr-1"></i> {{ likes }}
+                                    <i class="far fa-heart mr-1"></i> {{ article.likes }}
                                 </span>
                             </div>
-                            <a href="/{{ ArticleID }}.html"
+                            <a href="/{{ article.article_id }}.html"
                                class="text-indigo-600 hover:text-indigo-800 font-medium text-sm flex items-center">
                                 阅读全文 <i class="fas fa-arrow-right ml-1 text-xs"></i>
                             </a>
                         </div>
-                        {% if tags %}
+                        {% if article.tags %}
                             <div class="mt-4">
-                                {% for tag in tags %}
+                                {% for tag in article.tags %}
                                     <a href="/tag/{{ tag }}"
                                        class="tag inline-block bg-gray-100 hover:bg-indigo-100 text-gray-800 text-xs font-semibold rounded-full px-3 py-1 mr-2 transition-all">
                                         {{ tag }}
@@ -117,15 +114,15 @@
         <!-- 分页 -->
         <div class="flex justify-center mt-12 mb-16">
             <nav class="flex items-center space-x-2">
-                {% if page > 1 %}
-                    <a href="javascript:void(0)" onclick="changePage({{ page-1 }})"
+                {% if pagination.has_prev %}
+                    <a href="javascript:void(0)" onclick="changePage({{ pagination.prev_page }})"
                        class="pagination-item w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-indigo-100">
                         <i class="fas fa-chevron-left"></i>
                     </a>
                 {% endif %}
 
-                {% for p in range(1, total_pages + 1) %}
-                    {% if p == page %}
+                {% for p in range(1, pagination.total_pages + 1) %}
+                    {% if p == pagination.current_page %}
                         <span class="pagination-item w-10 h-10 flex items-center justify-center rounded-full bg-indigo-600 text-white active">{{ p }}</span>
                     {% else %}
                         <a href="javascript:void(0)" onclick="changePage({{ p }})"
@@ -133,8 +130,8 @@
                     {% endif %}
                 {% endfor %}
 
-                {% if page < total_pages %}
-                    <a href="javascript:void(0)" onclick="changePage({{ page+1 }})"
+                {% if pagination.has_next %}
+                    <a href="javascript:void(0)" onclick="changePage({{ pagination.next_page }})"
                        class="pagination-item w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-indigo-100">
                         <i class="fas fa-chevron-right"></i>
                     </a>
