@@ -40,6 +40,12 @@ update_status = {
 }
 
 
+def ensure_directory_exists(path):
+    """确保目录存在，如果不存在则创建"""
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+
 def get_latest_release():
     """
     从GitHub获取最新发行版信息，包含错误处理
@@ -55,7 +61,6 @@ def get_latest_release():
     except requests.exceptions.SSLError as e:
         # 专门处理SSL错误
         print(f"SSL证书验证失败: {e}")
-        # 这里可以记录日志或抛出更具体的自定义异常
         return None
     except requests.exceptions.ConnectionError as e:
         # 处理连接问题（如网络断开、DNS失败）
@@ -81,7 +86,7 @@ def check_for_update():
     changelog = latest_release.get('body', '')
     changelog = markdown.markdown(changelog, extensions=['markdown.extensions.fenced_code', 'toc'])
 
-    # 使用packaging.version进行精确版本比较:cite[1]:cite[9]
+    # 使用packaging.version进行精确版本比较
     current_ver = version.parse(CONFIG['current_version'])
     latest_ver = version.parse(latest_version)
 
@@ -95,6 +100,7 @@ def download_release(version):
     """下载指定版本的发行包"""
     url = f"https://github.com/{CONFIG['github_repo']}/archive/refs/tags/{version}.zip"
     download_path = f"{base_dir}/temp/{version}.zip"
+    ensure_directory_exists(os.path.dirname(download_path))  # 确保下载目录存在
 
     try:
         response = requests.get(url, stream=True, verify=False)
@@ -118,6 +124,8 @@ def download_release(version):
 def backup_current_version():
     """备份当前版本"""
     backup_dir = f"{base_dir}/temp/backup_{CONFIG['current_version']}"
+    ensure_directory_exists(os.path.dirname(backup_dir))  # 确保备份目录存在
+
     if os.path.exists(backup_dir):
         shutil.rmtree(backup_dir)
 
@@ -133,6 +141,8 @@ def apply_update(zip_path):
     try:
         # 解压更新包
         extract_dir = f"{base_dir}/temp/update_extract"
+        ensure_directory_exists(extract_dir)  # 确保解压目录存在
+
         if os.path.exists(extract_dir):
             shutil.rmtree(extract_dir)
 
