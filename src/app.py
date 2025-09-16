@@ -38,7 +38,6 @@ from src.plugin import plugin_bp, init_plugin_manager
 from src.setting import AppConfig
 from src.upload.admin_upload import admin_upload_file
 from src.upload.public_upload import handle_user_upload, handle_editor_upload, upload_cover_back
-from src.upload.views import upload_bulk_back
 from src.user.authz.decorators import jwt_required, admin_required, origin_required
 from src.user.authz.password import confirm_password_back, change_password_back
 from src.user.authz.qrlogin import qr_login, check_qr_login_back, phone_scan_back
@@ -408,16 +407,6 @@ def tag_page(tag_name):
 @cache.cached(timeout=300, query_string=True)
 def featured_page():
     return featured_page_back()
-
-
-@app.route('/upload/bulk', methods=['GET', 'POST'])
-@jwt_required
-def upload_bulk(user_id):
-    if request.method == 'POST':
-        api_key = request.form.get('API_KEY')
-        if not validate_api_key(api_key):
-            return jsonify([{"filename": "无法上传", "status": "failed", "message": "API_KEY 错误"}]), 403
-    return upload_bulk_back(user_id, cache, app.config['UPLOAD_LIMIT'])
 
 
 @app.route('/diy/space', methods=['GET'])
