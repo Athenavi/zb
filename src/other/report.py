@@ -1,22 +1,22 @@
 from flask import request, jsonify
 
-from src.database import get_db_connection
+from src.database import SessionLocal
+from src.models import Report
 
 
 def report_add(user_id, reported_type, reported_id, reason):
     reported = False
-    db = get_db_connection()
+    session = SessionLocal()
     try:
-        with db.cursor() as cursor:
-            query = ("INSERT INTO reports (reported_by, content_type, content_id,reason) VALUES (%s, %s, %s,"
-                     "%s);")
-            cursor.execute(query, (int(user_id), reported_type, reported_id, reason))
-            db.commit()
-            reported = True
+        new_report = Report(reported_by=int(user_id), content_type=reported_type, content_id=reported_id, reason=reason)
+        session.add(new_report)
+        session.commit()
+        reported = True
     except Exception as e:
         print(f'Error: {e}')
+        session.rollback()
     finally:
-        db.close()
+        session.close()
         return reported
 
 
@@ -28,9 +28,8 @@ def report_back(user_id):
         reason = report_type + report_reason
     except (TypeError, ValueError):
         return jsonify({"message": "Invalid Report ID"}), 400
-    result = report_add(user_id, "Comment", report_id, reason)
 
-    if result:
+    if report_add(user_id, "Comment", report_id, reason):
         return jsonify({'report-id': report_id, 'info': '举报已记录'}), 201
     else:
         return jsonify({"message": "举报失败"}), 500

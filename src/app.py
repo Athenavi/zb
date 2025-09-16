@@ -11,7 +11,6 @@ from werkzeug.exceptions import NotFound
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from src.blog.article.core.content import get_i18n_content_by_aid
-from src.blog.article.core.crud import get_aid_by_title
 from src.blog.article.core.views import blog_tmp_url, blog_detail_back, \
     blog_detail_aid_back, blog_detail_i18n, edit_article_back, new_article_back, blog_detail_i18n_list, contribute_back
 from src.blog.article.metadata.handlers import persist_views
@@ -27,7 +26,7 @@ from src.blueprints.role import role_bp
 from src.blueprints.theme import create_theme_blueprint
 from src.blueprints.website import create_website_blueprint
 from src.config.theme import db_get_theme
-from src.database import get_db_connection
+from src.database import SessionLocal
 from src.error import error
 from src.notification import read_all_notifications, get_notifications, read_current_notification
 from src.other.diy import diy_space_put
@@ -37,8 +36,7 @@ from src.other.search import search_handler
 from src.plugin import plugin_bp, init_plugin_manager
 from src.setting import AppConfig
 from src.upload.admin_upload import admin_upload_file
-from src.upload.public_upload import handle_user_upload, handle_editor_upload, handle_file_upload_v2, upload_cover_back
-from src.upload.views import upload_bulk_back
+from src.upload.public_upload import handle_user_upload, upload_cover_back
 from src.user.authz.decorators import jwt_required, admin_required, origin_required
 from src.user.authz.password import confirm_password_back, change_password_back
 from src.user.authz.qrlogin import qr_login, check_qr_login_back, phone_scan_back
@@ -58,9 +56,45 @@ db.init_app(app)
 
 # 初始化 Cache
 cache = Cache(app)
-# 管理员密钥管理
-ADMIN_KEY = secrets.token_urlsafe(32)
-print(f"此密钥仅在单次运行中生效: {ADMIN_KEY}")
+import threading
+
+
+# 初始化 ADMIN_KEY 并保存到文件
+def set_admin_key():
+    # 生成新的管理员密钥
+    # 将新的密钥写入 admin.key 文件
+    with open(Path(AppConfig.base_dir) / 'admin.key', 'w') as f:
+        f.write(secrets.token_urlsafe(32))
+    print(f"新的ADMIN_KEY已生成并保存")
+
+
+def generate_new_admin_key_periodically(interval_seconds):
+    while True:
+        set_admin_key()
+        threading.Event().wait(interval_seconds)
+
+
+def validate_api_key(api_key):
+    @cache.memoize(600)
+    def get_admin_key():
+        # 从文件中读取 ADMIN_KEY
+        with (open(Path(AppConfig.base_dir) / 'admin.key', 'r') as f):
+            key_value = f.readline().strip()
+            cache.set('admin_key', key_value, timeout=600)
+            return key_value
+
+    if api_key == get_admin_key():
+        return True
+    else:
+        return False
+
+
+set_admin_key()
+
+# 启动定时任务，每隔3600秒（1小时）生成一次新的密钥
+timer_thread = threading.Thread(target=generate_new_admin_key_periodically, args=(3600,))
+timer_thread.daemon = True  # 设置为守护线程，确保在主程序退出时自动退出
+timer_thread.start()
 # 打印运行信息
 print(f"running at: {AppConfig.base_dir}")
 print("sys information")
@@ -140,11 +174,6 @@ import threading
 # 启动持久化线程
 persist_thread = threading.Thread(target=persist_views, daemon=True)
 persist_thread.start()
-
-
-@cache.memoize(7200)
-def get_aid(title):
-    return get_aid_by_title(title)
 
 
 @app.route('/confirm-password', methods=['GET', 'POST'])
@@ -374,23 +403,6 @@ def featured_page():
     return featured_page_back()
 
 
-def validate_api_key(api_key):
-    if api_key == ADMIN_KEY:
-        return True
-    else:
-        return False
-
-
-@app.route('/upload/bulk', methods=['GET', 'POST'])
-@jwt_required
-def upload_bulk(user_id):
-    if request.method == 'POST':
-        api_key = request.form.get('API_KEY')
-        if not validate_api_key(api_key):
-            return jsonify([{"filename": "无法上传", "status": "failed", "message": "API_KEY 错误"}]), 403
-    return upload_bulk_back(user_id, cache, app.config['UPLOAD_LIMIT'])
-
-
 @app.route('/diy/space', methods=['GET'])
 @jwt_required
 def diy_space(user_id):
@@ -437,39 +449,32 @@ def get_current_theme():
 @cache.cached(timeout=300, key_prefix='all_users')
 def get_all_users():
     all_users = {}
-    db = get_db_connection()
+    session = SessionLocal()
     try:
-        with db.cursor() as cursor:
-            query = "SELECT username, id FROM users;"
-            cursor.execute(query)
-            results = cursor.fetchall()
-            for result in results:
-                username = result[0]
-                user_id = str(result[1])
-                all_users[username] = user_id
+        users = session.query(User.username, User.id).all()
+        for username, user_id in users:
+            all_users[username] = str(user_id)
     except Exception as e:
         print(f"An error occurred: {e}")
     finally:
-        db.close()
+        session.close()
         return all_users
 
 
 @cache.cached(timeout=3600, key_prefix='all_emails')
 def get_all_emails():
     all_emails = []
-    db = get_db_connection()
+    session = SessionLocal()
     try:
-        with db.cursor() as cursor:
-            query = "SELECT email FROM users;"
-            cursor.execute(query)
-            results = cursor.fetchall()
-            for result in results:
-                email = result[0]
-                all_emails.append(email)
+        # 查询所有用户邮箱
+        results = session.query(User.email).all()
+        for result in results:
+            email = result[0]
+            all_emails.append(email)
     except Exception as e:
         print(f"An error occurred: {e}")
     finally:
-        db.close()
+        session.close()
         return all_emails
 
 
@@ -588,24 +593,6 @@ def mark_all_as_read(user_id):
 def upload_user_path(user_id):
     return handle_user_upload(user_id=user_id, allowed_size=app.config['UPLOAD_LIMIT'],
                               allowed_mimes=app.config['ALLOWED_MIMES'], check_existing=False)
-
-
-@app.route('/api/upload/files', methods=['POST'])
-@siwa.doc(
-    summary="编辑时上传文件",
-    description="上传文件，返回外链 URL。",
-    tags=["文件"]
-)
-@jwt_required
-def handle_file_upload(user_id):
-    return handle_editor_upload(domain=domain, user_id=user_id, allowed_size=app.config['UPLOAD_LIMIT'],
-                                allowed_mimes=app.config['ALLOWED_MIMES'])
-
-
-@app.route('/api/upload/files/v2', methods=['POST'])
-@jwt_required
-def handle_file_upload_v2_test(user_id):
-    return handle_file_upload_v2(user_id=user_id, domain=domain, base_path=base_dir)
 
 
 @app.route('/api/upload/cover', methods=['POST'])

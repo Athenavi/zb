@@ -248,8 +248,8 @@
                     {% endif %}
                     <div class="file-actions absolute top-2 right-2 opacity-0 transition-opacity">
                         <button class="download-btn bg-white text-primary-600 p-2 rounded-full shadow hover:bg-primary-50"
-                                data-hash="{{ media.hash }}">
-                            <i class="fas fa-download"></i>
+                                data-hash="{{ media.hash }}" title="{{ media.original_filename }}">
+                            <i class="fas fa-copy"></i>
                         </button>
                     </div>
                     <div class="edit-checkbox absolute top-2 left-2 hidden">
@@ -317,10 +317,6 @@
         </div>
     {% endif %}
 </main>
-
-<!-- 页脚 -->
-{% from 'footer.html' import SimpleFooter %}
-{{ SimpleFooter(title, beian) }}
 <!-- 视频预览模态框 -->
 <div id="video-modal" class="fixed inset-0 z-50 bg-black bg-opacity-80 flex items-center justify-center hidden">
     <div class="relative w-full max-w-4xl">
@@ -467,9 +463,14 @@
 
     // 下载文件
     document.querySelectorAll('.download-btn').forEach(btn => {
-        btn.addEventListener('click', function () {
-            const hashValue = this.dataset.hash;
-            window.open(`/shared?data=${hashValue}`, '_blank');
+        btn.addEventListener('click', () => {
+            const hashValue = btn.dataset.hash;
+            const fileTitle = btn.title || '未命名文件';
+            const url = `/shared?data=${hashValue}&title=${encodeURIComponent(fileTitle)}`;
+
+            navigator.clipboard.writeText(document.location.origin + url)
+                .then(() => showResultMessage('链接已复制到剪切板', 'green'))
+                .catch(err => console.error('复制链接时出错:', err));
         });
     });
 

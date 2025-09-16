@@ -21,7 +21,7 @@ def create_website_blueprint(cache_instance, domain, sitename):
 
     @website_bp.route('/sitemap.xml')
     @website_bp.route('/sitemap')
-    @cache_instance.memoize(7200)
+    @cache_instance.cached(timeout=7200)
     def generate_sitemap():
         try:
             slugs_dict = get_article_slugs()
@@ -40,7 +40,7 @@ def create_website_blueprint(cache_instance, domain, sitename):
             response = Response(xml_data, mimetype='text/xml')
             return response
         except Exception as e:
-            print(e)  # 修改为print而不是return，因为return不能返回NoneType到HTTP响应
+            print(f"Error generating sitemap: {str(e)}")
             return "Error generating sitemap", 500
 
     @website_bp.route('/feed')
