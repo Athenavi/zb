@@ -606,16 +606,12 @@
 
                 // 检查是否为特定格式的URL
                 if (/^https?:\/\/.*\/shared\?data=/.test(text)) {
-                    // 将URL转换为Markdown图片格式
-                    var markdownImage = `![图片](${text})`;
-
-                    // 获取当前编辑器内容
+                    // 创建一个URL对象以便解析
+                    var url = new URL(text);
+                    var title = url.searchParams.get('title') || '图片'; // 如果没有title参数，则默认为'图片'
+                    var markdownImage = `![${title}](${text})`;
                     var currentContent = easyMDE.value();
-
-                    // 将新的Markdown图片内容追加到编辑器中
                     easyMDE.value(currentContent + markdownImage);
-
-                    // 更新字数统计
                     updateCharCount();
                 } else {
                     // 如果不符合条件，恢复默认粘贴行为
@@ -623,6 +619,7 @@
                     updateCharCount();
                 }
             });
+
 
             // 优化：统一处理字数统计
             function updateCharCount() {
