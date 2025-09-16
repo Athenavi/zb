@@ -597,6 +597,33 @@
                 minHeight: '400px'
             });
 
+            easyMDE.codemirror.on('paste', function (cm, event) {
+                // 阻止默认的粘贴行为
+                event.preventDefault();
+
+                // 读取剪切板内容
+                var text = (event.clipboardData || window.clipboardData).getData('text');
+
+                // 检查是否为特定格式的URL
+                if (/^https?:\/\/.*\/shared\?data=/.test(text)) {
+                    // 将URL转换为Markdown图片格式
+                    var markdownImage = `![图片](${text})`;
+
+                    // 获取当前编辑器内容
+                    var currentContent = easyMDE.value();
+
+                    // 将新的Markdown图片内容追加到编辑器中
+                    easyMDE.value(currentContent + markdownImage);
+
+                    // 更新字数统计
+                    updateCharCount();
+                } else {
+                    // 如果不符合条件，恢复默认粘贴行为
+                    cm.replaceSelection(text);
+                    updateCharCount();
+                }
+            });
+
             // 优化：统一处理字数统计
             function updateCharCount() {
                 // 标题字数统计
