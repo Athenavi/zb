@@ -256,7 +256,7 @@
                                     <div class="ml-3">
                                         <div class="text-sm font-medium text-gray-900">
                                             <a href="#" class="text-blue-600 hover:text-blue-800"
-                                               onclick="copyToClipboard('{{ request.url_root }}{{ url.short_url }}')">
+                                               onclick="copyToClipboard('{{ request.url_root }}s/{{ url.short_url }}')">
                                                 {{ url.short_url }}
                                             </a>
                                         </div>
@@ -277,7 +277,7 @@
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                 <div class="flex space-x-2">
                                     <button
-                                            onclick="copyToClipboard('{{ request.url_root }}{{ url.short_url }}')"
+                                            onclick="copyToClipboard('{{ request.url_root }}s/{{ url.short_url }}')"
                                             class="btn-secondary px-3 py-1 rounded text-xs hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     >
                                         复制
