@@ -2,7 +2,8 @@ import threading
 import time
 from collections import defaultdict
 
-from src.database import get_db_connection
+from src.database import SessionLocal
+from src.models import Article
 
 # 全局计数器和锁
 view_counts = defaultdict(int)
@@ -29,21 +30,19 @@ def persist_views():
             # 批量更新数据库
             update_success = False
             try:
-                with get_db_connection() as db:
-                    with db.cursor() as cursor:
-                        for blog_id, count in counts_snapshot.items():
-                            query = """
-                                    UPDATE articles
-                                    SET views = views + %s
-                                    WHERE article_id = %s \
-                                    """
-                            cursor.execute(query, (count, blog_id))
-                        db.commit()
-                        update_success = True
+                session = SessionLocal()  # 获取会话
+                for blog_id, count in counts_snapshot.items():
+                    article = session.query(Article).filter_by(article_id=blog_id).first()
+                    if article:
+                        article.views += count
+                    else:
+                        session.add(Article(article_id=blog_id, views=count))
+                session.commit()
+                update_success = True
 
             except Exception as db_error:
                 # current_app.logger.error(f"Database update failed: {str(db_error)}",exc_info=True)
-                db.rollback()
+                session.rollback()
 
             # 如果更新失败，恢复计数器
             if not update_success:
@@ -69,15 +68,14 @@ def final_persist():
         view_counts.clear()
 
     try:
-        with get_db_connection() as db:
-            with db.cursor() as cursor:
-                for blog_id, count in counts_snapshot.items():
-                    cursor.execute(
-                        "UPDATE articles SET views = views + %s WHERE article_id = %s",
-                        (count, blog_id)
-                    )
-                db.commit()
+        session = SessionLocal()  # 获取会话
+        for blog_id, count in counts_snapshot.items():
+            article = session.query(Article).filter_by(article_id=blog_id).first()
+            if article:
+                article.views += count
+            else:
+                session.add(Article(article_id=blog_id, views=count))
+        session.commit()
     except Exception as e:
         # current_app.logger.error(f"Final persist failed: {str(e)}",exc_info=True)
-        db.rollback()
-
+        session.rollback()
