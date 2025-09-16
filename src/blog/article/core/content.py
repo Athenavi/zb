@@ -1,23 +1,18 @@
-from src.database import get_db_connection
-from src.models import db, ArticleI18n
+from src.database import SessionLocal
+from src.models import db, ArticleI18n, Article
 
 
 def get_article_slugs():
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    session = SessionLocal()
 
-    query = """
-            SELECT article_id, slug
-            FROM articles
-            WHERE status = 'Published'
-              AND hidden is false
-            """
-    cursor.execute(query)
-    results = cursor.fetchall()
+    # 使用ORM查询
+    results = session.query(Article.article_id, Article.slug).filter(
+        Article.status == 'Published',
+        Article.hidden == False
+    ).all()
 
-    # 关闭数据库连接
-    cursor.close()
-    conn.close()
+    # 关闭会话
+    session.close()
 
     # 组合成字典返回
     article_dict = {row[0]: row[1] for row in results}
