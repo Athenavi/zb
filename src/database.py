@@ -4,6 +4,8 @@ import os
 import psycopg2
 from dotenv import load_dotenv
 from psycopg2 import pool
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 # 声明全局变量
 db_pool = None
@@ -131,6 +133,12 @@ def get_sqlalchemy_uri():
     sqlalchemy_uri = f"postgresql+psycopg2://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
     logger.info(f"SQLAlchemy URI: {sqlalchemy_uri.replace(db_password, '***')}")  # 安全日志
     return sqlalchemy_uri
+
+
+engine = create_engine(
+    get_sqlalchemy_uri()
+)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 def test_database_connection():
