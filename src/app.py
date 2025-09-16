@@ -58,9 +58,45 @@ db.init_app(app)
 
 # 初始化 Cache
 cache = Cache(app)
-# 管理员密钥管理
-ADMIN_KEY = secrets.token_urlsafe(32)
-print(f"此密钥仅在单次运行中生效: {ADMIN_KEY}")
+import threading
+
+
+# 初始化 ADMIN_KEY 并保存到文件
+def set_admin_key():
+    # 生成新的管理员密钥
+    # 将新的密钥写入 admin.key 文件
+    with open(Path(AppConfig.base_dir) / 'admin.key', 'w') as f:
+        f.write(secrets.token_urlsafe(32))
+    print(f"新的ADMIN_KEY已生成并保存")
+
+
+def generate_new_admin_key_periodically(interval_seconds):
+    while True:
+        set_admin_key()
+        threading.Event().wait(interval_seconds)
+
+
+def validate_api_key(api_key):
+    @cache.memoize(600)
+    def get_admin_key():
+        # 从文件中读取 ADMIN_KEY
+        with (open(Path(AppConfig.base_dir) / 'admin.key', 'r') as f):
+            key_value = f.readline().strip()
+            cache.set('admin_key', key_value, timeout=600)
+            return key_value
+
+    if api_key == get_admin_key():
+        return True
+    else:
+        return False
+
+
+set_admin_key()
+
+# 启动定时任务，每隔3600秒（1小时）生成一次新的密钥
+timer_thread = threading.Thread(target=generate_new_admin_key_periodically, args=(3600,))
+timer_thread.daemon = True  # 设置为守护线程，确保在主程序退出时自动退出
+timer_thread.start()
 # 打印运行信息
 print(f"running at: {AppConfig.base_dir}")
 print("sys information")
@@ -372,13 +408,6 @@ def tag_page(tag_name):
 @cache.cached(timeout=300, query_string=True)
 def featured_page():
     return featured_page_back()
-
-
-def validate_api_key(api_key):
-    if api_key == ADMIN_KEY:
-        return True
-    else:
-        return False
 
 
 @app.route('/upload/bulk', methods=['GET', 'POST'])
