@@ -119,7 +119,7 @@ siwa = SiwaDoc(
 # 注册蓝图
 app.register_blueprint(auth_bp)
 app.register_blueprint(create_website_blueprint(cache, AppConfig.domain, AppConfig.sitename))
-app.register_blueprint(create_theme_blueprint(cache, AppConfig.domain, AppConfig.base_dir))
+app.register_blueprint(create_theme_blueprint(cache, AppConfig.base_dir))
 app.register_blueprint(create_media_blueprint(cache, AppConfig.domain, AppConfig.base_dir))
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(my_bp)

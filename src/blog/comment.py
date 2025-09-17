@@ -26,22 +26,6 @@ def create_comment(user_id, article_id):
         return jsonify({"message": "评论失败"}), 500
 
 
-def delete_comment(user_id, comment_id):
-    comment_deleted = False
-    try:
-        # 查询要删除的评论
-        comment = Comment.query.filter_by(id=int(comment_id), user_id=int(user_id)).first()
-        if comment:
-            db.session.delete(comment)
-            db.session.commit()
-            comment_deleted = True
-    except Exception as e:
-        print(f'Error: {e}')
-        db.session.rollback()
-    finally:
-        return comment_deleted
-
-
 def comment_page_get(user_id, article_id):
     article = Article.query.filter_by(article_id=article_id).first()
     if not article:

@@ -25,16 +25,3 @@ def get_i18n_content_by_aid(iso, aid):
     except Exception as e:
         print(f"Error fetching i18n content: {str(e)}")
         return None
-
-
-def get_i18n_title(aid, iso):
-    try:
-        title = db.query(ArticleI18n.title).filter(
-            ArticleI18n.article_id == aid, ArticleI18n.language_code == iso).first()
-        if title:
-            return title[0]
-        else:
-            return None
-    except Exception as e:
-        print(f"Error fetching i18n info: {str(e)}")
-        return None

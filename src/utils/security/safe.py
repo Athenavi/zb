@@ -1,19 +1,6 @@
-import hashlib
 import random
 import re
 import string
-
-import requests
-
-from src.config.general import cloudflare_turnstile_conf
-
-
-def run_security_checks(url):
-    pattern = r"^(https?://)?([a-zA-Z0-9-]+\.)*[a-zA-Z]{2,}(\/)$"
-    if re.match(pattern, url):
-        return True
-    else:
-        return False
 
 
 def clean_html_format(text):
@@ -68,45 +55,6 @@ def is_valid_hash(length, f_hash):
             c in '0123456789abcdef' for c in f_hash.lower()):
         return False
     return True
-
-
-def verify_api_request(request):
-    site_key, turnstile_secret_key = cloudflare_turnstile_conf()
-    if site_key is None:
-        return 'success'
-    token = request.form.get('cf-turnstile-response')
-    if not token:
-        return ['missing-input-response']
-    client_ip = request.headers.get('CF-Connecting-IP') or request.remote_addr
-    verify_url = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
-    data = {
-        'secret': turnstile_secret_key,
-        'response': token,
-        'remoteip': client_ip
-    }
-
-    try:
-        response = requests.post(verify_url, data=data, timeout=10)
-        result = response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"请求失败: {e}")
-        return ['internal-error']
-    if not result.get('success'):
-        error_codes = result.get('error-codes', ['unknown-error'])
-        print(f"验证失败，错误代码: {error_codes}")
-        return error_codes
-
-    return "success"
-
-
-def gen_qr_token(input_string, current_time, sys_version, encoding='utf-8'):
-    ct = current_time
-    rd_num = random.randint(617, 1013)
-    input_string = sys_version + ct + input_string + str(rd_num)
-    # print(input_string)
-    sha256_hash = hashlib.sha256()
-    sha256_hash.update(input_string.encode(encoding))
-    return sha256_hash.hexdigest()
 
 
 valid_language_codes = {
