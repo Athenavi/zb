@@ -3,48 +3,45 @@ from datetime import datetime, timezone
 
 from flask import request
 
-from src.database import SessionLocal
+from src.database import get_db
 from src.models import ArticleContent
 
 
 def set_article_password(aid, passwd):
-    session = SessionLocal()
-    try:
-        # 查询是否存在该aid的记录
-        article_content = session.query(ArticleContent).filter(ArticleContent.aid == aid).first()
-        if article_content:
-            # 更新密码
-            article_content.passwd = passwd
-            article_content.updated_at = datetime.now(timezone.utc)
-        else:
-            # 插入新记录
-            new_content = ArticleContent(aid=aid, passwd=passwd, updated_at=datetime.now(timezone.utc))
-            session.add(new_content)
-        session.commit()
-        return True
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        session.rollback()
-        return False
-    finally:
-        session.close()
+    with get_db() as session:
+        try:
+            # 查询是否存在该aid的记录
+            article_content = session.query(ArticleContent).filter(ArticleContent.aid == aid).first()
+            if article_content:
+                # 更新密码
+                article_content.passwd = passwd
+                article_content.updated_at = datetime.now(timezone.utc)
+            else:
+                # 插入新记录
+                new_content = ArticleContent(aid=aid, passwd=passwd, updated_at=datetime.now(timezone.utc))
+                session.add(new_content)
+            return True
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            session.rollback()
+            return False
 
 
 def get_article_password(aid):
-    session = SessionLocal()
-    try:
-        # 查询密码
-        article_content = session.query(ArticleContent).filter(ArticleContent.aid == aid).first()
-        if article_content:
-            return article_content.passwd
-    except ValueError as e:
-        print(f"Value error: {e}")
-        pass
-    except Exception as e:
-        print(f"Unexpected error: {e}")
-        pass
-    finally:
-        session.close()
+    with get_db() as session:
+        try:
+            # 查询密码
+            article_content = session.query(ArticleContent).filter(ArticleContent.aid == aid).first()
+        except ValueError as e:
+            print(f"Value error: {e}")
+            pass
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+            pass
+        finally:
+            if article_content:
+                return article_content.passwd
+            return None
 
 
 def get_apw_form(aid):

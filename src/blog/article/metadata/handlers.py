@@ -2,7 +2,7 @@ import threading
 import time
 from collections import defaultdict
 
-from src.database import SessionLocal
+from src.database import get_db
 from src.models import Article
 
 # 全局计数器和锁
@@ -29,22 +29,19 @@ def persist_views():
 
             # 批量更新数据库
             update_success = False
-            try:
-                session = SessionLocal()  # 获取会话
-                for blog_id, count in counts_snapshot.items():
-                    article = session.query(Article).filter_by(article_id=blog_id).first()
-                    if article:
-                        article.views += count
-                    else:
-                        session.add(Article(article_id=blog_id, views=count))
-                session.commit()
-                update_success = True
+            with get_db() as session:
+                try:
+                    for blog_id, count in counts_snapshot.items():
+                        article = session.query(Article).filter_by(article_id=blog_id).first()
+                        if article:
+                            article.views += count
+                        else:
+                            session.add(Article(article_id=blog_id, views=count))
+                    update_success = True
+                except Exception as db_error:
+                    # current_app.logger.error(f"Database update failed: {str(db_error)}",exc_info=True)
+                    session.rollback()
 
-            except Exception as db_error:
-                # current_app.logger.error(f"Database update failed: {str(db_error)}",exc_info=True)
-                session.rollback()
-
-            # 如果更新失败，恢复计数器
             if not update_success:
                 with counter_lock:
                     for blog_id, count in counts_snapshot.items():
@@ -53,8 +50,6 @@ def persist_views():
         except Exception as e:
             # current_app.logger.error(f"View persistence error: {str(e)}",exc_info=True)
             pass
-
-    # 程序关闭时执行最后一次持久化
     final_persist()
 
 
@@ -67,15 +62,15 @@ def final_persist():
         counts_snapshot = view_counts.copy()
         view_counts.clear()
 
-    try:
-        session = SessionLocal()  # 获取会话
-        for blog_id, count in counts_snapshot.items():
-            article = session.query(Article).filter_by(article_id=blog_id).first()
-            if article:
-                article.views += count
-            else:
-                session.add(Article(article_id=blog_id, views=count))
-        session.commit()
-    except Exception as e:
-        # current_app.logger.error(f"Final persist failed: {str(e)}",exc_info=True)
-        session.rollback()
+    with get_db() as session:
+        try:
+            for blog_id, count in counts_snapshot.items():
+                article = session.query(Article).filter_by(article_id=blog_id).first()
+                if article:
+                    article.views += count
+                else:
+                    session.add(Article(article_id=blog_id, views=count))
+
+        except Exception as e:
+            # current_app.logger.error(f"Final persist failed: {str(e)}",exc_info=True)
+            session.rollback()

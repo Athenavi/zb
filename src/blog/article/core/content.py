@@ -1,22 +1,17 @@
-from src.database import SessionLocal
+from src.database import get_db
 from src.models import db, ArticleI18n, Article
 
 
 def get_article_slugs():
-    session = SessionLocal()
-
-    # 使用ORM查询
-    results = session.query(Article.article_id, Article.slug).filter(
-        Article.status == 'Published',
-        Article.hidden == False
-    ).all()
-
-    # 关闭会话
-    session.close()
-
-    # 组合成字典返回
-    article_dict = {row[0]: row[1] for row in results}
-    return article_dict
+    with get_db() as session:
+        # 使用ORM查询
+        results = session.query(Article.article_id, Article.slug).filter(
+            Article.status == 'Published',
+            Article.hidden == False
+        ).all()
+        # 组合成字典返回
+        article_dict = {row[0]: row[1] for row in results}
+        return article_dict
 
 
 def get_i18n_content_by_aid(iso, aid):
