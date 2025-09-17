@@ -192,11 +192,4 @@ def create_media_blueprint(cache_instance, domain, base_dir):
         except Exception as e:
             print(f"后台清理任务失败: {str(e)}")
 
-    @media_bp.route('/api/media/<int:id>', methods=['DELETE'])
-    @jwt_required
-    def mei_delete_api(user_id, id):
-        id_list = [id]
-        print(f"mei_delete_api - user_id: {user_id}, id_list: {id_list}")
-        return media_delete(user_id, id_list)
-
     return media_bp

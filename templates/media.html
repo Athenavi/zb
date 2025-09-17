@@ -125,7 +125,8 @@
             <button id="batch-delete-btn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 hidden"
                     onclick="batchDelete()">删除选中项
             </button>
-            <button class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition flex items-center">
+            <button class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition flex items-center"
+                    id="sortButton">
                 <i class="fas fa-sort mr-2"></i>排序
             </button>
         </div>
@@ -228,7 +229,7 @@
     </div>
 
     <!-- 媒体文件网格 -->
-    <div class="grid-container">
+    <div class="grid-container" id="gridContainer">
         {% for media in media_files %}
             <div class="file-card bg-white rounded-xl shadow overflow-hidden fade-in"
                  data-type="{{ 'video' if media.file_hash.mime_type.startswith('video') else 'image' }}"
@@ -266,8 +267,8 @@
                                 MB</p>
                         </div>
                         <span class="{{ 'bg-secondary-100 text-secondary-800' if media.file_hash.mime_type.startswith('video') else 'bg-primary-100 text-primary-800' }} text-xs px-2 py-1 rounded">
-                            {{ '视频' if media.file_hash.mime_type.startswith('video') else '图片' }}
-                        </span>
+                        {{ '视频' if media.file_hash.mime_type.startswith('video') else '图片' }}
+                    </span>
                     </div>
                     <div class="flex items-center mt-3 text-sm text-gray-500">
                         <i class="fas fa-calendar mr-1"></i>
@@ -497,6 +498,22 @@
     // 模拟文件卡片动画
     document.querySelectorAll('.file-card').forEach((card, index) => {
         card.style.animationDelay = `${index * 0.05}s`;
+    });
+
+    document.getElementById('sortButton').addEventListener('click', function () {
+        var gridContainer = document.getElementById('gridContainer');
+        var fileCards = Array.from(gridContainer.children);
+
+        // 反转顺序
+        fileCards.reverse();
+
+        // 清空网格容器
+        gridContainer.innerHTML = '';
+
+        // 将反转后的卡片重新插入
+        fileCards.forEach(function (card) {
+            gridContainer.appendChild(card);
+        });
     });
 </script>
 </body>
