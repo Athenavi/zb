@@ -11,7 +11,6 @@ def report_add(user_id, reported_type, reported_id, reason):
             new_report = Report(reported_by=int(user_id), content_type=reported_type, content_id=reported_id,
                                 reason=reason)
             session.add(new_report)
-            session.commit()
             reported = True
         except Exception as e:
             print(f'Error: {e}')

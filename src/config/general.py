@@ -22,20 +22,3 @@ def zy_safe_conf():
     refresh_token_expiration_delta = int(os.getenv('REFRESH_TOKEN_EXPIRATION_DELTA')) or 64800
     time_zone = os.getenv('TIME_ZONE') or 'Asia/Shanghai'
     return secret_key, jwt_expiration_delta, refresh_token_expiration_delta, time_zone
-
-
-def cloudflare_turnstile_conf():
-    load_dotenv()
-    site_key = os.getenv('TURNSTILE_SITE_KEY')
-    turnstile_secret_key = os.getenv('TURNSTILE_SECRET_KEY')
-    if os.getenv('TURNSTILE_OPEN').lower() == 'false':
-        site_key = None
-        turnstile_secret_key = None
-    return site_key, turnstile_secret_key
-
-
-def show_files(path):
-    # 指定目录的路径
-    directory = path
-    files = os.listdir(directory)
-    return files

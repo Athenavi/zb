@@ -3,7 +3,7 @@ from datetime import datetime
 from flask import Blueprint, Response, request, render_template, redirect
 
 from src.blog.article.core.content import get_article_slugs
-from src.utils.shortener.links import create_special_url, redirect_to_long_url
+from src.utils.shortener.links import redirect_to_long_url
 
 website_bp = Blueprint('website', __name__, template_folder='templates')
 
@@ -84,14 +84,6 @@ def create_website_blueprint(cache_instance, domain, sitename):
         url = request.args.get('url', default=domain)
         return render_template('inform.html', url=url, domain=domain)
 
-    @website_bp.route('/api/shortlink')
-    def api_shortlink(long_url):
-        if not long_url.startswith('https://') and not long_url.startswith('http://'):
-            return 'error'
-        short_url = create_special_url(long_url, user_id=1)
-        article_surl = domain + 's/' + short_url
-        return article_surl
-
     @cache_instance.cached(timeout=24 * 3600, key_prefix='short_link')
     @website_bp.route('/s/<short_url>', methods=['GET', 'POST'])
     def redirect_to_long_url_route(short_url):
@@ -102,10 +94,6 @@ def create_website_blueprint(cache_instance, domain, sitename):
             return redirect(long_url, code=302)
         else:
             return "短网址无效"
-
-    @website_bp.route('/guestbook', methods=['GET', 'POST'])
-    def guestbook():
-        return '当前功能暂未开放！'
 
     @website_bp.route('/message')
     def message_page():
