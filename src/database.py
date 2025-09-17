@@ -37,7 +37,7 @@ def get_sqlalchemy_uri():
 
 # 配置连接池参数
 pool_config = {
-    "pool_size": db_pool_size,  # 连接池大小
+    "pool_size": int(db_pool_size),  # 连接池大小
     "max_overflow": 20,  # 保留足够的突发缓冲
     "pool_timeout": 5,  # 大幅减少获取超时，快速失败
     "pool_recycle": 1200,  # 20分钟回收，依然很安全
