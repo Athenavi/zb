@@ -4,26 +4,27 @@ from contextlib import contextmanager
 
 import psycopg2
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, inspect
-from sqlalchemy import text
+from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import QueuePool
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# 加载 .env 文件
+load_dotenv()
+
+db_host = os.environ.get('DB_HOST') or os.getenv('DATABASE_HOST')
+db_port = os.environ.get('DB_PORT') or os.getenv('DATABASE_PORT', '5432')
+db_name = os.environ.get('DB_NAME') or os.getenv('DATABASE_NAME')
+db_user = os.environ.get('DB_USER') or os.getenv('DATABASE_USER')
+db_password = os.environ.get('DB_PASSWORD') or os.getenv('DATABASE_PASSWORD')
+db_pool_size = os.environ.get('DB_POOL_SIZE') or os.getenv('DATABASE_POOL_SIZE', '16')
+
 
 def get_sqlalchemy_uri():
     """获取SQLAlchemy数据库URI"""
-    # 加载 .env 文件
-    load_dotenv()
-
-    db_host = os.environ.get('DB_HOST') or os.getenv('DATABASE_HOST')
-    db_port = os.environ.get('DB_PORT') or os.getenv('DATABASE_PORT', '5432')
-    db_name = os.environ.get('DB_NAME') or os.getenv('DATABASE_NAME')
-    db_user = os.environ.get('DB_USER') or os.getenv('DATABASE_USER')
-    db_password = os.environ.get('DB_PASSWORD') or os.getenv('DATABASE_PASSWORD')
-
     if not all([db_host, db_port, db_name, db_user, db_password]):
         logger.error('数据库连接配置不完整，请检查 .env 文件或环境变量。')
         return None
@@ -34,9 +35,23 @@ def get_sqlalchemy_uri():
     return sqlalchemy_uri
 
 
+# 配置连接池参数
+pool_config = {
+    "pool_size": db_pool_size,  # 连接池大小
+    "max_overflow": 20,  # 保留足够的突发缓冲
+    "pool_timeout": 5,  # 大幅减少获取超时，快速失败
+    "pool_recycle": 1200,  # 20分钟回收，依然很安全
+    "pool_pre_ping": True,  # 保持开启，保证连接健康
+}
+
+# 创建带有连接池的引擎
 engine = create_engine(
-    get_sqlalchemy_uri()
+    get_sqlalchemy_uri(),
+    poolclass=QueuePool,  # 使用队列连接池
+    **pool_config
 )
+
+# 创建会话工厂
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -75,26 +90,24 @@ def test_database_connection():
 
 def check_db():
     """检查数据库表结构"""
-    with get_db() as session:
-        # 使用 ORM 检查所有表的结构
-        inspector = inspect(engine)
-        table_names = inspector.get_table_names(schema='public')
+    inspector = inspect(engine)
+    table_names = inspector.get_table_names(schema='public')
 
-        # 检查查询结果
-        if table_names:
-            if len(table_names) <= 6:
-                tables_str = "/".join(table_names)
-            else:
-                tables_str = "/".join(table_names[:3] + ["..."] + table_names[-3:])
-
-            logger.info(f"检测到表: {tables_str}")
-            logger.info(f"总表数: {len(table_names)}")
-            print(f"----------------数据库表预检测成功---------")
-            return len(table_names)
+    # 检查查询结果
+    if table_names:
+        if len(table_names) <= 6:
+            tables_str = "/".join(table_names)
         else:
-            logger.warning("数据库中没有找到表。")
-            print(f"----------------数据库表丢失")
-            return 0
+            tables_str = "/".join(table_names[:3] + ["..."] + table_names[-3:])
+
+        logger.info(f"检测到表: {tables_str}")
+        logger.info(f"总表数: {len(table_names)}")
+        print(f"----------------数据库表预检测成功---------")
+        return len(table_names)
+    else:
+        logger.warning("数据库中没有找到表。")
+        print(f"----------------数据库表丢失")
+        return 0
 
 
 if __name__ == "__main__":

@@ -29,5 +29,4 @@ def get_user_name_by_id(user_id):
         except (ValueError, TypeError) as e:
             pass
         finally:
-            session.close()
             return author_name
