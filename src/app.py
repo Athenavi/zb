@@ -26,7 +26,7 @@ from src.blueprints.role import role_bp
 from src.blueprints.theme import create_theme_blueprint
 from src.blueprints.website import create_website_blueprint
 from src.config.theme import db_get_theme
-from src.database import SessionLocal
+from src.database import get_db
 from src.error import error
 from src.notification import read_all_notifications, get_notifications, read_current_notification
 from src.other.diy import diy_space_put
@@ -449,33 +449,31 @@ def get_current_theme():
 @cache.cached(timeout=300, key_prefix='all_users')
 def get_all_users():
     all_users = {}
-    session = SessionLocal()
-    try:
-        users = session.query(User.username, User.id).all()
-        for username, user_id in users:
-            all_users[username] = str(user_id)
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    finally:
-        session.close()
-        return all_users
+    with get_db() as session:
+        try:
+            users = session.query(User.username, User.id).all()
+            for username, user_id in users:
+                all_users[username] = str(user_id)
+        except Exception as e:
+            print(f"An error occurred: {e}")
+        finally:
+            return all_users
 
 
 @cache.cached(timeout=3600, key_prefix='all_emails')
 def get_all_emails():
     all_emails = []
-    session = SessionLocal()
-    try:
-        # 查询所有用户邮箱
-        results = session.query(User.email).all()
-        for result in results:
-            email = result[0]
-            all_emails.append(email)
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    finally:
-        session.close()
-        return all_emails
+    with get_db() as session:
+        try:
+            # 查询所有用户邮箱
+            results = session.query(User.email).all()
+            for result in results:
+                email = result[0]
+                all_emails.append(email)
+        except Exception as e:
+            print(f"An error occurred: {e}")
+        finally:
+            return all_emails
 
 
 @app.route('/api/email-exists', methods=['GET'])

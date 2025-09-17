@@ -1,5 +1,6 @@
 import logging
 import os
+from contextlib import contextmanager
 
 import psycopg2
 from dotenv import load_dotenv
@@ -39,28 +40,42 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
+@contextmanager
+def get_db():
+    """
+    提供数据库session的上下文管理器，确保session正确关闭
+    """
+    db = SessionLocal()
+    try:
+        yield db
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.error(f"数据库操作失败: {e}")
+        raise
+    finally:
+        db.close()
+
+
 def test_database_connection():
     """测试数据库连接"""
-    try:
-        session = SessionLocal()
-        result = session.execute(text("SELECT version()")).scalar()
-        logger.info(f"PostgreSQL版本: {result}")
-        session.close()
-        logger.info("数据库连接测试成功。")
-        return True
-
-    except psycopg2.Error as err:
-        logger.error(f"连接数据库失败: {err}")
-        return False
-    except Exception as e:
-        logger.error(f"测试数据库连接时发生错误: {e}")
-        return False
+    with get_db() as session:
+        try:
+            result = session.execute(text("SELECT version()")).scalar()
+            logger.info(f"PostgreSQL版本: {result}")
+            logger.info("数据库连接测试成功。")
+            return True
+        except psycopg2.Error as err:
+            logger.error(f"连接数据库失败: {err}")
+            return False
+        except Exception as e:
+            logger.error(f"测试数据库连接时发生错误: {e}")
+            return False
 
 
 def check_db():
     """检查数据库表结构"""
-    try:
-        session = SessionLocal()
+    with get_db() as session:
         # 使用 ORM 检查所有表的结构
         inspector = inspect(engine)
         table_names = inspector.get_table_names(schema='public')
@@ -75,20 +90,11 @@ def check_db():
             logger.info(f"检测到表: {tables_str}")
             logger.info(f"总表数: {len(table_names)}")
             print(f"----------------数据库表预检测成功---------")
-            session.close()
             return len(table_names)
         else:
             logger.warning("数据库中没有找到表。")
             print(f"----------------数据库表丢失")
-            session.close()
             return 0
-
-    except psycopg2.Error as err:
-        logger.error(f"数据库错误: {err}")
-        return None
-    except Exception as e:
-        logger.error(f"检查数据库时发生错误: {e}")
-        return None
 
 
 if __name__ == "__main__":
