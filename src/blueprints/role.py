@@ -73,7 +73,7 @@ def update_role(role_id):
     """更新角色"""
     with get_db() as db:
         try:
-            role = Role.query.get_or_404(role_id)
+            role = db.query(Role).get(id=role_id).first()
             data = request.get_json()
 
             if 'name' in data:
@@ -119,7 +119,7 @@ def delete_role(role_id):
     """删除角色"""
     with get_db() as db:
         try:
-            role = Role.query.get_or_404(role_id)
+            role = db.query(Role).filter_by(id=role_id).first()
 
             if len(role.users) > 0:
                 return jsonify({
@@ -152,7 +152,7 @@ def get_permissions():
             per_page = request.args.get('per_page', 10, type=int)
             search = request.args.get('search', '', type=str)
 
-            query = Permission.query
+            query = db.query(Permission)
 
             if search:
                 query = query.filter(
@@ -245,7 +245,7 @@ def update_permission(permission_id):
     """更新权限"""
     with get_db() as db:
         try:
-            permission = Permission.query.get_or_404(permission_id)
+            permission = db.query(Permission).get(id=permission_id).first()
             data = request.get_json()
 
             if 'code' in data:
@@ -283,7 +283,7 @@ def delete_permission(permission_id):
     """删除权限"""
     with get_db() as db:
         try:
-            permission = Permission.query.get_or_404(permission_id)
+            permission = db.query(Permission).get(id=permission_id).first()
 
             if len(permission.roles) > 0:
                 return jsonify({
@@ -310,31 +310,32 @@ def delete_permission(permission_id):
 @role_bp.route('/admin/user/<int:user_id>/roles', methods=['GET'])
 def get_user_roles(user_id):
     """获取用户的角色"""
-    try:
-        user = User.query.get_or_404(user_id)
+    with get_db() as db:
+        try:
+            user = db.query(User).get(id=user_id).first()
 
-        user_roles = []
-        for role in user.roles:
-            user_roles.append({
-                'id': role.id,
-                'name': role.name,
-                'description': role.description
-            })
+            user_roles = []
+            for role in user.roles:
+                user_roles.append({
+                    'id': role.id,
+                    'name': role.name,
+                    'description': role.description
+                })
 
-        return jsonify({
-            'success': True,
-            'data': {
-                'user_id': user.id,
-                'username': user.username,
-                'roles': user_roles
-            }
-        }), 200
+            return jsonify({
+                'success': True,
+                'data': {
+                    'user_id': user.id,
+                    'username': user.username,
+                    'roles': user_roles
+                }
+            }), 200
 
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'message': f'获取用户角色失败: {str(e)}'
-        }), 500
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f'获取用户角色失败: {str(e)}'
+            }), 500
 
 
 @role_bp.route('/admin/user/<int:user_id>/roles', methods=['PUT'])
@@ -342,7 +343,7 @@ def update_user_roles(user_id):
     """更新用户角色"""
     with get_db() as db:
         try:
-            user = User.query.get_or_404(user_id)
+            user = db.query(User).get(id=user_id).first()
             data = request.get_json()
 
             if 'role_ids' not in data:

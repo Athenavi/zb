@@ -412,7 +412,7 @@ comment on column notifications.created_at is '创建时间';
 
 comment on column notifications.updated_at is '更新时间';
 
-create index if not exists idx_user_id
+create index if not exists idx_user_id_noti
     on notifications (user_id);
 
 create table if not exists user_subscriptions

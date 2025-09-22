@@ -1,5 +1,8 @@
 from . import db
 
+report_type = db.Enum('Article', 'Comment', name='report_type', create_type=False)
+
+
 class Event(db.Model):
     __tablename__ = 'events'
     id = db.Column(db.Integer, primary_key=True)
@@ -13,7 +16,7 @@ class Report(db.Model):
     __tablename__ = 'reports'
     id = db.Column(db.Integer, primary_key=True)
     reported_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    content_type = db.Column(db.Enum('Article', 'Comment'), nullable=False)
+    content_type = db.Column(report_type, nullable=False)
     content_id = db.Column(db.Integer, nullable=False)
     reason = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.TIMESTAMP, server_default=db.func.current_timestamp())

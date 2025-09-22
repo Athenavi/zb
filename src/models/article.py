@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 
 from . import db
 
+article_status = db.Enum('Draft', 'Published', 'Deleted', name='article_status', create_type=False)
+
 
 class Article(db.Model):
     __tablename__ = 'articles'
@@ -12,7 +14,7 @@ class Article(db.Model):
     hidden = db.Column(db.Boolean, default=False, nullable=False)
     views = db.Column(db.BigInteger, default=0, nullable=False)
     likes = db.Column(db.BigInteger, default=0, nullable=False)
-    status = db.Column(db.Enum('Draft', 'Published', 'Deleted'), default='Draft')
+    status = db.Column(article_status, default='Draft')
     cover_image = db.Column(db.String(255))
     article_type = db.Column(db.String(50))
     excerpt = db.Column(db.Text)
