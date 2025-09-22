@@ -63,7 +63,8 @@ cp .env_example .env
 # 编辑.env文件（详见配置说明）
 
 # 5. 初始化数据库
-mysql -u root -p < blog.sql
+createdb -U postgres flaskblog
+psql -U postgres -d flaskblog -f blog.sql
 
 # 6. 启动应用
 python wsgi.py
