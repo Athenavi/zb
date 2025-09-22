@@ -5,7 +5,9 @@ from pathlib import Path
 from flask import Flask, render_template, make_response, redirect
 from flask import request, jsonify, send_file
 from flask_caching import Cache
+from flask_migrate import Migrate
 from flask_siwadoc import SiwaDoc
+from flask_sqlalchemy import SQLAlchemy
 from jinja2 import select_autoescape
 from werkzeug.exceptions import NotFound
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -50,11 +52,16 @@ from src.utils.security.safe import is_valid_iso_language_code
 
 app = Flask(__name__, template_folder=f'{AppConfig.base_dir}/templates', static_folder=f'{AppConfig.base_dir}/static')
 app.config.from_object(AppConfig)
-from src.models import db, User, Article, UserSubscription
 
+# 先初始化db和migrate
+db = SQLAlchemy()  # 先创建db对象
+migrate = Migrate()  # 创建migrate对象
+
+from src.models import User, Article, UserSubscription
 db.init_app(app)
+migrate.init_app(app, db)  # 初始化migrate
 
-# 初始化 Cache
+# 初始化Cache等其他组件
 cache = Cache(app)
 import threading
 

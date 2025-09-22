@@ -1,4 +1,4 @@
-from MySQLdb import IntegrityError
+from psycopg2 import IntegrityError
 from flask import Blueprint, request, render_template
 from flask import jsonify
 
