@@ -13,6 +13,53 @@ def admin_roles():
     return render_template('dashboard/role.html')
 
 
+@role_bp.route('/admin/role/search', methods=['GET'])
+def admin_roles_search():
+    """获取角色列表，并支持分页和搜索"""
+    page = request.args.get('page', default=1, type=int)
+    per_page = request.args.get('per_page', default=10, type=int)
+    search = request.args.get('search', default='', type=str)
+
+    with get_db() as db:
+        try:
+            # 过滤角色数据，根据搜索关键词
+            query = db.query(Role)
+            if search:
+                query = query.filter(Role.name.ilike(f'%{search}%') | Role.description.ilike(f'%{search}%'))
+
+            # 获取所有匹配的角色
+            roles = query.all()
+
+            # 手动分页
+            total = len(roles)
+            start = (page - 1) * per_page
+            end = start + per_page
+            paginated_roles = roles[start:end]
+
+            # 返回结果
+            roles_data = [{
+                'id': role.id,
+                'name': role.name,
+                'description': role.description
+            } for role in paginated_roles]
+
+            return jsonify({
+                'success': True,
+                'data': roles_data,
+                'pagination': {
+                    'current_page': page,
+                    'per_page': per_page,
+                    'total': total,
+                    'total_pages': (total + per_page - 1) // per_page  # 计算总页数
+                }
+            })
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': str(e)
+            })
+
+
 @role_bp.route('/admin/role', methods=['POST'])
 def create_role():
     """创建新角色"""
@@ -39,7 +86,7 @@ def create_role():
             # 添加权限关联
             if 'permission_ids' in data:
                 for permission_id in data['permission_ids']:
-                    permission = Permission.query.get(permission_id)
+                    permission = db.query(Permission).get(permission_id)
                     if permission:
                         new_role.permissions.append(permission)
 
@@ -333,7 +380,13 @@ def get_user_roles(user_id):
     """获取用户的角色"""
     with get_db() as db:
         try:
-            user = db.query(User).get(id=user_id).first()
+            user = db.query(User).get(user_id)
+
+            if user is None:
+                return jsonify({
+                    'success': False,
+                    'message': '用户不存在'
+                }), 404
 
             user_roles = []
             for role in user.roles:
