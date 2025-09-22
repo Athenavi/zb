@@ -661,7 +661,7 @@
                     search: search
                 });
 
-                const response = await fetch(`${API_BASE_URL}/admin/role?${params}`);
+                const response = await fetch(`${API_BASE_URL}/admin/role/search?${params}`);
                 const result = await response.json();
 
                 if (result.success) {

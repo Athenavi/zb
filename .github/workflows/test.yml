@@ -1,0 +1,45 @@
+name: Compatibility Check
+
+on:
+  push:
+    branches: [alpha]
+  pull_request:
+    branches: [alpha]
+  workflow_dispatch:
+
+jobs:
+  compatibility:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # 使用当前稳定版本
+        python-version: ["3.13"]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Create virtual environment
+      run: |
+        python -m venv venv
+        source venv/bin/activate
+        echo "VIRTUAL_ENV=$PWD/venv" >> $GITHUB_ENV
+        echo "VIRTUAL_ENV_ACTIVATED=true" >> $GITHUB_ENV
+
+    - name: Install dependencies in virtual environment
+      run: |
+        source venv/bin/activate
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        # 验证安装
+        pip list
+
+    - name: Run basic validation
+      run: |
+        source venv/bin/activate
+        python -c "import sys; print(f'Python {sys.version}')"

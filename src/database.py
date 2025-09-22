@@ -24,24 +24,29 @@ db_pool_size = os.environ.get('DB_POOL_SIZE') or os.getenv('DATABASE_POOL_SIZE',
 
 
 def get_sqlalchemy_uri():
-    """获取SQLAlchemy数据库URI"""
-    if not all([db_host, db_port, db_name, db_user, db_password]):
+    """获取SQLAlchemy数据库URI，兼容空密码情况"""
+    if not all([db_host, db_port, db_name, db_user]):
         logger.error('数据库连接配置不完整，请检查 .env 文件或环境变量。')
         return None
 
-    # 构建SQLAlchemy数据库URI
-    sqlalchemy_uri = f"postgresql+psycopg2://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
-    logger.info(f"SQLAlchemy URI: {sqlalchemy_uri.replace(db_password, '***')}")  # 安全日志
+    # 构建SQLAlchemy数据库URI，处理密码为空的情况
+    if db_password:
+        sqlalchemy_uri = f"postgresql+psycopg2://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+        logger.info(f"SQLAlchemy URI: {sqlalchemy_uri.replace(db_password, '***')}")  # 安全日志
+    else:
+        sqlalchemy_uri = f"postgresql+psycopg2://{db_user}@{db_host}:{db_port}/{db_name}"
+        logger.info(f"SQLAlchemy URI: {sqlalchemy_uri}")  # 密码为空，无需隐藏
+
     return sqlalchemy_uri
 
 
 # 配置连接池参数
 pool_config = {
     "pool_size": int(db_pool_size),  # 连接池大小
-    "max_overflow": 20,  # 保留足够的突发缓冲
-    "pool_timeout": 5,  # 大幅减少获取超时，快速失败
-    "pool_recycle": 1200,  # 20分钟回收，依然很安全
-    "pool_pre_ping": True,  # 保持开启，保证连接健康
+    "max_overflow": 20,
+    "pool_timeout": 5,
+    "pool_recycle": 1200,
+    "pool_pre_ping": True,
 }
 
 # 创建带有连接池的引擎

@@ -5,6 +5,7 @@ from pathlib import Path
 from flask import Flask, render_template, make_response, redirect
 from flask import request, jsonify, send_file
 from flask_caching import Cache
+from flask_migrate import Migrate
 from flask_siwadoc import SiwaDoc
 from jinja2 import select_autoescape
 from werkzeug.exceptions import NotFound
@@ -28,6 +29,7 @@ from src.blueprints.website import create_website_blueprint
 from src.config.theme import db_get_theme
 from src.database import get_db
 from src.error import error
+from src.models import db, User, Article, UserSubscription
 from src.notification import read_all_notifications, get_notifications, read_current_notification
 from src.other.diy import diy_space_put
 from src.other.filters import json_filter, string_split, article_author, md2html, relative_time_filter
@@ -48,13 +50,19 @@ from src.utils.http.generate_response import send_chunk_md
 from src.utils.security.jwt_handler import JWTHandler
 from src.utils.security.safe import is_valid_iso_language_code
 
-app = Flask(__name__, template_folder=f'{AppConfig.base_dir}/templates', static_folder=f'{AppConfig.base_dir}/static')
+app = Flask(
+    __name__,
+    template_folder=f'{AppConfig.base_dir}/templates',
+    static_folder=f'{AppConfig.base_dir}/static'
+)
+
+# 先初始化 AppConfig
 app.config.from_object(AppConfig)
-from src.models import db, User, Article, UserSubscription
-
 db.init_app(app)
+# 创建并初始化 migrate 对象
+migrate = Migrate(app, db)
 
-# 初始化 Cache
+# 初始化 Cache 等其他组件
 cache = Cache(app)
 import threading
 
@@ -328,45 +336,48 @@ def profile(user_id):
 @jwt_required
 def user_space(user_id, target_user_id):
     """用户空间页面 - 显示用户资料和文章"""
-    target_user = User.query.get_or_404(target_user_id)
+    try:
+        target_user = User.query.get_or_404(target_user_id)
 
-    # 判断是否为当前用户自己的空间
-    is_own_profile = user_id == target_user_id
+        # 判断是否为当前用户自己的空间
+        is_own_profile = user_id == target_user_id
 
-    if target_user.profile_private and not is_own_profile:
-        return render_template('inform.html', status_code=503, message='<h1>该用户未公开资料</h1><UNK>')
+        if target_user.profile_private and not is_own_profile:
+            return render_template('inform.html', status_code=503, message='<h1>该用户未公开资料</h1><UNK>')
 
-    # 获取用户统计数据
-    stats = {
-        'articles_count': Article.query.filter_by(user_id=target_user_id, status='Published').count(),
-        'followers_count': UserSubscription.query.filter_by(subscribed_user_id=target_user_id).count(),
-        'following_count': UserSubscription.query.filter_by(subscriber_id=target_user_id).count(),
-        'total_views': db.session.query(db.func.sum(Article.views)).filter_by(user_id=target_user_id,
-                                                                              status='Published').scalar() or 0,
-        'total_likes': db.session.query(db.func.sum(Article.likes)).filter_by(user_id=target_user_id,
-                                                                              status='Published').scalar() or 0
-    }
+        # 获取用户统计数据
+        stats = {
+            'articles_count': Article.query.filter_by(user_id=target_user_id, status='Published').count(),
+            'followers_count': UserSubscription.query.filter_by(subscribed_user_id=target_user_id).count(),
+            'following_count': UserSubscription.query.filter_by(subscriber_id=target_user_id).count(),
+            'total_views': db.session.query(db.func.sum(Article.views)).filter_by(user_id=target_user_id,
+                                                                                  status='Published').scalar() or 0,
+            'total_likes': db.session.query(db.func.sum(Article.likes)).filter_by(user_id=target_user_id,
+                                                                                  status='Published').scalar() or 0
+        }
 
-    # 获取用户最新发布的文章
-    recent_articles = Article.query.filter_by(
-        user_id=target_user_id,
-        status='Published'
-    ).order_by(Article.updated_at.desc()).limit(6).all()
+        # 获取用户最新发布的文章
+        recent_articles = Article.query.filter_by(
+            user_id=target_user_id,
+            status='Published'
+        ).order_by(Article.updated_at.desc()).limit(6).all()
 
-    # 检查当前用户是否已关注目标用户
-    is_following = False
-    if user_id != target_user_id:
-        is_following = UserSubscription.query.filter_by(
-            subscriber_id=user_id,
-            subscribed_user_id=target_user_id
-        ).first() is not None
+        # 检查当前用户是否已关注目标用户
+        is_following = False
+        if user_id != target_user_id:
+            is_following = UserSubscription.query.filter_by(
+                subscriber_id=user_id,
+                subscribed_user_id=target_user_id
+            ).first() is not None
 
-    return render_template('Profile.html',
-                           target_user=target_user,
-                           is_own_profile=is_own_profile,
-                           is_following=is_following,
-                           stats=stats,
-                           recent_articles=recent_articles)
+        return render_template('Profile.html',
+                               target_user=target_user,
+                               is_own_profile=is_own_profile,
+                               is_following=is_following,
+                               stats=stats,
+                               recent_articles=recent_articles)
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 
 @app.route('/api/tags/suggest', methods=['GET'])

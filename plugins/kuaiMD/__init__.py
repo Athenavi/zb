@@ -56,7 +56,7 @@ def index(path=''):
 
 @kuaiMD_bp.route('/p/<slug>.md/fullscreen', methods=['GET', 'POST'])
 def fullscreen(slug=''):
-    article = db.session.query(Article).filter(
+    article = db.query(Article).filter(
         Article.slug == slug,
         Article.status == 'Published',
     ).first()
@@ -65,13 +65,13 @@ def fullscreen(slug=''):
 
     if article:
         # 获取文章内容
-        content = db.session.query(ArticleContent).filter_by(aid=article.article_id).first()
+        content = db.query(ArticleContent).filter_by(aid=article.article_id).first()
 
         # 获取多语言版本
-        # i18n_versions = db.session.query(ArticleI18n).filter_by(article_id=article.article_id).all()
+        # i18n_versions = db.query(ArticleI18n).filter_by(article_id=article.article_id).all()
 
         # 获取作者信息
-        # author = db.session.query(User).get(article.user_id)
+        # author = db.query(User).get(article.user_id)
         # print(f'1. author: {author}')
         # print(f'2. content: {content}')
         # print(f'3. i18n: {i18n_versions}')
