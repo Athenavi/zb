@@ -7,9 +7,10 @@ import humanize
 from flask import Blueprint, request, render_template, abort, jsonify, send_file, current_app
 from sqlalchemy import func
 
+from src.database import get_db
 from src.media.permissions import get_media_db
 from src.media.processing import generate_video_thumbnail, generate_thumbnail
-from src.models import Media, FileHash, db
+from src.models import Media, FileHash
 from src.user.authz.decorators import jwt_required
 from src.utils.security.safe import is_valid_hash
 
@@ -70,126 +71,127 @@ def create_media_blueprint(cache_instance, domain, base_dir):
     @media_bp.route('/media', methods=['GET'])
     @jwt_required
     def media_v2(user_id):
-        try:
-            user_id = int(user_id)
-            base_query = Media.query.filter(Media.user_id == user_id)
-            query = base_query.join(FileHash, Media.hash == FileHash.hash)
+        with get_db() as db:
+            try:
+                user_id = int(user_id)
+                base_query = Media.query.filter(Media.user_id == user_id)
+                query = base_query.join(FileHash, Media.hash == FileHash.hash)
 
-            media_type = request.args.get('type') or 'all'
-            if media_type == 'image':
-                query = query.filter(FileHash.mime_type.startswith('image'))
-            elif media_type == 'video':
-                query = query.filter(FileHash.mime_type.startswith('video'))
-            print(f"[DEBUG5] Type filter applied: {media_type}")
+                media_type = request.args.get('type') or 'all'
+                if media_type == 'image':
+                    query = query.filter(FileHash.mime_type.startswith('image'))
+                elif media_type == 'video':
+                    query = query.filter(FileHash.mime_type.startswith('video'))
+                print(f"[DEBUG5] Type filter applied: {media_type}")
 
-            page = request.args.get('page', 1, type=int)
-            per_page = 20
-            pagination = query.order_by(Media.created_at.desc()).paginate(
-                page=page, per_page=per_page, error_out=False
-            )
-            media_files = pagination.items
+                page = request.args.get('page', 1, type=int)
+                per_page = 20
+                pagination = query.order_by(Media.created_at.desc()).paginate(
+                    page=page, per_page=per_page, error_out=False
+                )
+                media_files = pagination.items
 
-            storage_used_query = db.session.query(func.sum(FileHash.file_size)) \
-                                     .join(Media, Media.hash == FileHash.hash) \
-                                     .filter(Media.user_id == user_id) \
-                                     .scalar() or 0
+                storage_used_query = db.query(func.sum(FileHash.file_size)) \
+                                         .join(Media, Media.hash == FileHash.hash) \
+                                         .filter(Media.user_id == user_id) \
+                                         .scalar() or 0
 
-            storage_total_bytes = 50 * 1024 * 1024 * 1024
-            storage_percentage = min(100, int(storage_used_query / storage_total_bytes * 100))
+                storage_total_bytes = 50 * 1024 * 1024 * 1024
+                storage_percentage = min(100, int(storage_used_query / storage_total_bytes * 100))
 
-            stats = {
-                'image_count': Media.query.filter_by(user_id=user_id)
-                .join(FileHash)
-                .filter(FileHash.mime_type.startswith('image'))
-                .count(),
-                'video_count': Media.query.filter_by(user_id=user_id)
-                .join(FileHash)
-                .filter(FileHash.mime_type.startswith('video'))
-                .count(),
-                'storage_used': humanize.naturalsize(storage_used_query),
-                'storage_total': '50 GB',
-                'storage_percentage': storage_percentage
-            }
+                stats = {
+                    'image_count': Media.query.filter_by(user_id=user_id)
+                    .join(FileHash)
+                    .filter(FileHash.mime_type.startswith('image'))
+                    .count(),
+                    'video_count': Media.query.filter_by(user_id=user_id)
+                    .join(FileHash)
+                    .filter(FileHash.mime_type.startswith('video'))
+                    .count(),
+                    'storage_used': humanize.naturalsize(storage_used_query),
+                    'storage_total': '50 GB',
+                    'storage_percentage': storage_percentage
+                }
 
-            return render_template('media.html',
-                                   title='媒体库',
-                                   media_files=media_files,
-                                   pagination=pagination,
-                                   media_type=media_type,
-                                   stats=stats,
-                                   current_year=datetime.now().year)
+                return render_template('media.html',
+                                       title='媒体库',
+                                       media_files=media_files,
+                                       pagination=pagination,
+                                       media_type=media_type,
+                                       stats=stats,
+                                       current_year=datetime.now().year)
 
-        except Exception as e:
-            import traceback
-            return f"Server Error: {str(e)}", 500
+            except Exception as e:
+                import traceback
+                return f"Server Error: {str(e)}", 500
 
     @media_bp.route('/media', methods=['DELETE'])
     @jwt_required
     def media_delete(user_id):
-        try:
-            file_ids = request.args.get('file-id-list', '')
-            if not file_ids:
-                return jsonify({"message": "缺少文件ID列表"}), 400
-
+        with get_db() as db:
             try:
-                id_list = [int(media_id) for media_id in file_ids.split(',')]
-            except ValueError:
-                return jsonify({"message": "文件ID包含非法字符"}), 400
+                file_ids = request.args.get('file-id-list', '')
+                if not file_ids:
+                    return jsonify({"message": "缺少文件ID列表"}), 400
 
-            try:
-                target_files = Media.query.filter(Media.id.in_(id_list), Media.user_id == user_id).all()
-                if len(target_files) != len(id_list):
+                try:
+                    id_list = [int(media_id) for media_id in file_ids.split(',')]
+                except ValueError:
+                    return jsonify({"message": "文件ID包含非法字符"}), 400
+
+                try:
+                    target_files = Media.query.filter(Media.id.in_(id_list), Media.user_id == user_id).all()
+                    if len(target_files) != len(id_list):
+                        return jsonify({
+                            "message": f"找到{len(target_files)}个文件，请求{len(id_list)}个",
+                            "hint": "可能文件不存在或无权访问"
+                        }), 403
+
+                    for media_file in target_files:
+                        db.delete(media_file)
+                        file_hash = FileHash.query.filter_by(hash=media_file.hash).first()
+                        if file_hash:
+                            file_hash.reference_count -= 1
+                            if file_hash.reference_count == 0:
+                                db.delete(file_hash)
+
+                                # 启动后台清理
+                    hashes_to_check = [
+                        (media_file.hash, FileHash.query.filter_by(hash=media_file.hash).first().storage_path) for
+                        media_file in target_files]
+                    if hashes_to_check:
+                        Thread(target=async_file_cleanup, args=(hashes_to_check,)).start()
+
                     return jsonify({
-                        "message": f"找到{len(target_files)}个文件，请求{len(id_list)}个",
-                        "hint": "可能文件不存在或无权访问"
-                    }), 403
+                        "deleted_count": len(target_files),
+                        "message": "删除成功，后台清理中"
+                    }), 200
 
-                for media_file in target_files:
-                    db.session.delete(media_file)
-                    file_hash = FileHash.query.filter_by(hash=media_file.hash).first()
-                    if file_hash:
-                        file_hash.reference_count -= 1
-                        if file_hash.reference_count == 0:
-                            db.session.delete(file_hash)
-
-                db.session.commit()
-
-                # 启动后台清理
-                hashes_to_check = [
-                    (media_file.hash, FileHash.query.filter_by(hash=media_file.hash).first().storage_path) for
-                    media_file in target_files]
-                if hashes_to_check:
-                    Thread(target=async_file_cleanup, args=(hashes_to_check,)).start()
-
-                return jsonify({
-                    "deleted_count": len(target_files),
-                    "message": "删除成功，后台清理中"
-                }), 200
+                except Exception as e:
+                    db.rollback()
+                    current_app.logger.error(f"删除失败: {str(e)}")
+                    return jsonify({"message": "数据库操作失败"}), 500
 
             except Exception as e:
-                db.session.rollback()
-                current_app.logger.error(f"删除失败: {str(e)}")
-                return jsonify({"message": "数据库操作失败"}), 500
-
-        except Exception as e:
-            current_app.logger.error(f"请求处理异常: {str(e)}")
-            return jsonify({"message": "服务器内部错误"}), 500
+                current_app.logger.error(f"请求处理异常: {str(e)}")
+                return jsonify({"message": "服务器内部错误"}), 500
 
     def async_file_cleanup(file_hashes_to_check):
         """后台线程执行的清理任务"""
-        try:
-            for file_hash, storage_path in file_hashes_to_check:
-                file_hash = FileHash.query.filter_by(hash=file_hash).first()
-                if file_hash and file_hash.reference_count == 0:
-                    db.session.delete(file_hash)
-                    db.session.commit()
-                    try:
-                        if os.path.exists(storage_path):
-                            os.remove(storage_path)
-                    except Exception as e:
-                        print(f"后台文件删除失败: {storage_path} - {str(e)}")
+        with get_db() as db:
+            try:
+                for file_hash, storage_path in file_hashes_to_check:
+                    file_hash = FileHash.query.filter_by(hash=file_hash).first()
+                    if file_hash and file_hash.reference_count == 0:
+                        db.delete(file_hash)
 
-        except Exception as e:
-            print(f"后台清理任务失败: {str(e)}")
+                        try:
+                            if os.path.exists(storage_path):
+                                os.remove(storage_path)
+                        except Exception as e:
+                            print(f"后台文件删除失败: {storage_path} - {str(e)}")
+
+            except Exception as e:
+                print(f"后台清理任务失败: {str(e)}")
 
     return media_bp

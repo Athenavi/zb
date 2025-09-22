@@ -6,110 +6,110 @@ import magic
 from flask import jsonify, request
 from werkzeug.utils import secure_filename
 
-from src.models import db, Media, FileHash
+from src.database import get_db
+from src.models import Media, FileHash
 
 
 def handle_user_upload(user_id, allowed_size, allowed_mimes, check_existing=False):
     if not request.files.getlist('file'):
         return jsonify({'message': 'no files uploaded'}), 400
+    with get_db() as db:
+        try:
+            uploaded_files = []
+            reused_count = 0
 
-    try:
-        uploaded_files = []
-        reused_count = 0
+            for f in request.files.getlist('file'):
+                # 校验基础属性
+                if f.content_length > allowed_size:
+                    return jsonify({'message': f'File size exceeds limit: {allowed_size / 1024 / 1024}MB'}), 413
 
-        for f in request.files.getlist('file'):
-            # 校验基础属性
-            if f.content_length > allowed_size:
-                return jsonify({'message': f'File size exceeds limit: {allowed_size / 1024 / 1024}MB'}), 413
+                # 读取文件内容并计算哈希
+                file_data = f.read()
+                file_hash = hashlib.sha256(file_data).hexdigest()
+                f.seek(0)  # 重置文件指针
 
-            # 读取文件内容并计算哈希
-            file_data = f.read()
-            file_hash = hashlib.sha256(file_data).hexdigest()
-            f.seek(0)  # 重置文件指针
+                if check_existing:
+                    # 检查用户是否已上传过相同文件
+                    existing_media = Media.query.filter_by(
+                        user_id=user_id,
+                        hash=file_hash
+                    ).first()
 
-            if check_existing:
-                # 检查用户是否已上传过相同文件
-                existing_media = Media.query.filter_by(
-                    user_id=user_id,
-                    hash=file_hash
+                    if existing_media:
+                        # 根据需求决定是否跳过已存在文件
+                        # 这里只是示例，可以根据需要调整
+                        pass
+
+                # 校验MIME类型
+                mime_type = magic.from_buffer(file_data, mime=True)
+                if mime_type not in allowed_mimes:
+                    print(f'Rejected: User {user_id}, Invalid MIME {mime_type}')
+                    continue
+
+                # 检查文件哈希是否已存在
+                existing_file_hash = FileHash.query.filter_by(
+                    hash=file_hash,
+                    mime_type=mime_type
                 ).first()
 
-                if existing_media:
-                    # 根据需求决定是否跳过已存在文件
-                    # 这里只是示例，可以根据需要调整
-                    pass
+                storage_path = None
+                if existing_file_hash:
+                    # 复用已有文件
+                    storage_path = existing_file_hash.storage_path
+                    print(f'Reuse existing file: {storage_path}')
 
-            # 校验MIME类型
-            mime_type = magic.from_buffer(file_data, mime=True)
-            if mime_type not in allowed_mimes:
-                print(f'Rejected: User {user_id}, Invalid MIME {mime_type}')
-                continue
+                    # 增加引用计数
+                    existing_file_hash.reference_count += 1
+                    db.add(existing_file_hash)
+                    reused_count += 1
+                else:
+                    # 生成存储路径（哈希分片目录）
+                    hash_prefix = file_hash[:2]
+                    hash_subdir = os.path.join('hashed_files', hash_prefix)
+                    os.makedirs(hash_subdir, exist_ok=True)
 
-            # 检查文件哈希是否已存在
-            existing_file_hash = FileHash.query.filter_by(
-                hash=file_hash,
-                mime_type=mime_type
-            ).first()
+                    # 保存文件
+                    filename = f.filename
+                    storage_path = os.path.join(hash_subdir, file_hash)
+                    with open(storage_path, 'wb') as dest:
+                        dest.write(file_data)
 
-            storage_path = None
-            if existing_file_hash:
-                # 复用已有文件
-                storage_path = existing_file_hash.storage_path
-                print(f'Reuse existing file: {storage_path}')
+                    # 创建新的 FileHash 记录
+                    new_file_hash = FileHash(
+                        hash=file_hash,
+                        filename=filename,
+                        file_size=len(file_data),
+                        mime_type=mime_type,
+                        storage_path=storage_path,
+                        reference_count=1
+                    )
+                    db.add(new_file_hash)
 
-                # 增加引用计数
-                existing_file_hash.reference_count += 1
-                db.session.add(existing_file_hash)
-                reused_count += 1
-            else:
-                # 生成存储路径（哈希分片目录）
-                hash_prefix = file_hash[:2]
-                hash_subdir = os.path.join('hashed_files', hash_prefix)
-                os.makedirs(hash_subdir, exist_ok=True)
+                # 创建媒体记录（即使文件已存在也需要记录用户关联）
+                try:
+                    new_media = Media(
+                        user_id=user_id,
+                        hash=file_hash,
+                        original_filename=secure_filename(f.filename)
+                    )
+                    db.add(new_media)
+                    uploaded_files.append(f.filename)
+                except Exception as e:
+                    # 处理同一用户重复上传相同文件
+                    print(f'Error inserting media record: {e}')
+                    db.rollback()
+                    continue
 
-                # 保存文件
-                filename = f.filename
-                storage_path = os.path.join(hash_subdir, file_hash)
-                with open(storage_path, 'wb') as dest:
-                    dest.write(file_data)
+            return jsonify({
+                'message': 'success',
+                'uploaded': uploaded_files,
+                'reused': reused_count
+            }), 200
 
-                # 创建新的 FileHash 记录
-                new_file_hash = FileHash(
-                    hash=file_hash,
-                    filename=filename,
-                    file_size=len(file_data),
-                    mime_type=mime_type,
-                    storage_path=storage_path,
-                    reference_count=1
-                )
-                db.session.add(new_file_hash)
-
-            # 创建媒体记录（即使文件已存在也需要记录用户关联）
-            try:
-                new_media = Media(
-                    user_id=user_id,
-                    hash=file_hash,
-                    original_filename=secure_filename(f.filename)
-                )
-                db.session.add(new_media)
-                uploaded_files.append(f.filename)
-            except Exception as e:
-                # 处理同一用户重复上传相同文件
-                print(f'Error inserting media record: {e}')
-                db.session.rollback()
-                continue
-
-        db.session.commit()
-        return jsonify({
-            'message': 'success',
-            'uploaded': uploaded_files,
-            'reused': reused_count
-        }), 200
-
-    except Exception as e:
-        print(f"Upload Error: {str(e)}")
-        db.session.rollback()
-        return jsonify({'message': 'failed', 'error': str(e)}), 500
+        except Exception as e:
+            print(f"Upload Error: {str(e)}")
+            db.rollback()
+            return jsonify({'message': 'failed', 'error': str(e)}), 500
 
 
 def upload_cover_back(user_id, base_path):
