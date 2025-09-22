@@ -24,7 +24,7 @@ class Article(db.Model):
 
     # 关系定义
     author = db.relationship('User', back_populates='articles')
-    comments = db.relationship('Comment', back_populates='article', cascade='all, delete-orphan')  # 新增这一行
+    comments = db.relationship('Comment', back_populates='article', cascade='all, delete-orphan')
 
     def __repr__(self):
         return f'<Article {self.title}>'
@@ -43,7 +43,7 @@ class Article(db.Model):
             'article_type': self.article_type,
             'excerpt': self.excerpt,
             'is_featured': self.is_featured,
-            'tags': self.tags,
+            'tags': self.tags.split(',') if self.tags else [],
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }

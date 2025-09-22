@@ -7,7 +7,7 @@ from psycopg2 import IntegrityError
 
 from src.config.theme import get_all_themes
 from src.database import get_db
-from src.models import User, Article, ArticleContent, ArticleI18n, Category
+from src.models import User, Article, ArticleContent, ArticleI18n, Category, Comment
 # from src.error import error
 from src.user.authz.decorators import admin_required
 from src.utils.security.ip_utils import get_client_ip
@@ -267,7 +267,7 @@ def delete_user(user_id, user_id2):
     """删除用户"""
     with get_db() as db:
         try:
-            user = User.query.get_or_404(user_id2)
+            user = db.query(User).filter_by(id=user_id2).first()
 
             # 检查用户是否有关联数据
             media_count = len(user.media)
@@ -413,7 +413,7 @@ def get_articles(user_id):
                     'cover_image': article.cover_image,
                     'views': article.views,
                     'likes': article.likes,
-                    'comment_count': article.comment_count,
+                    'comment_count': Comment.query.filter_by(article_id=article.article_id).count(),
                     'created_at': article.created_at.isoformat() if article.created_at else None,
                     'updated_at': article.updated_at.isoformat() if article.updated_at else None,
                     'author': {
@@ -544,7 +544,7 @@ def get_article(user_id, article_id):
                 'tags': article.tags.split(',') if article.tags else [],
                 'views': article.views,
                 'likes': article.likes,
-                'comment_count': article.comment_count,
+                'comment_count': Comment.query.filter_by(article_id=article.article_id).count(),
                 'article_type': article.article_type,
                 'is_featured': article.is_featured,
                 'hidden': article.hidden,
@@ -577,6 +577,7 @@ def update_article(user_id, article_id):
         try:
             article = Article.query.filter_by(article_id=article_id).first_or_404()
             data = request.get_json()
+            print(data)
 
             # 更新文章基本信息
             if 'title' in data:
@@ -596,7 +597,7 @@ def update_article(user_id, article_id):
 
             # 更新状态
             if 'status' in data:
-                article.status = data['status']
+                article.status = data['status'] or 'Draft'
 
             # 更新文章内容
             if 'content' in data:
@@ -639,18 +640,23 @@ def update_article(user_id, article_id):
 @admin_required
 def delete_article(user_id, article_id):
     """删除文章"""
-    with get_db() as db:
+    with get_db() as db_session:
         try:
-            article = Article.query.filter_by(article_id=article_id).first_or_404()
+            article = db_session.query(Article).filter_by(article_id=article_id).first()
+            if article is None:
+                return jsonify({
+                    'success': False,
+                    'message': f'删除文章失败: 文章不存在'
+                }), 500
 
             # 删除相关的文章内容
-            ArticleContent.query.filter_by(aid=article.article_id).delete()
-
+            db_session.query(ArticleContent).filter_by(aid=article.article_id).delete()
             # 删除相关的国际化内容
-            ArticleI18n.query.filter_by(article_id=article.article_id).delete()
+            db_session.query(ArticleI18n).filter_by(article_id=article.article_id).delete()
 
             title = article.title
-            db.delete(article)
+            db_session.delete(article)
+            db_session.commit()  # 确保提交会话
 
             return jsonify({
                 'success': True,
@@ -658,7 +664,7 @@ def delete_article(user_id, article_id):
             }), 200
 
         except Exception as e:
-            db.rollback()
+            db_session.rollback()
             return jsonify({
                 'success': False,
                 'message': f'删除文章失败: {str(e)}'

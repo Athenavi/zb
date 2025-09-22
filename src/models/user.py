@@ -20,26 +20,29 @@ class User(db.Model):
     profile_private = db.Column(db.Boolean, default=False)
 
     # 关系定义
-    media = db.relationship('Media', back_populates='user', lazy=True)
-    comments = db.relationship('Comment', back_populates='author', lazy='dynamic')
-    articles = db.relationship('Article', back_populates='author', lazy='dynamic')
-    notifications = db.relationship('Notification', back_populates='user', lazy='dynamic')
-    custom_fields = db.relationship('CustomField', back_populates='user', lazy='dynamic')
-    email_subscription = db.relationship('EmailSubscription', back_populates='user', uselist=False)
-    reports = db.relationship('Report', back_populates='reporter', lazy='dynamic')
-    urls = db.relationship('Url', back_populates='user', lazy='dynamic')
+    media = db.relationship('Media', back_populates='user', lazy=True, cascade='all, delete-orphan')
+    comments = db.relationship('Comment', back_populates='author', lazy='dynamic', cascade='all, delete-orphan')
+    articles = db.relationship('Article', back_populates='author', lazy='dynamic', cascade='all, delete-orphan')
+    notifications = db.relationship('Notification', back_populates='user', lazy='dynamic', cascade='all, delete-orphan')
+    custom_fields = db.relationship('CustomField', back_populates='user', lazy='dynamic', cascade='all, delete-orphan')
+    email_subscription = db.relationship('EmailSubscription', back_populates='user', uselist=False,
+                                         cascade='all, delete-orphan')
+    reports = db.relationship('Report', back_populates='reporter', lazy='dynamic', cascade='all, delete-orphan')
+    urls = db.relationship('Url', back_populates='user', lazy='dynamic', cascade='all, delete-orphan')
 
     # 订阅关系
     subscriptions = db.relationship('UserSubscription', foreign_keys='UserSubscription.subscriber_id',
-                                    back_populates='subscriber', lazy='dynamic')
+                                    back_populates='subscriber', lazy='dynamic', cascade='all, delete-orphan')
     subscribers = db.relationship('UserSubscription', foreign_keys='UserSubscription.subscribed_user_id',
-                                  back_populates='subscribed_user', lazy='dynamic')
-    category_subscriptions = db.relationship('CategorySubscription', back_populates='subscriber', lazy='dynamic')
+                                  back_populates='subscribed_user', lazy='dynamic', cascade='all, delete-orphan')
+    category_subscriptions = db.relationship('CategorySubscription', back_populates='subscriber', lazy='dynamic',
+                                             cascade='all, delete-orphan')
 
     # 角色关系
-    roles = db.relationship('Role', secondary='user_roles', back_populates='users')
+    roles = db.relationship('Role', secondary='user_roles', back_populates='users', cascade='all, delete-orphan')
 
-    oauth_connections = db.relationship('OAuthConnection', back_populates='user', lazy='dynamic')
+    oauth_connections = db.relationship('OAuthConnection', back_populates='user', lazy='dynamic',
+                                        cascade='all, delete-orphan')
 
     def __repr__(self):
         return f'<User {self.username}>'
@@ -53,7 +56,6 @@ class User(db.Model):
             'profile_picture': self.profile_picture,
             'bio': self.bio
         }
-
 
 
 class OAuthConnection(db.Model):
