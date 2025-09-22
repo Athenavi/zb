@@ -1,6 +1,6 @@
 from . import db
 
-report_type = db.Enum('Article', 'Comment', name='report_type', create_type=False)
+report_type = db.Enum('Article', 'Comment', name='report_content_type', create_type=False)
 
 
 class Event(db.Model):

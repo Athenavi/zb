@@ -289,7 +289,7 @@ create index if not exists idx_article_created
 create index if not exists idx_parent_created
     on comments (parent_id, created_at);
 
-create index if not exists user_id
+create index if not exists user_id_comments
     on comments (user_id);
 
 create table if not exists file_hashes
