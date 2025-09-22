@@ -143,6 +143,9 @@ def delete_role(role_id):
             }), 500
 
 
+from sqlalchemy import or_
+
+
 @role_bp.route('/admin/permission', methods=['GET'])
 def get_permissions():
     """获取权限列表"""
@@ -156,16 +159,22 @@ def get_permissions():
 
             if search:
                 query = query.filter(
-                    db.or_(
+                    or_(
                         Permission.code.contains(search),
                         Permission.description.contains(search)
                     )
                 )
 
-            permissions = query.paginate(page=page, per_page=per_page, error_out=False)
+            # 手动计算分页
+            total = query.count()
+            pages = (total + per_page - 1) // per_page  # 计算总页数
+            offset = (page - 1) * per_page
+
+            # 获取当前页的数据
+            permissions = query.offset(offset).limit(per_page).all()
 
             permissions_data = []
-            for permission in permissions.items:
+            for permission in permissions:
                 permissions_data.append({
                     'id': permission.id,
                     'code': permission.code,
@@ -177,12 +186,12 @@ def get_permissions():
                 'success': True,
                 'data': permissions_data,
                 'pagination': {
-                    'page': permissions.page,
-                    'pages': permissions.pages,
-                    'per_page': permissions.per_page,
-                    'total': permissions.total,
-                    'has_next': permissions.has_next,
-                    'has_prev': permissions.has_prev
+                    'page': page,
+                    'pages': pages,
+                    'per_page': per_page,
+                    'total': total,
+                    'has_next': page < pages,
+                    'has_prev': page > 1
                 }
             }), 200
 
@@ -283,7 +292,12 @@ def delete_permission(permission_id):
     """删除权限"""
     with get_db() as db:
         try:
-            permission = db.query(Permission).get(id=permission_id).first()
+            permission = db.query(Permission).filter_by(id=permission_id).first()
+            if permission is None:
+                return jsonify({
+                    'success': False,
+                    'message': f'权限ID {permission_id} 不存在'
+                }), 404
 
             if len(permission.roles) > 0:
                 return jsonify({
@@ -298,6 +312,13 @@ def delete_permission(permission_id):
                 'success': True,
                 'message': f'权限 "{permission_code}" 删除成功'
             }), 200
+
+        except IntegrityError:
+            db.rollback()
+            return jsonify({
+                'success': False,
+                'message': '权限代码已存在'
+            }), 409
 
         except Exception as e:
             db.rollback()
