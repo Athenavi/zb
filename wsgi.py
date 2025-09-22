@@ -1,15 +1,15 @@
 # wsgi.py
 import argparse
 import os
-import sys
 import socket
+import sys
 
 from src.logger_config import init_optimized_logger
 
 
 def parse_arguments():
     """解析命令行参数"""
-    parser = argparse.ArgumentParser(description='启动应用程序服务器')
+    parser = argparse.ArgumentParser(description='启动应用程序')
     parser.add_argument('--port', type=int, default=9421,
                         help='应用程序运行的端口号 (默认: 9421)')
     parser.add_argument('--host', type=str, default='0.0.0.0',
@@ -84,7 +84,9 @@ def main():
 
     # 处理更新选项
     if args.update_only:
-        run_update()
+        if not run_update():
+            print("更新失败，程序将退出")
+            sys.exit(1)
         return
 
     if args.update:
@@ -93,8 +95,12 @@ def main():
 
     # 测试数据库连接
     from src.database import test_database_connection, check_db
-    test_database_connection()
-    check_db()
+    try:
+        test_database_connection()
+        check_db()
+    except Exception as e:
+        print(f"数据库连接测试失败: {str(e)}")
+        sys.exit(1)
 
     # 检查端口可用性
     final_port = args.port
