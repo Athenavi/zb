@@ -20,7 +20,7 @@ class Comment(db.Model):
                               lazy='dynamic', cascade='all, delete-orphan')
 
     __table_args__ = (
-        db.Index('idx_article_created', 'article_id', 'created_at'),
-        db.Index('idx_parent_created', 'parent_id', 'created_at'),
-        db.Index('user_id', 'user_id'),
+        db.Index('idx_comments_article_created', 'article_id', 'created_at'),
+        db.Index('idx_comments_parent_created', 'parent_id', 'created_at'),
+        db.Index('idx_comments_user_id', 'user_id'),
     )

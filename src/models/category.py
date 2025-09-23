@@ -27,6 +27,7 @@ class CategorySubscription(db.Model):
     category = db.relationship('Category', back_populates='subscriptions')
 
     __table_args__ = (
-        db.Index('idx_subscriber', 'subscriber_id'),
-        db.Index('idx_category', 'category_id'),
+        db.Index('idx_category_subscriptions_subscriber', 'subscriber_id'),
+        db.Index('idx_category_subscriptions_category', 'category_id'),
+        db.UniqueConstraint('subscriber_id', 'category_id', name='uq_category_subscriptions')
     )

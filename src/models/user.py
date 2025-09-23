@@ -87,7 +87,8 @@ class CustomField(db.Model):
     user = db.relationship('User', back_populates='custom_fields')
 
     __table_args__ = (
-        db.Index('idx_user_id', 'user_id'),
+        db.Index('idx_user_id_cf', 'user_id'),
+        db.UniqueConstraint('user_id', 'field_name', name='uq_user_custom_fields')
     )
 
 
@@ -102,5 +103,5 @@ class EmailSubscription(db.Model):
     user = db.relationship('User', back_populates='email_subscription')
 
     __table_args__ = (
-        db.Index('idx_user_id', 'user_id'),
+        db.Index('idx_user_id_es', 'user_id'),
     )

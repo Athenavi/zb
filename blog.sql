@@ -6,9 +6,9 @@ create table if not exists users
 (
     id              serial
         primary key,
-    username        varchar(255) not null,
+    username        varchar(255) not null unique,
     password        varchar(255) not null,
-    email           varchar(255) not null,
+    email           varchar(255) not null unique,
     created_at      timestamp default CURRENT_TIMESTAMP,
     updated_at      timestamp default CURRENT_TIMESTAMP,
     profile_picture varchar(255),
@@ -117,7 +117,7 @@ create table if not exists categories
 (
     id         serial
         primary key,
-    name       varchar(255) not null,
+    name       varchar(255) not null unique,
     created_at timestamp default CURRENT_TIMESTAMP,
     updated_at timestamp default CURRENT_TIMESTAMP
 );
