@@ -5,7 +5,7 @@ from flask import request, render_template, url_for, jsonify, current_app, flash
 from src.blog.article.security.password import get_article_password
 from src.database import get_db
 from src.error import error
-from src.models import Article, ArticleContent, ArticleI18n, User
+from src.models import Article, ArticleContent, ArticleI18n, User, db
 from src.user.entities import auth_by_uid
 from src.utils.security.safe import random_string, is_valid_iso_language_code, valid_language_codes
 
@@ -245,13 +245,16 @@ def edit_article_back(user_id, article_id):
     auth = auth_by_uid(article_id, user_id)
     if not auth:
         return jsonify({"message": "Authentication failed"}), 401
-    with get_db() as db:
-        article = Article.query.get_or_404(article_id)
-        content_obj = ArticleContent.query.filter_by(aid=article_id).first()
-        content = content_obj.content if content_obj else ""
 
-        if request.method == 'POST':
-            # 更新文章信息
+    article = Article.query.get_or_404(article_id)
+    content_obj = ArticleContent.query.filter_by(aid=article_id).first()
+    content = content_obj.content if content_obj else ""
+
+    if request.method == 'POST':
+        print(request.form)
+
+        try:
+            # 更新文章基本信息
             article.title = request.form.get('title')
             article.slug = request.form.get('slug')
             article.excerpt = request.form.get('excerpt')
@@ -261,27 +264,41 @@ def edit_article_back(user_id, article_id):
             article.article_type = request.form.get('article_type')
             article.cover_image = request.form.get('cover_image')
 
-            article.slug = re.sub(r'[^\w\s]', '', article.slug)  # 移除非字母数字和下划线的字符
+            # 处理slug
+            article.slug = re.sub(r'[^\w\s]', '', article.slug)
             article.slug = re.sub(r'\s+', '_', article.slug)
 
-            # 更新内容
+            # 更新或创建文章内容
+            content_value = request.form.get('content')
             if content_obj:
-                content_obj.content = request.form.get('content')
+                content_obj.content = content_value
             else:
                 content_obj = ArticleContent(
                     aid=article_id,
-                    content=request.form.get('content'),
+                    content=content_value,
                     language_code='zh-CN'
                 )
-                db.add(content_obj)
+                db.session.add(content_obj)
 
-                # flash('update success!', 'success')
-            return redirect(url_for('edit_article', article_id=article_id))
+            # 提交所有更改到数据库
+            db.session.commit()
+            flash('更新成功!', 'success')
 
-        return render_template('article_edit.html',
-                               article=article,
-                               content=content,
-                               status_options=['Draft', 'Published', 'Deleted'])
+        except Exception as e:
+            db.session.rollback()
+            print(f"保存失败: {str(e)}")
+            flash(f'保存失败: {str(e)}', 'error')
+            return render_template('article_edit.html',
+                                   article=article,
+                                   content=content,
+                                   status_options=['Draft', 'Published', 'Deleted'])
+
+        return redirect(url_for('markdown_editor', aid=article_id))
+
+    return render_template('article_edit.html',
+                           article=article,
+                           content=content,
+                           status_options=['Draft', 'Published', 'Deleted'])
 
 
 def new_article_back(user_id):

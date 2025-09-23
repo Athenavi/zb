@@ -608,7 +608,7 @@ def upload_user_path(user_id):
 def upload_cover(user_id):
     cover_path = Path(base_dir) / 'static' / 'cover'
     # print(cover_path)
-    return upload_cover_back(user_id=user_id, base_path=cover_path)
+    return upload_cover_back(user_id=user_id, base_path=cover_path,domain=domain)
 
 
 @app.route('/api/article/password-form/<int:aid>', methods=['GET'])

@@ -51,18 +51,20 @@ def create_media_blueprint(cache_instance, domain, base_dir):
         return send_file(thumb_path)
 
     @media_bp.route('/shared')
-    def get_image_path(f_hash=None):
-        if f_hash is None:
-            f_hash = request.args.get('data')
+    def get_image_path():
+        f_hash = request.args.get('data')
         if f_hash is None:
             return "File hash not provided", 400
+
         if not is_valid_hash(64, f_hash):
             return "Invalid file hash", 400
+
         try:
             file_hash = FileHash.query.filter_by(hash=f_hash).first()
             if not file_hash:
                 print("No result found for the given f_hash")
                 return "File not found", 404
+
             file_path = Path(base_dir) / file_hash.storage_path
             return send_file(file_path, as_attachment=False, mimetype=file_hash.mime_type, max_age=2592000)
         except FileNotFoundError:
