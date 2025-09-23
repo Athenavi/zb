@@ -50,12 +50,9 @@ def create_media_blueprint(cache_instance, domain, base_dir):
                 return send_file(thumb_path, as_attachment=False, mimetype='image/jpeg', max_age=2592000)
         return send_file(thumb_path)
 
-    @media_bp.route('/shared')
-    def get_image_path(f_hash=None):
-        if f_hash is None:
-            f_hash = request.args.get('data')
-        if f_hash is None:
-            return "File hash not provided", 400
+    @media_bp.route('/shared', methods=['GET'])
+    def media_shared():
+        f_hash = request.args.get('data')
         if not is_valid_hash(64, f_hash):
             return "Invalid file hash", 400
         try:
@@ -64,7 +61,7 @@ def create_media_blueprint(cache_instance, domain, base_dir):
                 print("No result found for the given f_hash")
                 return "File not found", 404
             file_path = Path(base_dir) / file_hash.storage_path
-            return send_file(file_path, as_attachment=False, mimetype=file_hash.mime_type, max_age=2592000)
+            return send_file(file_path, as_attachment=True, mimetype=file_hash.mime_type, max_age=2592000)
         except FileNotFoundError:
             abort(404)
 
@@ -140,27 +137,55 @@ def create_media_blueprint(cache_instance, domain, base_dir):
                     return jsonify({"message": "文件ID包含非法字符"}), 400
 
                 try:
-                    target_files = Media.query.filter(Media.id.in_(id_list), Media.user_id == user_id).all()
+                    # 使用 with_for_update 锁定记录，避免并发问题
+                    target_files = db.query(Media).filter(
+                        Media.id.in_(id_list),
+                        Media.user_id == user_id
+                    ).with_for_update().all()
+
                     if len(target_files) != len(id_list):
                         return jsonify({
                             "message": f"找到{len(target_files)}个文件，请求{len(id_list)}个",
                             "hint": "可能文件不存在或无权访问"
                         }), 403
 
+                    # 收集需要清理的信息
+                    cleanup_data = []
+                    media_hashes = []  # 收集所有涉及的hash
+
+                    # 第一步：先收集所有hash，不修改任何对象
+                    for media_file in target_files:
+                        media_hashes.append(media_file.hash)
+
+                    # 第二步：批量查询FileHash对象，确保它们属于当前会话
+                    file_hashes = db.query(FileHash).filter(
+                        FileHash.hash.in_(media_hashes)
+                    ).with_for_update().all()
+
+                    # 创建hash到对象的映射
+                    file_hash_map = {fh.hash: fh for fh in file_hashes}
+
+                    # 第三步：执行删除和更新操作
                     for media_file in target_files:
                         db.delete(media_file)
-                        file_hash = FileHash.query.filter_by(hash=media_file.hash).first()
-                        if file_hash:
-                            file_hash.reference_count -= 1
-                            if file_hash.reference_count == 0:
-                                db.delete(file_hash)
 
-                                # 启动后台清理
-                    hashes_to_check = [
-                        (media_file.hash, FileHash.query.filter_by(hash=media_file.hash).first().storage_path) for
-                        media_file in target_files]
-                    if hashes_to_check:
-                        Thread(target=async_file_cleanup, args=(hashes_to_check,)).start()
+                        file_hash_obj = file_hash_map.get(media_file.hash)
+                        if file_hash_obj:
+                            file_hash_obj.reference_count -= 1
+                            if file_hash_obj.reference_count == 0:
+                                cleanup_data.append({
+                                    'hash': file_hash_obj.hash,
+                                    'storage_path': file_hash_obj.storage_path
+                                })
+                                db.delete(file_hash_obj)
+
+                    # 提交所有更改
+                    db.commit()
+
+                    # 启动后台清理
+                    if cleanup_data:
+                        Thread(target=async_file_cleanup,
+                               args=(current_app._get_current_object(), cleanup_data)).start()
 
                     return jsonify({
                         "deleted_count": len(target_files),
@@ -176,22 +201,22 @@ def create_media_blueprint(cache_instance, domain, base_dir):
                 current_app.logger.error(f"请求处理异常: {str(e)}")
                 return jsonify({"message": "服务器内部错误"}), 500
 
-    def async_file_cleanup(file_hashes_to_check):
+    def async_file_cleanup(app, cleanup_data):
         """后台线程执行的清理任务"""
-        with get_db() as db:
-            try:
-                for file_hash, storage_path in file_hashes_to_check:
-                    file_hash = FileHash.query.filter_by(hash=file_hash).first()
-                    if file_hash and file_hash.reference_count == 0:
-                        db.delete(file_hash)
+        try:
+            for file_info in cleanup_data:
+                storage_path = file_info['storage_path']
+                # 只进行文件清理，不在后台进行数据库操作
+                try:
+                    if os.path.exists(storage_path):
+                        os.remove(storage_path)
+                        app.logger.info(f"成功删除文件: {storage_path}")
+                    else:
+                        app.logger.warning(f"文件不存在: {storage_path}")
+                except Exception as e:
+                    app.logger.error(f"文件删除失败: {storage_path} - {str(e)}")
 
-                        try:
-                            if os.path.exists(storage_path):
-                                os.remove(storage_path)
-                        except Exception as e:
-                            print(f"后台文件删除失败: {storage_path} - {str(e)}")
-
-            except Exception as e:
-                print(f"后台清理任务失败: {str(e)}")
+        except Exception as e:
+            app.logger.error(f"后台清理任务失败: {str(e)}")
 
     return media_bp
