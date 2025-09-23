@@ -15,5 +15,5 @@ class Notification(db.Model):
     user = db.relationship('User', back_populates='notifications')
 
     __table_args__ = (
-        db.Index('idx_user_id', 'user_id'),
+        db.Index('idx_user_id_noti', 'user_id'),
     )

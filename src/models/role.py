@@ -27,7 +27,7 @@ class UserRole(db.Model):
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id'), primary_key=True)
 
     __table_args__ = (
-        db.Index('idx_role_id', 'role_id'),
+        db.Index('idx_user_roles_role_id', 'role_id'),
     )
 
 
@@ -37,5 +37,5 @@ class RolePermission(db.Model):
     permission_id = db.Column(db.Integer, db.ForeignKey('permissions.id'), primary_key=True)
 
     __table_args__ = (
-        db.Index('permission_id', 'permission_id'),
+        db.Index('idx_role_permissions_permission_id', 'permission_id'),
     )

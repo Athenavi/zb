@@ -25,7 +25,7 @@ class Report(db.Model):
     reporter = db.relationship('User', back_populates='reports')
 
     __table_args__ = (
-        db.Index('idx_reported_by', 'reported_by'),
+        db.Index('idx_reports_reported_by', 'reported_by'),
     )
 
 
