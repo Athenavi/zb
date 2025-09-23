@@ -389,7 +389,6 @@ def suggest_tags():
 
 
 @app.route('/new', methods=['GET', 'POST'])
-@app.route('/article/new', methods=['GET', 'POST'])
 @jwt_required
 def new_article(user_id):
     return new_article_back(user_id)

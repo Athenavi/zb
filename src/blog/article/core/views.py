@@ -275,7 +275,7 @@ def edit_article_back(user_id, article_id):
                 )
                 db.add(content_obj)
 
-                        # flash('update success!', 'success')
+                # flash('update success!', 'success')
             return redirect(url_for('edit_article', article_id=article_id))
 
         return render_template('article_edit.html',
@@ -287,46 +287,42 @@ def edit_article_back(user_id, article_id):
 def new_article_back(user_id):
     article = None
     content = ""
-    with get_db() as db:
-        if request.method == 'POST':
-            # 处理表单提交
-            title = request.form.get('title')
-            slug = request.form.get('slug')
-            excerpt = request.form.get('excerpt')
-            content = request.form.get('content')
-            tags = request.form.get('tags')
-            is_featured = True if request.form.get('is_featured') else False
-            status = request.form.get('status', 'Draft')
-            article_type = request.form.get('article_type')
-            cover_image = request.form.get('cover_image')
-
-            # 创建新文章
-            new_article = Article(
-                title=title,
-                slug=slug,
-                excerpt=excerpt,
-                tags=tags,
-                is_featured=is_featured,
-                status=status,
-                article_type=article_type,
-                cover_image=cover_image,
-                user_id=user_id
-            )
-
+    if request.method == 'POST':
+        # 处理表单提交
+        title = request.form.get('title')
+        slug = request.form.get('slug')
+        excerpt = request.form.get('excerpt')
+        content = request.form.get('content')
+        tags = request.form.get('tags')
+        is_featured = True if request.form.get('is_featured') else False
+        status = request.form.get('status', 'Draft')
+        article_type = request.form.get('article_type')
+        cover_image = request.form.get('cover_image')
+        # 创建新文章
+        new_article = Article(
+            title=title,
+            slug=slug,
+            excerpt=excerpt,
+            tags=tags,
+            is_featured=is_featured,
+            status=status,
+            article_type=article_type,
+            cover_image=cover_image,
+            user_id=user_id
+        )
+        with get_db() as db:
             db.add(new_article)
-            
-            # 创建内容
+            db.commit()
             article_content = ArticleContent(
                 aid=new_article.article_id,
                 content=content,
                 language_code='zh-CN'
             )
             db.add(article_content)
-            
             flash('文章创建成功!', 'success')
-            return redirect(url_for('edit_article', article_id=new_article.article_id))
+            return redirect(url_for('markdown_editor', aid=new_article.article_id))
 
-        return render_template('article_edit.html',
-                               article=article,
-                               content=content,
-                               status_options=['Draft', 'Published'])
+    return render_template('article_edit.html',
+                           article=article,
+                           content=content,
+                           status_options=['Draft', 'Published'])
