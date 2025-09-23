@@ -10,7 +10,6 @@ from src.database import get_db
 from src.models import User, Article, ArticleContent, ArticleI18n, Category, Comment
 # from src.error import error
 from src.user.authz.decorators import admin_required
-from src.utils.security.ip_utils import get_client_ip
 from src.utils.security.safe import validate_email
 
 dashboard_bp = Blueprint('dashboard', __name__, template_folder='templates')
@@ -142,10 +141,11 @@ def create_user(user_id):
                 email=data['email'],
                 profile_picture=data.get('profile_picture'),
                 bio=data.get('bio'),
-                register_ip=get_client_ip()
+                register_ip="（系统维护）"
             )
 
             db.add(new_user)
+            db.flush()  # 确保 new_user.id 和 created_at 已经被设置
 
             return jsonify({
                 'success': True,
@@ -154,7 +154,7 @@ def create_user(user_id):
                     'id': new_user.id,
                     'username': new_user.username,
                     'email': new_user.email,
-                    'created_at': new_user.created_at.isoformat()
+                    'created_at': new_user.created_at.isoformat(),
                 }
             }), 201
 

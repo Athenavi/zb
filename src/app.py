@@ -26,7 +26,7 @@ from src.blueprints.relation import relation_bp
 from src.blueprints.role import role_bp
 from src.blueprints.theme import create_theme_blueprint
 from src.blueprints.website import create_website_blueprint
-from src.config.theme import db_get_theme
+from src.config.theme import get_all_themes
 from src.database import get_db
 from src.error import error
 from src.models import db, User, Article, UserSubscription
@@ -453,7 +453,7 @@ def confirm_email_change(user_id, token):
     tags=['主题'],
 )
 def get_current_theme():
-    return db_get_theme()
+    return jsonify(get_all_themes())
 
 
 @cache.cached(timeout=300, key_prefix='all_users')

@@ -72,10 +72,10 @@
                         </div>
 
                         <div class="flex flex-col gap-2">
-                            <button id="changeDisplay"
+                            <button id="banDisplay"
                                     class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg
                                        transition duration-200">
-                                应用此主题
+                                禁用此主题
                             </button>
                             <button id="deleteDisplay"
                                     class="w-full bg-red-100 hover:bg-red-200 text-red-600 px-4 py-2 rounded-lg
@@ -142,16 +142,16 @@
         }
 
         // 主题操作
-        document.getElementById('changeDisplay').addEventListener('click', async () => {
+        document.getElementById('banDisplay').addEventListener('click', async () => {
             try {
-                const response = await fetch(`/api/theme?NT=${currentThemeId}`, {
+                const response = await fetch(`/api/theme?id=${currentThemeId}`, {
                     method: 'PUT',
                     credentials: 'include'
                 });
 
                 const result = await response.text();
-                alert(result === 'success' ? '主题应用成功！' :
-                    result === 'failed001' ? '当前已是该主题' : '主题应用失败');
+                alert(result === 'success' ? '主题禁用成功！' :
+                    result === 'failed001' ? '禁用此主题！' : '主题禁用失败');
             } catch (error) {
                 console.error('Error applying theme:', error);
                 alert('请求出错，请重试！');

@@ -3,7 +3,7 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, send_from_directory, request
 
-from src.config.theme import theme_safe_check, db_change_theme, db_get_theme
+from src.config.theme import theme_safe_check, db_remove_theme, get_all_themes
 from src.user.authz.decorators import admin_required
 
 theme_bp = Blueprint('theme', __name__, template_folder='templates')
@@ -11,22 +11,9 @@ theme_bp = Blueprint('theme', __name__, template_folder='templates')
 
 def create_theme_blueprint(cache_instance, base_dir):
     @theme_bp.route('/theme/<theme_id>')
-    @cache_instance.cached(timeout=300, key_prefix='display_detail')
+    @cache_instance.cached(timeout=300)
     def get_theme_detail(theme_id):
-        if theme_id == 'default':
-            theme_properties = {
-                'id': theme_id,
-                'author': "系统默认",
-                'title': "恢复系统默认",
-                'authorWebsite': "默认",
-                'version': '0.3.0',
-                'versionCode': "None",
-                'updateUrl': "None",
-                'screenshot': "None",
-            }
-            return jsonify(theme_properties)
-        else:
-            return theme_safe_check(theme_id=theme_id, channel=1)
+        return theme_safe_check(theme_id=theme_id, channel=1)
 
     @theme_bp.route('/theme/<theme_id>/<img_name>')
     def get_screenshot(theme_id, img_name):
@@ -81,23 +68,17 @@ def create_theme_blueprint(cache_instance, base_dir):
     @theme_bp.route('/api/theme', methods=['PUT'])
     @admin_required
     def change_display(user_id):
-        if cache_instance.get("Theme_Lock"):
-            return "failed"
-
-        theme_id = request.args.get('NT')
+        theme_id = request.args.get('id')
         if not theme_id:
             return "failed403"
 
-        current_theme = db_get_theme()
-        if theme_id == current_theme:
+        all_themes = get_all_themes()
+        if theme_id not in all_themes:
             return "failed001"
 
-        if theme_id == 'default' or theme_safe_check(theme_id, channel=2):
+        if theme_safe_check(theme_id, channel=2):
             try:
-                if db_change_theme(user_id, theme_id):
-                    cache_instance.set('display_theme', theme_id)
-                    cache_instance.set(f"Theme_Lock", theme_id, timeout=15)
-                    print(f'{user_id} : change theme to {theme_id}')
+                if db_remove_theme(user_id, theme_id):
                     return "success"
                 else:
                     return "failed"
@@ -105,7 +86,7 @@ def create_theme_blueprint(cache_instance, base_dir):
                 print(f"Error during theme change: {e}")
                 return "failed500"
             finally:
-                log_msg = f"{user_id} : change theme to {theme_id}"
+                log_msg = f"{user_id} : ban {theme_id} theme"
                 print(log_msg)
         else:
             return "failed"

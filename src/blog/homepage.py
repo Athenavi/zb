@@ -3,12 +3,13 @@ from datetime import datetime
 
 from flask import render_template, request, make_response, current_app
 
+from src.config.theme import get_all_themes
 from src.database import get_db
 from src.error import error
 from src.models import Article
 
 
-def proces_page_data(total_articles, article_info, current_page, page_size):
+def proces_page_data(total_articles, article_info, current_page, page_size, theme='default'):
     """
     处理分页数据并生成HTML内容和ETag
     """
@@ -41,13 +42,21 @@ def proces_page_data(total_articles, article_info, current_page, page_size):
             'slug': article[10]
         } for article in article_info]
 
-        # 渲染模板
-        html_content = render_template(
-            'index.html',
-            articles=articles,
-            pagination=pagination_data,
-            total_articles=total_articles
-        )
+        all_appearance = get_all_themes()
+        if theme in all_appearance:
+            html_content = render_template(
+                f'theme/{theme}/index.html',
+                articles=articles,
+                pagination=pagination_data,
+            )
+        else:
+            # 渲染模板
+            html_content = render_template(
+                'index.html',
+                articles=articles,
+                pagination=pagination_data,
+                total_articles=total_articles
+            )
 
         # 生成ETag
         content_hash = hashlib.md5(html_content.encode()).hexdigest()
@@ -121,10 +130,10 @@ def create_response(html_content, etag):
 def index_page_back():
     page = max(request.args.get('page', 1, type=int), 1)
     page_size = 45
-
+    theme = request.cookies.get('site-theme') or 'default'
     try:
         article_info, total_articles = get_articles_with_filters([], page, page_size)
-        html_content, etag = proces_page_data(total_articles, article_info, page, page_size)
+        html_content, etag = proces_page_data(total_articles, article_info, page, page_size, theme)
         return create_response(html_content, etag)
     except Exception as e:
         return error(str(e), 500)
