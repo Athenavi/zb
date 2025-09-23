@@ -251,7 +251,6 @@ def edit_article_back(user_id, article_id):
     content = content_obj.content if content_obj else ""
 
     if request.method == 'POST':
-        print(request.form)
 
         try:
             # 更新文章基本信息
