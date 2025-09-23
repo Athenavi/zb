@@ -98,11 +98,11 @@ def register():
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     try:
-        callback_route = request.args.get('callback', 'profile')
+        callback_endpoint = request.args.get('callback', '/profile')
         if request.method == 'GET':
             user_agent = request.headers.get('User-Agent', '')
             if is_mobile_device(user_agent):
-                return redirect(f'/api/mobile/scanner?callback={callback_route}')
+                return redirect(f'/api/mobile/scanner?callback={callback_endpoint}')
 
         if request.method == 'POST':
             if request.is_json:
@@ -131,7 +131,7 @@ def login():
                     expires = datetime.now(timezone.utc) + timedelta(seconds=JWT_EXPIRATION_DELTA)
                     refresh_expires = datetime.now(timezone.utc) + timedelta(seconds=REFRESH_TOKEN_EXPIRATION_DELTA)
 
-                    response = make_response(redirect(url_for(callback_route)))
+                    response = make_response(redirect(callback_endpoint))
                     response.set_cookie('jwt', token, httponly=True, expires=expires)
                     response.set_cookie('refresh_token', refresh_token, httponly=True, expires=refresh_expires)
                     flash('登录成功', 'success')
@@ -144,17 +144,16 @@ def login():
                     }), 401
                 else:
                     flash('无效的电子邮件或密码', 'error')
-                    return render_template('auth/login.html', email=email)
+                    return render_template('auth/login.html', email=email,callback=callback_endpoint)
 
         if jwt_cookie := request.cookies.get('jwt'):
             try:
                 JWTHandler.authenticate_token(jwt_cookie)
-                return redirect(url_for(callback_route))
+                return redirect(callback_endpoint)
             except Exception:
                 flash('您的登录已过期，请重新登录', 'error')
-                return render_template('auth/login.html')
 
-        return render_template('auth/login.html')
+        return render_template('auth/login.html', callback=callback_endpoint)
     except Exception as e:
         flash('登录过程中发生错误，请稍后再试', 'error')
         print(e)
