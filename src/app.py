@@ -19,6 +19,7 @@ from src.blog.article.security.password import get_apw_form, check_apw_form
 from src.blog.comment import create_comment, comment_page_get
 from src.blog.homepage import index_page_back, tag_page_back, featured_page_back
 from src.blueprints.auth import auth_bp
+from src.blueprints.category import category_bp
 from src.blueprints.dashboard import dashboard_bp
 from src.blueprints.media import create_media_blueprint
 from src.blueprints.my import my_bp
@@ -133,6 +134,7 @@ app.register_blueprint(dashboard_bp)
 app.register_blueprint(my_bp)
 app.register_blueprint(relation_bp)
 app.register_blueprint(role_bp)
+app.register_blueprint(category_bp)
 app.register_blueprint(plugin_bp)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)  # 添加 ProxyFix 中间件
 
