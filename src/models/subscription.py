@@ -14,4 +14,5 @@ class UserSubscription(db.Model):
     __table_args__ = (
         db.Index('idx_user_subscriptions_subscriber', 'subscriber_id'),
         db.Index('idx_user_subscriptions_subscribed_user', 'subscribed_user_id'),
+        db.UniqueConstraint('subscriber_id', 'subscribed_user_id', name='uq_user_subscriptions')
     )

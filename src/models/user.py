@@ -88,6 +88,7 @@ class CustomField(db.Model):
 
     __table_args__ = (
         db.Index('idx_user_id_cf', 'user_id'),
+        db.UniqueConstraint('user_id', 'field_name', name='uq_user_custom_fields')
     )
 
 

@@ -39,3 +39,9 @@ class Url(db.Model):
 
     # 关系定义
     user = db.relationship('User', back_populates='urls')
+
+    __table_args__ = (
+        db.Index('idx_user_id_url', 'user_id'),
+        db.UniqueConstraint('user_id', 'long_url', name='uq_user_long_url')
+    )
+
