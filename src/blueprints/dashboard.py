@@ -489,7 +489,6 @@ def create_article(user_id):
                 cover_image=data.get('cover_image'),
                 tags=data.get('tags', ''),
                 status=data.get('status', 'Draft'),
-                article_type=data.get('article_type', 'article'),
                 is_featured=data.get('is_featured', False)
             )
 
@@ -545,7 +544,6 @@ def get_article(user_id, article_id):
                 'views': article.views,
                 'likes': article.likes,
                 'comment_count': Comment.query.filter_by(article_id=article.article_id).count(),
-                'article_type': article.article_type,
                 'is_featured': article.is_featured,
                 'hidden': article.hidden,
                 'created_at': article.created_at.isoformat() if article.created_at else None,
@@ -588,8 +586,6 @@ def update_article(user_id, article_id):
                 article.cover_image = data['cover_image']
             if 'tags' in data:
                 article.tags = data['tags']
-            if 'article_type' in data:
-                article.article_type = data['article_type']
             if 'is_featured' in data:
                 article.is_featured = data['is_featured']
             if 'hidden' in data:

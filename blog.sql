@@ -115,11 +115,12 @@ create index if not exists permission_id
 
 create table if not exists categories
 (
-    id         serial
+    id          serial
         primary key,
-    name       varchar(255) not null unique,
-    created_at timestamp default CURRENT_TIMESTAMP,
-    updated_at timestamp default CURRENT_TIMESTAMP
+    name        varchar(255) not null unique,
+    description text,
+    created_at  timestamp default CURRENT_TIMESTAMP,
+    updated_at  timestamp default CURRENT_TIMESTAMP
 );
 
 comment on table categories is '文章分类表';
