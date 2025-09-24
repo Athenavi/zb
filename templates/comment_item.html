@@ -1,5 +1,5 @@
 <div class="comment-item bg-white rounded-lg p-4 border border-gray-100 fade-in" data-id="{{ comment.id }}">
-    <div class="floor-number">#{{ comment.parent_id }}</div>
+    <div class="floor-number">#{{ comment.id }}</div>
 
     <div class="flex items-start">
         <div class="flex-shrink-0">
@@ -9,9 +9,10 @@
         </div>
         <div class="flex-1 min-w-0">
             {% if comment.parent_id %}
-            <div class="reply-info">
-                <i class="fas fa-reply mr-1"></i> 回复 <a href="#comment-{{ comment.parent_id }}" class="font-medium">#{{ comment.parent_id }}</a>
-            </div>
+                <div class="reply-info">
+                    <i class="fas fa-reply mr-1"></i> 回复 <a href="#comment-{{ comment.parent_id }}"
+                                                              class="font-medium">#{{ comment.parent_id }}</a>
+                </div>
             {% endif %}
 
             <div class="comment-header flex flex-wrap items-center mb-2">

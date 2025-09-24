@@ -83,7 +83,8 @@ def get_notifications(user_id):
         try:
             # 获取用户的所有通知
             notifications = session.query(Notification).filter(Notification.user_id == user_id).all()
-            messages = [{"id": n.id, "user_id": n.user_id, "message": n.message, "is_read": n.is_read} for n in
+            messages = [{"id": n.id, "user_id": n.user_id, "message": n.message, "is_read": n.is_read,
+                         "created_at": n.created_at.strftime("%Y-%m-%d %H:%M:%S"), 'type': n.type} for n in
                         notifications]
         except Exception as e:
             print(f"获取消息时发生错误: {e}")

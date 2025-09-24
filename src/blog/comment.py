@@ -2,7 +2,7 @@ from flask import render_template, current_app, abort
 from flask import request, jsonify
 
 from src.database import get_db
-from src.models import Comment, Article
+from src.models import Comment, Article, Notification
 
 
 def create_comment(user_id, article_id):
@@ -11,15 +11,28 @@ def create_comment(user_id, article_id):
     user_agent_str = str(request.user_agent)
     with get_db() as db:
         try:
+            parent_id = data['parent_id'] if 'parent_id' in data and data['parent_id'] else None
             new_comment = Comment(
                 user_id=int(user_id),
                 article_id=int(article_id),
                 content=data['content'],
                 ip=request.remote_addr,
                 user_agent=user_agent_str,
-                parent_id=int(data['parent_id']) if 'parent_id' in data else None,
+                parent_id=parent_id
             )
             db.add(new_comment)
+            if parent_id:
+                comment = db.query(Comment).filter_by(id=int(parent_id)).first()
+                if comment:
+                    notification = Notification(
+                        user_id=comment.user_id,
+                        type='system',
+                        message=f"您在《{comment.article.title}》的评论有新的回复",
+                        is_read=False
+                    )
+                    db.add(notification)
+            db.commit()
+
             return jsonify({"message": "评论成功"}), 201
         except Exception as e:
             print(f'Error: {e}')

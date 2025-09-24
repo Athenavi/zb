@@ -177,7 +177,7 @@
                 replyIndicator.classList.remove('hidden');
 
                 // 在文本框中添加回复提示
-                commentContent.value = `回复 #${floor}：`;
+                commentContent.value = `@${username} 回复 #${floor}：`;
                 commentContent.focus();
                 commentContent.setSelectionRange(commentContent.value.length, commentContent.value.length);
 

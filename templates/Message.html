@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>消息中心</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         /* 之前的样式保持不变 */
@@ -237,13 +236,12 @@
 
             const data = await response.json();
             const notifications = data.map(item => ({
-                id: item[0],
-                user_id: item[1],
-                type: item[2],
-                message: item[3],
-                is_read: item[4],
-                created_at: item[5],
-                updated_at: item[6]
+                id: item.id,
+                user_id: item.user_id,
+                type: item.type,
+                message: item.message,
+                is_read: item.is_read,
+                created_at: item.created_at,
             }));
 
             renderNotifications(notifications);
@@ -394,8 +392,6 @@
             notice.is_read ? 'bg-gray-50' : 'bg-white'
         }`;
         item.dataset.id = notice.id;
-
-        const createTime = dayjs(notice.created_at).format('YYYY-MM-DD HH:mm');
         const typeStyles = getTypeStyles(notice.type);
 
         item.innerHTML = `
@@ -414,7 +410,7 @@
                             </span>
                             <p class="mt-3 text-gray-700">${notice.message}</p>
                         </div>
-                        <span class="text-sm text-gray-500 whitespace-nowrap">${createTime}</span>
+                        <span class="text-sm text-gray-500 whitespace-nowrap">${notice.created_at}</span>
                     </div>
                     <div class="mt-4 flex justify-between items-center">
                         <div class="text-xs text-gray-400">
