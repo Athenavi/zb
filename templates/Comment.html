@@ -1,5 +1,6 @@
 <!-- templates/comments.html -->
 <link rel="stylesheet" href="/static/css/tailwind.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
     body {
         overflow-y: hidden;
@@ -13,6 +14,7 @@
 <style>
     .comment-item {
         transition: all 0.3s ease;
+        position: relative;
     }
 
     .comment-item:hover {
@@ -53,17 +55,49 @@
         overflow-y: auto;
     }
 
+    .floor-number {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        background: #f1f5f9;
+        border-radius: 4px;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #475569;
+    }
+
+    .reply-info {
+        background: #f0f9ff;
+        border-left: 3px solid #0ea5e9;
+        padding: 0.5rem 0.75rem;
+        margin-bottom: 0.75rem;
+        border-radius: 0 4px 4px 0;
+        font-size: 0.875rem;
+        color: #0369a1;
+    }
+
     @media (max-width: 640px) {
-        .replies {
-            padding-left: 0.5rem !important;
-            border-left: none !important;
+        .floor-number {
+            position: static;
+            display: inline-block;
+            margin-left: 0.5rem;
+        }
+
+        .comment-header {
+            flex-wrap: wrap;
+        }
+
+        .comment-actions {
+            width: 100%;
+            margin-top: 0.5rem;
         }
     }
 </style>
 
 <div class="comment-section max-w-3xl mx-auto py-6">
     <!-- 评论表单 -->
-    <div class="comment-form bg-white rounded-lg shadow-sm p-4 mb-6">
+    <div class="comment-form rounded-lg shadow-sm p-4 mb-6">
         <h3 class="text-lg font-semibold text-gray-800 mb-3 flex items-center">
             <i class="fas fa-pen mr-2 text-blue-500"></i>发表评论
         </h3>
@@ -86,7 +120,7 @@
                 <div class="reply-indicator hidden w-full sm:w-auto" id="replyIndicator">
                     <div class="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex items-center">
                         <span class="text-sm text-blue-700">
-                            回复 <span id="replyUsername" class="font-medium"></span>
+                            回复 <span id="replyUsername" class="font-medium"></span> 的评论
                         </span>
                         <button type="button" id="cancelReply"
                                 class="ml-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">
@@ -108,10 +142,8 @@
     <div id="commentsContainer" class="max-iframe-height">
         {% if comments_tree %}
             <div id="commentsList" class="space-y-4">
-                {% for node in comments_tree %}
-                    {% with comment=node, depth=0 %}
-                        {% include 'comment_item.html' %}
-                    {% endwith %}
+                {% for comment in comments_tree %}
+                    {% include 'comment_item.html' %}
                 {% endfor %}
             </div>
         {% else %}
@@ -130,6 +162,7 @@
         const replyIndicator = document.getElementById('replyIndicator');
         const replyUsername = document.getElementById('replyUsername');
         const cancelReplyBtn = document.getElementById('cancelReply');
+        const commentContent = document.getElementById('commentContent');
 
         // 回复按钮事件
         document.addEventListener('click', function (e) {
@@ -137,12 +170,16 @@
                 const btn = e.target.closest('.reply-btn');
                 const commentId = btn.dataset.id;
                 const username = btn.dataset.username;
+                const floor = btn.dataset.floor;
 
                 replyTo.value = commentId;
                 replyUsername.textContent = username;
                 replyIndicator.classList.remove('hidden');
 
-                document.getElementById('commentContent').focus();
+                // 在文本框中添加回复提示
+                commentContent.value = `回复 #${floor}：`;
+                commentContent.focus();
+                commentContent.setSelectionRange(commentContent.value.length, commentContent.value.length);
 
                 // 滚动到表单
                 commentForm.scrollIntoView({behavior: 'smooth', block: 'center'});
@@ -153,6 +190,7 @@
         cancelReplyBtn.addEventListener('click', function () {
             replyTo.value = '';
             replyIndicator.classList.add('hidden');
+            commentContent.value = '';
         });
 
         // 表单提交
@@ -179,7 +217,7 @@
                 const result = await response.json();
 
                 if (response.ok) {
-                    // 成功处理 - 重新加载页面或动态添加评论
+                    // 成功处理 - 重新加载页面
                     window.location.reload();
                 } else {
                     throw new Error(result.error || '发布评论失败');
@@ -189,6 +227,30 @@
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalText;
+            }
+        });
+
+        // 点击评论项可以快速回复（移动端友好）
+        document.addEventListener('click', function (e) {
+            if (e.target.closest('.comment-item') && !e.target.closest('.reply-btn')) {
+                const commentItem = e.target.closest('.comment-item');
+                const replyBtn = commentItem.querySelector('.reply-btn');
+
+                if (replyBtn && window.innerWidth < 640) {
+                    const commentId = replyBtn.dataset.id;
+                    const username = replyBtn.dataset.username;
+                    const floor = replyBtn.dataset.floor;
+
+                    replyTo.value = commentId;
+                    replyUsername.textContent = username;
+                    replyIndicator.classList.remove('hidden');
+
+                    commentContent.value = `回复 #${floor}：`;
+                    commentContent.focus();
+                    commentContent.setSelectionRange(commentContent.value.length, commentContent.value.length);
+
+                    commentForm.scrollIntoView({behavior: 'smooth', block: 'center'});
+                }
             }
         });
     });

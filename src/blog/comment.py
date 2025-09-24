@@ -16,7 +16,8 @@ def create_comment(user_id, article_id):
                 article_id=int(article_id),
                 content=data['content'],
                 ip=request.remote_addr,
-                user_agent=user_agent_str
+                user_agent=user_agent_str,
+                parent_id=int(data['parent_id']) if 'parent_id' in data else None,
             )
             db.add(new_comment)
             return jsonify({"message": "评论成功"}), 201
@@ -41,21 +42,10 @@ def comment_page_get(user_id, article_id):
                 .order_by(Comment.parent_id, Comment.created_at.asc()) \
                 .all()
 
-            # 构建评论树结构
-            comments_map = {c.id: {"comment": c, "replies": []} for c in comments}
-            comments_tree = []
-
-            for comment in comments:
-                if comment.parent_id is None:
-                    comments_tree.append(comments_map[comment.id])
-                else:
-                    parent = comments_map.get(comment.parent_id)
-                    if parent:
-                        parent["replies"].append(comments_map[comment.id])
             # print(comments_tree)
             return render_template('Comment.html',
                                    article=article,
-                                   comments_tree=comments_tree)
+                                   comments_tree=comments)
 
         except Exception as e:
             current_app.logger.error(f"加载评论失败: {str(e)}")
