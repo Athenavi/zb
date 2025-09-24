@@ -456,9 +456,10 @@ def create_article(user_id):
     with get_db() as db:
         try:
             data = request.get_json()
+            print(data)
 
             # 验证必填字段
-            required_fields = ['title', 'user_id']
+            required_fields = ['title', 'author_id']
             for field in required_fields:
                 if not data.get(field):
                     return jsonify({
@@ -467,7 +468,7 @@ def create_article(user_id):
                     }), 400
 
             # 验证作者是否存在
-            author = User.query.get(data['user_id'])
+            author = User.query.get(data['author_id'])
             if not author:
                 return jsonify({
                     'success': False,
@@ -489,12 +490,13 @@ def create_article(user_id):
             new_article = Article(
                 title=data['title'],
                 slug=slug,
-                user_id=data['user_id'],
+                user_id=data['author_id'] or user_id,
                 excerpt=data.get('excerpt', ''),
                 cover_image=data.get('cover_image'),
                 tags=data.get('tags', ''),
                 status=data.get('status', 'Draft'),
-                is_featured=data.get('is_featured', False)
+                is_featured=data.get('is_featured', False),
+                category_id=data.get('category_id', None)
             )
 
             db.add(new_article)
@@ -599,6 +601,8 @@ def update_article(user_id, article_id):
             article.hidden = data['hidden']
         if 'status' in data:
             article.status = data['status'] or 'Draft'
+        if 'category_id' in data:
+            article.category_id = data.get('category_id', None)
 
         article.updated_at = datetime.today()
         print(f"Article {article_id} updated successfully")
