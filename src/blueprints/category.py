@@ -41,7 +41,7 @@ def category_index(name):
         return error(str(e), 500)
 
 
-@category_bp.route('/', methods=['POST'])
+@category_bp.route('/', methods=['GET'])
 @category_bp.route('/all', methods=['GET'])
 # 分类列表页面
 @jwt_required
@@ -134,30 +134,33 @@ def unsubscribe_category(user_id):
 # 添加分类（管理员功能）
 @admin_required
 def add_category(user_id):
-    if request.method == 'POST':
-        name = request.form.get('name', '').strip().replace(' ', '-')
+    try:
+        if request.method == 'POST':
+            name = request.form.get('name', '').strip().replace(' ', '-')
 
-        # 检查分类名称的长度
-        if len(name) > 50:
-            flash(f'分类 "{name}" 创建失败，名称过长', 'error')
-            return render_template('categories/add.html')
+            # 检查分类名称的长度
+            if len(name) > 50:
+                flash(f'分类 "{name}" 创建失败，名称过长', 'error')
+                return render_template('categories/add.html')
 
-        # 检查分类名称的合法性，例如只允许中文字符、字母、数字、连字符和下划线
-        if not re.match(r'^[\u4e00-\u9fa5a-zA-Z0-9_-]+$', name):
-            flash(f'分类 "{name}" 创建失败，名称不合法', 'error')
-            return render_template('categories/add.html')
+            # 检查分类名称的合法性，例如只允许中文字符、字母、数字、连字符和下划线
+            if not re.match(r'^[\u4e00-\u9fa5a-zA-Z0-9_-]+$', name):
+                flash(f'分类 "{name}" 创建失败，名称不合法', 'error')
+                return render_template('categories/add.html')
 
-        # 检查分类是否已存在
-        existing_category = Category.query.filter_by(name=name).first()
-        if existing_category:
-            flash('分类名称已存在', 'error')
-            return render_template('categories/add.html')
+            # 检查分类是否已存在
+            existing_category = Category.query.filter_by(name=name).first()
+            if existing_category:
+                flash('分类名称已存在', 'error')
+                return render_template('categories/add.html')
 
-        category = Category(name=name)
-        db.session.add(category)
-        db.session.commit()
+            category = Category(name=name)
+            db.session.add(category)
+            db.session.commit()
 
-        flash(f'分类 "{name}" 创建成功', 'success')
-        return redirect(url_for('category.category_list'))
+            flash(f'分类 "{name}" 创建成功', 'success')
+            return redirect(url_for('category.category_list'))
 
-    return render_template('categories/add.html')
+        return render_template('categories/add.html')
+    except Exception as e:
+        print(e)
