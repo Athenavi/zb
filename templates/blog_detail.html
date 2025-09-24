@@ -21,7 +21,7 @@
         }
     </script>
 </head>
-<body class="bg-gray-50">
+<body>
 <!-- 导航栏 -->
 {% from 'header.html' import SimpleHeader %}
 {{ SimpleHeader(title) }}
@@ -30,7 +30,7 @@
     <div class="lg:grid lg:grid-cols-3 lg:gap-8">
         <!-- 文章主体 -->
         <div class="lg:col-span-2">
-            <article class="bg-white shadow rounded-lg overflow-hidden">
+            <article class="shadow rounded-lg overflow-hidden">
                 <div class="p-6">
                     <!-- 标题和元信息 -->
                     <h1 class="text-3xl font-bold text-gray-900 mb-2">{{ article.title }}</h1>
@@ -62,7 +62,7 @@
                             {% for tag in article.tags.split(',') %}
                                 {% if tag.strip() %}
                                     <a href="/tag/{{ tag.strip() }}"
-                                       class="mr-2 mb-2 px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-primary hover:text-white">
+                                       class="mr-2 mb-2 px-3 py-1 text-gray-700 rounded-full text-sm hover:bg-primary hover:text-white">
                                         {{ tag.strip() }}
                                     </a>
                                 {% endif %}
@@ -96,7 +96,7 @@
                                     <i class="fas fa-language mr-1"></i>
                                     语言
                                 </button>
-                                <div class="absolute right-0 bottom-0 mb-2 w-48 bg-white shadow-lg rounded-md py-1 hidden group-hover:block z-10">
+                                <div class="absolute right-0 bottom-0 mb-2 w-48 shadow-lg rounded-md py-1 hidden group-hover:block z-10">
                                     {% if i18n_versions and i18n_versions|length >= 1 %}
                                         {% for version in i18n_versions %}
                                             <a href="/{{ article.article_id }}.html/{{ version.language_code }}/{{ version.slug }}"
@@ -133,7 +133,7 @@
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {% for related in related_articles %}
                             <a href="/p/{{ related.slug }}"
-                               class="block bg-white rounded-lg shadow overflow-hidden hover:shadow-md transition">
+                               class="block rounded-lg shadow overflow-hidden hover:shadow-md transition">
                                 {% if related.cover_image %}
                                     <img src="{{ url_for('static', filename='uploads/covers/' + related.cover_image + '.jpg') }}"
                                          alt="{{ related.title }}"
@@ -159,7 +159,7 @@
             <!-- 作者信息 -->
             <!-- 添加 author 存在性检查 -->
             {% if author %}
-                <div class="bg-white shadow rounded-lg p-6 mb-6">
+                <div class="shadow rounded-lg p-6 mb-6">
                     <div class="flex items-center mb-4">
                         <img src="/static/avatar/{{ author.profile_picture or 'default' }}.webp"
                              alt="{{ article.title }}"
@@ -171,7 +171,7 @@
                     </div>
                     <div class="flex">
                         <a href="/space/{{ author.id }}"
-                           class="flex-grow text-center py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200">
+                           class="flex-grow text-center py-2 text-gray-700 rounded-md hover:bg-gray-200">
                             更多文章
                         </a>
                     </div>
@@ -179,13 +179,13 @@
             {% endif %}
 
             <!-- 目录导航 -->
-            <div class="bg-white shadow rounded-lg p-6 mb-6">
+            <div class="shadow rounded-lg p-6 mb-6">
                 <h3 class="text-lg font-bold text-gray-900 mb-4">目录</h3>
                 <div class="space-y-2" id="toc-container">
                     <!-- 通过JS动态生成 -->
                 </div>
             </div>
-            <div class="bg-white shadow rounded-lg p-6 mb-6">
+            <div class="shadow rounded-lg p-6 mb-6">
                 <h3 class="text-lg font-bold text-gray-900 mb-4">评论</h3>
                 <iframe src="/login?callback=/api/comment/{{ article.article_id }}" width="100%" height="600"
                         frameborder="0"

@@ -22,32 +22,14 @@
         }
     </script>
 </head>
-<body class="bg-gray-50 min-h-screen">
-<!-- 顶部导航 -->
-<nav class="bg-white shadow-sm border-b">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center h-16">
-            <div class="flex items-center space-x-4">
-                <h1 class="text-xl font-semibold text-gray-900">博客管理后台</h1>
-                <span class="text-sm text-gray-500">欢迎，{{ username }}</span>
-            </div>
-            <div class="flex items-center space-x-4">
-                <a href="{{ url_for('relation.fans_list') }}" class="text-gray-600 hover:text-gray-900">
-                    <i class="fas fa-users mr-1"></i>粉丝管理
-                </a>
-                <button class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                        onclick="location.href='/new'">
-                    <i class="fas fa-plus mr-1"></i>写文章
-                </button>
-            </div>
-        </div>
-    </div>
-</nav>
-
+<body class="min-h-screen">
+<!-- 导航栏 -->
+{% from 'header.html' import SimpleHeader %}
+{{ SimpleHeader(title) }}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <!-- 统计卡片 -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div class="bg-white rounded-lg shadow-sm p-6 border">
+        <div class="rounded-lg shadow-sm p-6 border">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-gray-600">总文章数</p>
@@ -59,7 +41,7 @@
             </div>
         </div>
 
-        <div class="bg-white rounded-lg shadow-sm p-6 border">
+        <div class="rounded-lg shadow-sm p-6 border">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-gray-600">已发布</p>
@@ -71,7 +53,7 @@
             </div>
         </div>
 
-        <div class="bg-white rounded-lg shadow-sm p-6 border">
+        <div class="rounded-lg shadow-sm p-6 border">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-gray-600">草稿</p>
@@ -83,7 +65,7 @@
             </div>
         </div>
 
-        <div class="bg-white rounded-lg shadow-sm p-6 border">
+        <div class="rounded-lg shadow-sm p-6 border">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-gray-600">已删除</p>
@@ -97,7 +79,7 @@
     </div>
 
     <!-- 文章管理区域 -->
-    <div class="bg-white rounded-lg shadow-sm border">
+    <div class="rounded-lg shadow-sm border">
         <!-- 工具栏 -->
         <div class="p-6 border-b border-gray-200">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
@@ -105,6 +87,10 @@
 
                 <!-- 筛选和搜索 -->
                 <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
+                    <button class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                            onclick="location.href='/new'">
+                        <i class="fas fa-plus mr-1"></i>写文章
+                    </button>
                     <!-- 状态筛选 -->
                     <select id="statusFilter"
                             class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
@@ -129,7 +115,7 @@
         <!-- 文章列表 -->
         <div class="overflow-x-auto">
             <table class="w-full">
-                <thead class="bg-gray-50">
+                <thead>
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">文章</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
@@ -145,9 +131,9 @@
                     </th>
                 </tr>
                 </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
+                <tbody class="divide-y divide-gray-200">
                 {% for article in articles.items %}
-                    <tr class="hover:bg-gray-50 transition-colors">
+                    <tr class="hover:bg-warning transition-colors">
                         <td class="px-6 py-4">
                             <div class="flex items-start space-x-3">
                                 {% if article.cover_image %}

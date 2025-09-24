@@ -6,48 +6,14 @@
     <title>{% if is_own_profile %}我的空间{% else %}{{ target_user.username }} 的空间{% endif %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#3b82f6',
-                        secondary: '#64748b'
-                    }
-                }
-            }
-        }
-    </script>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="min-h-screen">
 <!-- 导航栏 -->
-<nav class="bg-white shadow-sm border-b">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center h-16">
-            <div class="flex items-center space-x-4">
-                <a href="/" class="text-xl font-bold text-gray-900">
-                    <i class="fas fa-home mr-2"></i>首页
-                </a>
-                {% if target_user.username == username %}
-                    <a href="{{ url_for('my.my_posts') }}" class="text-gray-600 hover:text-primary transition-colors">
-                        <i class="fas fa-edit mr-1"></i>我的文章
-                    </a>
-                    <a href="{{ url_for('relation.fans_list') }}"
-                       class="text-gray-600 hover:text-primary transition-colors">
-                        <i class="fas fa-users mr-1"></i>粉丝管理
-                    </a>
-                    <a href="/setting/profiles" class="text-gray-600 hover:text-primary transition-colors">
-                        <i class="fas fa-users mr-1"></i>设置
-                    </a>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</nav>
-
+{% from 'header.html' import SimpleHeader %}
+{{ SimpleHeader(title) }}
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <!-- 用户信息卡片 -->
-    <div class="bg-white rounded-xl shadow-sm border mb-8">
+    <div class="rounded-xl shadow-sm border mb-8">
         <!-- 封面背景 -->
         <div class="h-32 sm:h-48 bg-gradient-to-r from-blue-500 to-purple-600 rounded-t-xl relative">
             <div class="absolute inset-0 bg-black bg-opacity-20 rounded-t-xl"></div>
@@ -87,6 +53,10 @@
                                    class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600 transition-colors">
                                     <i class="fas fa-edit mr-2"></i>管理文章
                                 </a>
+                                <a href="/setting/profiles"
+                                   class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600 transition-colors">
+                                    <i class="fas fa-edit mr-2"></i>设置
+                                </a>
                             {% else %}
                                 <button id="followBtn"
                                         data-user-id="{{ target_user.id }}"
@@ -111,28 +81,28 @@
 
     <!-- 统计数据 -->
     <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-8">
-        <div class="bg-white rounded-lg shadow-sm border p-4 text-center" onclick="location.href='/my/posts'">
+        <div class="rounded-lg shadow-sm border p-4 text-center" onclick="location.href='/my/posts'">
             <div class="text-2xl font-bold text-primary">{{ stats.articles_count }}</div>
             <div class="text-sm text-gray-600 mt-1">文章</div>
         </div>
-        <div class="bg-white rounded-lg shadow-sm border p-4 text-center" onclick="location.href='/fans/fans'">
+        <div class="rounded-lg shadow-sm border p-4 text-center" onclick="location.href='/fans/fans'">
             <div class="text-2xl font-bold text-green-600">{{ stats.followers_count }}</div>
             <div class="text-sm text-gray-600 mt-1">粉丝</div>
         </div>
-        <div class="bg-white rounded-lg shadow-sm border p-4 text-center" onclick="location.href='/fans/follow'">
+        <div class="rounded-lg shadow-sm border p-4 text-center" onclick="location.href='/fans/follow'">
             <div class="text-2xl font-bold text-purple-600">{{ stats.following_count }}</div>
             <div class="text-sm text-gray-600 mt-1">关注</div>
         </div>
-        <div class="bg-white rounded-lg shadow-sm border p-4 text-center" onclick="location.href='/my/comments'">
+        <div class="rounded-lg shadow-sm border p-4 text-center" onclick="location.href='/my/comments'">
             <div class="text-sm text-gray-600 mt-1">我的评论</div>
         </div>
-        <div class="bg-white rounded-lg shadow-sm border p-4 text-center" onclick="location.href='/my/urls'">
+        <div class="rounded-lg shadow-sm border p-4 text-center" onclick="location.href='/my/urls'">
             <div class="text-sm text-gray-600 mt-1">链接管理</div>
         </div>
     </div>
 
     <!-- 最新文章 -->
-    <div class="bg-white rounded-xl shadow-sm border">
+    <div class="rounded-xl shadow-sm border">
         <div class="px-6 py-4 border-b">
             <h2 class="text-xl font-semibold text-gray-900">
                 <i class="fas fa-newspaper mr-2 text-primary"></i>

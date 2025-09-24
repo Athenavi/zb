@@ -7,13 +7,6 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
-        body {
-            font-family: 'Inter', 'Arial', sans-serif;
-            background-color: #fafafa;
-        }
-
         .progress-bar {
             position: fixed;
             left: 0;
@@ -58,7 +51,7 @@
     {% if articles %}
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {% for article in articles %}
-                <div class="article-card bg-white rounded-xl overflow-hidden shadow-md">
+                <div class="article-card rounded-xl overflow-hidden shadow-md">
                     <div class="relative">
                         {% if article.cover_image %}
                             <img src="{{ article.cover_image }}"
@@ -153,19 +146,9 @@
     {% endif %}
 </div>
 <!-- 页脚 -->
-{% from 'footer.html' import SimpleFooter %}
-{{ SimpleFooter(title, beian) }}
+{% from 'footer.html' import oneFooter %}
+{{ oneFooter(title,beian) }}
 <script>
-    // 阅读进度条功能
-    window.addEventListener('scroll', function () {
-        const progressBar = document.querySelector('.progress-bar');
-        const scrollTop = document.documentElement.scrollTop;
-        const scrollHeight = document.documentElement.scrollHeight;
-        const clientHeight = document.documentElement.clientHeight;
-        const scrolled = (scrollTop / (scrollHeight - clientHeight)) * 100;
-        progressBar.style.width = scrolled + '%';
-    });
-
     // 卡片悬停动画
     const cards = document.querySelectorAll('.article-card');
     cards.forEach(card => {

@@ -105,7 +105,7 @@
         }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="min-h-screen">
 <!-- 导航栏 -->
 {% from 'header.html' import SimpleHeader %}
 {{ SimpleHeader(title) }}
@@ -118,14 +118,14 @@
         <div id="result-message"></div>
         <div class="flex space-x-2">
             <button id="edit-mode-btn"
-                    class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition flex items-center">
+                    class="px-4 py-2 rounded-lg transition flex items-center">
                 <i class="fas fa-edit mr-2"></i>编辑模式
             </button>
             <!-- 添加批量删除按钮 (默认隐藏) -->
             <button id="batch-delete-btn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 hidden"
                     onclick="batchDelete()">删除选中项
             </button>
-            <button class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition flex items-center"
+            <button class="px-4 py-2 rounded-lg transition flex items-center"
                     id="sortButton">
                 <i class="fas fa-sort mr-2"></i>排序
             </button>
@@ -137,7 +137,7 @@
 <main class="container mx-auto px-4 py-8">
     <!-- 统计卡片 -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div class="bg-white rounded-xl shadow p-6 flex items-center">
+        <div class="rounded-xl shadow p-6 flex items-center">
             <div class="bg-primary-100 p-3 rounded-full mr-4">
                 <i class="fas fa-images text-primary-600 text-2xl"></i>
             </div>
@@ -147,7 +147,7 @@
             </div>
         </div>
 
-        <div class="bg-white rounded-xl shadow p-6 flex items-center">
+        <div class="rounded-xl shadow p-6 flex items-center">
             <div class="bg-secondary-100 p-3 rounded-full mr-4">
                 <i class="fas fa-film text-secondary-600 text-2xl"></i>
             </div>
@@ -157,7 +157,7 @@
             </div>
         </div>
 
-        <div class="bg-white rounded-xl shadow p-6 flex items-center">
+        <div class="rounded-xl shadow p-6 flex items-center">
             <div class="bg-green-100 p-3 rounded-full mr-4">
                 <i class="fas fa-database text-green-600 text-2xl"></i>
             </div>
@@ -173,7 +173,7 @@
     </div>
 
     <!-- 操作区域 -->
-    <div class="bg-white rounded-xl shadow-lg mb-8 overflow-hidden">
+    <div class="rounded-xl shadow-lg mb-8 overflow-hidden">
         <div class="p-6 border-b border-gray-100">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
                 <h2 class="text-xl font-bold text-gray-800 mb-4 md:mb-0">我的媒体文件</h2>
@@ -184,11 +184,11 @@
                                 onclick="filterMedia('all')">
                             <i class="fas fa-layer-group mr-2"></i>全部
                         </button>
-                        <button class="filter-btn bg-white text-gray-700 hover:bg-gray-50 px-4 py-2" data-filter="image"
+                        <button class="filter-btn text-gray-700 hover:bg-gray-50 px-4 py-2" data-filter="image"
                                 onclick="filterMedia('image')">
                             <i class="fas fa-image mr-2"></i>图片
                         </button>
-                        <button class="filter-btn bg-white text-gray-700 hover:bg-gray-50 px-4 py-2" data-filter="video"
+                        <button class="filter-btn text-gray-700 hover:bg-gray-50 px-4 py-2" data-filter="video"
                                 onclick="filterMedia('video')">
                             <i class="fas fa-video mr-2"></i>视频
                         </button>
@@ -231,7 +231,7 @@
     <!-- 媒体文件网格 -->
     <div class="grid-container" id="gridContainer">
         {% for media in media_files %}
-            <div class="file-card bg-white rounded-xl shadow overflow-hidden fade-in"
+            <div class="file-card rounded-xl shadow overflow-hidden fade-in"
                  data-type="{{ 'video' if media.file_hash.mime_type.startswith('video') else 'image' }}"
                  data-id="{{ media.id }}">
                 <div class="relative">
@@ -248,7 +248,7 @@
                         </a>
                     {% endif %}
                     <div class="file-actions absolute top-2 right-2 opacity-0 transition-opacity">
-                        <button class="download-btn bg-white text-primary-600 p-2 rounded-full shadow hover:bg-primary-50"
+                        <button class="download-btn text-primary-600 p-2 rounded-full shadow hover:bg-primary-50"
                                 data-hash="{{ media.hash }}" title="{{ media.original_filename }}">
                             <i class="fas fa-copy"></i>
                         </button>
@@ -285,7 +285,7 @@
             <nav class="inline-flex rounded-md shadow">
                 {% if pagination.has_prev %}
                     <a href="{{ url_for('media.media_v2', page=pagination.prev_num, type=media_type) }}"
-                       class="py-2 px-4 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                       class="py-2 px-4 rounded-l-md border border-gray-300 text-sm font-medium text-gray-500 hover:bg-gray-50">
                         <i class="fas fa-chevron-left"></i>
                     </a>
                 {% endif %}
@@ -294,23 +294,23 @@
                     {% if page %}
                         {% if page == pagination.page %}
                             <a href="{{ url_for('media.media_v2', page=page, type=media_type) }}"
-                               class="py-2 px-4 border-t border-b border-gray-300 bg-white text-sm font-medium text-primary-600 hover:bg-gray-50">
+                               class="py-2 px-4 border-t border-b border-gray-300 text-sm font-medium text-primary-600 hover:bg-gray-50">
                                 {{ page }}
                             </a>
                         {% else %}
                             <a href="{{ url_for('media.media_v2', page=page, type=media_type) }}"
-                               class="py-2 px-4 border-t border-b border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                               class="py-2 px-4 border-t border-b border-gray-300 text-sm font-medium text-gray-500 hover:bg-gray-50">
                                 {{ page }}
                             </a>
                         {% endif %}
                     {% else %}
-                        <span class="py-2 px-4 border-t border-b border-gray-300 bg-white text-sm font-medium text-gray-500">...</span>
+                        <span class="py-2 px-4 border-t border-b border-gray-300 text-sm font-medium text-gray-500">...</span>
                     {% endif %}
                 {% endfor %}
 
                 {% if pagination.has_next %}
                     <a href="{{ url_for('media.media_v2', page=pagination.next_num, type=media_type) }}"
-                       class="py-2 px-4 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                       class="py-2 px-4 rounded-r-md border border-gray-300 text-sm font-medium text-gray-500 hover:bg-gray-50">
                         <i class="fas fa-chevron-right"></i>
                     </a>
                 {% endif %}
