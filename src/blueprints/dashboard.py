@@ -7,7 +7,7 @@ from psycopg2 import IntegrityError
 
 from src.config.theme import get_all_themes
 from src.database import get_db
-from src.models import User, Article, ArticleContent, ArticleI18n, Category, Comment
+from src.models import User, Article, ArticleContent, ArticleI18n, Category, Comment, db
 # from src.error import error
 from src.user.authz.decorators import admin_required
 from src.utils.security.safe import validate_email
@@ -580,65 +580,50 @@ def get_article(user_id, article_id):
 @admin_required
 def update_article(user_id, article_id):
     """更新文章"""
-    with get_db() as db:
-        try:
-            article = Article.query.filter_by(article_id=article_id).first_or_404()
-            data = request.get_json()
-            print(data)
+    try:
+        article = Article.query.filter_by(article_id=article_id).first_or_404()
+        data = request.get_json()
+        # print(data)
+        # 更新文章基本信息
+        if 'title' in data:
+            article.title = data['title']
+        if 'excerpt' in data:
+            article.excerpt = data['excerpt']
+        if 'cover_image' in data:
+            article.cover_image = data['cover_image']
+        if 'tags' in data:
+            article.tags = data['tags']
+        if 'is_featured' in data:
+            article.is_featured = data['is_featured']
+        if 'hidden' in data:
+            article.hidden = data['hidden']
+        if 'status' in data:
+            article.status = data['status'] or 'Draft'
 
-            # 更新文章基本信息
-            if 'title' in data:
-                article.title = data['title']
-            if 'excerpt' in data:
-                article.excerpt = data['excerpt']
-            if 'cover_image' in data:
-                article.cover_image = data['cover_image']
-            if 'tags' in data:
-                article.tags = data['tags']
-            if 'is_featured' in data:
-                article.is_featured = data['is_featured']
-            if 'hidden' in data:
-                article.hidden = data['hidden']
+        article.updated_at = datetime.today()
+        print(f"Article {article_id} updated successfully")
 
-            # 更新状态
-            if 'status' in data:
-                article.status = data['status'] or 'Draft'
+        # 保存更改到数据库
+        db.session.commit()
 
-            # 更新文章内容
-            if 'content' in data:
-                content = ArticleContent.query.filter_by(aid=article.article_id).first()
-                if content:
-                    content.content = data['content']
-                    if 'language_code' in data:
-                        content.language_code = data['language_code']
-                else:
-                    # 创建新的内容记录
-                    new_content = ArticleContent(
-                        aid=article.article_id,
-                        content=data['content'],
-                        language_code=data.get('language_code', 'zh-CN')
-                    )
-                    db.add(new_content)
+        return jsonify({
+            'success': True,
+            'message': '文章更新成功',
+            'data': {
+                'id': article.article_id,
+                'title': article.title,
+                'status': article.status,
+                'updated_at': article.updated_at.isoformat()
+            }
+        }), 200
 
-            article.updated_at = datetime.today()
-
-            return jsonify({
-                'success': True,
-                'message': '文章更新成功',
-                'data': {
-                    'id': article.article_id,
-                    'title': article.title,
-                    'status': article.status,
-                    'updated_at': article.updated_at.isoformat()
-                }
-            }), 200
-
-        except Exception as e:
-            db.rollback()
-            return jsonify({
-                'success': False,
-                'message': f'更新文章失败: {str(e)}'
-            }), 500
+    except Exception as e:
+        print(f"Failed to update article {article_id}: {str(e)}")
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'更新文章失败: {str(e)}'
+        }), 500
 
 
 @dashboard_bp.route('/admin/article/<int:article_id>', methods=['DELETE'])
