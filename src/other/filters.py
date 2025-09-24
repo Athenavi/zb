@@ -5,6 +5,8 @@ from functools import lru_cache
 import markdown
 from flask import current_app as app
 
+from src.database import get_db
+from src.models import Category
 from src.user.profile.social import get_user_name_by_id
 
 
@@ -74,3 +76,12 @@ def relative_time_filter(dt):
         return f"{diff.days}天前"
     else:
         return dt.strftime('%Y-%m-%d')
+
+
+@lru_cache(maxsize=128)
+def category_filter(category_id):
+    with get_db() as db:
+        category = db.query(Category).filter(Category.id == category_id).first()
+        if category:
+            return category.name
+        return None

@@ -132,25 +132,27 @@ comment on column categories.updated_at is '更新时间';
 
 create table if not exists articles
 (
-    article_id   serial
+    article_id  serial
         primary key,
-    title        varchar(255)                 not null,
-    slug         varchar(255)                 not null
+    title       varchar(255)                 not null,
+    slug        varchar(255)                 not null
         unique,
-    user_id      integer                      not null
+    user_id     integer                      not null
         references users
             on delete cascade,
-    hidden       boolean        default false not null,
-    views        bigint         default 0     not null,
-    likes        bigint         default 0     not null,
-    status       article_status default 'Draft'::article_status,
-    cover_image  varchar(255),
-    article_type varchar(50),
-    excerpt      text,
-    is_featured  boolean        default false,
-    tags         varchar(255)                 not null,
-    created_at   timestamp      default CURRENT_TIMESTAMP,
-    updated_at   timestamp      default CURRENT_TIMESTAMP
+    hidden      boolean        default false not null,
+    views       bigint         default 0     not null,
+    likes       bigint         default 0     not null,
+    status      article_status default 'Draft'::article_status,
+    cover_image varchar(255),
+    excerpt     text,
+    is_featured boolean        default false,
+    tags        varchar(255)                 not null,
+    created_at  timestamp      default CURRENT_TIMESTAMP,
+    updated_at  timestamp      default CURRENT_TIMESTAMP,
+    category_id integer
+        references categories,
+    article_ad  text
 );
 
 comment on table articles is '文章基本信息表';

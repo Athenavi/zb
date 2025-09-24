@@ -13,6 +13,7 @@ class Category(db.Model):
 
     # 关系定义
     subscriptions = db.relationship('CategorySubscription', back_populates='category', lazy='dynamic')
+    articles = db.relationship('Article', back_populates='category', lazy='dynamic')
 
 
 class CategorySubscription(db.Model):

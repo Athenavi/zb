@@ -6,7 +6,7 @@ from flask import render_template, request, make_response, current_app
 from src.config.theme import get_all_themes
 from src.database import get_db
 from src.error import error
-from src.models import Article
+from src.models import Article, Category
 
 
 def proces_page_data(total_articles, article_info, current_page, page_size, theme='default'):
@@ -35,7 +35,7 @@ def proces_page_data(total_articles, article_info, current_page, page_size, them
             'views': article[3],
             'likes': article[4],
             'cover_image': article[5],
-            'article_type': article[6],
+            'category_id': article[6],
             'excerpt': article[7],
             'is_featured': article[8],
             'tags': article[9].split(',') if article[9] else [],
@@ -83,12 +83,12 @@ def get_articles_with_filters(filters, page, page_size):
                 Article.views,
                 Article.likes,
                 Article.cover_image,
-                Article.article_type,
+                Article.category_id,
                 Article.excerpt,
                 Article.is_featured,
                 Article.tags,
                 Article.slug
-            ).filter(
+            ).outerjoin(Category, Article.category_id == Category.id).filter(
                 Article.hidden == False,
                 Article.status == 'Published'
             )

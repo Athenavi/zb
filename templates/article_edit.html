@@ -503,14 +503,7 @@
                     </h2>
                     <div class="space-y-4">
                         <div>
-                            <label for="article_type" class="form-label">文章类型</label>
-                            <input type="text" id="article_type" name="article_type"
-                                   value="{{ article.article_type if article }}" class="form-input"
-                                   placeholder="例如: 教程、新闻等">
-                        </div>
-
-                        <div>
-                            <label for="category" class="form-label">分类目录</label>
+                            <label for="category" class="form-label">分类</label>
                             <select id="category" name="category" class="form-input">
                                 {% for category in categories %}
                                     <option value="{{ category.id }}"
@@ -572,6 +565,17 @@
                                    value="{{ article.cover_image if article }}" class="form-input"
                                    placeholder="https://example.com/image.jpg">
                         </div>
+                    </div>
+                </div>
+                <div class="metadata-section">
+                    <h2 class="metadata-title">
+                        <i class="fas fa-calendar-alt"></i>扩展设置
+                    </h2>
+                    <div>
+                        <label for="article_ad" class="form-label">广告</label>
+                        <input type="text" id="article_ad" name="article_ad"
+                               value="{{ article.ad if article }}" class="form-input"
+                               placeholder="请输入广告内容">
                     </div>
                 </div>
             </div>

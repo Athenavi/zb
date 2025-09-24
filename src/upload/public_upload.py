@@ -50,7 +50,7 @@ def upload_cover_back(user_id, base_path, domain):
 
             if result.get('success'):
                 s_url = create_special_url(
-                    long_url=(domain + "shared?data=" + result.get('hash')),
+                    long_url=(domain + "thumbnail?data=" + result.get('hash')),
                     user_id=user_id)
                 cover_url = ("/s/" + s_url)
                 return jsonify({"code": 200, "msg": "上传成功", "data": cover_url}), 200

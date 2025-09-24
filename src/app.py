@@ -33,7 +33,7 @@ from src.error import error
 from src.models import db, User, Article, UserSubscription
 from src.notification import read_all_notifications, get_notifications, read_current_notification
 from src.other.diy import diy_space_put
-from src.other.filters import json_filter, string_split, article_author, md2html, relative_time_filter
+from src.other.filters import json_filter, string_split, article_author, md2html, relative_time_filter, category_filter
 from src.other.report import report_back
 from src.other.search import search_handler
 from src.plugin import plugin_bp, init_plugin_manager
@@ -161,6 +161,7 @@ app.add_template_filter(string_split, 'string.split')
 app.add_template_filter(article_author, 'Author')
 app.add_template_filter(md2html, 'md2html')
 app.add_template_filter(relative_time_filter, 'relative_time')
+app.add_template_filter(category_filter, 'CategoryName')
 
 
 @app.context_processor
@@ -610,7 +611,7 @@ def upload_user_path(user_id):
 def upload_cover(user_id):
     cover_path = Path(base_dir) / 'static' / 'cover'
     # print(cover_path)
-    return upload_cover_back(user_id=user_id, base_path=cover_path,domain=domain)
+    return upload_cover_back(user_id=user_id, base_path=cover_path, domain=domain)
 
 
 @app.route('/api/article/password-form/<int:aid>', methods=['GET'])
