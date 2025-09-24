@@ -403,7 +403,7 @@ def get_articles(user_id):
             articles_data = []
             for article in articles.items:
                 # 获取文章内容
-                content = ArticleContent.query.filter_by(aid=article.article_id).first()
+                # content = ArticleContent.query.filter_by(aid=article.article_id).first()
 
                 articles_data.append({
                     'id': article.article_id,
@@ -420,8 +420,13 @@ def get_articles(user_id):
                         'id': article.author.id,
                         'username': article.author.username
                     } if article.author else None,
-                    'content_preview': content.content[:200] + '...' if content and content.content else '',
-                    'tags': article.tags.split(',') if article.tags else []
+                    # 'content_preview': content.content[:200] + '...' if content and content.content else '',
+                    'tags': article.tags.split(',') if article.tags else [],
+                    'category_id': article.category_id if article.category_id else None,
+                    'category': {
+                        'id': article.category_id if article.category_id else None,
+                        'name': article.category.name if article.category_id else None,
+                    }
                 })
 
             return jsonify({
@@ -553,6 +558,10 @@ def get_article(user_id, article_id):
                     'username': article.author.username,
                     'email': article.author.email
                 } if article.author else None,
+                'category': {
+                    'id': article.category_id if article.category_id else None,
+                    'name': article.category.name if article.category else None
+                },
                 'content': {
                     'content': content.content if content else '',
                     'language_code': content.language_code if content else 'zh-CN'
@@ -709,6 +718,9 @@ def update_article_status(user_id, article_id):
             }), 500
 
 
+from sqlalchemy import func
+
+
 @dashboard_bp.route('/admin/article/stats', methods=['GET'])
 @admin_required
 def get_article_stats(user_id):
@@ -727,10 +739,10 @@ def get_article_stats(user_id):
             ).count()
 
             # 总浏览量
-            total_views = db.query(db.func.sum(Article.views)).scalar() or 0
+            total_views = db.query(func.sum(Article.views)).scalar() or 0
 
             # 总点赞数
-            total_likes = db.query(db.func.sum(Article.likes)).scalar() or 0
+            total_likes = db.query(func.sum(Article.likes)).scalar() or 0
 
             return jsonify({
                 'success': True,
