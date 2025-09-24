@@ -33,7 +33,8 @@ from src.error import error
 from src.models import db, User, Article, UserSubscription
 from src.notification import read_all_notifications, get_notifications, read_current_notification
 from src.other.diy import diy_space_put
-from src.other.filters import json_filter, string_split, article_author, md2html, relative_time_filter, category_filter
+from src.other.filters import json_filter, string_split, article_author, md2html, relative_time_filter, category_filter, \
+    f2list
 from src.other.report import report_back
 from src.other.search import search_handler
 from src.plugin import plugin_bp, init_plugin_manager
@@ -162,6 +163,7 @@ app.add_template_filter(article_author, 'Author')
 app.add_template_filter(md2html, 'md2html')
 app.add_template_filter(relative_time_filter, 'relative_time')
 app.add_template_filter(category_filter, 'CategoryName')
+app.add_template_filter(f2list, 'F2list')
 
 
 @app.context_processor

@@ -99,7 +99,7 @@
                         </div>
                         {% if article.tags %}
                             <div class="mt-4">
-                                {% for tag in article.tags %}
+                                {% for tag in article.tags | F2list %}
                                     <a href="/tag/{{ tag }}"
                                        class="tag inline-block bg-gray-100 hover:bg-indigo-100 text-gray-800 text-xs font-semibold rounded-full px-3 py-1 mr-2 transition-all">
                                         {{ tag }}
