@@ -142,8 +142,11 @@ def featured_page():
 @other_bp.route('/diy/space', methods=['GET'])
 @jwt_required
 def diy_space(user_id):
-    return diy_space_back(user_id, avatar_url=api_user_avatar(user_id), profiles=api_user_profile(user_id),
-                          user_bio=api_user_bio(user_id))
+    try:
+        return diy_space_back(user_id, avatar_url=api_user_avatar(user_id), profiles=api_user_profile(user_id),
+                              user_bio=api_user_bio(user_id))
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 
 @other_bp.route('/edit/blog/<int:aid>', methods=['GET', 'POST', 'PUT'])

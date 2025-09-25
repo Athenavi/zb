@@ -10,7 +10,7 @@ def get_general_config():
 
     domain = os.getenv('DOMAIN')
     title = os.getenv('TITLE') or 'zyblog'
-    beian = os.getenv('BEIAN') or '京ICP备12345678号'
+    beian = os.getenv('BEIAN').rstrip('/') + '/' or '京ICP备12345678号'
 
     return domain, title, beian
 

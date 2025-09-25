@@ -13,6 +13,7 @@ from src.extensions import cache
 from src.models import Article, User
 from src.other.filters import f2list
 from src.other.report import report_back
+from src.setting import AppConfig
 from src.upload.admin_upload import admin_upload_file
 from src.upload.public_upload import upload_cover_back, handle_user_upload
 from src.user.authz.decorators import jwt_required, admin_required, origin_required
@@ -25,6 +26,7 @@ from src.utils.security.jwt_handler import JWTHandler
 from src.utils.security.safe import is_valid_iso_language_code
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
+domain = AppConfig.domain
 
 
 @api_bp.route('/theme/upload', methods=['POST'])
@@ -46,7 +48,7 @@ def api_blog_i18n_content(iso, aid):
 
 @api_bp.route('/article/unlock', methods=['GET', 'POST'])
 def api_article_unlock():
-    return blog_tmp_url(domain=current_app.config['DOMAIN'], cache_instance=cache)
+    return blog_tmp_url(domain=domain, cache_instance=cache)
 
 
 @api_bp.route('/comment/<article_id>', methods=['POST'])
@@ -74,7 +76,7 @@ def api_user_avatar(user_identifier=None, identifier_type='id'):
     if user_id is not None:
         user_identifier = int(user_id)
         identifier_type = 'id'
-    avatar_url = get_avatar(current_app.config['DOMAIN'], user_identifier=user_identifier,
+    avatar_url = get_avatar(domain=domain, user_identifier=user_identifier,
                             identifier_type=identifier_type)
     if avatar_url:
         return avatar_url
@@ -205,7 +207,7 @@ def api_username_check(username):
 def upload_cover(user_id):
     cover_path = Path(str(current_app.root_path)).parent / 'static' / 'cover'
     print(cover_path)
-    return upload_cover_back(user_id=user_id, base_path=cover_path, domain=current_app.config['DOMAIN'])
+    return upload_cover_back(user_id=user_id, base_path=cover_path, domain=domain)
 
 
 @api_bp.route('/article/password-form/<int:aid>', methods=['GET'])
@@ -239,7 +241,7 @@ def generate_qr():
     try:
         token_json, qr_code_base64, token_expire, token = qr_login(
             sys_version="1.0", global_encoding=current_app.config['GLOBAL_ENCODING'],
-            domain=current_app.config['DOMAIN']
+            domain=domain
         )
 
         # Store token in cache

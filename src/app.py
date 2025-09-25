@@ -11,14 +11,14 @@ from src.blueprints.api import api_bp
 from src.blueprints.auth import auth_bp
 from src.blueprints.category import category_bp
 from src.blueprints.dashboard import dashboard_bp
-from src.blueprints.media import create_media_blueprint
+from src.blueprints.media import media_bp
 from src.blueprints.my import my_bp
 from src.blueprints.noti import noti_bp
 from src.blueprints.other import other_bp
 from src.blueprints.relation import relation_bp
 from src.blueprints.role import role_bp
-from src.blueprints.theme import create_theme_blueprint
-from src.blueprints.website import create_website_blueprint
+from src.blueprints.theme import theme_bp
+from src.blueprints.website import website_bp
 from src.error import error
 from src.extensions import cache
 from src.models import db
@@ -66,7 +66,7 @@ def create_app(config_class=AppConfig):
     register_direct_routes(app, config_class)
 
     # 注册蓝图
-    register_blueprints(app, config_class)
+    register_blueprints(app)
 
     # 初始化插件管理器
     init_plugin_manager(app)
@@ -89,7 +89,7 @@ def register_context_processors(app, config_class):
             beian=config_class.beian,
             title=config_class.sitename,
             username=JWTHandler.get_current_username(),
-            domain=config_class.domain.rstrip('/') + '/'
+            domain=config_class.domain
         )
 
 
@@ -147,14 +147,11 @@ def register_template_filters(app):
     app.add_template_filter(f2list, 'F2list')
 
 
-def register_blueprints(app, config_class):
+def register_blueprints(app):
     """注册所有蓝图"""
-    # 注册需要缓存参数的蓝图
-    app.register_blueprint(create_website_blueprint(cache, config_class.domain, config_class.sitename))
-    app.register_blueprint(create_theme_blueprint(cache, config_class.base_dir))
-    app.register_blueprint(create_media_blueprint(cache, config_class.domain, config_class.base_dir))
-
-    # 注册普通蓝图
+    app.register_blueprint(media_bp)
+    app.register_blueprint(theme_bp)
+    app.register_blueprint(website_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(my_bp)
