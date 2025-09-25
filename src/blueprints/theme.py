@@ -1,9 +1,9 @@
 import shutil
 from pathlib import Path
 
-from flask import Blueprint, jsonify, send_from_directory, request
+from flask import Blueprint, jsonify, send_from_directory, request, render_template
 
-from src.config.theme import theme_safe_check, db_remove_theme, get_all_themes
+from src.config.theme import theme_safe_check, get_all_themes
 from src.user.authz.decorators import admin_required
 
 theme_bp = Blueprint('theme', __name__, template_folder='templates')
@@ -65,30 +65,11 @@ def create_theme_blueprint(cache_instance, base_dir):
         except Exception as e:
             return jsonify({'error': f'Deletion failed: {str(e)}'}), 500
 
-    @theme_bp.route('/api/theme', methods=['PUT'])
-    @admin_required
-    def change_display(user_id):
-        theme_id = request.args.get('id')
-        if not theme_id:
-            return "failed403"
-
-        all_themes = get_all_themes()
-        if theme_id not in all_themes:
-            return "failed001"
-
-        if theme_safe_check(theme_id, channel=2):
-            try:
-                if db_remove_theme(user_id, theme_id):
-                    return "success"
-                else:
-                    return "failed"
-            except Exception as e:
-                print(f"Error during theme change: {e}")
-                return "failed500"
-            finally:
-                log_msg = f"{user_id} : ban {theme_id} theme"
-                print(log_msg)
-        else:
-            return "failed"
+    @theme_bp.route('/theme/display', methods=['GET'])
+    def m_display():
+        try:
+            return render_template('dashboard/M-display.html', displayList=get_all_themes())
+        except Exception as e:
+            return jsonify({'error': f'Failed to get display list: {str(e)}'}), 500
 
     return theme_bp
