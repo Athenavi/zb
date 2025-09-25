@@ -15,7 +15,6 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from src.blog.article.core.content import get_i18n_content_by_aid
 from src.blog.article.core.views import blog_tmp_url, blog_detail_back, \
     blog_detail_aid_back, blog_detail_i18n, edit_article_back, new_article_back, blog_detail_i18n_list, contribute_back
-from src.blog.article.metadata.handlers import persist_views
 from src.blog.article.security.password import get_apw_form, check_apw_form
 from src.blog.comment import comment_page_get, create_comment_with_anti_spam
 from src.blog.homepage import index_page_back, tag_page_back, featured_page_back
@@ -182,13 +181,6 @@ def inject_variables():
 @jwt_required
 def search(user_id):
     return search_handler(user_id, domain, global_encoding, app.config['MAX_CACHE_TIMESTAMP'])
-
-
-import threading
-
-# 启动持久化线程
-persist_thread = threading.Thread(target=persist_views, daemon=True)
-persist_thread.start()
 
 
 @app.route('/confirm-password', methods=['GET', 'POST'])
