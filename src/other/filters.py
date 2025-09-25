@@ -5,6 +5,8 @@ from functools import lru_cache
 import markdown
 from flask import current_app as app
 
+from src.database import get_db
+from src.models import Category
 from src.user.profile.social import get_user_name_by_id
 
 
@@ -74,3 +76,44 @@ def relative_time_filter(dt):
         return f"{diff.days}天前"
     else:
         return dt.strftime('%Y-%m-%d')
+
+
+@lru_cache(maxsize=128)
+def category_filter(category_id):
+    with get_db() as db:
+        category = db.query(Category).filter(Category.id == category_id).first()
+        if category:
+            return category.name
+        return None
+
+
+def f2list(input_value, delimiter=';'):
+    """
+    将分隔符分隔的字符串转换为列表
+    """
+    try:
+        if input_value is None:
+            return []
+
+        # 如果已经是列表且不为空，直接返回
+        if isinstance(input_value, list):
+            if input_value and isinstance(input_value[0], str) and delimiter in input_value[0]:
+                # 如果列表中的字符串包含分隔符，进行分割
+                result = []
+                for item in input_value:
+                    if isinstance(item, str):
+                        result.extend([tag.strip() for tag in item.split(delimiter) if tag.strip()])
+                    else:
+                        result.append(str(item).strip())
+                return result
+            return input_value
+
+        # 处理字符串输入
+        if isinstance(input_value, str):
+            return [tag.strip() for tag in input_value.split(delimiter) if tag.strip()]
+
+        # 处理其他类型
+        return [str(input_value).strip()]
+
+    except Exception as e:
+        return [str(input_value)] if input_value else []

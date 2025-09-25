@@ -417,7 +417,13 @@ def update_user_roles(user_id):
     """更新用户角色"""
     with get_db() as db:
         try:
-            user = db.query(User).get(id=user_id).first()
+            user = db.query(User).get(user_id)
+            if user is None:
+                return jsonify({
+                    'success': False,
+                    'message': '用户不存在'
+                }), 404
+
             data = request.get_json()
 
             if 'role_ids' not in data:
@@ -429,9 +435,8 @@ def update_user_roles(user_id):
             # 清除现有角色
             user.roles.clear()
 
-            # 添加新角色
             for role_id in data['role_ids']:
-                role = Role.query.get(role_id)
+                role = db.query(Role).get(role_id)
                 if role:
                     user.roles.append(role)
 

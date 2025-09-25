@@ -5,7 +5,7 @@ from flask import request, render_template, url_for, jsonify, current_app, flash
 from src.blog.article.security.password import get_article_password
 from src.database import get_db
 from src.error import error
-from src.models import Article, ArticleContent, ArticleI18n, User, db
+from src.models import Article, ArticleContent, ArticleI18n, User, db, Category
 from src.user.entities import auth_by_uid
 from src.utils.security.safe import random_string, is_valid_iso_language_code, valid_language_codes
 
@@ -249,19 +249,22 @@ def edit_article_back(user_id, article_id):
     article = Article.query.get_or_404(article_id)
     content_obj = ArticleContent.query.filter_by(aid=article_id).first()
     content = content_obj.content if content_obj else ""
+    categories = Category.query.all()
 
     if request.method == 'POST':
 
         try:
             # 更新文章基本信息
+            # print(request.form)
             article.title = request.form.get('title')
             article.slug = request.form.get('slug')
             article.excerpt = request.form.get('excerpt')
             article.tags = request.form.get('tags')
             article.hidden = 1 if request.form.get('hidden') else 0
             article.status = request.form.get('status')
-            article.article_type = request.form.get('article_type')
+            article.category_id = request.form.get('category')
             article.cover_image = request.form.get('cover_image')
+            article.article_ad = request.form.get('article_ad')
 
             # 处理slug
             article.slug = re.sub(r'[^\w\s]', '', article.slug)
@@ -290,6 +293,7 @@ def edit_article_back(user_id, article_id):
             return render_template('article_edit.html',
                                    article=article,
                                    content=content,
+                                   categories=categories,
                                    status_options=['Draft', 'Published', 'Deleted'])
 
         return redirect(url_for('markdown_editor', aid=article_id))
@@ -297,6 +301,7 @@ def edit_article_back(user_id, article_id):
     return render_template('article_edit.html',
                            article=article,
                            content=content,
+                           categories=categories,
                            status_options=['Draft', 'Published', 'Deleted'])
 
 

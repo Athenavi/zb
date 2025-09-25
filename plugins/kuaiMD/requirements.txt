@@ -1,1 +1,2 @@
-pygements==2.19.2
+pymdown-extensions==10.16.1
+pygements

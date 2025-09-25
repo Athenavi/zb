@@ -7,10 +7,9 @@ from psycopg2 import IntegrityError
 
 from src.config.theme import get_all_themes
 from src.database import get_db
-from src.models import User, Article, ArticleContent, ArticleI18n, Category, Comment
+from src.models import User, Article, ArticleContent, ArticleI18n, Category, Comment, db
 # from src.error import error
 from src.user.authz.decorators import admin_required
-from src.utils.security.ip_utils import get_client_ip
 from src.utils.security.safe import validate_email
 
 dashboard_bp = Blueprint('dashboard', __name__, template_folder='templates')
@@ -142,10 +141,11 @@ def create_user(user_id):
                 email=data['email'],
                 profile_picture=data.get('profile_picture'),
                 bio=data.get('bio'),
-                register_ip=get_client_ip()
+                register_ip="（系统维护）"
             )
 
             db.add(new_user)
+            db.flush()  # 确保 new_user.id 和 created_at 已经被设置
 
             return jsonify({
                 'success': True,
@@ -154,7 +154,7 @@ def create_user(user_id):
                     'id': new_user.id,
                     'username': new_user.username,
                     'email': new_user.email,
-                    'created_at': new_user.created_at.isoformat()
+                    'created_at': new_user.created_at.isoformat(),
                 }
             }), 201
 
@@ -403,7 +403,7 @@ def get_articles(user_id):
             articles_data = []
             for article in articles.items:
                 # 获取文章内容
-                content = ArticleContent.query.filter_by(aid=article.article_id).first()
+                # content = ArticleContent.query.filter_by(aid=article.article_id).first()
 
                 articles_data.append({
                     'id': article.article_id,
@@ -420,8 +420,13 @@ def get_articles(user_id):
                         'id': article.author.id,
                         'username': article.author.username
                     } if article.author else None,
-                    'content_preview': content.content[:200] + '...' if content and content.content else '',
-                    'tags': article.tags.split(',') if article.tags else []
+                    # 'content_preview': content.content[:200] + '...' if content and content.content else '',
+                    'tags': article.tags.split(',') if article.tags else [],
+                    'category_id': article.category_id if article.category_id else None,
+                    'category': {
+                        'id': article.category_id if article.category_id else None,
+                        'name': article.category.name if article.category_id else None,
+                    }
                 })
 
             return jsonify({
@@ -451,9 +456,10 @@ def create_article(user_id):
     with get_db() as db:
         try:
             data = request.get_json()
+            print(data)
 
             # 验证必填字段
-            required_fields = ['title', 'user_id']
+            required_fields = ['title', 'author_id']
             for field in required_fields:
                 if not data.get(field):
                     return jsonify({
@@ -462,7 +468,7 @@ def create_article(user_id):
                     }), 400
 
             # 验证作者是否存在
-            author = User.query.get(data['user_id'])
+            author = User.query.get(data['author_id'])
             if not author:
                 return jsonify({
                     'success': False,
@@ -484,13 +490,13 @@ def create_article(user_id):
             new_article = Article(
                 title=data['title'],
                 slug=slug,
-                user_id=data['user_id'],
+                user_id=data['author_id'] or user_id,
                 excerpt=data.get('excerpt', ''),
                 cover_image=data.get('cover_image'),
                 tags=data.get('tags', ''),
                 status=data.get('status', 'Draft'),
-                article_type=data.get('article_type', 'article'),
-                is_featured=data.get('is_featured', False)
+                is_featured=data.get('is_featured', False),
+                category_id=data.get('category_id', None)
             )
 
             db.add(new_article)
@@ -545,7 +551,6 @@ def get_article(user_id, article_id):
                 'views': article.views,
                 'likes': article.likes,
                 'comment_count': Comment.query.filter_by(article_id=article.article_id).count(),
-                'article_type': article.article_type,
                 'is_featured': article.is_featured,
                 'hidden': article.hidden,
                 'created_at': article.created_at.isoformat() if article.created_at else None,
@@ -555,6 +560,10 @@ def get_article(user_id, article_id):
                     'username': article.author.username,
                     'email': article.author.email
                 } if article.author else None,
+                'category': {
+                    'id': article.category_id if article.category_id else None,
+                    'name': article.category.name if article.category else None
+                },
                 'content': {
                     'content': content.content if content else '',
                     'language_code': content.language_code if content else 'zh-CN'
@@ -573,67 +582,52 @@ def get_article(user_id, article_id):
 @admin_required
 def update_article(user_id, article_id):
     """更新文章"""
-    with get_db() as db:
-        try:
-            article = Article.query.filter_by(article_id=article_id).first_or_404()
-            data = request.get_json()
-            print(data)
+    try:
+        article = Article.query.filter_by(article_id=article_id).first_or_404()
+        data = request.get_json()
+        # print(data)
+        # 更新文章基本信息
+        if 'title' in data:
+            article.title = data['title']
+        if 'excerpt' in data:
+            article.excerpt = data['excerpt']
+        if 'cover_image' in data:
+            article.cover_image = data['cover_image']
+        if 'tags' in data:
+            article.tags = data['tags']
+        if 'is_featured' in data:
+            article.is_featured = data['is_featured']
+        if 'hidden' in data:
+            article.hidden = data['hidden']
+        if 'status' in data:
+            article.status = data['status'] or 'Draft'
+        if 'category_id' in data:
+            article.category_id = data.get('category_id', None)
 
-            # 更新文章基本信息
-            if 'title' in data:
-                article.title = data['title']
-            if 'excerpt' in data:
-                article.excerpt = data['excerpt']
-            if 'cover_image' in data:
-                article.cover_image = data['cover_image']
-            if 'tags' in data:
-                article.tags = data['tags']
-            if 'article_type' in data:
-                article.article_type = data['article_type']
-            if 'is_featured' in data:
-                article.is_featured = data['is_featured']
-            if 'hidden' in data:
-                article.hidden = data['hidden']
+        article.updated_at = datetime.today()
+        print(f"Article {article_id} updated successfully")
 
-            # 更新状态
-            if 'status' in data:
-                article.status = data['status'] or 'Draft'
+        # 保存更改到数据库
+        db.session.commit()
 
-            # 更新文章内容
-            if 'content' in data:
-                content = ArticleContent.query.filter_by(aid=article.article_id).first()
-                if content:
-                    content.content = data['content']
-                    if 'language_code' in data:
-                        content.language_code = data['language_code']
-                else:
-                    # 创建新的内容记录
-                    new_content = ArticleContent(
-                        aid=article.article_id,
-                        content=data['content'],
-                        language_code=data.get('language_code', 'zh-CN')
-                    )
-                    db.add(new_content)
+        return jsonify({
+            'success': True,
+            'message': '文章更新成功',
+            'data': {
+                'id': article.article_id,
+                'title': article.title,
+                'status': article.status,
+                'updated_at': article.updated_at.isoformat()
+            }
+        }), 200
 
-            article.updated_at = datetime.today()
-
-            return jsonify({
-                'success': True,
-                'message': '文章更新成功',
-                'data': {
-                    'id': article.article_id,
-                    'title': article.title,
-                    'status': article.status,
-                    'updated_at': article.updated_at.isoformat()
-                }
-            }), 200
-
-        except Exception as e:
-            db.rollback()
-            return jsonify({
-                'success': False,
-                'message': f'更新文章失败: {str(e)}'
-            }), 500
+    except Exception as e:
+        print(f"Failed to update article {article_id}: {str(e)}")
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'更新文章失败: {str(e)}'
+        }), 500
 
 
 @dashboard_bp.route('/admin/article/<int:article_id>', methods=['DELETE'])
@@ -713,6 +707,9 @@ def update_article_status(user_id, article_id):
             }), 500
 
 
+from sqlalchemy import func
+
+
 @dashboard_bp.route('/admin/article/stats', methods=['GET'])
 @admin_required
 def get_article_stats(user_id):
@@ -731,10 +728,10 @@ def get_article_stats(user_id):
             ).count()
 
             # 总浏览量
-            total_views = db.query(db.func.sum(Article.views)).scalar() or 0
+            total_views = db.query(func.sum(Article.views)).scalar() or 0
 
             # 总点赞数
-            total_likes = db.query(db.func.sum(Article.likes)).scalar() or 0
+            total_likes = db.query(func.sum(Article.likes)).scalar() or 0
 
             return jsonify({
                 'success': True,

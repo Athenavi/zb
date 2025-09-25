@@ -16,10 +16,11 @@ class Article(db.Model):
     likes = db.Column(db.BigInteger, default=0, nullable=False)
     status = db.Column(article_status, default='Draft')
     cover_image = db.Column(db.String(255))
-    article_type = db.Column(db.String(50))
+    category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=True)
     excerpt = db.Column(db.Text)
     is_featured = db.Column(db.Boolean, default=False)
     tags = db.Column(db.String(255), nullable=False)
+    article_ad = db.Column(db.Text)
     created_at = db.Column(db.TIMESTAMP, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.TIMESTAMP, default=lambda: datetime.now(timezone.utc),
                            onupdate=lambda: datetime.now(timezone.utc))
@@ -27,6 +28,7 @@ class Article(db.Model):
     # 关系定义
     author = db.relationship('User', back_populates='articles')
     comments = db.relationship('Comment', back_populates='article', cascade='all, delete-orphan')
+    category = db.relationship('Category', back_populates='articles')
 
     def __repr__(self):
         return f'<Article {self.title}>'

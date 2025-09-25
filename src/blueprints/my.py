@@ -36,7 +36,7 @@ def create_short_url(user_id):
 
         if not long_url:
             flash('请输入有效的URL', 'error')
-            return redirect(url_for('user_urls'))
+            return redirect(url_for('my.user_urls'))
 
         # 生成短链接
         short_code = generate_short_url()
@@ -56,7 +56,7 @@ def create_short_url(user_id):
             db.rollback()
             flash(f'创建失败: {str(e)}', 'error')
 
-        return redirect(url_for('user_urls'))
+        return redirect(url_for('my.user_urls'))
 
 
 @my_bp.route('/my/urls/delete/<int:url_id>', methods=['POST'])
@@ -66,7 +66,7 @@ def delete_url(user_id, url_id):
     url = Url.query.filter_by(id=url_id, user_id=user_id).first()
     if not url:
         flash('链接不存在', 'error')
-        return redirect(url_for('user_urls'))
+        return redirect(url_for('my.user_urls'))
     with get_db() as db:
         try:
             db.delete(url)
@@ -76,7 +76,7 @@ def delete_url(user_id, url_id):
             db.rollback()
             flash(f'删除失败: {str(e)}', 'error')
 
-        return redirect(url_for('user_urls'))
+        return redirect(url_for('my.user_urls'))
 
 
 @my_bp.route('/my/comments')
@@ -100,7 +100,7 @@ def edit_comment(user_id, comment_id):
         comment = Comment.query.filter_by(id=comment_id, user_id=user_id).first()
         if not comment:
             flash('评论不存在', 'error')
-            return redirect(url_for('user_comments'))
+            return redirect(url_for('my.user_comments'))
 
         if request.method == 'POST':
             content = request.form.get('content')
@@ -110,7 +110,7 @@ def edit_comment(user_id, comment_id):
                     comment.updated_at = datetime.now()
 
                     flash('评论更新成功', 'success')
-                    return redirect(url_for('user_comments'))
+                    return redirect(url_for('my.user_comments'))
                 except Exception as e:
                     db.rollback()
                     flash(f'更新失败: {str(e)}', 'error')
@@ -126,7 +126,7 @@ def delete_comment(user_id, comment_id):
         comment = Comment.query.filter_by(id=comment_id, user_id=user_id).first()
         if not comment:
             flash('评论不存在', 'error')
-            return redirect(url_for('user_comments'))
+            return redirect(url_for('my.user_comments'))
 
         try:
             db.delete(comment)
@@ -136,7 +136,7 @@ def delete_comment(user_id, comment_id):
             db.rollback()
             flash(f'删除失败: {str(e)}', 'error')
 
-        return redirect(url_for('user_comments'))
+        return redirect(url_for('my.user_comments'))
 
 
 @my_bp.route('/my/posts')
@@ -185,16 +185,15 @@ def my_posts(user_id):
 @jwt_required
 def update_article_status(user_id, article_id):
     """更新文章状态"""
-    with get_db() as db:
-        article = Article.query.filter_by(article_id=article_id, user_id=user_id).first()
-        if not article:
-            return jsonify({'success': False, 'message': '文章不存在'}), 404
+    article = Article.query.filter_by(article_id=article_id, user_id=user_id).first()
+    if not article:
+        return jsonify({'success': False, 'message': '文章不存在'}), 404
 
-        new_status = request.json.get('status')
-        if new_status not in ['Draft', 'Published', 'Deleted']:
-            return jsonify({'success': False, 'message': '无效的状态'}), 400
+    new_status = request.json.get('status')
+    if new_status not in ['Draft', 'Published', 'Deleted']:
+        return jsonify({'success': False, 'message': '无效的状态'}), 400
 
-        article.status = new_status
-        article.updated_at = datetime.utcnow()
+    article.status = new_status
+    article.updated_at = datetime.now()
 
-        return jsonify({'success': True, 'message': f'文章已{new_status}'})
+    return jsonify({'success': True, 'message': f'文章已{new_status}'})

@@ -111,17 +111,17 @@
         }
 
         /* Status badges */
-        .status-published {
+        .status-Published {
             background-color: #10b981;
             color: white;
         }
 
-        .status-draft {
+        .status-Draft {
             background-color: #f59e0b;
             color: white;
         }
 
-        .status-archived {
+        .status-Deleted {
             background-color: #6b7280;
             color: white;
         }
@@ -360,9 +360,9 @@
                         <select id="statusFilter"
                                 class="input-bg border border-custom rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto">
                             <option value="">全部状态</option>
-                            <option value="published">已发布</option>
-                            <option value="draft">草稿</option>
-                            <option value="archived">已归档</option>
+                            <option value="Published">已发布</option>
+                            <option value="Draft">草稿</option>
+                            <option value="Deleted">已删除</option>
                         </select>
                     </div>
 
@@ -505,9 +505,9 @@
                     <label for="status" class="block text-sm font-medium text-gray-700 mb-1">状态</label>
                     <select id="status" name="status"
                             class="w-full input-bg border border-custom rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="draft">草稿</option>
-                        <option value="published">已发布</option>
-                        <option value="archived">已归档</option>
+                        <option value="Draft">草稿</option>
+                        <option value="Published">已发布</option>
+                        <option value="Deleted">已删除</option>
                     </select>
                 </div>
             </div>
@@ -549,13 +549,6 @@
                 <input type="text" id="tags" name="tags" placeholder="用逗号分隔多个标签"
                        class="w-full input-bg border border-custom rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
-
-            <div>
-                <label for="content" class="block text-sm font-medium text-gray-700 mb-1">内容</label>
-                <textarea id="content" name="content" rows="8"
-                          class="w-full input-bg border border-custom rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-            </div>
-
             <div class="flex items-center justify-end space-x-3 pt-4 border-t border-custom">
                 <button type="button" id="cancelBtn"
                         class="px-4 py-2 text-sm border border-custom rounded-lg hover:bg-gray-50">
@@ -565,6 +558,12 @@
                         class="btn-primary px-4 py-2 text-sm rounded-lg hover:opacity-90 transition-opacity">
                     保存
                 </button>
+            </div>
+            <div>
+                <label for="content" class="block text-sm font-medium text-gray-700 mb-1">内容
+                    (仅预览:此页面无法修改)</label>
+                <textarea id="content" name="content" rows="8"
+                          class="w-full input-bg border border-custom rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
             </div>
         </form>
     </div>
@@ -840,16 +839,16 @@
             // 状态徽章
             const statusClass = `status-${article.status}`;
             const statusText = {
-                'published': '已发布',
-                'draft': '草稿',
-                'archived': '已归档'
+                'Published': '已发布',
+                'Draft': '草稿',
+                'Deleted': '已删除'
             }[article.status] || article.status;
 
             row.innerHTML = `
                     <td class="px-3 lg:px-6 py-4">
                         <div class="flex items-start space-x-3">
-                            ${article.featured_image ?
-                `<img src="${article.featured_image}" alt="${article.title}" class="w-12 h-12 rounded-lg object-cover flex-shrink-0">` :
+                            ${article.cover_image ?
+                `<img src="${article.cover_image}" alt="${article.title}" class="w-12 h-12 rounded-lg object-cover flex-shrink-0">` :
                 `<div class="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
                                     <svg class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                                         <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"/>
@@ -874,7 +873,7 @@
                         ${article.author ? article.author.username : '-'}
                     </td>
                     <td class="px-3 lg:px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden md:table-cell">
-                        ${article.category ? article.category.name : '-'}
+                        ${article.category_id ? article.category.name : '-'}
                     </td>
                     <td class="px-3 lg:px-6 py-4 whitespace-nowrap">
                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass}">

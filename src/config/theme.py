@@ -4,9 +4,6 @@ import os
 from flask import jsonify
 from packaging.version import Version
 
-from src.database import get_db
-from src.models import CustomField
-
 
 def theme_safe_check(theme_id, channel=1):
     theme_path = f'templates/theme/{theme_id}'
@@ -55,7 +52,7 @@ def theme_safe_check(theme_id, channel=1):
 
 
 def get_all_themes():
-    display_list = ['default']
+    display_list = []
     themes_path = 'templates/theme'
     if os.path.exists(themes_path):
         subfolders = [f.path for f in os.scandir(themes_path) if f.is_dir()]
@@ -66,29 +63,3 @@ def get_all_themes():
                 display_list.append(os.path.basename(subfolder))
     # print(display_list)
     return display_list
-
-
-def db_change_theme(user_id, theme_id):
-    try:
-        with get_db() as session:
-            new_theme = CustomField(user_id=user_id, field_name="theme", field_value=str(theme_id))
-            session.add(new_theme)
-        return True
-    except Exception:
-        session.rollback()
-        return False
-
-
-def db_get_theme():
-    try:
-        with get_db() as session:
-            theme_record = session.query(CustomField.field_value).filter(
-                CustomField.user_id == 1,
-                CustomField.field_name == 'theme'
-            ).order_by(CustomField.id.desc()).first()
-        current_theme = theme_record[0] if theme_record else 'default'
-    except Exception as e:
-        session.rollback()
-        print(f"Error getting current theme: {e}")
-        current_theme = 'default'
-    return str(current_theme)
