@@ -118,7 +118,7 @@ def main():
             final_port = get_user_port_input()
 
     # 导入应用
-    from src.app import app
+    from src.app import create_app
 
     # 显示端口信息
     print("=" * 50)
@@ -135,7 +135,7 @@ def main():
     # 启动服务
     try:
         from waitress import serve
-        serve(app, host=args.host, port=final_port, threads=8, channel_timeout=60)
+        serve(create_app(), host=args.host, port=final_port, threads=8, channel_timeout=60)
     except KeyboardInterrupt:
         print("\n服务器正在关闭...")
     except Exception as e:
