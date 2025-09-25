@@ -8,6 +8,7 @@ from flask_caching import Cache
 from flask_migrate import Migrate
 from flask_siwadoc import SiwaDoc
 from jinja2 import select_autoescape
+from sqlalchemy import select, func
 from werkzeug.exceptions import NotFound
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -388,10 +389,38 @@ def user_space(user_id, target_user_id):
 
 @app.route('/api/tags/suggest', methods=['GET'])
 def suggest_tags():
-    prefix = request.args.get('prefix', '')
-    # 从数据库获取匹配的标签
-    tags = [2025, 2026, 2027]
-    return jsonify(tags)
+    prefix = request.args.get('q', '')
+    # print(f"prefix: {prefix}")
+
+    # 使用缓存来存储去重后的标签列表
+    cache_key = 'unique_tags'  # 使用明确的缓存键名
+    unique_tags = cache.get(cache_key)
+
+    if not unique_tags:
+        print("缓存未命中，从数据库加载标签...")
+        with get_db() as db:
+            # 获取所有文章的标签字符串
+            tags_results = db.execute(select(func.distinct(Article.tags))).scalars().all()
+
+            # 处理标签数据
+            all_tags = []
+            for tag_string in tags_results:
+                if tag_string:  # 确保不是空字符串
+                    all_tags.extend(f2list(tag_string.strip()))
+
+            # 去重并排序
+            unique_tags = sorted(set(all_tags))
+            print(f"加载并处理完成，唯一标签数量: {len(unique_tags)}")
+
+            # 缓存处理后的结果，避免重复处理
+            cache.set(cache_key, unique_tags, timeout=1200)
+
+    # 过滤出匹配前缀的标签
+    matched_tags = [tag for tag in unique_tags if tag.startswith(prefix)]
+    # print(f"匹配前缀 '{prefix}' 的标签数量: {len(matched_tags)}")
+
+    # 返回前五个匹配的标签
+    return jsonify(matched_tags[:5])
 
 
 @app.route('/new', methods=['GET', 'POST'])
