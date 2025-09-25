@@ -49,13 +49,17 @@
                         <!-- 操作按钮 -->
                         <div class="flex space-x-3 mt-4 sm:mt-0">
                             {% if is_own_profile %}
+                                <a href="/message"
+                                   class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600 transition-colors">
+                                    <i class="fas fa-bell mr-2"></i>消息通知
+                                </a>
                                 <a href="{{ url_for('my.my_posts') }}"
                                    class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600 transition-colors">
                                     <i class="fas fa-edit mr-2"></i>管理文章
                                 </a>
                                 <a href="/setting/profiles"
                                    class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600 transition-colors">
-                                    <i class="fas fa-edit mr-2"></i>设置
+                                    <i class="fas fa-gears mr-2"></i>设置
                                 </a>
                             {% else %}
                                 <button id="followBtn"
@@ -93,12 +97,14 @@
             <div class="text-2xl font-bold text-purple-600">{{ stats.following_count }}</div>
             <div class="text-sm text-gray-600 mt-1">关注</div>
         </div>
-        <div class="rounded-lg shadow-sm border p-4 text-center" onclick="location.href='/my/comments'">
-            <div class="text-sm text-gray-600 mt-1">我的评论</div>
-        </div>
-        <div class="rounded-lg shadow-sm border p-4 text-center" onclick="location.href='/my/urls'">
-            <div class="text-sm text-gray-600 mt-1">链接管理</div>
-        </div>
+        {% if is_own_profile %}
+            <div class="rounded-lg shadow-sm border p-4 text-center" onclick="location.href='/my/comments'">
+                <div class="text-sm text-gray-600 mt-1">我的评论</div>
+            </div>
+            <div class="rounded-lg shadow-sm border p-4 text-center" onclick="location.href='/my/urls'">
+                <div class="text-sm text-gray-600 mt-1">链接管理</div>
+            </div>
+        {% endif %}
     </div>
 
     <!-- 最新文章 -->
