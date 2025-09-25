@@ -7,7 +7,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* 之前的样式保持不变 */
         @keyframes slide-in {
             from {
                 transform: translateX(100%);
@@ -81,6 +80,15 @@
                 transform: rotate(360deg);
             }
         }
+
+        .delete-btn {
+            transition: all 0.3s ease;
+        }
+
+        .delete-btn:hover {
+            background-color: #fee2e2 !important;
+            color: #dc2626 !important;
+        }
     </style>
 </head>
 <body class="min-h-screen">
@@ -146,8 +154,14 @@
 
     <!-- 已读通知区域 -->
     <div class="rounded-xl shadow-md overflow-hidden">
-        <div class="border-b border-gray-100 px-6 py-4">
+        <div class="border-b border-gray-100 px-6 py-4 flex justify-between items-center">
             <h2 class="text-lg font-semibold text-gray-700">已读通知</h2>
+            <button id="delete-all-read"
+                    class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium
+                    transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                <i class="fas fa-trash-alt"></i>
+                全部删除
+            </button>
         </div>
 
         <!-- 状态容器 -->
@@ -184,17 +198,21 @@
 </div>
 
 <script>
-    // API 端点配置
+    // API 端点配置 - 添加删除API
     const API_ENDPOINTS = {
         FETCH: '/noti/api/messages',
         MARK_READ: '/noti/api/messages/read',
-        MARK_ALL_READ: '/noti/api/messages/read_all'
+        MARK_ALL_READ: '/noti/api/messages/read_all',
+        DELETE: '/noti/api/messages/clean'
     };
 
     document.addEventListener('DOMContentLoaded', function () {
         loadNotifications();
         document.getElementById('retry-unread')?.addEventListener('click', loadNotifications);
         document.getElementById('retry-read')?.addEventListener('click', loadNotifications);
+
+        // 添加全部删除按钮事件监听
+        document.getElementById('delete-all-read')?.addEventListener('click', deleteAllRead);
     });
 
     // 加载通知数据
@@ -273,6 +291,97 @@
         }
     }
 
+    // 删除单个消息
+    async function deleteNotification(nid, element) {
+        const deleteBtn = element.querySelector('.delete-btn');
+        if (deleteBtn) {
+            deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>删除中';
+            deleteBtn.disabled = true;
+        }
+
+        try {
+            const response = await fetch(`${API_ENDPOINTS.DELETE}?nid=${nid}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+
+            const result = await response.json();
+
+            if (!response.ok || !result.success) {
+                const errorMsg = result.message || '删除消息失败';
+                throw new Error(errorMsg);
+            }
+
+            // 添加删除动画
+            element.style.opacity = '0';
+            element.style.transform = 'translateX(100%)';
+            element.style.transition = 'all 0.3s ease';
+
+            setTimeout(() => {
+                element.remove();
+                checkEmpty();
+                showToast('消息已删除', 'success');
+            }, 300);
+
+        } catch (error) {
+            console.error('删除消息失败:', error);
+            if (deleteBtn) {
+                deleteBtn.innerHTML = '<i class="fas fa-trash mr-1"></i>删除';
+                deleteBtn.disabled = false;
+            }
+            showToast(error.message || '删除失败，请重试', 'error');
+        }
+    }
+
+    // 删除所有已读消息
+    async function deleteAllRead() {
+        const btn = document.getElementById('delete-all-read');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>删除中...';
+
+        try {
+            const response = await fetch(`${API_ENDPOINTS.DELETE}?nid=all`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+
+            const result = await response.json();
+
+            if (!response.ok || !result.success) {
+                throw new Error('删除所有消息失败');
+            }
+
+            // 移除所有已读消息
+            const readList = document.getElementById('read-list');
+            const readItems = Array.from(readList.children);
+
+            readItems.forEach((item, index) => {
+                setTimeout(() => {
+                    item.style.opacity = '0';
+                    item.style.transform = 'translateX(100%)';
+                    item.style.transition = 'all 0.3s ease';
+
+                    setTimeout(() => {
+                        item.remove();
+                    }, 300);
+                }, index * 100); // 错开删除动画
+            });
+
+            setTimeout(() => {
+                checkEmpty();
+                showToast(`已删除 ${readItems.length} 条消息`, 'success');
+            }, readItems.length * 100 + 300);
+
+        } catch (error) {
+            console.error('删除所有消息失败:', error);
+            showToast('操作失败，请重试', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    }
+
     // 更新通知UI状态
     function updateNotificationUI(element, markReadBtn) {
         if (markReadBtn) {
@@ -291,6 +400,9 @@
         // 移动到已读列表
         document.getElementById('read-list').prepend(element);
 
+        // 为已读消息添加删除按钮
+        addDeleteButton(element);
+
         // 更新未读计数
         const unreadCountElement = document.getElementById('unread-count');
         let unreadCount = parseInt(unreadCountElement.textContent) - 1;
@@ -304,7 +416,36 @@
 
         updateMarkAllButton();
         checkEmpty();
+    }
 
+    // 为已读消息添加删除按钮
+    function addDeleteButton(element) {
+        // 移除原有的按钮区域
+        const buttonArea = element.querySelector('.mt-4.flex.justify-between.items-center');
+        if (buttonArea) {
+            buttonArea.innerHTML = `
+                <div class="text-xs text-gray-400">
+                    <i class="far fa-user"></i> 用户ID: ${element.dataset.id}
+                </div>
+                <button class="delete-btn text-xs font-medium px-3 py-1.5 rounded text-red-600 bg-red-50 hover:bg-red-100">
+                    <i class="fas fa-trash mr-1"></i>删除
+                </button>
+            `;
+
+            // 添加删除按钮事件
+            const deleteBtn = buttonArea.querySelector('.delete-btn');
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    deleteNotification(element.dataset.id, element);
+                });
+            }
+
+            // 更新点击事件 - 已读消息点击时直接删除
+            element.addEventListener('click', function () {
+                deleteNotification(element.dataset.id, element);
+            });
+        }
     }
 
     // 一键已读功能
@@ -346,6 +487,9 @@
                     const unreadText = item.querySelector('.mt-4.border-t');
                     if (unreadText) unreadText.remove();
 
+                    // 为已读消息添加删除按钮
+                    addDeleteButton(item);
+
                     readList.prepend(item);
                 });
 
@@ -375,8 +519,12 @@
 
     function showLoading(show) {
         const markAllBtn = document.getElementById('mark-all-read');
+        const deleteAllBtn = document.getElementById('delete-all-read');
         if (markAllBtn) {
             markAllBtn.disabled = show;
+        }
+        if (deleteAllBtn) {
+            deleteAllBtn.disabled = show;
         }
     }
 
@@ -387,6 +535,15 @@
         }`;
         item.dataset.id = notice.id;
         const typeStyles = getTypeStyles(notice.type);
+
+        // 根据消息状态生成不同的按钮
+        const actionButton = notice.is_read
+            ? `<button class="delete-btn text-xs font-medium px-3 py-1.5 rounded text-red-600 bg-red-50 hover:bg-red-100">
+                  <i class="fas fa-trash mr-1"></i>删除
+               </button>`
+            : `<button class="mark-read-btn text-xs font-medium px-3 py-1.5 rounded text-blue-600 hover:bg-blue-50">
+                  标记为已读
+               </button>`;
 
         item.innerHTML = `
             <div class="flex gap-4">
@@ -410,30 +567,43 @@
                         <div class="text-xs text-gray-400">
                             <i class="far fa-user"></i> 用户ID: ${notice.user_id}
                         </div>
-                        <button class="mark-read-btn text-xs font-medium px-3 py-1.5 rounded ${
-            notice.is_read ? 'text-gray-500 bg-gray-100' : 'text-blue-600 hover:bg-blue-50'
-        }">
-                            ${notice.is_read ? '<i class="fas fa-check mr-1"></i> 已读' : '标记为已读'}
-                        </button>
+                        ${actionButton}
                     </div>
                 </div>
             </div>
             ${!notice.is_read ? '<div class="mt-4 border-t border-gray-100 pt-4 flex items-center text-blue-500 text-sm font-medium"><span class="unread-indicator"></span> 未读消息</div>' : ''}
         `;
 
-        const markReadBtn = item.querySelector('.mark-read-btn');
-        if (markReadBtn) {
-            markReadBtn.addEventListener('click', function (e) {
-                e.stopPropagation();
+        // 添加事件监听
+        if (notice.is_read) {
+            // 已读消息：添加删除功能
+            const deleteBtn = item.querySelector('.delete-btn');
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    deleteNotification(notice.id, item);
+                });
+            }
+
+            // 已读消息点击时直接删除
+            item.addEventListener('click', function () {
+                deleteNotification(notice.id, item);
+            });
+        } else {
+            // 未读消息：添加标记已读功能
+            const markReadBtn = item.querySelector('.mark-read-btn');
+            if (markReadBtn) {
+                markReadBtn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    markAsRead(notice.id, item);
+                });
+            }
+
+            // 未读消息点击时标记为已读
+            item.addEventListener('click', function () {
                 markAsRead(notice.id, item);
             });
         }
-
-        item.addEventListener('click', function () {
-            if (!notice.is_read) {
-                markAsRead(notice.id, item);
-            }
-        });
 
         return item;
     }
@@ -533,6 +703,13 @@
         if (markAllBtn) {
             markAllBtn.disabled = unreadCount === 0;
         }
+
+        // 更新全部删除按钮状态
+        const readList = document.getElementById('read-list');
+        const deleteAllBtn = document.getElementById('delete-all-read');
+        if (deleteAllBtn) {
+            deleteAllBtn.disabled = readList.children.length === 0;
+        }
     }
 
     function checkEmpty() {
@@ -549,6 +726,12 @@
             showElement('no-read');
         } else {
             hideElement('no-read');
+        }
+
+        // 更新全部删除按钮状态
+        const deleteAllBtn = document.getElementById('delete-all-read');
+        if (deleteAllBtn) {
+            deleteAllBtn.disabled = readList.children.length === 0;
         }
     }
 

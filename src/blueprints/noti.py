@@ -1,5 +1,7 @@
-from flask import Blueprint
+from flask import Blueprint, jsonify
 
+from src.database import get_db
+from src.models import Notification
 from src.notification import read_current_notification, get_notifications, read_all_notifications
 from src.user.authz.decorators import jwt_required
 
@@ -25,3 +27,16 @@ def fetch_message(user_id):
 @jwt_required
 def mark_all_as_read(user_id):
     return read_all_notifications(user_id)
+
+
+@noti_bp.route('/api/messages/clean', methods=['DELETE'])
+@jwt_required
+def clean_notification(user_id):
+    nid = request.args.get('nid', 'all')
+    with get_db() as db:
+        if nid == 'all':
+            db.query(Notification).filter_by(user_id=user_id).delete()
+        else:
+            db.query(Notification).filter_by(user_id=user_id, id=int(nid)).delete()
+        db.commit()
+    return jsonify({"success": True})
