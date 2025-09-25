@@ -56,17 +56,16 @@
                     </div>
 
                     <!-- 标签 -->
-                    <!-- 添加 None 值检查，防止 split() 方法在 None 上调用 -->
                     <div class="flex flex-wrap mb-6">
                         {% if article.tags %}
-                            {% for tag in article.tags.split(',') %}
-                                {% if tag.strip() %}
-                                    <a href="/tag/{{ tag.strip() }}"
-                                       class="mr-2 mb-2 px-3 py-1 text-gray-700 rounded-full text-sm hover:bg-primary hover:text-white">
-                                        {{ tag.strip() }}
+                            <div class="mt-4">
+                                {% for tag in article.tags | F2list %}
+                                    <a href="/tag/{{ tag }}"
+                                       class="tag inline-block bg-gray-100 hover:bg-indigo-100 text-gray-800 text-xs font-semibold rounded-full px-3 py-1 mr-2 transition-all">
+                                        {{ tag }}
                                     </a>
-                                {% endif %}
-                            {% endfor %}
+                                {% endfor %}
+                            </div>
                         {% endif %}
                     </div>
 

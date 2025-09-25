@@ -16,7 +16,7 @@ from src.blog.article.core.views import blog_tmp_url, blog_detail_back, \
     blog_detail_aid_back, blog_detail_i18n, edit_article_back, new_article_back, blog_detail_i18n_list, contribute_back
 from src.blog.article.metadata.handlers import persist_views
 from src.blog.article.security.password import get_apw_form, check_apw_form
-from src.blog.comment import create_comment, comment_page_get
+from src.blog.comment import comment_page_get, create_comment_with_anti_spam
 from src.blog.homepage import index_page_back, tag_page_back, featured_page_back
 from src.blueprints.auth import auth_bp
 from src.blueprints.category import category_bp
@@ -291,7 +291,7 @@ def temp_view():
 )
 @jwt_required
 def api_comment(user_id, article_id):
-    return create_comment(user_id, article_id)
+    return create_comment_with_anti_spam(user_id, article_id)
 
 
 @app.route("/api/comment/<article_id>", methods=['GET'])
