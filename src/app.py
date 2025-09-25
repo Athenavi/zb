@@ -23,6 +23,7 @@ from src.blueprints.category import category_bp
 from src.blueprints.dashboard import dashboard_bp
 from src.blueprints.media import create_media_blueprint
 from src.blueprints.my import my_bp
+from src.blueprints.noti import noti_bp
 from src.blueprints.relation import relation_bp
 from src.blueprints.role import role_bp
 from src.blueprints.theme import create_theme_blueprint
@@ -31,7 +32,6 @@ from src.config.theme import get_all_themes
 from src.database import get_db
 from src.error import error
 from src.models import db, User, Article, UserSubscription
-from src.notification import read_all_notifications, get_notifications, read_current_notification
 from src.other.diy import diy_space_put
 from src.other.filters import json_filter, string_split, article_author, md2html, relative_time_filter, category_filter, \
     f2list
@@ -136,6 +136,7 @@ app.register_blueprint(my_bp)
 app.register_blueprint(relation_bp)
 app.register_blueprint(role_bp)
 app.register_blueprint(category_bp)
+app.register_blueprint(noti_bp)
 app.register_blueprint(plugin_bp)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)  # 添加 ProxyFix 中间件
 
@@ -560,40 +561,6 @@ def api_user_profile(user_id):
 @cache.cached(timeout=600, key_prefix='username_check')
 def api_username_check(username):
     return username_exists(username)
-
-
-@app.route('/api/messages/read', methods=['POST'])
-@siwa.doc(
-    summary="标记消息为已读",
-    description="标记消息为已读。",
-    tags=["消息"]
-)
-@jwt_required
-def read_notification(user_id):
-    nid = request.args.get('nid')
-    return read_current_notification(user_id, nid)
-
-
-@app.route('/api/messages', methods=['GET'])
-@siwa.doc(
-    summary="获取消息列表",
-    description="获取消息列表。",
-    tags=["消息"]
-)
-@jwt_required
-def fetch_message(user_id):
-    return get_notifications(user_id)
-
-
-@app.route('/api/messages/read_all', methods=['POST'])
-@siwa.doc(
-    summary="标记所有消息为已读",
-    description="标记所有消息为已读。",
-    tags=["消息"]
-)
-@jwt_required
-def mark_all_as_read(user_id):
-    return read_all_notifications(user_id)
 
 
 @app.route('/api/media/upload', methods=['POST'])

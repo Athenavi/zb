@@ -83,24 +83,10 @@
         }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
-<!-- 导航栏保持不变 -->
-<nav class="bg-white shadow-sm">
-    <div class="container mx-auto px-4 py-4 flex justify-between items-center">
-        <div class="flex items-center space-x-2">
-            <i class="fas fa-comment-alt text-blue-500 text-xl"></i>
-            <h1 class="text-xl font-bold text-gray-800">消息中心</h1>
-        </div>
-        <div class="flex items-center space-x-4">
-            <div class="relative">
-                <button class="bg-blue-100 text-blue-800 rounded-full p-2 hover:bg-blue-200 transition-colors">
-                    <i class="fas fa-user"></i>
-                </button>
-            </div>
-        </div>
-    </div>
-</nav>
-
+<body class="min-h-screen">
+<!-- 导航栏 -->
+{% from 'header.html' import SimpleHeader %}
+{{ SimpleHeader(title) }}
 <div class="container mx-auto px-4 py-8 max-w-4xl">
     <!-- 标题部分保持不变 -->
     <div class="flex justify-between items-center mb-8">
@@ -115,7 +101,7 @@
     </div>
 
     <!-- 未读通知区域 -->
-    <div class="bg-white rounded-xl shadow-md overflow-hidden mb-8">
+    <div class="rounded-xl shadow-md overflow-hidden mb-8">
         <div class="border-b border-gray-100 px-6 py-4 flex justify-between items-center">
             <h2 class="text-lg font-semibold text-gray-700">未读通知</h2>
             <button id="mark-all-read"
@@ -159,7 +145,7 @@
     </div>
 
     <!-- 已读通知区域 -->
-    <div class="bg-white rounded-xl shadow-md overflow-hidden">
+    <div class="rounded-xl shadow-md overflow-hidden">
         <div class="border-b border-gray-100 px-6 py-4">
             <h2 class="text-lg font-semibold text-gray-700">已读通知</h2>
         </div>
@@ -200,9 +186,9 @@
 <script>
     // API 端点配置
     const API_ENDPOINTS = {
-        FETCH: '/api/messages',
-        MARK_READ: '/api/messages/read',
-        MARK_ALL_READ: '/api/messages/read_all'
+        FETCH: '/noti/api/messages',
+        MARK_READ: '/noti/api/messages/read',
+        MARK_ALL_READ: '/noti/api/messages/read_all'
     };
 
     document.addEventListener('DOMContentLoaded', function () {
@@ -306,11 +292,19 @@
         document.getElementById('read-list').prepend(element);
 
         // 更新未读计数
-        const unreadCount = parseInt(document.getElementById('unread-count').textContent) - 1;
-        document.getElementById('unread-count').textContent = unreadCount;
+        const unreadCountElement = document.getElementById('unread-count');
+        let unreadCount = parseInt(unreadCountElement.textContent) - 1;
+
+        // 确保未读计数不低于0
+        if (unreadCount < 0) {
+            unreadCount = 0;
+        }
+
+        unreadCountElement.textContent = unreadCount;
 
         updateMarkAllButton();
         checkEmpty();
+
     }
 
     // 一键已读功能
