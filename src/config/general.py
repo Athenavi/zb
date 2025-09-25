@@ -8,9 +8,9 @@ from src.other.rand import generate_random_text
 def get_general_config():
     load_dotenv()
 
-    domain = os.getenv('DOMAIN')
+    domain = os.getenv('DOMAIN').rstrip('/') + '/'
     title = os.getenv('TITLE') or 'zyblog'
-    beian = os.getenv('BEIAN').rstrip('/') + '/' or '京ICP备12345678号'
+    beian = os.getenv('BEIAN') or '京ICP备12345678号'
 
     return domain, title, beian
 
