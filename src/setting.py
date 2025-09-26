@@ -116,6 +116,3 @@ class AppConfig(BaseConfig):
         'db_name': db_name,
         'db_password': db_password
     })
-
-
-app_config = AppConfig()
