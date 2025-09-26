@@ -317,7 +317,7 @@ def new_article_back(user_id):
         tags = request.form.get('tags')
         is_featured = True if request.form.get('is_featured') else False
         status = request.form.get('status', 'Draft')
-        article_type = request.form.get('article_type')
+        article_ad = request.form.get('article_ad')
         cover_image = request.form.get('cover_image')
         # 创建新文章
         new_article = Article(
@@ -327,7 +327,7 @@ def new_article_back(user_id):
             tags=tags,
             is_featured=is_featured,
             status=status,
-            article_type=article_type,
+            article_ad=article_ad,
             cover_image=cover_image,
             user_id=user_id
         )
@@ -340,8 +340,9 @@ def new_article_back(user_id):
                 language_code='zh-CN'
             )
             db.add(article_content)
+            db.commit()
             flash('文章创建成功!', 'success')
-            return redirect(url_for('markdown_editor', aid=new_article.article_id))
+            return redirect('/my/posts')
 
     return render_template('article_edit.html',
                            article=article,
