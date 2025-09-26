@@ -96,10 +96,17 @@ class AppConfig(BaseConfig):
         "pool_pre_ping": True,
     }
 
-    redis_host = os.environ.get('REDIS_HOST') or os.getenv('REDIS_HOST', 'localhost')
-    redis_port = os.environ.get('REDIS_PORT') or os.getenv('REDIS_PORT', 6379)
-    redis_db = os.environ.get('REDIS_DB') or os.getenv('REDIS_DB', 0)
-    redis_password = os.environ.get('REDIS_PASSWORD') or os.getenv('REDIS_PASSWORD') or None
+    RedisConfig = {
+        "host": os.environ.get('REDIS_HOST') or os.getenv('REDIS_HOST', 'localhost'),
+        "port": os.environ.get('REDIS_PORT') or os.getenv('REDIS_PORT', 6379),
+        "db": os.environ.get('REDIS_DB') or os.getenv('REDIS_DB', 0),
+        "password": os.environ.get('REDIS_PASSWORD') or os.getenv('REDIS_PASSWORD') or None,
+        "decode_responses": True,
+        "socket_connect_timeout": 3,  # 连接超时3秒
+        "socket_timeout": 3,  # 读写超时3秒
+        "retry_on_timeout": True,  # 超时重试
+        "max_connections": 10  # 连接池大小
+    }
 
     # 在子类中设置数据库URI
     SQLALCHEMY_DATABASE_URI = get_sqlalchemy_uri({

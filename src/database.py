@@ -85,17 +85,8 @@ def check_db():
 redis_client = None
 try:
     redis_client = redis.Redis(
-        host=app_config.redis_host,
-        port=app_config.redis_port,
-        db=app_config.redis_db,
-        password=app_config.redis_password,
-        decode_responses=True,
-        socket_connect_timeout=3,  # 连接超时3秒
-        socket_timeout=3,  # 读写超时3秒
-        retry_on_timeout=True,  # 超时重试
-        max_connections=10  # 连接池大小
+        **app_config.RedisConfig
     )
-    # 测试连接
     redis_client.ping()
     print("Redis连接成功")
 except Exception as e:
