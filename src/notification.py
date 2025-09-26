@@ -4,11 +4,11 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 # import flask_socketio
-from flask import Flask, jsonify, current_app
+from flask import Flask, jsonify
 from flask_caching import Cache
 
 from src.config.mail import get_mail_conf
-from src.database import get_db
+from src.database import get_db, redis_client, get_cache_status
 from src.models import Notification
 from src.utils.security.jwt_handler import secret_key
 
@@ -113,30 +113,9 @@ def read_current_notification(user_id, notification_id):
     return response, 200
 
 
-import redis
 import json
 from datetime import datetime, timedelta
 import threading
-
-# Redis连接配置
-redis_client = None
-try:
-    redis_client = redis.Redis(
-        host='localhost',
-        port=6379,
-        db=0,
-        decode_responses=True,
-        socket_connect_timeout=3,  # 连接超时3秒
-        socket_timeout=3,  # 读写超时3秒
-        retry_on_timeout=True,  # 超时重试
-        max_connections=10  # 连接池大小
-    )
-    # 测试连接
-    redis_client.ping()
-    print("Redis连接成功")
-except Exception as e:
-    print(f"Redis连接失败，将使用内存缓存: {e}")
-    redis_client = None
 
 
 # 内存缓存实现
@@ -287,34 +266,6 @@ def update_notification_cache(parent_comment_id, user_id, count=1):
     # Redis不可用或操作失败，使用内存缓存
     print("使用内存缓存进行更新")
     _update_notification_cache_memory(parent_comment_id, user_id, count)
-
-
-# 辅助函数：检查当前使用的缓存类型
-def get_cache_status():
-    """获取当前缓存状态"""
-    if redis_client is not None:
-        try:
-            redis_client.ping()
-            return "redis"
-        except:
-            return "memory"
-    return "memory"
-
-
-# 辅助函数：手动切换缓存类型（用于测试或特殊场景）
-def switch_cache_type(cache_type):
-    """手动切换缓存类型（主要用于测试）"""
-    global redis_client
-    if cache_type == "redis" and redis_client is not None:
-        try:
-            redis_client.ping()
-            print("已切换到Redis缓存")
-        except Exception as e:
-            current_app.logger.error(f"无法切换到Redis: {e}")
-    elif cache_type == "memory":
-        print("已切换到内存缓存")
-    else:
-        print("不支持或不可用的缓存类型")
 
 
 # 测试函数

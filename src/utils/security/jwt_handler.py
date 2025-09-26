@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 import pytz
-from flask import request
+from flask import request, flash
 from jwt import encode, decode, ExpiredSignatureError, InvalidTokenError
 
 from src.config.general import zy_safe_conf
@@ -41,7 +41,7 @@ class JWTHandler:
             return payload['user_id']
         except ExpiredSignatureError:
             print("Token expired")
-            return None
+            return flash('Token expired', 'error')   # 这里可以返回错误信息，前端显示
         except InvalidTokenError:
             print("Invalid token")
             return None
