@@ -1,9 +1,8 @@
 import logging
-import os
 from contextlib import contextmanager
 
 import psycopg2
-from dotenv import load_dotenv
+import redis
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool
@@ -12,48 +11,15 @@ from sqlalchemy.pool import QueuePool
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# 加载 .env 文件
-load_dotenv()
+from src.setting import AppConfig
 
-db_host = os.environ.get('DB_HOST') or os.getenv('DATABASE_HOST')
-db_port = os.environ.get('DB_PORT') or os.getenv('DATABASE_PORT', '5432')
-db_name = os.environ.get('DB_NAME') or os.getenv('DATABASE_NAME')
-db_user = os.environ.get('DB_USER') or os.getenv('DATABASE_USER')
-db_password = os.environ.get('DB_PASSWORD') or os.getenv('DATABASE_PASSWORD')
-db_pool_size = os.environ.get('DB_POOL_SIZE') or os.getenv('DATABASE_POOL_SIZE', '16')
-
-
-def get_sqlalchemy_uri():
-    """获取SQLAlchemy数据库URI，兼容空密码情况"""
-    if not all([db_host, db_port, db_name, db_user]):
-        logger.error('数据库连接配置不完整，请检查 .env 文件或环境变量。')
-        return None
-
-    # 构建SQLAlchemy数据库URI，处理密码为空的情况
-    if db_password:
-        sqlalchemy_uri = f"postgresql+psycopg2://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
-        logger.info(f"SQLAlchemy URI: {sqlalchemy_uri.replace(db_password, '***')}")  # 安全日志
-    else:
-        sqlalchemy_uri = f"postgresql+psycopg2://{db_user}@{db_host}:{db_port}/{db_name}"
-        logger.info(f"SQLAlchemy URI: {sqlalchemy_uri}")  # 密码为空，无需隐藏
-
-    return sqlalchemy_uri
-
-
-# 配置连接池参数
-pool_config = {
-    "pool_size": int(db_pool_size),  # 连接池大小
-    "max_overflow": 20,
-    "pool_timeout": 5,
-    "pool_recycle": 1200,
-    "pool_pre_ping": True,
-}
+app_config = AppConfig()
 
 # 创建带有连接池的引擎
 engine = create_engine(
-    get_sqlalchemy_uri(),
+    app_config.SQLALCHEMY_DATABASE_URI,
     poolclass=QueuePool,  # 使用队列连接池
-    **pool_config
+    **app_config.pool_config
 )
 
 # 创建会话工厂
@@ -113,6 +79,56 @@ def check_db():
         logger.warning("数据库中没有找到表。")
         print(f"----------------数据库表丢失")
         return 0
+
+
+# Redis连接配置
+redis_client = None
+try:
+    redis_client = redis.Redis(
+        host=app_config.redis_host,
+        port=app_config.redis_port,
+        db=app_config.redis_db,
+        password=app_config.redis_password,
+        decode_responses=True,
+        socket_connect_timeout=3,  # 连接超时3秒
+        socket_timeout=3,  # 读写超时3秒
+        retry_on_timeout=True,  # 超时重试
+        max_connections=10  # 连接池大小
+    )
+    # 测试连接
+    redis_client.ping()
+    print("Redis连接成功")
+except Exception as e:
+    print(f"Redis连接失败，将使用内存缓存: {e}")
+    redis_client = None
+
+
+# 辅助函数：检查当前使用的缓存类型
+def get_cache_status():
+    """获取当前缓存状态"""
+    if redis_client is not None:
+        try:
+            redis_client.ping()
+            return "redis"
+        except:
+            return "memory"
+    return "memory"
+
+
+# 辅助函数：手动切换缓存类型（用于测试或特殊场景）
+def switch_cache_type(cache_type):
+    """手动切换缓存类型（主要用于测试）"""
+    global redis_client
+    if cache_type == "redis" and redis_client is not None:
+        try:
+            redis_client.ping()
+            print("已切换到Redis缓存")
+        except Exception as e:
+            print(f"无法切换到Redis: {e}")
+    elif cache_type == "memory":
+        print("已切换到内存缓存")
+    else:
+        print("不支持或不可用的缓存类型")
 
 
 if __name__ == "__main__":
