@@ -1,9 +1,9 @@
 import os
 from datetime import timedelta
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-from src.config.general import get_general_config
 from src.other.rand import generate_random_text
 
 # 加载 .env 文件
@@ -35,7 +35,12 @@ class BaseConfig:
     global_encoding = 'utf-8'
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     SECRET_KEY = os.environ.get('SECRET_KEY') or generate_random_text(32)
-    domain, sitename, beian = get_general_config()
+    JWT_EXPIRATION_DELTA = int(os.getenv('JWT_EXPIRATION_DELTA')) or 7200
+    REFRESH_TOKEN_EXPIRATION_DELTA = int(os.getenv('REFRESH_TOKEN_EXPIRATION_DELTA')) or 64800
+    TIME_ZONE = os.getenv('TIME_ZONE') or 'Asia/Shanghai'
+    domain = os.getenv('DOMAIN').rstrip('/') + '/'
+    sitename = os.getenv('TITLE') or 'zyblog'
+    beian = os.getenv('BEIAN') or '京ICP备12345678号'
 
     # 注意：这里暂时设为None，在子类中具体设置
     SQLALCHEMY_DATABASE_URI = None
@@ -76,6 +81,7 @@ class BaseConfig:
     UPLOAD_LIMIT = 60 * 1024 * 1024
     MAX_LINE = 1000
     MAX_CACHE_TIMESTAMP = 7200
+    USER_FREE_STORAGE_LIMIT = 0.5 * 1024 * 1024 * 1024  # 512MB 用户免费空间限制
 
 
 class AppConfig(BaseConfig):
@@ -116,3 +122,33 @@ class AppConfig(BaseConfig):
         'db_name': db_name,
         'db_password': db_password
     })
+
+
+class WechatPayConfig:
+    # 微信支付配置 (服务商模式或直连模式)
+    WECHAT_APPID = os.getenv('WECHAT_APPID')  # 小程序/公众号AppID
+    WECHAT_MCHID = os.getenv('WECHAT_MCHID')  # 商户号
+    WECHAT_API_V3_KEY = os.getenv('WECHAT_API_V3_KEY')  # APIv3密钥
+
+    private_key_path = Path('keys/wechat/private_key.pem')
+    WECHAT_PRIVATE_KEY = private_key_path.read_text() if private_key_path.exists() else None  # 商户私钥
+    WECHAT_CERT_SERIAL_NO = os.getenv('WECHAT_CERT_SERIAL_NO')  # 证书序列号
+    WECHAT_NOTIFY_URL = os.getenv('WECHAT_NOTIFY_URL', 'https://yourdomain.com/api/payment/wechat/notify')
+    WECHAT_CERT_DIR = './cert'
+
+
+class AliPayConfig:
+    # 支付宝配置
+    ALIPAY_APPID = os.getenv('ALIPAY_APPID')
+    ALIPAY_DEBUG = os.getenv('ALIPAY_DEBUG', True)  # 沙箱模式设为True
+    ALIPAY_GATEWAY = 'https://openapi.alipaydev.com/gateway.do' if ALIPAY_DEBUG else 'https://openapi.alipay.com/gateway.do'
+    ALIPAY_RETURN_URL = os.getenv('ALIPAY_RETURN_URL', 'https://yourdomain.com/payment/success')  # 同步回调(网页支付)
+    ALIPAY_NOTIFY_URL = os.getenv('ALIPAY_NOTIFY_URL', 'https://yourdomain.com/api/payment/alipay/notify')  # 异步回调
+    # 密钥字符串 (推荐从环境变量或文件读取)
+    private_key_path = Path('keys/alipay/app_private_key.pem')
+    ALIPAY_PRIVATE_KEY_STRING = private_key_path.read_text() if private_key_path.exists() else None
+    public_key_path = Path('keys/alipay/alipay_public_key.pem')
+    ALIPAY_PUBLIC_KEY_STRING = public_key_path.read_text() if public_key_path.exists() else None
+
+
+app_config = AppConfig()

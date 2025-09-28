@@ -3,10 +3,10 @@ from datetime import datetime
 
 from flask import render_template, request, make_response, current_app
 
-from src.config.theme import get_all_themes
 from src.database import get_db
 from src.error import error
 from src.models import Article, Category
+from src.utils.config.theme import get_all_themes
 
 
 def proces_page_data(total_articles, article_info, current_page, page_size, theme='default'):
@@ -87,10 +87,11 @@ def get_articles_with_filters(filters, page, page_size):
                 Article.excerpt,
                 Article.is_featured,
                 Article.tags,
-                Article.slug
+                Article.slug,
             ).outerjoin(Category, Article.category_id == Category.id).filter(
                 Article.hidden == False,
-                Article.status == 'Published'
+                Article.status == 'Published',
+                Article.is_vip_only == False,
             )
 
             # 添加额外过滤器
