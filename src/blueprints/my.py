@@ -185,15 +185,16 @@ def my_posts(user_id):
 @jwt_required
 def update_article_status(user_id, article_id):
     """更新文章状态"""
-    article = Article.query.filter_by(article_id=article_id, user_id=user_id).first()
-    if not article:
-        return jsonify({'success': False, 'message': '文章不存在'}), 404
+    with get_db() as db:
+        article = db.query(Article).filter_by(article_id=article_id, user_id=user_id).first()
+        if not article:
+            return jsonify({'success': False, 'message': '文章不存在'}), 404
 
-    new_status = request.json.get('status')
-    if new_status not in ['Draft', 'Published', 'Deleted']:
-        return jsonify({'success': False, 'message': '无效的状态'}), 400
+        new_status = int(request.json.get('status'))
+        if not isinstance(new_status, int):
+            return jsonify({'success': False, 'message': '状态必须是整数类型'}), 400
 
-    article.status = new_status
-    article.updated_at = datetime.now()
+        article.status = new_status
+        article.updated_at = datetime.now()
 
-    return jsonify({'success': True, 'message': f'文章已{new_status}'})
+        return jsonify({'success': True, 'message': f'文章已{new_status}'})

@@ -193,12 +193,12 @@
                                     </button>
                                 {% endif %}
                                 {% if article.status == 1 %}
-                                    <button onclick="updateStatus({{ article.article_id }}, 'Draft')"
+                                    <button onclick="updateStatus({{ article.article_id }}, 0)"
                                             class="text-warning hover:text-yellow-700 p-1" title="转为草稿">
                                         <i class="fas fa-archive"></i>
                                     </button>
                                 {% endif %}
-                                <button onclick="updateStatus({{ article.article_id }}, 'Deleted')"
+                                <button onclick="updateStatus({{ article.article_id }}, -1)"
                                         class="text-danger hover:text-red-700 p-1" title="删除">
                                     <i class="fas fa-trash"></i>
                                 </button>
