@@ -167,9 +167,9 @@ def my_posts(user_id):
         # 统计数据
         stats = {
             'total': Article.query.filter_by(user_id=user_id).count(),
-            'published': Article.query.filter_by(user_id=user_id, status='Published').count(),
-            'draft': Article.query.filter_by(user_id=user_id, status='Draft').count(),
-            'deleted': Article.query.filter_by(user_id=user_id, status='Deleted').count(),
+            'published': Article.query.filter_by(user_id=user_id, status=1).count(),
+            'draft': Article.query.filter_by(user_id=user_id, status=0).count(),
+            'deleted': Article.query.filter_by(user_id=user_id, status=-1).count(),
         }
 
         return render_template('my/user_posts.html',

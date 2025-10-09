@@ -403,9 +403,9 @@
                 <span>{{ '编辑文章' if article else '新建文章' }}</span>
                 {% if article %}
                     <span class="ml-4 badge badge-{{ article.status }}">
-                        {% if article.status == 'Draft' %}草稿
-                        {% elif article.status == 'Published' %}已发布
-                        {% elif article.status == 'Deleted' %}删除
+                        {% if article.status == 0 %}草稿
+                        {% elif article.status == 1 %}已发布
+                        {% elif article.status == -1 %}删除
                         {% endif %}
                     </span>
                 {% endif %}

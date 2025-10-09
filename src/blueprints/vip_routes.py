@@ -67,7 +67,7 @@ def subscribe(user_id, plan_id):
     existing_subscription = VIPSubscription.query.filter(
         and_(
             VIPSubscription.user_id == user_id,
-            VIPSubscription.status == 'active',
+            VIPSubscription.status == 1,
             VIPSubscription.expires_at.astimezone(timezone('UTC')) > utc_now
         )
     ).first()
@@ -87,7 +87,7 @@ def subscribe(user_id, plan_id):
         plan_id=plan.id,
         starts_at=starts_at,
         expires_at=expires_at,
-        status='active',
+        status=1,
         payment_amount=plan.price
     )
 
@@ -126,14 +126,14 @@ def my_subscription(user_id):
             current_time = datetime.now(timezone.utc)
 
             # 更新过期状态
-            if latest_subscription.status == 'active' and latest_subscription.expires_at <= current_time:
-                latest_subscription.status = 'expired'
+            if latest_subscription.status == 1 and latest_subscription.expires_at <= current_time:
+                latest_subscription.status = -1
                 db.session.commit()
 
             active_subscription = latest_subscription
 
             # 只有当订阅有效时才更新用户VIP信息
-            if latest_subscription.status == 'active':
+            if latest_subscription.status == 1:
                 plan = VIPPlan.query.filter_by(id=latest_subscription.plan_id).first()
                 if plan:
                     user.vip_level = plan.level
@@ -183,11 +183,11 @@ def premium_content():
 
         premium_articles = Article.query.filter(
             or_(
-                Article.is_vip_only == True,
-                Article.required_vip_level > 0
+                Article.is_vip_only.is_(True),
+                Article.required_vip_level != 0
             ),
-            Article.status == 'Published',
-            Article.hidden == False
+            Article.status == 1,
+            Article.hidden.is_(False)
         ).filter(
             Article.required_vip_level <= user.vip_level
         ).order_by(Article.created_at.desc()).all()
