@@ -97,24 +97,25 @@ def user_comments(user_id):
 def edit_comment(user_id, comment_id):
     """编辑评论"""
     with get_db() as db:
-        comment = Comment.query.filter_by(id=comment_id, user_id=user_id).first()
+        # 获取要编辑的评论
+        comment = db.query(Comment).filter_by(id=comment_id, user_id=user_id).first()
+
         if not comment:
             flash('评论不存在', 'error')
             return redirect(url_for('my.user_comments'))
 
         if request.method == 'POST':
+            # 检查该评论是否有回复
+            has_replies = Comment.query.filter_by(parent_id=comment_id).first() is not None
+            if has_replies:
+                flash('不允许编辑已经存在回复的评论', 'error')
+                return redirect(url_for('my.user_comments'))
             content = request.form.get('content')
             if content:
-                try:
-                    comment.content = content
-                    comment.updated_at = datetime.now()
-
-                    flash('评论更新成功', 'success')
-                    return redirect(url_for('my.user_comments'))
-                except Exception as e:
-                    db.rollback()
-                    flash(f'更新失败: {str(e)}', 'error')
-
+                comment.content = content
+                comment.updated_at = datetime.now()
+                flash('评论更新成功', 'success')
+                return redirect(url_for('my.user_comments'))
         return render_template('my/edit_comment.html', comment=comment)
 
 
@@ -123,7 +124,7 @@ def edit_comment(user_id, comment_id):
 def delete_comment(user_id, comment_id):
     """删除评论"""
     with get_db() as db:
-        comment = Comment.query.filter_by(id=comment_id, user_id=user_id).first()
+        comment = db.query(Comment).filter_by(id=comment_id, user_id=user_id).first()
         if not comment:
             flash('评论不存在', 'error')
             return redirect(url_for('my.user_comments'))
