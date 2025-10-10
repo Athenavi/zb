@@ -100,32 +100,28 @@ class MediaDAVProvider(DAVProvider):
         # 解码 Basic Auth 凭据
         try:
             auth_decoded = base64.b64decode(auth_header[6:]).decode('utf-8')
-            username, refresh_token = auth_decoded.split(':', 1)
+            username, password = auth_decoded.split(':', 1)
         except Exception as e:
             logger.error(f"Basic Auth decode error: {e}")
             return None
 
         # 验证 refresh_token 并获取用户
         try:
-            payload = JWTHandler.decode_token(refresh_token)
-            user_id = payload.get('user_id')
-            if not user_id:
-                return None
-
-            with get_db() as db:
-                user = db.query(User).filter(User.id == user_id).first()
-                # 验证用户名是否匹配
-                if user and user.username == username:
-                    logger.info(f"Basic Auth successful for user: {username}")
-                    # 在会话关闭前提取所需属性
-                    return {
-                        'id': user.id,
-                        'username': user.username,
-                        'vip_level': user.vip_level,
-                        'created_at': user.created_at
-                    }
-                else:
-                    logger.warning(f"Basic Auth failed: username mismatch")
+            jwt_handler = JWTHandler()
+            refresh_token = jwt_handler.decode_token(password)
+            user_id = refresh_token.get('user_id')
+            if user_id:
+                with get_db() as db:
+                    user = db.query(User).filter(User.id == user_id).first()
+                    if user and user.verify_password(username):
+                        logger.info(f"Basic Auth successful for user: {user.username}")
+                        # 在会话关闭前提取所需属性
+                        return {
+                            'id': user.id,
+                            'username': user.username,
+                            'vip_level': user.vip_level,
+                            'created_at': user.created_at
+                        }
 
         except Exception as e:
             logger.error(f"Refresh token validation error: {e}")
@@ -306,7 +302,8 @@ class UserMediaRootCollection(DAVCollection):
                         )
         return None
 
-    def _safe_filename(self, filename):
+    @staticmethod
+    def _safe_filename(filename):
         """处理文件名编码问题"""
         try:
             # 尝试使用 UTF-8 编码
@@ -321,11 +318,15 @@ class UserMediaRootCollection(DAVCollection):
         return f"{self.user_info['username']}'s Media Library"
 
     def get_creation_date(self):
-        """返回集合的创建日期"""
-        return self.user_info.get('created_at', datetime.datetime.now())
+        """返回集合的创建日期（返回时间戳）"""
+        created_at = self.user_info.get('created_at', datetime.datetime.now())
+        if isinstance(created_at, datetime.datetime):
+            return created_at.timestamp()
+        else:
+            return datetime.datetime.now().timestamp()
 
     def get_last_modified(self):
-        """返回集合的最后修改时间"""
+        """返回集合的最后修改时间（返回时间戳）"""
         # 返回最新文件的修改时间
         with get_db() as db:
             latest_media = db.query(Media).filter(
@@ -333,8 +334,9 @@ class UserMediaRootCollection(DAVCollection):
             ).order_by(Media.updated_at.desc()).first()
 
             if latest_media and latest_media.updated_at:
-                return latest_media.updated_at
-        return datetime.datetime.now()
+                if isinstance(latest_media.updated_at, datetime.datetime):
+                    return latest_media.updated_at.timestamp()
+        return datetime.datetime.now().timestamp()
 
     def create_collection(self, name):
         """创建新集合（目录）"""
@@ -356,7 +358,12 @@ class UserMediaRootCollection(DAVCollection):
             ).order_by(Media.updated_at.desc()).first()
 
             latest_time = latest.updated_at if latest and latest.updated_at else datetime.datetime.min
-            etag_data = f"{count}-{latest_time.timestamp()}"
+            if isinstance(latest_time, datetime.datetime):
+                latest_timestamp = latest_time.timestamp()
+            else:
+                latest_timestamp = datetime.datetime.now().timestamp()
+
+            etag_data = f"{count}-{latest_timestamp}"
             return generate_etag(etag_data.encode())
 
     def support_etag(self):
@@ -374,6 +381,47 @@ class UserMediaRootCollection(DAVCollection):
 
     def get_content_type(self):
         return "httpd/unix-directory"
+
+    def get_properties(self, properties=None, **kwargs):
+        """返回资源属性 - 修复方法签名"""
+        props = {}
+        if properties is None:
+            # 返回所有属性
+            props.update({
+                "displayname": self.get_display_name(),
+                "creationdate": self.get_creation_date(),
+                "getlastmodified": self.get_last_modified(),
+                "getcontentlength": self.get_content_length(),
+                "getcontenttype": self.get_content_type(),
+                "getetag": self.get_etag(),
+            })
+        else:
+            # 只返回请求的属性
+            for prop in properties:
+                if prop == "displayname":
+                    props[prop] = self.get_display_name()
+                elif prop == "creationdate":
+                    props[prop] = self.get_creation_date()
+                elif prop == "getlastmodified":
+                    props[prop] = self.get_last_modified()
+                elif prop == "getcontentlength":
+                    props[prop] = self.get_content_length()
+                elif prop == "getcontenttype":
+                    props[prop] = self.get_content_type()
+                elif prop == "getetag":
+                    props[prop] = self.get_etag()
+        return props
+
+    def get_property_names(self, is_allprop=None, **kwargs):
+        """返回支持的属性名称 - 修复方法签名"""
+        return [
+            "displayname",
+            "creationdate",
+            "getlastmodified",
+            "getcontentlength",
+            "getcontenttype",
+            "getetag",
+        ]
 
 
 class MediaFile(DAVNonCollection):
@@ -431,6 +479,7 @@ class MediaFile(DAVNonCollection):
         return self.media_info['original_filename']
 
     def get_creation_date(self):
+        """返回创建日期（时间戳）"""
         created_dt = self.media_info.get('created_at', datetime.datetime.now())
         if isinstance(created_dt, datetime.datetime):
             return created_dt.timestamp()
@@ -438,6 +487,7 @@ class MediaFile(DAVNonCollection):
             return datetime.datetime.now().timestamp()
 
     def get_last_modified(self):
+        """返回最后修改时间（时间戳）"""
         last_modified_dt = self.media_info.get('updated_at', datetime.datetime.now())
         if isinstance(last_modified_dt, datetime.datetime):
             return last_modified_dt.timestamp()
@@ -448,19 +498,38 @@ class MediaFile(DAVNonCollection):
     def is_readonly():
         return True  # 文件只读
 
-    def get_properties(self, **kwargs):
-        """返回资源属性"""
-        return {
-            "displayname": self.get_display_name(),
-            "creationdate": self.get_creation_date(),
-            "getlastmodified": self.get_last_modified(),
-            "getcontentlength": self.get_content_length(),
-            "getcontenttype": self.get_content_type(),
-            "getetag": self.get_etag(),
-        }
+    def get_properties(self, properties=None, **kwargs):
+        """返回资源属性 - 修复方法签名"""
+        props = {}
+        if properties is None:
+            # 返回所有属性
+            props.update({
+                "displayname": self.get_display_name(),
+                "creationdate": self.get_creation_date(),
+                "getlastmodified": self.get_last_modified(),
+                "getcontentlength": self.get_content_length(),
+                "getcontenttype": self.get_content_type(),
+                "getetag": self.get_etag(),
+            })
+        else:
+            # 只返回请求的属性
+            for prop in properties:
+                if prop == "displayname":
+                    props[prop] = self.get_display_name()
+                elif prop == "creationdate":
+                    props[prop] = self.get_creation_date()
+                elif prop == "getlastmodified":
+                    props[prop] = self.get_last_modified()
+                elif prop == "getcontentlength":
+                    props[prop] = self.get_content_length()
+                elif prop == "getcontenttype":
+                    props[prop] = self.get_content_type()
+                elif prop == "getetag":
+                    props[prop] = self.get_etag()
+        return props
 
-    def get_property_names(self, **kwargs):
-        """返回支持的属性名称"""
+    def get_property_names(self, is_allprop=None, **kwargs):
+        """返回支持的属性名称 - 修复方法签名"""
         return [
             "displayname",
             "creationdate",

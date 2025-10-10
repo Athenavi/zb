@@ -9,7 +9,7 @@ from .dav_provider import MediaDAVProvider
 def register_plugin(app):
     bp = Blueprint('webdav_plugin', __name__)
 
-    # WebDAV 配置 - 完全禁用 WsgiDAV 内置认证
+    # WebDAV 配置 - 使用 WsgiDAV 内置认证
     config = {
         "provider_mapping": {
             "/dav": MediaDAVProvider(app)
@@ -20,12 +20,12 @@ def register_plugin(app):
         },
         "property_manager": True,
         "lock_storage": False,
-        # 关键：完全禁用 WsgiDAV 内置认证
+        # 关键：使用 WsgiDAV 内置认证
         "http_authenticator": {
-            "accept_basic": True,    # 允许 Basic 认证
-            "accept_digest": False,  # 禁用 Digest 认证
+            "accept_basic": True,  # 允许 Basic 认证
+            "accept_digest": True,  # 允许 Digest 认证
             "default_to_digest": False,
-            # 禁用域控制器
+            # 使用简单域控制器
             "domain_controller": None,
         },
         "hotfixes": {
