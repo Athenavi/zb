@@ -1,6 +1,7 @@
 import base64
 import datetime
 from pathlib import Path
+import logging
 
 from werkzeug.http import generate_etag
 from wsgidav.dav_provider import DAVProvider, DAVCollection, DAVNonCollection
@@ -8,6 +9,8 @@ from wsgidav.dav_provider import DAVProvider, DAVCollection, DAVNonCollection
 from src.database import get_db
 from src.models import Media, FileHash, User
 from src.utils.security.jwt_handler import JWTHandler
+
+logger = logging.getLogger(__name__)
 
 
 class MediaDAVProvider(DAVProvider):
@@ -99,7 +102,7 @@ class MediaDAVProvider(DAVProvider):
             auth_decoded = base64.b64decode(auth_header[6:]).decode('utf-8')
             username, refresh_token = auth_decoded.split(':', 1)
         except Exception as e:
-            print(f"Basic Auth decode error: {e}")
+            logger.error(f"Basic Auth decode error: {e}")
             return None
 
         # 验证 refresh_token 并获取用户
@@ -113,7 +116,7 @@ class MediaDAVProvider(DAVProvider):
                 user = db.query(User).filter(User.id == user_id).first()
                 # 验证用户名是否匹配
                 if user and user.username == username:
-                    print(f"Basic Auth successful for user: {username}")
+                    logger.info(f"Basic Auth successful for user: {username}")
                     # 在会话关闭前提取所需属性
                     return {
                         'id': user.id,
@@ -122,31 +125,37 @@ class MediaDAVProvider(DAVProvider):
                         'created_at': user.created_at
                     }
                 else:
-                    print(f"Basic Auth failed: username mismatch")
+                    logger.warning(f"Basic Auth failed: username mismatch")
 
         except Exception as e:
-            print(f"Refresh token validation error: {e}")
+            logger.error(f"Refresh token validation error: {e}")
 
         return None
 
     @staticmethod
     def _get_user_from_cookie(environ):
         """从 Cookie 中提取用户信息（浏览器访问）"""
-        from flask import request as flask_request
-
-        # 使用 Flask 的请求对象来获取 cookie
-        jwt_token = flask_request.cookies.get('jwt')
-        if not jwt_token:
-            return None
-
         try:
+            # 从 WSGI environ 中获取 cookie
+            cookie_header = environ.get('HTTP_COOKIE', '')
+            cookies = {}
+            if cookie_header:
+                for cookie in cookie_header.split(';'):
+                    if '=' in cookie:
+                        name, value = cookie.strip().split('=', 1)
+                        cookies[name] = value
+
+            jwt_token = cookies.get('jwt')
+            if not jwt_token:
+                return None
+
             payload = JWTHandler.decode_token(jwt_token)
             user_id = payload.get('user_id')
             if user_id:
                 with get_db() as db:
                     user = db.query(User).filter(User.id == user_id).first()
                     if user:
-                        print(f"Cookie Auth successful for user: {user.username}")
+                        logger.info(f"Cookie Auth successful for user: {user.username}")
                         # 在会话关闭前提取所需属性
                         return {
                             'id': user.id,
@@ -155,7 +164,7 @@ class MediaDAVProvider(DAVProvider):
                             'created_at': user.created_at
                         }
         except Exception as e:
-            print(f"Cookie JWT validation error: {e}")
+            logger.error(f"Cookie JWT validation error: {e}")
 
         return None
 
@@ -173,7 +182,23 @@ class MediaDAVProvider(DAVProvider):
                 ).first()
 
                 if file_hash:
-                    return MediaFile(path, environ, media, file_hash, self.base_dir, user_info)
+                    # 在数据库会话关闭前提取所有需要的属性
+                    media_info = {
+                        'id': media.id,
+                        'original_filename': media.original_filename,
+                        'hash': media.hash,
+                        'created_at': media.created_at,
+                        'updated_at': media.updated_at
+                    }
+
+                    file_hash_info = {
+                        'hash': file_hash.hash,
+                        'file_size': file_hash.file_size,
+                        'mime_type': file_hash.mime_type,
+                        'storage_path': file_hash.storage_path
+                    }
+
+                    return MediaFile(path, environ, media_info, file_hash_info, self.base_dir, user_info)
         return None
 
 
@@ -199,11 +224,31 @@ class UserMediaRootCollection(DAVCollection):
                 ).first()
 
                 if file_hash:
+                    # 在数据库会话关闭前提取所有需要的属性
+                    media_info = {
+                        'id': media.id,
+                        'original_filename': media.original_filename,
+                        'hash': media.hash,
+                        'created_at': media.created_at,
+                        'updated_at': media.updated_at
+                    }
+
+                    file_hash_info = {
+                        'hash': file_hash.hash,
+                        'file_size': file_hash.file_size,
+                        'mime_type': file_hash.mime_type,
+                        'storage_path': file_hash.storage_path
+                    }
+
+                    # 安全地处理文件名编码
+                    safe_filename = self._safe_filename(media.original_filename)
+                    safe_path = f"{self.path}/{safe_filename}"
+
                     members.append(MediaFile(
-                        f"{self.path}/{media.original_filename}",
+                        safe_path,
                         self.environ,
-                        media,
-                        file_hash,
+                        media_info,
+                        file_hash_info,
                         self.app.config.get('base_dir', '.'),
                         self.user_info
                     ))
@@ -215,31 +260,61 @@ class UserMediaRootCollection(DAVCollection):
             media_files = db.query(Media).filter(
                 Media.user_id == self.user_info['id']
             ).all()
-            return [m.original_filename for m in media_files]
+            return [self._safe_filename(m.original_filename) for m in media_files]
 
     def get_member(self, name):
         """获取特定成员"""
+        # 需要处理编码后的文件名与原始文件名的映射
         with get_db() as db:
-            media = db.query(Media).filter(
-                Media.user_id == self.user_info['id'],
-                Media.original_filename == name
-            ).first()
+            # 查找所有媒体文件，然后匹配编码后的文件名
+            media_files = db.query(Media).filter(
+                Media.user_id == self.user_info['id']
+            ).all()
 
-            if media:
-                file_hash = db.query(FileHash).filter(
-                    FileHash.hash == media.hash
-                ).first()
+            for media in media_files:
+                safe_name = self._safe_filename(media.original_filename)
+                if safe_name == name:
+                    file_hash = db.query(FileHash).filter(
+                        FileHash.hash == media.hash
+                    ).first()
 
-                if file_hash:
-                    return MediaFile(
-                        f"{self.path}/{name}",
-                        self.environ,
-                        media,
-                        file_hash,
-                        self.app.config.get('base_dir', '.'),
-                        self.user_info
-                    )
+                    if file_hash:
+                        # 在数据库会话关闭前提取所有需要的属性
+                        media_info = {
+                            'id': media.id,
+                            'original_filename': media.original_filename,
+                            'hash': media.hash,
+                            'created_at': media.created_at,
+                            'updated_at': media.updated_at
+                        }
+
+                        file_hash_info = {
+                            'hash': file_hash.hash,
+                            'file_size': file_hash.file_size,
+                            'mime_type': file_hash.mime_type,
+                            'storage_path': file_hash.storage_path
+                        }
+
+                        safe_path = f"{self.path}/{safe_name}"
+                        return MediaFile(
+                            safe_path,
+                            self.environ,
+                            media_info,
+                            file_hash_info,
+                            self.app.config.get('base_dir', '.'),
+                            self.user_info
+                        )
         return None
+
+    def _safe_filename(self, filename):
+        """处理文件名编码问题"""
+        try:
+            # 尝试使用 UTF-8 编码
+            return filename.encode('utf-8').decode('latin-1')
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            # 如果失败，使用 URL 编码
+            import urllib.parse
+            return urllib.parse.quote(filename)
 
     def get_display_name(self):
         """返回集合的显示名称"""
@@ -302,22 +377,22 @@ class UserMediaRootCollection(DAVCollection):
 
 
 class MediaFile(DAVNonCollection):
-    def __init__(self, path, environ, media, file_hash, base_dir, user_info):
+    def __init__(self, path, environ, media_info, file_hash_info, base_dir, user_info):
         super().__init__(path, environ)
-        self.media = media
-        self.file_hash = file_hash
+        self.media_info = media_info  # 使用字典而不是 ORM 对象
+        self.file_hash_info = file_hash_info  # 使用字典而不是 ORM 对象
         self.base_dir = base_dir
         self.user_info = user_info
 
     def get_content_length(self):
-        return self.file_hash.file_size
+        return self.file_hash_info['file_size']
 
     def get_content_type(self):
-        return self.file_hash.mime_type or "application/octet-stream"
+        return self.file_hash_info['mime_type'] or "application/octet-stream"
 
     def get_content(self):
         """返回文件内容流"""
-        file_path = Path(self.base_dir) / self.file_hash.storage_path
+        file_path = Path(self.base_dir) / self.file_hash_info['storage_path']
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
         return open(file_path, 'rb')
@@ -349,16 +424,25 @@ class MediaFile(DAVNonCollection):
         return True
 
     def get_etag(self):
-        return self.file_hash.hash
+        return self.file_hash_info['hash']
 
     def get_display_name(self):
-        return self.media.original_filename
+        # 直接返回存储的文件名，避免数据库访问
+        return self.media_info['original_filename']
 
     def get_creation_date(self):
-        return self.media.created_at if hasattr(self.media, 'created_at') else datetime.datetime.now()
+        created_dt = self.media_info.get('created_at', datetime.datetime.now())
+        if isinstance(created_dt, datetime.datetime):
+            return created_dt.timestamp()
+        else:
+            return datetime.datetime.now().timestamp()
 
     def get_last_modified(self):
-        return self.media.updated_at if hasattr(self.media, 'updated_at') else datetime.datetime.now()
+        last_modified_dt = self.media_info.get('updated_at', datetime.datetime.now())
+        if isinstance(last_modified_dt, datetime.datetime):
+            return last_modified_dt.timestamp()
+        else:
+            return datetime.datetime.now().timestamp()
 
     @staticmethod
     def is_readonly():
