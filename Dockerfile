@@ -44,9 +44,9 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser \
 
 # 设置环境变量
 ENV DB_HOST='host.docker.internal'
-ENV DB_PORT='3306'
-ENV DB_NAME='zb'
-ENV DB_USER='root'
+ENV DB_PORT='5432'
+ENV DB_NAME='flaskblog'
+ENV DB_USER='postgres'
 ENV DB_PASSWORD='123456'
 ENV DB_POOL_SIZE='16'
 
