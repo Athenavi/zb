@@ -105,23 +105,23 @@ class MediaDAVProvider(DAVProvider):
             logger.error(f"Basic Auth decode error: {e}")
             return None
 
-        # 验证 refresh_token 并获取用户
+        # 验证 密码 并获取用户
         try:
-            jwt_handler = JWTHandler()
-            refresh_token = jwt_handler.decode_token(password)
-            user_id = refresh_token.get('user_id')
-            if user_id:
+            if username and password:
                 with get_db() as db:
-                    user = db.query(User).filter(User.id == user_id).first()
-                    if user and user.verify_password(username):
-                        logger.info(f"Basic Auth successful for user: {user.username}")
-                        # 在会话关闭前提取所需属性
-                        return {
-                            'id': user.id,
-                            'username': user.username,
-                            'vip_level': user.vip_level,
-                            'created_at': user.created_at
-                        }
+                    refresh_token = password
+                    if refresh_token is not None:
+                        user_id = JWTHandler.authenticate_refresh_token(refresh_token)
+                        user = db.query(User).filter(User.id == user_id).first()
+                        if user and user.username == username:
+                            logger.info(f"Basic Auth successful for user: {user.username}")
+                            # 在会话关闭前提取所需属性
+                            return {
+                                'id': user.id,
+                                'username': user.username,
+                                'vip_level': user.vip_level,
+                                'created_at': user.created_at
+                            }
 
         except Exception as e:
             logger.error(f"Refresh token validation error: {e}")
@@ -151,7 +151,7 @@ class MediaDAVProvider(DAVProvider):
                 with get_db() as db:
                     user = db.query(User).filter(User.id == user_id).first()
                     if user:
-                        logger.info(f"Cookie Auth successful for user: {user.username}")
+                        logger.info(f"Basic Auth successful for user: {user.username}")
                         # 在会话关闭前提取所需属性
                         return {
                             'id': user.id,
