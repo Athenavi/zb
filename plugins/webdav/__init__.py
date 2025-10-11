@@ -1,9 +1,11 @@
 import logging
 import os
 import urllib.parse
+from decimal import Decimal
 
-from flask import Blueprint, request, Response, jsonify
+from flask import Blueprint, request, Response, jsonify, send_file
 
+from blueprints.media import get_user_storage_used
 from setting import app_config
 from src.database import get_db
 from src.models import Media, FileHash, User
@@ -26,6 +28,23 @@ def register_plugin(app):
             self.base_dir = app_config.base_dir or os.getcwd()
             print(f"WebDAV base dir: {self.base_dir}")
 
+            # 初始化时不获取磁盘使用情况
+            self.total_size = None
+            self.used_size = None
+            self.free_size = None
+
+        def _get_disk_usage(self, request):
+            """获取磁盘的总大小、已使用大小和可用大小"""
+            user_info = self._authenticate_user(request)
+            if user_info:
+                disk_used = Decimal(user_info['disk_used'])
+                disk_limit = Decimal(user_info['disk_limit'])
+                disk_available = disk_limit - disk_used
+                return disk_limit, disk_used, disk_available
+            else:
+                logger.error("无法获取用户信息")
+                return None
+
         def handle_request(self, path, method, user_info):
             """处理 WebDAV 请求"""
             try:
@@ -34,12 +53,12 @@ def register_plugin(app):
 
                 if len(path_parts) == 0:
                     # 根目录 - 返回目录列表
-                    return self._handle_propfind_root(user_info)
+                    return self._handle_propfind_root(user_info, request)
                 elif len(path_parts) == 1:
                     # 用户目录
                     if path_parts[0] != user_info['username']:
                         return self._not_found()
-                    return self._handle_propfind_root(user_info)
+                    return self._handle_propfind_root(user_info, request)
                 else:
                     # 文件请求
                     if path_parts[0] != user_info['username']:
@@ -51,8 +70,11 @@ def register_plugin(app):
                 logger.error(f"WebDAV request error: {e}", exc_info=True)
                 return self._error_response(500, str(e))
 
-        def _handle_propfind_root(self, user_info):
+        def _handle_propfind_root(self, user_info, request):
             """处理根目录的 PROPFIND 请求"""
+            if self.total_size is None:
+                self.total_size, self.used_size, self.free_size = self._get_disk_usage(request)
+
             with get_db() as db:
                 media_files = db.query(Media).filter(
                     Media.user_id == user_info['id']
@@ -72,6 +94,9 @@ def register_plugin(app):
                 xml_parts.append(f'<D:displayname>{user_info["username"]}\'s Media</D:displayname>')
                 xml_parts.append(f'<D:creationdate>2012-01-01T00:00:00Z</D:creationdate>')
                 xml_parts.append(f'<D:getlastmodified>{SAFE_DATE_STRING}</D:getlastmodified>')
+                xml_parts.append(f'<D:getcontentlength>{self.total_size}</D:getcontentlength>')
+                xml_parts.append(f'<D:quota-used-bytes>{self.used_size}</D:quota-used-bytes>')
+                xml_parts.append(f'<D:quota-available-bytes>{self.free_size}</D:quota-available-bytes>')
                 xml_parts.append(f'</D:prop>')
                 xml_parts.append(f'<D:status>HTTP/1.1 200 OK</D:status>')
                 xml_parts.append(f'</D:propstat>')
@@ -143,7 +168,7 @@ def register_plugin(app):
                 elif method == 'HEAD':
                     return self._file_headers(file_hash, original_filename)
                 elif method == 'PROPFIND':
-                    return self._handle_propfind_file(file_hash, media, user_info)
+                    return self._handle_propfind_file(file_hash, media, user_info, request)
                 else:
                     return self._method_not_allowed()
 
@@ -162,7 +187,6 @@ def register_plugin(app):
 
             try:
                 # 使用 Flask 的 send_file 替代手动文件操作
-                from flask import send_file
                 return send_file(
                     file_path,
                     as_attachment=False,
@@ -175,7 +199,8 @@ def register_plugin(app):
                 logger.error(f"Error serving file {file_path}: {e}")
                 return self._error_response(500, "File serving error")
 
-        def _file_headers(self, file_hash, filename):
+        @staticmethod
+        def _file_headers(file_hash, filename):
             """返回文件头部信息"""
             return Response(
                 status=200,
@@ -188,8 +213,11 @@ def register_plugin(app):
                 }
             )
 
-        def _handle_propfind_file(self, file_hash, media, user_info):
+        def _handle_propfind_file(self, file_hash, media, user_info, request):
             """处理文件的 PROPFIND 请求"""
+            if self.total_size is None:
+                self.total_size, self.used_size, self.free_size = self._get_disk_usage(request)
+
             safe_filename = urllib.parse.quote(media.original_filename)
 
             xml_parts = []
@@ -224,7 +252,8 @@ def register_plugin(app):
                 }
             )
 
-        def _authenticate_user(self, request):
+        @staticmethod
+        def _authenticate_user(request):
             """用户认证"""
             # 检查 Basic Auth
             auth_header = request.headers.get('Authorization', '')
@@ -237,33 +266,39 @@ def register_plugin(app):
                     with get_db() as db:
                         user_id = JWTHandler.authenticate_refresh_token(refresh_token)
                         user = db.query(User).filter(User.id == user_id).first()
+
                         if user and user.username == username:
                             return {
                                 'id': user.id,
                                 'username': user.username,
                                 'vip_level': user.vip_level,
-                                'created_at': user.created_at
+                                'created_at': user.created_at,
+                                'disk_used': get_user_storage_used(user.id),
+                                'disk_limit': app_config.USER_FREE_STORAGE_LIMIT,
                             }
                 except Exception as e:
                     logger.error(f"Basic Auth error: {e}")
 
             return None
 
-        def _not_found(self):
+        @staticmethod
+        def _not_found():
             return Response(
                 response="Not Found",
                 status=404,
                 content_type='text/plain'
             )
 
-        def _method_not_allowed(self):
+        @staticmethod
+        def _method_not_allowed():
             return Response(
                 response="Method Not Allowed",
                 status=405,
                 content_type='text/plain'
             )
 
-        def _error_response(self, status, message):
+        @staticmethod
+        def _error_response(status, message):
             return Response(
                 response=message,
                 status=status,
