@@ -286,26 +286,28 @@ class UserMediaRootCollection(DAVCollection):
         return f"{self.user_info['username']}'s Media Library"
 
     def get_creation_date(self):
-        """返回集合的创建日期"""
-        created_at = self.user_info.get('created_at', datetime.datetime.now())
-        # 转换为时间戳
+        created_at = self.user_info.get('created_at', datetime.datetime.utcnow())
         if isinstance(created_at, datetime.datetime):
-            return int(created_at.timestamp())
-        return int(time.time())
+            return created_at.strftime('%Y-%m-%dT%H:%M:%SZ')
+        else:
+            return datetime.datetime.utcfromtimestamp(created_at).strftime('%Y-%m-%dT%H:%M:%SZ')
 
     def get_last_modified(self):
-        """返回集合的最后修改时间"""
         with get_db() as db:
             latest_media = db.query(Media).filter(
                 Media.user_id == self.user_info['id']
             ).order_by(Media.updated_at.desc()).first()
 
             if latest_media and latest_media.updated_at:
-                # 转换为时间戳
-                if isinstance(latest_media.updated_at, datetime.datetime):
-                    return int(latest_media.updated_at.timestamp())
-                return int(latest_media.updated_at)
-        return int(time.time())
+                updated_at = latest_media.updated_at
+                if isinstance(updated_at, datetime.datetime):
+                    # 将datetime对象转换为时间戳
+                    return int(time.mktime(updated_at.timetuple()))
+                else:
+                    # 假设updated_at是一个时间戳
+                    return int(updated_at)
+            # 如果没有找到媒体或updated_at为空，返回当前时间的时间戳
+            return int(time.mktime(datetime.datetime.utcnow().timetuple()))
 
     def create_collection(self, name):
         """创建新集合（目录）"""
@@ -440,27 +442,34 @@ class MediaFile(DAVNonCollection):
         return self.media_info['original_filename']
 
     def get_creation_date(self):
-        """返回文件的创建日期"""
-        created_at = self.media_info.get('created_at', datetime.datetime.now())
-        # 转换为时间戳
+        created_at = self.media_info.get('created_at', datetime.datetime.utcnow())
         if isinstance(created_at, datetime.datetime):
-            return int(created_at.timestamp())
-        return int(time.time())
+            return created_at.strftime('%Y-%m-%dT%H:%M:%SZ')
+        else:
+            return datetime.datetime.utcfromtimestamp(created_at).strftime('%Y-%m-%dT%H:%M:%SZ')
 
     def get_last_modified(self):
-        """返回文件的最后修改时间"""
-        updated_at = self.media_info.get('updated_at', datetime.datetime.now())
-        # 转换为时间戳
+        updated_at = self.media_info.get('updated_at', datetime.datetime.utcnow())
         if isinstance(updated_at, datetime.datetime):
-            return int(updated_at.timestamp())
-        return int(time.time())
+            # 将datetime对象转换为时间戳
+            return int(time.mktime(updated_at.timetuple()))
+        else:
+            # 假设updated_at是一个时间戳，直接返回
+            return int(updated_at)
 
     def get_content_headers(self):
         """返回内容相关的 HTTP 头"""
+        # 获取时间戳并转换为 datetime 对象用于格式化
+        last_modified_timestamp = self.get_last_modified()
+        if isinstance(last_modified_timestamp, (int, float)):
+            last_modified_dt = datetime.datetime.fromtimestamp(last_modified_timestamp, datetime.timezone.utc)
+        else:
+            last_modified_dt = last_modified_timestamp
+
         return {
             'Content-Type': self.get_content_type(),
             'Content-Length': str(self.get_content_length()),
-            'Last-Modified': self._format_http_date(self.get_last_modified()),
+            'Last-Modified': last_modified_dt.strftime('%a, %d %b %Y %H:%M:%S GMT'),
             'ETag': self.get_etag(),
             'Accept-Ranges': 'bytes',
         }
