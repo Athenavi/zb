@@ -34,14 +34,8 @@ def register_plugin(app):
             # 确保上传目录存在
             os.makedirs(self.upload_dir, exist_ok=True)
 
-            # 初始化时不获取磁盘使用情况
-            self.total_size = None
-            self.used_size = None
-            self.free_size = None
-
-        def _get_disk_usage(self, request):
-            """获取磁盘的总大小、已使用大小和可用大小"""
-            user_info = self._authenticate_user(request)
+        def _get_disk_usage(self, user_info):
+            """获取当前用户的总大小、已使用大小和可用大小"""
             if user_info:
                 disk_used = Decimal(user_info['disk_used'])
                 disk_limit = Decimal(user_info['disk_limit'])
@@ -49,7 +43,7 @@ def register_plugin(app):
                 return disk_limit, disk_used, disk_available
             else:
                 logger.error("无法获取用户信息")
-                return None
+                return Decimal(0), Decimal(0), Decimal(0)
 
         def handle_request(self, path, method, user_info):
             """处理 WebDAV 请求"""
@@ -60,7 +54,7 @@ def register_plugin(app):
                 if len(path_parts) == 0:
                     # 根目录 - 返回目录列表
                     if method == 'PROPFIND':
-                        return self._handle_propfind_root(user_info, request)
+                        return self._handle_propfind_root(user_info)
                     else:
                         return self._method_not_allowed()
                 elif len(path_parts) == 1:
@@ -69,7 +63,7 @@ def register_plugin(app):
                         return self._not_found()
 
                     if method == 'PROPFIND':
-                        return self._handle_propfind_root(user_info, request)
+                        return self._handle_propfind_root(user_info)
                     elif method == 'MKCOL':
                         return self._handle_mkcol(user_info)
                     else:
@@ -86,7 +80,7 @@ def register_plugin(app):
                     elif method == 'PUT':
                         return self._handle_put_file(filename, user_info, request)
                     elif method == 'PROPFIND':
-                        return self._handle_propfind_file_request(filename, user_info, request)
+                        return self._handle_propfind_file_request(filename, user_info)
                     elif method == 'DELETE':
                         return self._handle_delete_file(filename, user_info)
                     else:
@@ -140,12 +134,11 @@ def register_plugin(app):
             """处理文件上传"""
             try:
                 original_filename = urllib.parse.unquote(filename)
-                # 检查磁盘空间
-                if self.total_size is None:
-                    self.total_size, self.used_size, self.free_size = self._get_disk_usage(request)
+                # 动态获取当前用户的磁盘使用情况
+                total_size, used_size, free_size = self._get_disk_usage(user_info)
 
                 content_length = request.content_length or 0
-                if content_length > self.free_size:
+                if content_length > free_size:
                     return self._error_response(507, "Insufficient Storage")
 
                 # 计算文件哈希
@@ -235,10 +228,10 @@ def register_plugin(app):
             # WebDAV 要求创建目录，但我们这里只支持用户根目录
             return Response(status=405)
 
-        def _handle_propfind_root(self, user_info, request):
+        def _handle_propfind_root(self, user_info):
             """处理根目录的 PROPFIND 请求"""
-            if self.total_size is None:
-                self.total_size, self.used_size, self.free_size = self._get_disk_usage(request)
+            # 动态获取当前用户的磁盘使用情况
+            total_size, used_size, free_size = self._get_disk_usage(user_info)
 
             with get_db() as db:
                 media_files = db.query(Media).filter(
@@ -259,9 +252,9 @@ def register_plugin(app):
                 xml_parts.append(f'<D:displayname>{user_info["username"]}\'s Media</D:displayname>')
                 xml_parts.append(f'<D:creationdate>2025-10-01T00:00:00Z</D:creationdate>')
                 xml_parts.append(f'<D:getlastmodified>{SAFE_DATE_STRING}</D:getlastmodified>')
-                xml_parts.append(f'<D:getcontentlength>{self.total_size}</D:getcontentlength>')
-                xml_parts.append(f'<D:quota-used-bytes>{self.used_size}</D:quota-used-bytes>')
-                xml_parts.append(f'<D:quota-available-bytes>{self.free_size}</D:quota-available-bytes>')
+                xml_parts.append(f'<D:getcontentlength>{total_size}</D:getcontentlength>')
+                xml_parts.append(f'<D:quota-used-bytes>{used_size}</D:quota-used-bytes>')
+                xml_parts.append(f'<D:quota-available-bytes>{free_size}</D:quota-available-bytes>')
                 xml_parts.append(f'<D:supportedlock>')
                 xml_parts.append(f'<D:lockentry>')
                 xml_parts.append(f'<D:lockscope><D:exclusive/></D:lockscope>')
@@ -347,7 +340,7 @@ def register_plugin(app):
                 else:
                     return self._method_not_allowed()
 
-        def _handle_propfind_file_request(self, filename, user_info, request):
+        def _handle_propfind_file_request(self, filename, user_info):
             """处理文件的 PROPFIND 请求"""
             try:
                 original_filename = urllib.parse.unquote(filename)
@@ -370,7 +363,7 @@ def register_plugin(app):
                 if not file_hash:
                     return self._not_found()
 
-                return self._handle_propfind_file(file_hash, media, user_info, request)
+                return self._handle_propfind_file(file_hash, media, user_info)
 
         def _serve_file(self, file_hash, filename):
             """提供文件下载"""
@@ -413,10 +406,10 @@ def register_plugin(app):
                 }
             )
 
-        def _handle_propfind_file(self, file_hash, media, user_info, request):
+        def _handle_propfind_file(self, file_hash, media, user_info):
             """处理文件的 PROPFIND 请求"""
-            if self.total_size is None:
-                self.total_size, self.used_size, self.free_size = self._get_disk_usage(request)
+            # 动态获取当前用户的磁盘使用情况
+            total_size, used_size, free_size = self._get_disk_usage(user_info)
 
             safe_filename = urllib.parse.quote(media.original_filename)
 
