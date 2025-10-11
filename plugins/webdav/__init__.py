@@ -1,230 +1,354 @@
-import io
-import time
-import datetime
-import re
+import logging
+import os
+import urllib.parse
 
-from flask import Blueprint, request, Response
-from wsgidav.wsgidav_app import WsgiDAVApp
+from flask import Blueprint, request, Response, jsonify
 
-from .dav_provider import MediaDAVProvider
+from setting import app_config
+from src.database import get_db
+from src.models import Media, FileHash, User
+from src.utils.security.jwt_handler import JWTHandler
+
+logger = logging.getLogger(__name__)
 
 
 def register_plugin(app):
     bp = Blueprint('webdav_plugin', __name__)
 
-    # WebDAV 配置 - 修复时间处理问题
-    config = {
-        "provider_mapping": {
-            "/dav": MediaDAVProvider(app)
-        },
-        "verbose": 3,
-        "logging": {
-            "enable_loggers": [],
-        },
-        "property_manager": True,
-        "lock_storage": False,
-        # 使用自定义认证
-        "http_authenticator": {
-            "accept_basic": True,
-            "accept_digest": False,
-            "default_to_digest": False,
-        },
-        "hotfixes": {
-            "emulate_win32_lastmod": False,  # 禁用win32模拟，使用标准格式
-            "win_accept_anonymous_creator": True,
-            "win_accept_anonymous_owner": True,
-        },
-        # 启用简单目录列表
-        "simple_dc": {
-            "user_mapping": {
-                "*": True  # 允许所有用户，因为我们有自己的认证
-            }
-        }
-    }
+    # 安全的时间戳 - 确保在 Windows FileTime 有效范围内
+    SAFE_TIMESTAMP = 1325376000  # 2012-01-01 00:00:00 UTC
+    SAFE_DATE_STRING = "Sun, 01 Jan 2012 00:00:00 GMT"
 
-    # 创建 WebDAV 应用
-    dav_app = WsgiDAVApp(config)
+    class WebDAVHandler:
+        """简化的 WebDAV 处理器"""
 
-    # 修复日期格式的中间件
-    class DateFixMiddleware:
         def __init__(self, app):
-            self.app = app
-            # RFC 1123 日期格式正则表达式
-            self.rfc1123_pattern = re.compile(
-                r'^\w{3}, \d{2} \w{3} \d{4} \d{2}:\d{2}:\d{2} GMT$'
-            )
+            self.base_dir = app_config.base_dir or os.getcwd()
+            print(f"WebDAV base dir: {self.base_dir}")
 
-        def _is_rfc1123_format(self, date_str):
-            """检查是否为 RFC 1123 格式"""
-            return bool(self.rfc1123_pattern.match(date_str))
-
-        def _is_iso_format(self, date_str):
-            """检查是否为 ISO 8601 格式"""
-            return 'T' in date_str and ('Z' in date_str or '+' in date_str)
-
-        def _fix_date_header(self, value):
-            """修复日期头格式"""
-            if value is None:
-                return datetime.datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
-
-            # 如果已经是 RFC 1123 格式，直接返回
-            if isinstance(value, str) and self._is_rfc1123_format(value):
-                return value
-
+        def handle_request(self, path, method, user_info):
+            """处理 WebDAV 请求"""
             try:
-                # 处理时间戳
-                if isinstance(value, (int, float)):
-                    dt = datetime.datetime.utcfromtimestamp(value)
-                    return dt.strftime('%a, %d %b %Y %H:%M:%S GMT')
+                # 解析路径
+                path_parts = [p for p in path.strip('/').split('/') if p]
 
-                # 处理 datetime 对象
-                if isinstance(value, datetime.datetime):
-                    return value.strftime('%a, %d %b %Y %H:%M:%S GMT')
-
-                # 处理 ISO 8601 格式字符串
-                if isinstance(value, str) and self._is_iso_format(value):
-                    # 清理 ISO 字符串
-                    iso_str = value.replace('Z', '+00:00')
-                    dt = datetime.datetime.fromisoformat(iso_str)
-                    return dt.strftime('%a, %d %b %Y %H:%M:%S GMT')
-
-                # 处理其他字符串格式，尝试解析
-                if isinstance(value, str):
-                    try:
-                        # 尝试常见日期格式
-                        formats = [
-                            '%a, %d %b %Y %H:%M:%S %Z',
-                            '%Y-%m-%d %H:%M:%S',
-                            '%Y-%m-%dT%H:%M:%S',
-                            '%Y-%m-%dT%H:%M:%SZ',
-                            '%Y-%m-%dT%H:%M:%S.%fZ'
-                        ]
-                        for fmt in formats:
-                            try:
-                                dt = datetime.datetime.strptime(value, fmt)
-                                return dt.strftime('%a, %d %b %Y %H:%M:%S GMT')
-                            except ValueError:
-                                continue
-                    except:
-                        pass
-
-                # 如果无法解析，使用当前时间
-                app.logger.warning(f"无法解析日期格式: {value}, 使用当前时间")
-                return datetime.datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
+                if len(path_parts) == 0:
+                    # 根目录 - 返回目录列表
+                    return self._handle_propfind_root(user_info)
+                elif len(path_parts) == 1:
+                    # 用户目录
+                    if path_parts[0] != user_info['username']:
+                        return self._not_found()
+                    return self._handle_propfind_root(user_info)
+                else:
+                    # 文件请求
+                    if path_parts[0] != user_info['username']:
+                        return self._not_found()
+                    filename = '/'.join(path_parts[1:])
+                    return self._handle_file_request(filename, method, user_info)
 
             except Exception as e:
-                app.logger.warning(f"日期格式修复失败: {e}, 值: {value}")
-                return datetime.datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
+                logger.error(f"WebDAV request error: {e}", exc_info=True)
+                return self._error_response(500, str(e))
 
-        def __call__(self, environ, start_response):
-            def custom_start_response(status, headers, exc_info=None):
-                # 修复日期头
-                new_headers = []
-                for name, value in headers:
-                    if name.lower() in ('last-modified', 'date', 'creationdate'):
-                        fixed_value = self._fix_date_header(value)
-                        new_headers.append((name, fixed_value))
-                    else:
-                        new_headers.append((name, value))
-                return start_response(status, new_headers, exc_info)
+        def _handle_propfind_root(self, user_info):
+            """处理根目录的 PROPFIND 请求"""
+            with get_db() as db:
+                media_files = db.query(Media).filter(
+                    Media.user_id == user_info['id']
+                ).all()
 
-            return self.app(environ, custom_start_response)
+                # 生成目录列表 XML
+                xml_parts = []
+                xml_parts.append('<?xml version="1.0" encoding="utf-8"?>')
+                xml_parts.append('<D:multistatus xmlns:D="DAV:">')
 
-    # 包装DAV应用
-    dav_app = DateFixMiddleware(dav_app)
+                # 添加当前目录
+                xml_parts.append(f'<D:response>')
+                xml_parts.append(f'<D:href>/dav/{user_info["username"]}/</D:href>')
+                xml_parts.append(f'<D:propstat>')
+                xml_parts.append(f'<D:prop>')
+                xml_parts.append(f'<D:resourcetype><D:collection/></D:resourcetype>')
+                xml_parts.append(f'<D:displayname>{user_info["username"]}\'s Media</D:displayname>')
+                xml_parts.append(f'<D:creationdate>2012-01-01T00:00:00Z</D:creationdate>')
+                xml_parts.append(f'<D:getlastmodified>{SAFE_DATE_STRING}</D:getlastmodified>')
+                xml_parts.append(f'</D:prop>')
+                xml_parts.append(f'<D:status>HTTP/1.1 200 OK</D:status>')
+                xml_parts.append(f'</D:propstat>')
+                xml_parts.append(f'</D:response>')
 
-    # 将 WebDAV 挂载到 Flask 路由
-    @bp.route('/dav/', defaults={'path': ''},
-              methods=['GET', 'PUT', 'DELETE', 'PROPFIND', 'PROPPATCH', 'MKCOL', 'COPY', 'MOVE', 'LOCK', 'UNLOCK'])
-    @bp.route('/dav/<path:path>',
-              methods=['GET', 'PUT', 'DELETE', 'PROPFIND', 'PROPPATCH', 'MKCOL', 'COPY', 'MOVE', 'LOCK', 'UNLOCK'])
-    def webdav_handler(path=''):
-        try:
-            # 构建正确的 PATH_INFO
-            environ = request.environ.copy()
+                # 添加文件
+                for media in media_files:
+                    file_hash = db.query(FileHash).filter(
+                        FileHash.hash == media.hash
+                    ).first()
 
-            # 确保路径格式正确
-            dav_path = f'/dav/{path}' if path else '/dav/'
-            environ['PATH_INFO'] = dav_path
+                    if file_hash:
+                        safe_filename = urllib.parse.quote(media.original_filename)
+                        xml_parts.append(f'<D:response>')
+                        xml_parts.append(f'<D:href>/dav/{user_info["username"]}/{safe_filename}</D:href>')
+                        xml_parts.append(f'<D:propstat>')
+                        xml_parts.append(f'<D:prop>')
+                        xml_parts.append(f'<D:resourcetype/>')
+                        xml_parts.append(f'<D:displayname>{media.original_filename}</D:displayname>')
+                        xml_parts.append(f'<D:creationdate>2012-01-01T00:00:00Z</D:creationdate>')
+                        xml_parts.append(f'<D:getlastmodified>{SAFE_DATE_STRING}</D:getlastmodified>')
+                        xml_parts.append(f'<D:getcontentlength>{file_hash.file_size}</D:getcontentlength>')
+                        xml_parts.append(
+                            f'<D:getcontenttype>{file_hash.mime_type or "application/octet-stream"}</D:getcontenttype>')
+                        xml_parts.append(f'<D:getetag>"{file_hash.hash}"</D:getetag>')
+                        xml_parts.append(f'</D:prop>')
+                        xml_parts.append(f'<D:status>HTTP/1.1 200 OK</D:status>')
+                        xml_parts.append(f'</D:propstat>')
+                        xml_parts.append(f'</D:response>')
 
-            # 记录请求信息用于调试
-            app.logger.debug(f"WebDAV Request: {request.method} {dav_path}")
+                xml_parts.append('</D:multistatus>')
+                xml_response = '\n'.join(xml_parts)
 
-            # 处理 WebDAV 请求
-            response_headers = []
-            response_status = [200]
-            response_body = io.BytesIO()
+                return Response(
+                    response=xml_response,
+                    status=207,
+                    content_type='application/xml; charset="utf-8"',
+                    headers={
+                        'DAV': '1, 2',
+                        'Allow': 'OPTIONS, PROPFIND, GET, HEAD',
+                    }
+                )
 
-            # 创建日期修复器实例用于 start_response
-            date_fixer = DateFixMiddleware(None)
+        def _handle_file_request(self, filename, method, user_info):
+            """处理文件请求"""
+            try:
+                original_filename = urllib.parse.unquote(filename)
+            except:
+                original_filename = filename
 
-            def start_response(status, headers, exc_info=None):
-                response_status[0] = status
-                # 修复日期头
-                fixed_headers = []
-                for name, value in headers:
-                    if name.lower() in ('last-modified', 'date', 'creationdate'):
-                        fixed_value = date_fixer._fix_date_header(value)
-                        fixed_headers.append((name, fixed_value))
-                    else:
-                        fixed_headers.append((name, value))
-                response_headers.extend(fixed_headers)
-                return response_body.write
+            with get_db() as db:
+                media = db.query(Media).filter(
+                    Media.user_id == user_info['id'],
+                    Media.original_filename == original_filename
+                ).first()
 
-            # 执行 WebDAV 应用
-            result = dav_app(environ, start_response)
+                if not media:
+                    return self._not_found()
 
-            # 收集响应内容
-            for data in result:
-                if data:
-                    response_body.write(data)
-            if hasattr(result, 'close'):
-                result.close()
+                file_hash = db.query(FileHash).filter(
+                    FileHash.hash == media.hash
+                ).first()
 
-            # 构建 Flask 响应
-            response = Response(
-                response=response_body.getvalue(),
-                status=response_status[0],
-                headers=dict(response_headers)
+                if not file_hash:
+                    return self._not_found()
+
+                if method == 'GET':
+                    return self._serve_file(file_hash, original_filename)
+                elif method == 'HEAD':
+                    return self._file_headers(file_hash, original_filename)
+                elif method == 'PROPFIND':
+                    return self._handle_propfind_file(file_hash, media, user_info)
+                else:
+                    return self._method_not_allowed()
+
+        def _serve_file(self, file_hash, filename):
+            """提供文件下载"""
+            storage_path = file_hash.storage_path
+            if not os.path.isabs(storage_path):
+                file_path = os.path.join(self.base_dir, storage_path)
+            else:
+                file_path = storage_path
+
+            file_path = os.path.normpath(file_path)
+
+            if not os.path.exists(file_path):
+                return self._not_found()
+
+            try:
+                # 使用 Flask 的 send_file 替代手动文件操作
+                from flask import send_file
+                return send_file(
+                    file_path,
+                    as_attachment=False,
+                    download_name=filename,
+                    mimetype=file_hash.mime_type or 'application/octet-stream',
+                    last_modified=SAFE_TIMESTAMP,
+                    etag=file_hash.hash
+                )
+            except Exception as e:
+                logger.error(f"Error serving file {file_path}: {e}")
+                return self._error_response(500, "File serving error")
+
+        def _file_headers(self, file_hash, filename):
+            """返回文件头部信息"""
+            return Response(
+                status=200,
+                headers={
+                    'Content-Type': file_hash.mime_type or 'application/octet-stream',
+                    'Content-Length': str(file_hash.file_size),
+                    'Last-Modified': SAFE_DATE_STRING,
+                    'ETag': f'"{file_hash.hash}"',
+                    'Accept-Ranges': 'bytes',
+                }
             )
 
-            return response
+        def _handle_propfind_file(self, file_hash, media, user_info):
+            """处理文件的 PROPFIND 请求"""
+            safe_filename = urllib.parse.quote(media.original_filename)
 
-        except Exception as e:
-            app.logger.error(f"WebDAV error: {str(e)}", exc_info=True)
+            xml_parts = []
+            xml_parts.append('<?xml version="1.0" encoding="utf-8"?>')
+            xml_parts.append('<D:multistatus xmlns:D="DAV:">')
+            xml_parts.append(f'<D:response>')
+            xml_parts.append(f'<D:href>/dav/{user_info["username"]}/{safe_filename}</D:href>')
+            xml_parts.append(f'<D:propstat>')
+            xml_parts.append(f'<D:prop>')
+            xml_parts.append(f'<D:resourcetype/>')
+            xml_parts.append(f'<D:displayname>{media.original_filename}</D:displayname>')
+            xml_parts.append(f'<D:creationdate>2012-01-01T00:00:00Z</D:creationdate>')
+            xml_parts.append(f'<D:getlastmodified>{SAFE_DATE_STRING}</D:getlastmodified>')
+            xml_parts.append(f'<D:getcontentlength>{file_hash.file_size}</D:getcontentlength>')
+            xml_parts.append(
+                f'<D:getcontenttype>{file_hash.mime_type or "application/octet-stream"}</D:getcontenttype>')
+            xml_parts.append(f'<D:getetag>"{file_hash.hash}"</D:getetag>')
+            xml_parts.append(f'</D:prop>')
+            xml_parts.append(f'<D:status>HTTP/1.1 200 OK</D:status>')
+            xml_parts.append(f'</D:propstat>')
+            xml_parts.append(f'</D:response>')
+            xml_parts.append('</D:multistatus>')
+
+            xml_response = '\n'.join(xml_parts)
+
             return Response(
-                response=f"WebDAV Error: {str(e)}",
-                status=500,
+                response=xml_response,
+                status=207,
+                content_type='application/xml; charset="utf-8"',
+                headers={
+                    'DAV': '1, 2',
+                }
+            )
+
+        def _authenticate_user(self, request):
+            """用户认证"""
+            # 检查 Basic Auth
+            auth_header = request.headers.get('Authorization', '')
+            if auth_header.startswith('Basic '):
+                try:
+                    import base64
+                    auth_decoded = base64.b64decode(auth_header[6:]).decode('utf-8')
+                    username, refresh_token = auth_decoded.split(':', 1)
+
+                    with get_db() as db:
+                        user_id = JWTHandler.authenticate_refresh_token(refresh_token)
+                        user = db.query(User).filter(User.id == user_id).first()
+                        if user and user.username == username:
+                            return {
+                                'id': user.id,
+                                'username': user.username,
+                                'vip_level': user.vip_level,
+                                'created_at': user.created_at
+                            }
+                except Exception as e:
+                    logger.error(f"Basic Auth error: {e}")
+
+            return None
+
+        def _not_found(self):
+            return Response(
+                response="Not Found",
+                status=404,
                 content_type='text/plain'
             )
 
-    # 添加 WebDAV 发现端点
+        def _method_not_allowed(self):
+            return Response(
+                response="Method Not Allowed",
+                status=405,
+                content_type='text/plain'
+            )
+
+        def _error_response(self, status, message):
+            return Response(
+                response=message,
+                status=status,
+                content_type='text/plain'
+            )
+
+    # 创建处理器实例
+    handler = WebDAVHandler(app)
+
+    # WebDAV 路由
+    @bp.route('/dav/', defaults={'path': ''},
+              methods=['OPTIONS', 'GET', 'HEAD', 'PROPFIND'])
+    @bp.route('/dav/<path:path>',
+              methods=['OPTIONS', 'GET', 'HEAD', 'PROPFIND'])
+    def webdav_handler(path=''):
+        # 用户认证
+        user_info = handler._authenticate_user(request)
+        if not user_info:
+            return Response(
+                response="Authentication required",
+                status=401,
+                headers={'WWW-Authenticate': 'Basic realm="WebDAV"'},
+                content_type='text/plain'
+            )
+
+        # 处理 OPTIONS 请求
+        if request.method == 'OPTIONS':
+            return Response(
+                status=200,
+                headers={
+                    'DAV': '1, 2',
+                    'Allow': 'OPTIONS, GET, HEAD, PROPFIND',
+                    'MS-Author-Via': 'DAV',
+                }
+            )
+
+        # 处理其他 WebDAV 请求
+        return handler.handle_request(path, request.method, user_info)
+
+    # WebDAV 发现页面
     @bp.route('/dav/')
     def webdav_root():
-        """WebDAV 根目录发现"""
         return """
         <html>
-            <head><title>WebDAV Media Server</title></head>
+            <head>
+                <title>WebDAV Media Server</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 40px; }
+                    h1 { color: #333; }
+                    .info { background: #f5f5f5; padding: 15px; border-radius: 5px; }
+                </style>
+            </head>
             <body>
                 <h1>WebDAV Media Server</h1>
-                <p>Your media files are available via WebDAV protocol.</p>
-                <p>Authentication methods:</p>
-                <ul>
-                    <li>Browser: Automatic Cookie-based authentication</li>
-                    <li>WebDAV Clients: HTTP Basic Auth (username + refresh_token)</li>
-                </ul>
-                <p><a href="/dav/">Browse your files</a></p>
+                <div class="info">
+                    <p>Your media files are available via WebDAV protocol.</p>
+                    <p><strong>Authentication methods:</strong></p>
+                    <ul>
+                        <li>Browser: Automatic Cookie-based authentication</li>
+                        <li>WebDAV Clients: HTTP Basic Auth (username + refresh_token)</li>
+                    </ul>
+                    <p><strong>Supported methods:</strong> OPTIONS, GET, HEAD, PROPFIND</p>
+                    <p><a href="/dav/">Browse your files via WebDAV</a></p>
+                </div>
             </body>
         </html>
         """
 
+    # 健康检查端点
+    @bp.route('/dav/health')
+    def webdav_health():
+        return jsonify({
+            "status": "healthy",
+            "service": "webdav",
+            "timestamp": SAFE_TIMESTAMP
+        })
+
     plugin = type('Plugin', (), {
-        'name': 'WebDAV Media Mount',
-        'version': '1.0.0',
-        'description': 'WebDAV 协议支持用户媒体库，支持WebDAV客户端Basic认证',
+        'name': 'WebDAV Media Server',
+        'version': '2.0.0',
+        'description': '轻量级 WebDAV 媒体服务器，支持只读访问用户媒体库',
         'author': 'System',
         'blueprint': bp,
-        'enabled': True
+        'enabled': True,
+        'handler': handler
     })()
 
     return plugin
