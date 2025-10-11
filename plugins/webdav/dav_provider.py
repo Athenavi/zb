@@ -3,9 +3,9 @@ import datetime
 import logging
 import os
 import urllib.parse
+import time
 
-from flask import request
-from werkzeug.http import generate_etag, http_date
+from werkzeug.http import generate_etag
 from wsgidav.dav_provider import DAVProvider, DAVCollection, DAVNonCollection
 
 from src.database import get_db
@@ -78,17 +78,10 @@ class MediaDAVProvider(DAVProvider):
         """
         综合认证方法，支持：
         1. HTTP Basic 认证（用户名 + refresh_token）
-        2. Cookie JWT 认证（浏览器访问）
         """
         user_info = None
-
         # 1. 首先尝试 HTTP Basic 认证（WebDAV客户端）
         user_info = self._get_user_from_basic_auth(environ)
-        if user_info:
-            return user_info
-
-        # 2. 尝试 Cookie JWT 认证（浏览器访问）
-        user_info = self._get_user_from_cookie(environ)
         if user_info:
             return user_info
 
@@ -133,33 +126,6 @@ class MediaDAVProvider(DAVProvider):
 
         return None
 
-    @staticmethod
-    def _get_user_from_cookie(environ):
-        """从 Cookie 中提取用户信息（浏览器访问）"""
-        try:
-            cookies = request.cookies
-            jwt_value = cookies.get('jwt')
-            if not jwt_value:
-                return None
-            user_id = JWTHandler.authenticate_refresh_token(jwt_value)
-            print(f"cookies find user_id: {user_id}")
-            if user_id:
-                with get_db() as db:
-                    user = db.query(User).filter(User.id == user_id).first()
-                    if user:
-                        logger.info(f"Cookie Auth successful for user: {user.username}")
-                        # 在会话关闭前提取所需属性
-                        return {
-                            'id': user.id,
-                            'username': user.username,
-                            'vip_level': user.vip_level,
-                            'created_at': user.created_at
-                        }
-        except Exception as e:
-            logger.error(f"Cookie JWT validation error: {e}")
-
-        return None
-
     def _get_media_file(self, user_info, filename, path, environ):
         """获取用户的媒体文件"""
         # 解码 URL 编码的文件名
@@ -185,8 +151,8 @@ class MediaDAVProvider(DAVProvider):
                         'id': media.id,
                         'original_filename': media.original_filename,
                         'hash': media.hash,
-                        'created_date': media.created_at,
-                        'last_modified': media.updated_at
+                        'created_at': media.created_at,
+                        'updated_at': media.updated_at
                     }
 
                     file_hash_info = {
@@ -227,8 +193,8 @@ class UserMediaRootCollection(DAVCollection):
                         'id': media.id,
                         'original_filename': media.original_filename,
                         'hash': media.hash,
-                        'created_date': media.created_at,
-                        'last_modified': media.updated_at
+                        'created_at': media.created_at,
+                        'updated_at': media.updated_at
                     }
 
                     file_hash_info = {
@@ -282,8 +248,8 @@ class UserMediaRootCollection(DAVCollection):
                             'id': media.id,
                             'original_filename': media.original_filename,
                             'hash': media.hash,
-                            'created_date': media.created_at,
-                            'last_modified': media.updated_at
+                            'created_at': media.created_at,
+                            'updated_at': media.updated_at
                         }
 
                         file_hash_info = {
@@ -320,20 +286,26 @@ class UserMediaRootCollection(DAVCollection):
         return f"{self.user_info['username']}'s Media Library"
 
     def get_creation_date(self):
-        """返回集合的创建日期（Win32 FileTime 格式）"""
+        """返回集合的创建日期"""
         created_at = self.user_info.get('created_at', datetime.datetime.now())
-        return created_at
+        # 转换为时间戳
+        if isinstance(created_at, datetime.datetime):
+            return int(created_at.timestamp())
+        return int(time.time())
 
     def get_last_modified(self):
-        """返回集合的最后修改时间（Win32 FileTime 格式）"""
+        """返回集合的最后修改时间"""
         with get_db() as db:
             latest_media = db.query(Media).filter(
                 Media.user_id == self.user_info['id']
             ).order_by(Media.updated_at.desc()).first()
 
             if latest_media and latest_media.updated_at:
-                return latest_media.updated_at
-        return datetime.datetime.now()
+                # 转换为时间戳
+                if isinstance(latest_media.updated_at, datetime.datetime):
+                    return int(latest_media.updated_at.timestamp())
+                return int(latest_media.updated_at)
+        return int(time.time())
 
     def create_collection(self, name):
         """创建新集合（目录）"""
@@ -355,6 +327,7 @@ class UserMediaRootCollection(DAVCollection):
             ).order_by(Media.updated_at.desc()).first()
 
             latest_time = latest.updated_at if latest and latest.updated_at else datetime.datetime.min
+            # 将 datetime 转换为时间戳
             if isinstance(latest_time, datetime.datetime):
                 latest_timestamp = latest_time.timestamp()
             else:
@@ -466,15 +439,35 @@ class MediaFile(DAVNonCollection):
     def get_display_name(self):
         return self.media_info['original_filename']
 
+    def get_creation_date(self):
+        """返回文件的创建日期"""
+        created_at = self.media_info.get('created_at', datetime.datetime.now())
+        # 转换为时间戳
+        if isinstance(created_at, datetime.datetime):
+            return int(created_at.timestamp())
+        return int(time.time())
+
+    def get_last_modified(self):
+        """返回文件的最后修改时间"""
+        updated_at = self.media_info.get('updated_at', datetime.datetime.now())
+        # 转换为时间戳
+        if isinstance(updated_at, datetime.datetime):
+            return int(updated_at.timestamp())
+        return int(time.time())
+
     def get_content_headers(self):
         """返回内容相关的 HTTP 头"""
         return {
             'Content-Type': self.get_content_type(),
             'Content-Length': str(self.get_content_length()),
-            'Last-Modified': self.get_last_modified_string(),
+            'Last-Modified': self._format_http_date(self.get_last_modified()),
             'ETag': self.get_etag(),
             'Accept-Ranges': 'bytes',
         }
+
+    def _format_http_date(self, timestamp):
+        """将时间戳格式化为 HTTP 日期格式"""
+        return time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime(timestamp))
 
     @staticmethod
     def is_readonly():
@@ -486,8 +479,8 @@ class MediaFile(DAVNonCollection):
         if properties is None:
             props.update({
                 "displayname": self.get_display_name(),
-                "creationdate": self.get_creation_date_string(),
-                "getlastmodified": self.get_last_modified_string(),
+                "creationdate": self.get_creation_date(),
+                "getlastmodified": self.get_last_modified(),
                 "getcontentlength": self.get_content_length(),
                 "getcontenttype": self.get_content_type(),
                 "getetag": self.get_etag(),
@@ -497,9 +490,9 @@ class MediaFile(DAVNonCollection):
                 if prop == "displayname":
                     props[prop] = self.get_display_name()
                 elif prop == "creationdate":
-                    props[prop] = self.get_creation_date_string()
+                    props[prop] = self.get_creation_date()
                 elif prop == "getlastmodified":
-                    props[prop] = self.get_last_modified_string()
+                    props[prop] = self.get_last_modified()
                 elif prop == "getcontentlength":
                     props[prop] = self.get_content_length()
                 elif prop == "getcontenttype":
@@ -535,9 +528,9 @@ class MediaFile(DAVNonCollection):
 
     def get_content(self):
         """返回文件内容流"""
-        print(f"get_content: {self.path}")
+        logger.debug(f"get_content: {self.path}")
         storage_path = self.file_hash_info['storage_path']
-        print(f"storage_path: {storage_path}")
+        logger.debug(f"storage_path: {storage_path}")
         # 构建完整路径
         if not os.path.isabs(storage_path):
             file_path = os.path.join(self.base_dir, storage_path)
@@ -551,57 +544,3 @@ class MediaFile(DAVNonCollection):
 
         # 直接返回文件句柄，让WebDAV库处理
         return open(file_path, 'rb')
-
-    # 添加对 PROPFIND 请求的兼容性方法
-    def get_creation_date_string(self):
-        """返回 ISO 8601 格式的创建日期字符串（兼容所有操作系统）"""
-        try:
-            created_dt = self.media_info.get('created_date', datetime.datetime.now())
-
-            # 确保是 datetime 对象
-            if isinstance(created_dt, str):
-                # 尝试解析字符串格式
-                try:
-                    created_dt = datetime.datetime.fromisoformat(created_dt.replace('Z', '+00:00'))
-                except:
-                    created_dt = datetime.datetime.now()
-            elif not isinstance(created_dt, datetime.datetime):
-                created_dt = datetime.datetime.now()
-
-            # 确保时区信息（使用 UTC 避免时区问题）
-            if created_dt.tzinfo is None:
-                created_dt = created_dt.replace(tzinfo=datetime.timezone.utc)
-
-            # 返回标准的 ISO 8601 格式
-            return created_dt.isoformat()
-
-        except Exception as e:
-            logger.error(f"Error formatting creation date: {e}")
-            # 返回当前时间的 ISO 格式作为回退
-            return datetime.datetime.now(datetime.timezone.utc).isoformat()
-
-    def get_last_modified_string(self):
-        """返回 RFC 1123 格式的最后修改时间字符串（兼容所有操作系统）"""
-        try:
-            last_modified_dt = self.media_info.get('last_modified', datetime.datetime.now())
-
-            # 确保是 datetime 对象
-            if isinstance(last_modified_dt, str):
-                try:
-                    last_modified_dt = datetime.datetime.fromisoformat(last_modified_dt.replace('Z', '+00:00'))
-                except:
-                    last_modified_dt = datetime.datetime.now()
-            elif not isinstance(last_modified_dt, datetime.datetime):
-                last_modified_dt = datetime.datetime.now()
-
-            # 确保时区信息（使用 UTC）
-            if last_modified_dt.tzinfo is None:
-                last_modified_dt = last_modified_dt.replace(tzinfo=datetime.timezone.utc)
-
-            # 使用 werkzeug 的 http_date 函数，它处理时区兼容性
-            return http_date(last_modified_dt)
-
-        except Exception as e:
-            logger.error(f"Error formatting last modified date: {e}")
-            # 返回当前时间的 RFC 1123 格式作为回退
-            return http_date(datetime.datetime.now(datetime.timezone.utc))
