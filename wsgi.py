@@ -4,7 +4,7 @@ import os
 import socket
 import sys
 
-from src.logger_config import init_optimized_logger
+from logger_config import init_pythonanywhere_logger, init_optimized_logger
 
 
 def parse_arguments():
@@ -18,6 +18,8 @@ def parse_arguments():
                         help='启动前执行更新检查')
     parser.add_argument('--update-only', action='store_true',
                         help='仅执行更新而不启动服务器')
+    parser.add_argument('--pythonanywhere', action='store_true', default=False,
+                        help='在 PythonAnywhere 上运行,将禁用日志文件')
     return parser.parse_args()
 
 
@@ -73,9 +75,19 @@ def run_update():
 def main():
     # 解析命令行参数
     args = parse_arguments()
-
-    # 初始化日志系统
-    init_optimized_logger()
+    # 根据 --pythonanywhere 参数初始化日志系统
+    if args.pythonanywhere:
+        logger = init_pythonanywhere_logger()
+        if logger is None:
+            print("PythonAnywhere 环境下日志系统初始化失败")
+            sys.exit(1)
+        logger.info("PythonAnywhere 环境下日志系统已启动")
+    else:
+        logger = init_optimized_logger()
+        if logger is None:
+            print("日志系统初始化失败")
+            sys.exit(1)
+        logger.info("日志系统已启动")
 
     # 检查配置文件
     if not os.path.isfile(".env"):
