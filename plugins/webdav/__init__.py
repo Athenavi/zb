@@ -538,7 +538,7 @@ def register_plugin(app):
         return handler.handle_request(path, request.method, user_info)
 
     # WebDAV 发现页面
-    @bp.route('/dav/')
+    @bp.route('/dav/index.html', methods=['GET'])
     def webdav_root():
         return """
         <html>
@@ -565,15 +565,6 @@ def register_plugin(app):
             </body>
         </html>
         """
-
-    # 健康检查端点
-    @bp.route('/dav/health')
-    def webdav_health():
-        return jsonify({
-            "status": "healthy",
-            "service": "webdav",
-            "timestamp": SAFE_TIMESTAMP
-        })
 
     plugin = type('Plugin', (), {
         'name': 'WebDAV Media Server',
