@@ -148,6 +148,8 @@ def get_table_names_by_engine(inspector, schema):
             return inspector.get_table_names(schema=schema.upper() if schema else None)
         elif DB_ENGINE in ['mssql']:
             return inspector.get_table_names(schema=schema)
+        elif DB_ENGINE in ['sqlite']:
+            return inspector.get_table_names()
         else:
             return inspector.get_table_names(schema=schema or 'public')
     except Exception as e:

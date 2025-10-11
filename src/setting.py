@@ -125,13 +125,31 @@ class AppConfig(BaseConfig):
     db_pool_size = os.environ.get('DB_POOL_SIZE') or os.getenv('DATABASE_POOL_SIZE', '16')
 
     # 配置连接池参数
-    pool_config = {
-        "pool_size": int(db_pool_size),  # 连接池大小
-        "max_overflow": 20,
-        "pool_timeout": 5,
-        "pool_recycle": 1200,
-        "pool_pre_ping": True,
-    }
+    @property
+    def SQLALCHEMY_DATABASE_URI(self):
+        """动态获取数据库URI"""
+        return get_sqlalchemy_uri({
+            'db_engine': self.db_engine,
+            'db_host': self.db_host,
+            'db_user': self.db_user,
+            'db_port': self.db_port,
+            'db_name': self.db_name,
+            'db_password': self.db_password
+        })
+
+    @property
+    def pool_config(self):
+        """动态获取连接池配置"""
+        if self.db_engine == 'sqlite':
+            return {}
+        else:
+            return {
+                "pool_size": int(self.db_pool_size),
+                "max_overflow": 20,
+                "pool_timeout": 5,
+                "pool_recycle": 1200,
+                "pool_pre_ping": True,
+            }
 
     RedisConfig = {
         "host": os.environ.get('REDIS_HOST') or os.getenv('REDIS_HOST', 'localhost'),
@@ -144,21 +162,6 @@ class AppConfig(BaseConfig):
         "retry_on_timeout": True,  # 超时重试
         "max_connections": 10  # 连接池大小
     }
-
-    # 在子类中设置数据库URI
-    SQLALCHEMY_DATABASE_URI = get_sqlalchemy_uri({
-        'db_engine': db_engine,
-        'db_host': db_host,
-        'db_user': db_user,
-        'db_port': db_port,
-        'db_name': db_name,
-        'db_password': db_password
-    })
-
-    # 根据数据库引擎调整连接池配置
-    if db_engine == 'sqlite':
-        # SQLite不需要连接池
-        pool_config = {}
 
 
 class WechatPayConfig:
