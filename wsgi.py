@@ -19,8 +19,6 @@ def parse_arguments():
                         help='仅执行更新而不启动服务器')
     parser.add_argument('--pythonanywhere', action='store_true', default=False,
                         help='在 PythonAnywhere 上运行,将禁用日志文件')
-    parser.add_argument('--skip-guide', action='store_true', default=False,
-                        help='跳过引导程序，即使没有配置文件也强制启动主应用')
     return parser.parse_args()
 
 
@@ -73,18 +71,12 @@ def run_update():
         return False
 
 
-def check_config_exists():
-    """检查配置文件是否存在"""
-    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
-    return os.path.isfile(env_path)
-
-
 def main():
     # 解析命令行参数
     args = parse_arguments()
 
     # 检查配置文件是否存在
-    if not check_config_exists() and not args.skip_guide:
+    if not os.path.isfile(".env"):
         print("=" * 60)
         print("检测到系统未初始化，正在启动引导程序...")
         print("=" * 60)
@@ -108,7 +100,7 @@ def main():
         return
 
     # 初始化日志系统
-    if args.pythonanwhere:
+    if args.pythonanywhere:
         logger = init_pythonanywhere_logger()
         if logger is None:
             print("PythonAnywhere 环境下日志系统初始化失败")
@@ -133,23 +125,22 @@ def main():
             print("更新失败，继续使用当前版本启动")
 
     # 测试数据库连接（仅在配置文件存在时）
-    if check_config_exists():
-        try:
-            from src.database import test_database_connection, check_db
-            test_database_connection()
-            check_db()
-        except ImportError:
-            print("警告: 无法导入数据库模块，跳过数据库检查")
-        except Exception as e:
-            print(f"数据库连接测试失败: {str(e)}")
-            if not args.skip_guide:
-                print("建议运行引导程序重新配置数据库")
-                response = input("是否立即启动引导程序? (y/N): ")
-                if response.lower() in ['y', 'yes']:
-                    from guide import run_guide_app
-                    run_guide_app(args.host, args.port)
-                    return
-            sys.exit(1)
+    try:
+        from src.database import test_database_connection, check_db
+        test_database_connection()
+        check_db()
+    except ImportError:
+        print("警告: 无法导入数据库模块，跳过数据库检查")
+    except Exception as e:
+        print(f"数据库连接测试失败: {str(e)}")
+        if not args.skip_guide:
+            print("建议运行引导程序重新配置数据库")
+            response = input("是否立即启动引导程序? (y/N): ")
+            if response.lower() in ['y', 'yes']:
+                from guide import run_guide_app
+                run_guide_app(args.host, args.port)
+                return
+        sys.exit(1)
 
     # 检查端口可用性
     final_port = args.port
@@ -161,7 +152,7 @@ def main():
             final_port = available_port
             print(f"找到可用端口: {final_port}")
         else:
-            print("9421-9430范围内的所有端口均被占用。")
+            print("9421-9430范围内的所有端口已被占用。")
             final_port = get_user_port_input()
 
     # 导入应用
@@ -177,13 +168,6 @@ def main():
     print("应用程序正在启动...")
     print(f"服务地址: http://{args.host}:{final_port}")
     print(f"内部地址: http://127.0.0.1:{final_port}")
-    print("=" * 50)
-
-    if check_config_exists():
-        print("主应用程序已启动")
-    else:
-        print("警告: 在无配置文件模式下运行，某些功能可能不可用")
-
     print("=" * 50)
 
     # 启动服务

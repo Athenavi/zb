@@ -6,7 +6,6 @@ from jinja2 import select_autoescape
 from werkzeug.exceptions import NotFound
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from blueprints.guide import guide_bp
 from src.blog.article.core.views import blog_detail_back
 from src.blueprints.admin_vip import admin_vip_bp
 from src.blueprints.api import api_bp
@@ -167,7 +166,6 @@ def register_blueprints(app):
     app.register_blueprint(other_bp)
     app.register_blueprint(vip_bp)
     app.register_blueprint(admin_vip_bp)
-    app.register_blueprint(guide_bp)
 
 
 def configure_logging(app):
