@@ -91,8 +91,10 @@ def main():
 
     # 检查配置文件
     if not os.path.isfile(".env"):
-        print('配置文件不存在！详情请阅读 README.md')
-        return
+        print('The configuration file does not exist！For details, please read README.md.')
+        print('the database check will be skipped.')
+        print('if you  want to run the app, you should create a .env file in the root directory of the project.')
+        print('you can open {your_domain}/guide to init the app.')
 
     # 处理更新选项
     if args.update_only:
@@ -106,13 +108,14 @@ def main():
             print("更新失败，继续使用当前版本启动")
 
     # 测试数据库连接
-    from src.database import test_database_connection, check_db
-    try:
-        test_database_connection()
-        check_db()
-    except Exception as e:
-        print(f"数据库连接测试失败: {str(e)}")
-        sys.exit(1)
+    if os.path.isfile(".env"):
+        from src.database import test_database_connection, check_db
+        try:
+            test_database_connection()
+            check_db()
+        except Exception as e:
+            print(f"数据库连接测试失败: {str(e)}")
+            sys.exit(1)
 
     # 检查端口可用性
     final_port = args.port
