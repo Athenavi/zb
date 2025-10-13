@@ -1,8 +1,9 @@
 import os
 import secrets
 import string
-
 import psycopg2
+from mysql.connector import connect as mysql_connect
+from sqlite3 import connect as sqlite_connect
 from flask import Blueprint, render_template, request, jsonify, current_app
 
 guide_bp = Blueprint('guide', __name__)
@@ -42,23 +43,62 @@ class GuideConfig:
     @staticmethod
     def test_database_connection(db_config):
         """测试数据库连接"""
+        db_engine = db_config.get('db_engine', '').lower()
+
         try:
-            conn = psycopg2.connect(
-                host=db_config.get('host'),
-                port=db_config.get('port'),
-                user=db_config.get('user'),
-                password=db_config.get('password'),
-                database=db_config.get('database')
-            )
+            # 处理端口号，确保不为None且有默认值
+            port = db_config.get('port')
+            if port is None or port == '':
+                # 根据数据库类型设置默认端口
+                if db_engine == 'postgresql':
+                    port = 5432
+                elif db_engine == 'mysql':
+                    port = 3306
+                else:
+                    port = None
+            else:
+                # 确保端口号是整数
+                port = int(port)
+
+            if db_engine == 'postgresql':
+                conn = psycopg2.connect(
+                    host=db_config.get('host'),
+                    port=port,
+                    user=db_config.get('user'),
+                    password=db_config.get('password'),
+                    database=db_config.get('database')
+                )
+            elif db_engine == 'mysql':
+                conn = mysql_connect(
+                    host=db_config.get('host'),
+                    port=port,
+                    user=db_config.get('user'),
+                    password=db_config.get('password'),
+                    database=db_config.get('database')
+                )
+            elif db_engine == 'sqlite':
+                db_path = db_config.get('database', '')
+                if not db_path:
+                    return False, "SQLite数据库路径不能为空"
+                # 对于SQLite，确保路径存在
+                db_dir = os.path.dirname(db_path)
+                if db_dir and not os.path.exists(db_dir):
+                    os.makedirs(db_dir, exist_ok=True)
+                conn = sqlite_connect(db_path)
+            else:
+                return False, "不支持的数据库类型"
+
             conn.close()
             return True, "数据库连接成功"
+        except ValueError as ve:
+            return False, f"参数错误: {str(ve)}"
         except Exception as e:
             return False, f"数据库连接失败: {str(e)}"
 
     @staticmethod
     def generate_env_file(config_data):
         """生成 .env 配置文件"""
-        env_content = f"""# 数据库配置 pgsql
+        env_content = f"""# 数据库配置
 DB_ENGINE={config_data.get('db_engine', 'postgresql')}
 DB_HOST={config_data.get('db_host')}
 DB_PORT={config_data.get('db_port')}
@@ -110,14 +150,36 @@ def guide_index():
 def test_database():
     """测试数据库连接"""
     data = request.get_json()
+    print("测试数据库连接数据:", data)
+
+    # 统一的字段名映射处理
+    def get_field(*possible_names):
+        for name in possible_names:
+            value = data.get(name)
+            if value is not None and value != '':
+                return value
+        return None
 
     db_config = {
-        'host': data.get('host'),
-        'port': data.get('port'),
-        'user': data.get('user'),
-        'password': data.get('password'),
-        'database': data.get('database')
+        'db_engine': get_field('db_engine', 'engine'),
+        'host': get_field('db_host', 'host'),
+        'port': get_field('db_port', 'port'),
+        'user': get_field('db_user', 'user'),
+        'password': get_field('db_password', 'password'),
+        'database': get_field('db_name', 'database', 'db_database')
     }
+
+    print("处理后的数据库配置:", db_config)
+
+    # 验证必需字段
+    if not db_config['db_engine']:
+        return jsonify({'success': False, 'message': '请选择数据库类型'})
+
+    if db_config['db_engine'] != 'sqlite':
+        required_fields = ['host', 'user', 'database']
+        missing_fields = [field for field in required_fields if not db_config[field]]
+        if missing_fields:
+            return jsonify({'success': False, 'message': f'缺少必需字段: {", ".join(missing_fields)}'})
 
     success, message = guide_config.test_database_connection(db_config)
     return jsonify({'success': success, 'message': message})
@@ -137,6 +199,7 @@ def save_config():
     """保存配置文件"""
     try:
         data = request.get_json()
+        print("保存配置数据:", data)
 
         # 生成环境文件内容
         env_content = guide_config.generate_env_file(data)
@@ -154,6 +217,8 @@ def save_config():
         with open(env_path, 'w', encoding='utf-8') as f:
             f.write(env_content)
 
+        print(f"配置文件已保存到: {env_path}")
+
         # 如果是最后一步，创建管理员账户
         if data.get('step') == 'complete':
             admin_data = data.get('admin', {})
@@ -167,6 +232,7 @@ def save_config():
         })
 
     except Exception as e:
+        print(f"保存配置失败: {str(e)}")
         return jsonify({
             'success': False,
             'message': f'保存配置失败: {str(e)}'
