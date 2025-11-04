@@ -43,8 +43,7 @@ class User(db.Model):
     # 角色关系
     roles = db.relationship('Role', secondary='user_roles', back_populates='users', cascade='all')
 
-    social_accounts = db.relationship('SocialAccount', back_populates='user', lazy='dynamic',
-                                      cascade='all, delete')
+    social_profiles = db.relationship('SocialAccount', backref='user_profile', overlaps="social_accounts")
     vip_subscriptions = db.relationship('VIPSubscription', back_populates='user',
                                         lazy='dynamic', cascade='all, delete')
 
