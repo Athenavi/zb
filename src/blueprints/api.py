@@ -193,6 +193,7 @@ def api_user_bio(user_id):
 
 
 @api_bp.route('/user/profile/<int:user_id>', methods=['GET'])
+@cache.memoize(timeout=300)
 def api_user_profile(user_id):
     return get_user_info(user_id)
 
