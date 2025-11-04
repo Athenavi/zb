@@ -17,7 +17,7 @@ class SocialAccount(db.Model):
     updated_at = db.Column(db.TIMESTAMP, server_default=current_timestamp(), onupdate=current_timestamp())
 
     # 关系定义
-    user = db.relationship('User', backref='social_accounts')
+    user = db.relationship('User', backref='social_account_links')
 
     __table_args__ = (
         db.UniqueConstraint('provider', 'provider_uid', name='uq_provider_uid'),
