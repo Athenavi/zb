@@ -45,6 +45,8 @@ class User(db.Model):
 
     oauth_connections = db.relationship('OAuthConnection', back_populates='user', lazy='dynamic',
                                         cascade='all, delete')
+    social_accounts = db.relationship('SocialAccount', back_populates='user', lazy='dynamic',
+                                      cascade='all, delete')
     vip_subscriptions = db.relationship('VIPSubscription', back_populates='user',
                                         lazy='dynamic', cascade='all, delete')
 

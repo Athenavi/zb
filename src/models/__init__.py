@@ -14,6 +14,7 @@ from .notification import Notification
 from .subscription import UserSubscription
 from .misc import Event, Report, Url
 from .vip import VIPPlan, VIPSubscription, VIPFeature
+from .social_account import SocialAccount
 
 __all__ = [
     'db',
@@ -26,5 +27,6 @@ __all__ = [
     'Notification',
     'UserSubscription',
     'Event', 'Report', 'Url',
-    'VIPPlan', 'VIPSubscription', 'VIPFeature'
+    'VIPPlan', 'VIPSubscription', 'VIPFeature',
+    'SocialAccount',
 ]
