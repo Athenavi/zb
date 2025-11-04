@@ -7,7 +7,7 @@ from decimal import Decimal
 from flask import Blueprint, request, Response, jsonify, send_file
 
 from blueprints.media import get_user_storage_used
-from setting import app_config
+from src.setting import app_config
 from src.database import get_db
 from src.models import Media, FileHash, User
 from src.utils.security.jwt_handler import JWTHandler
