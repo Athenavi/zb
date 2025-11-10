@@ -97,6 +97,12 @@ def register_context_processors(app, config_class):
 
 def register_direct_routes(app, config_class):
     """注册直接定义在应用上的路由"""
+    from flask import redirect
+    @app.route('/profile')
+    @jwt_required
+    def profile(user_id):
+        """当前用户的个人资料页面"""
+        return redirect(f'/space/{user_id}')
 
     @app.route('/search', methods=['GET', 'POST'])
     @jwt_required

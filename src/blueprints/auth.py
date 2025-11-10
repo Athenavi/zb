@@ -6,13 +6,9 @@ from flask import Blueprint, make_response, current_app
 from flask import render_template, jsonify, flash
 from flask_bcrypt import check_password_hash
 
-from extensions import cache
 from src.database import get_db
 from src.models import User
 from src.utils.security.jwt_handler import JWTHandler, JWT_EXPIRATION_DELTA, REFRESH_TOKEN_EXPIRATION_DELTA
-from user.authz.decorators import jwt_required
-from user.authz.password import validate_password, update_password
-from utils.security.ip_utils import get_client_ip
 
 auth_bp = Blueprint('auth', __name__, template_folder='templates')
 
@@ -111,7 +107,7 @@ def is_safe_url(target):
         ref_url.netloc == test_url.netloc
 
 
-def resolve_callback(callback, default='my.profile'):
+def resolve_callback(callback, default='profile'):
     """
     解析callback参数，可能是endpoint名称或URL路径
     """
@@ -149,13 +145,13 @@ def login():
     try:
         # 获取并正确解析callback参数
         raw_callback = request.args.get('callback') or '/profile'
-        callback_url = resolve_callback(raw_callback, 'my.profile')
+        callback_url = resolve_callback(raw_callback, 'profile')
 
         if request.method == 'GET':
             user_agent = request.headers.get('User-Agent', '')
             if is_mobile_device(user_agent):
                 # 对于移动端，传递原始callback参数
-                mobile_callback = raw_callback or 'my.profile'
+                mobile_callback = raw_callback or 'profile'
                 return redirect(f'/api/mobile/scanner?callback={mobile_callback}')
 
         if request.method == 'POST':
@@ -235,36 +231,3 @@ def logout():
     response.set_cookie('refresh_token', '', expires=0)
     return response
 
-
-@auth_bp.route('/confirm-password', methods=['GET', 'POST'])
-@jwt_required
-def confirm_password(user_id):
-    return confirm_password_back(user_id, cache)
-
-
-@auth_bp.route('/change-password', methods=['GET', 'POST'])
-@jwt_required
-def change_password(user_id):
-    return change_password_back(user_id, cache)
-
-
-def confirm_password_back(user_id, cache_instance):
-    if request.method == 'POST':
-        if validate_password(user_id):
-            cache_instance.set(f"tmp-change-key_{user_id}", True, timeout=300)
-            return redirect("/change-password")
-    return render_template('Authentication.html', form='confirm')
-
-
-def change_password_back(user_id, cache_instance):
-    if not cache_instance.get(f"tmp-change-key_{user_id}"):
-        return redirect('/confirm-password')
-    if request.method == 'POST':
-        ip = get_client_ip(request)
-        new_pass = request.form.get('new_password')
-        repeat_pass = request.form.get('confirm_password')
-        if update_password(user_id, new_password=new_pass, confirm_password=repeat_pass, ip=ip):
-            return render_template('inform.html', status_code='200', message='密码修改成功！')
-        else:
-            return render_template('Authentication.html', form='change')
-    return render_template('Authentication.html', form='change')
