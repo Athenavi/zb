@@ -3,11 +3,10 @@ from datetime import datetime
 from flask import Blueprint, request, render_template, redirect, flash, url_for, jsonify
 
 from src.database import get_db
-from src.models import Url, Comment, Article
+from src.models import Url, Comment
+from src.models import UserSubscription, Article, db, User
 from src.user.authz.decorators import jwt_required
 from src.utils.shortener.links import generate_short_url
-
-# from src.error import error
 
 my_bp = Blueprint('my', __name__, template_folder='templates')
 
@@ -199,3 +198,58 @@ def update_article_status(user_id, article_id):
         article.updated_at = datetime.now()
 
         return jsonify({'success': True, 'message': f'文章已{new_status}'})
+
+
+@my_bp.route('/profile')
+@jwt_required
+def profile(user_id):
+    """当前用户的个人资料页面"""
+    return redirect(f'/space/{user_id}')
+
+
+@my_bp.route('/space/<int:target_user_id>')
+@jwt_required
+def user_space(user_id, target_user_id):
+    """用户空间页面 - 显示用户资料和文章"""
+    try:
+        target_user = User.query.get_or_404(target_user_id)
+
+        # 判断是否为当前用户自己的空间
+        is_own_profile = user_id == target_user_id
+
+        if target_user.profile_private and not is_own_profile:
+            return render_template('inform.html', status_code=503, message='<h1>该用户未公开资料</h1><UNK>')
+
+        # 获取用户统计数据
+        stats = {
+            'articles_count': Article.query.filter_by(user_id=target_user_id, status=1).count(),
+            'followers_count': UserSubscription.query.filter_by(subscribed_user_id=target_user_id).count(),
+            'following_count': UserSubscription.query.filter_by(subscriber_id=target_user_id).count(),
+            'total_views': db.session.query(db.func.sum(Article.views)).filter_by(user_id=target_user_id,
+                                                                                  status=1).scalar() or 0,
+            'total_likes': db.session.query(db.func.sum(Article.likes)).filter_by(user_id=target_user_id,
+                                                                                  status=1).scalar() or 0
+        }
+
+        # 获取用户最新发布的文章
+        recent_articles = Article.query.filter_by(
+            user_id=target_user_id,
+            status=1
+        ).order_by(Article.updated_at.desc()).limit(6).all()
+
+        # 检查当前用户是否已关注目标用户
+        is_following = False
+        if user_id != target_user_id:
+            is_following = UserSubscription.query.filter_by(
+                subscriber_id=user_id,
+                subscribed_user_id=target_user_id
+            ).first() is not None
+
+        return render_template('Profile.html',
+                               target_user=target_user,
+                               is_own_profile=is_own_profile,
+                               is_following=is_following,
+                               stats=stats,
+                               recent_articles=recent_articles)
+    except Exception as e:
+        print(f"An error occurred: {e}")

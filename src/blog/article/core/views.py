@@ -347,7 +347,7 @@ def edit_article_back(user_id, article_id):
                                    categories=categories,
                                    status_options=['Draft', 'Published', 'Deleted'])
 
-        return redirect(url_for('other.markdown_editor', aid=article_id))
+        return redirect(url_for('blog.markdown_editor', aid=article_id))
 
     return render_template('article_edit.html',
                            article=article,
