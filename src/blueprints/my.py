@@ -1,8 +1,5 @@
-from datetime import datetime
+from flask import Blueprint, flash
 
-from flask import Blueprint, request, render_template, redirect, flash, url_for
-
-from extensions import cache
 from src.database import get_db
 from src.models import Article
 from src.models import Url, Comment
@@ -184,27 +181,45 @@ def my_posts(user_id):
         print(e)
 
 
+from flask import session, redirect, request, render_template, url_for
+from datetime import datetime, timedelta, timezone
+
+
 @my_bp.route('/pw/confirm', methods=['GET', 'POST'])
 @jwt_required
 def confirm_password(user_id):
     if request.method == 'POST':
         if validate_password(user_id):
-            cache.set(f"tmp-change-key_{user_id}", True, timeout=300)
-            return redirect("/my/pw/change")
+            session.permanent = True  # 使 session 持久化
+            session[f"tmp-change-key_{user_id}"] = True
+            session[f"tmp-change-key-time_{user_id}"] = datetime.now(timezone.utc)  # 记录当前时间，并指定时区为 UTC
+            return redirect(url_for('my.change_password', user_id=user_id))
     return render_template('Authentication.html', form='confirm')
 
 
 @my_bp.route('/pw/change', methods=['GET', 'POST'])
 @jwt_required
 def change_password(user_id):
-    if not cache.get(f"tmp-change-key_{user_id}"):
-        return redirect('/my/pw/confirm')
+    if not session.get(f"tmp-change-key_{user_id}"):
+        return redirect(url_for('my.confirm_password', user_id=user_id))
+
+    # 检查时间戳是否超过 15 分钟
+    confirm_time = session.get(f"tmp-change-key-time_{user_id}")
+    if confirm_time is None or datetime.now(timezone.utc) - confirm_time > timedelta(
+            minutes=15):  # 使用 timezone.utc 以确保时区一致
+        session.pop(f"tmp-change-key_{user_id}", None)
+        session.pop(f"tmp-change-key-time_{user_id}", None)
+        return redirect(url_for('my.confirm_password', user_id=user_id))
+
     if request.method == 'POST':
         ip = get_client_ip(request)
         new_pass = request.form.get('new_password')
         repeat_pass = request.form.get('confirm_password')
         if update_password(user_id, new_password=new_pass, confirm_password=repeat_pass, ip=ip):
+            session.pop(f"tmp-change-key_{user_id}")
+            session.pop(f"tmp-change-key-time_{user_id}")
             return render_template('inform.html', status_code='200', message='密码修改成功！')
         else:
             return render_template('Authentication.html', form='change')
+
     return render_template('Authentication.html', form='change')
