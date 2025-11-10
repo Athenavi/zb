@@ -1,10 +1,11 @@
+import re
 from datetime import datetime, timedelta
 
 import bcrypt
 from flask import Blueprint, request, jsonify, render_template
 
 from src.database import get_db
-from src.models import User, Article, ArticleContent, ArticleI18n, Category, Comment, db
+from src.models import User, Article, ArticleContent, ArticleI18n, Category, Comment, db, CategorySubscription
 # from src.error import error
 from src.user.authz.decorators import admin_required
 from src.utils.config.theme import get_all_themes
@@ -135,7 +136,9 @@ def admin_index(user_id):
 @admin_required
 def admin_user(user_id):
     try:
-        return render_template('dashboard/user.html')
+        with get_db() as db:
+            current_user = db.query(User).filter_by(id=user_id).first()
+            return render_template('dashboard/user.html', current_user=current_user)
     except Exception as e:
         return jsonify({'error': str(e)})
 
@@ -143,7 +146,9 @@ def admin_user(user_id):
 @dashboard_bp.route('/blog', methods=['GET'])
 @admin_required
 def admin_blog(user_id):
-    return render_template('dashboard/blog.html')
+    with get_db() as db:
+        current_user = db.query(User).filter_by(id=user_id).first()
+        return render_template('dashboard/blog.html', current_user=current_user)
 
 
 @dashboard_bp.route('/user', methods=['GET'])
@@ -449,7 +454,11 @@ def get_stats(user_id):
 @dashboard_bp.route('/display', methods=['GET'])
 @admin_required
 def m_display(user_id):
-    return render_template('dashboard/M-display.html', displayList=get_all_themes(), user_id=user_id)
+    with get_db() as db:
+        current_user = db.query(User).filter_by(id=user_id).first()
+        return render_template('dashboard/M-display.html',
+                               current_user=current_user,
+                               displayList=get_all_themes(), user_id=user_id)
 
 
 @dashboard_bp.route('/article', methods=['GET'])
@@ -905,3 +914,123 @@ def get_authors(user_id):
         }), 500
     finally:
         db_session.close()
+
+
+@dashboard_bp.route('/categories', methods=['POST', 'PUT', 'DELETE'])
+@admin_required
+def admin_categories(user_id):
+    try:
+        with get_db() as db:
+            # 获取当前用户信息
+            current_user = db.query(User).filter_by(id=user_id).first()
+
+            # 处理删除请求
+            if request.method == 'DELETE':
+                category_id = request.json.get('category_id')
+                category = db.query(Category).filter_by(id=category_id).first()
+                if category:
+                    # 检查是否有文章关联到这个分类
+                    article_count = db.query(Article).filter_by(category_id=category_id).count()
+                    if article_count > 0:
+                        return jsonify({'success': False, 'message': f'无法删除，该分类下有 {article_count} 篇文章'})
+
+                    # 删除分类订阅
+                    db.query(CategorySubscription).filter_by(category_id=category_id).delete()
+
+                    db.delete(category)
+                    db.commit()
+                    return jsonify({'success': True, 'message': '分类已删除'})
+                return jsonify({'success': False, 'message': '分类不存在'})
+
+            # 处理创建/更新请求
+            elif request.method == 'POST' or request.method == 'PUT':
+                name = request.form.get('name')
+                description = request.form.get('description', '')
+
+                if not name:
+                    return jsonify({'success': False, 'message': '分类名称不能为空'})
+                if len(name) > 50:
+                    return jsonify({'success': False, 'message': '分类名称不能超过50个字符'})
+                if not re.match(r'^[\u4e00-\u9fa5a-zA-Z0-9_-]+$', name):
+                    return jsonify({'success': False, 'message': '分类名称只能包含中文、英文、数字、下划线、中划线'})
+                # 检查名称是否已存在
+                existing_category = db.query(Category).filter(
+                    func.lower(Category.name) == func.lower(name)
+                ).first()
+
+                if request.method == 'POST':  # 创建
+                    if existing_category:
+                        return jsonify({'success': False, 'message': '分类名称已存在'})
+
+                    category = Category(
+                        name=name,
+                        description=description,
+                        created_at=datetime.now(),
+                        updated_at=datetime.now()
+                    )
+                    db.add(category)
+                    db.commit()
+                    return jsonify({'success': True, 'message': '分类创建成功'})
+
+                else:  # 更新()
+                    category_id = request.form.get('category_id')
+                    category = db.query(Category).filter_by(id=category_id).first()
+
+                    if not category:
+                        return jsonify({'success': False, 'message': '分类不存在'})
+
+                    # 检查名称冲突（排除自己）
+                    if existing_category and existing_category.id != int(category_id):
+                        return jsonify({'success': False, 'message': '分类名称已存在'})
+
+                    category.name = name
+                    category.description = description
+                    category.updated_at = datetime.now()
+                    db.commit()
+                    return jsonify({'success': True, 'message': '分类更新成功'})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@dashboard_bp.route('/category', methods=['GET'])
+@admin_required
+def list_categories(user_id):
+    try:
+        from src.extensions import db
+        db_session = db.session()
+
+        # 获取当前用户信息
+        current_user = db_session.query(User).filter_by(id=user_id).first()
+
+        # GET请求 - 显示分类列表
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        search = request.args.get('search', '')
+
+        # 构建查询
+        query = db_session.query(
+            Category,
+            func.count(Article.article_id).label('article_count'),
+            func.count(CategorySubscription.id).label('subscriber_count')
+        ).outerjoin(Article, Category.id == Article.category_id) \
+            .outerjoin(CategorySubscription, Category.id == CategorySubscription.category_id)
+
+        if search:
+            query = query.filter(
+                Category.name.ilike(f'%{search}%') |
+                Category.description.ilike(f'%{search}%')
+            )
+
+        # 分组并分页
+        categories = query.group_by(Category.id) \
+            .order_by(Category.created_at.desc()) \
+            .paginate(page=page, per_page=per_page, error_out=False)
+
+        return render_template('dashboard/category.html',
+                               categories=categories,
+                               current_user=current_user,
+                               search=search)
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
