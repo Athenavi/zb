@@ -6,7 +6,7 @@ from src.blog.homepage import index_page_back, tag_page_back, featured_page_back
 from src.blueprints.api import api_user_profile
 from src.error import error
 from src.extensions import cache
-from src.models import UserSubscription, Article, db, User
+from src.models import UserSubscription, Article, db, User, Notification
 from src.user.authz.decorators import jwt_required, domain
 from src.user.views import change_profiles_back, setting_profiles_back
 
@@ -108,6 +108,13 @@ def user_space(user_id, target_user_id):
         # 判断是否为当前用户自己的空间
         is_own_profile = user_id == target_user_id
 
+        has_unread_message = False
+
+        if is_own_profile:
+            # 获取用户未读消息数
+            has_unread_message = bool(db.session.query(Notification).filter_by(user_id=target_user_id,
+                                                                               is_read=False).count()) or False
+
         if target_user.profile_private and not is_own_profile:
             return render_template('inform.html', status_code=503, message='<h1>该用户未公开资料</h1><UNK>')
 
@@ -140,6 +147,7 @@ def user_space(user_id, target_user_id):
                                target_user=target_user,
                                is_own_profile=is_own_profile,
                                is_following=is_following,
+                               has_unread_message=has_unread_message,
                                stats=stats,
                                recent_articles=recent_articles)
     except Exception as e:
