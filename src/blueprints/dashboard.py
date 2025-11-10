@@ -1,8 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import bcrypt
-from flask import Blueprint, request, render_template
-from flask import jsonify
+from flask import Blueprint, request, jsonify, render_template
 
 from src.database import get_db
 from src.models import User, Article, ArticleContent, ArticleI18n, Category, Comment, db
@@ -14,9 +13,127 @@ from src.utils.security.safe import validate_email
 dashboard_bp = Blueprint('dashboard', __name__, template_folder='templates', url_prefix='/admin')
 
 
-@dashboard_bp.route('/', methods=['GET'])
+@dashboard_bp.route('/comments', methods=['GET', 'POST', 'DELETE'])
+@admin_required
+def admin_comments(user_id):
+    try:
+        from src.extensions import db
+        # 获取当前用户信息
+        current_user = db.session.query(User).filter_by(id=user_id).first()
+
+        # 处理删除请求
+        if request.method == 'DELETE':
+            comment_id = request.json.get('comment_id')
+            comment = db.session.query(Comment).filter_by(id=comment_id).first()
+            if comment:
+                db.session.delete(comment)
+                db.session.commit()
+                return jsonify({'success': True, 'message': '评论已删除'})
+            return jsonify({'success': False, 'message': '评论不存在'})
+
+        # 处理状态更新请求
+        if request.method == 'POST':
+            action = request.form.get('action')
+            comment_id = request.form.get('comment_id')
+            comment = db.session.query(Comment).filter_by(id=comment_id).first()
+
+            if comment and action == 'approve':
+                # 这里可以添加状态字段的更新逻辑
+                comment.status = 'published'  # 假设这是您想要更新的状态
+                db.session.commit()
+                return jsonify({'success': True, 'message': '评论已审核通过'})
+
+            return jsonify({'success': False, 'message': '操作失败'})
+
+        # 获取查询参数
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        status = request.args.get('status', 'all')
+        search = request.args.get('search', '')
+        article_id = request.args.get('article_id', '')
+        date_from = request.args.get('date_from', '')
+        date_to = request.args.get('date_to', '')
+
+        # 构建查询
+        query = db.session.query(Comment)
+
+        # 应用筛选条件
+        if status != 'all':
+            if status == 'pending':
+                query = query.filter(Comment.status == 'pending')
+            elif status == 'published':
+                query = query.filter(Comment.status == 'published')
+            elif status == 'deleted':
+                query = query.filter(Comment.status == 'deleted')
+
+        if search:
+            query = query.filter(
+                or_(
+                    Comment.content.ilike(f'%{search}%'),
+                    User.username.ilike(f'%{search}%')
+                )
+            ).join(User)
+        else:
+            query = query.join(User)
+
+        if article_id:
+            query = query.filter(Comment.article_id == article_id)
+
+        if date_from:
+            try:
+                date_from_obj = datetime.strptime(date_from, '%Y-%m-%d')
+                query = query.filter(Comment.created_at >= date_from_obj)
+            except ValueError:
+                pass
+
+        if date_to:
+            try:
+                date_to_obj = datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1)
+                query = query.filter(Comment.created_at < date_to_obj)
+            except ValueError:
+                pass
+
+        # 使用 paginate 方法进行分页
+        comments = query.order_by(Comment.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
+
+        # 获取文章列表用于筛选
+        articles = db.session.query(Article).all()
+
+        return render_template('dashboard/comments.html',
+                               comments=comments,
+                               articles=articles,
+                               current_user=current_user,
+                               status=status,
+                               search=search,
+                               article_id=article_id,
+                               date_from=date_from,
+                               date_to=date_to)
+
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+
+@dashboard_bp.route('/index', methods=['GET'])
 @admin_required
 def admin_index(user_id):
+    try:
+        with get_db() as db:
+            # 获取用户信息
+            users_count = db.query(User).count()
+            # 获取文章数量
+            articles_count = db.query(Article).count()
+            # 获取评论数量
+            comments_count = db.query(Comment).count()
+            current_user = db.query(User).filter_by(id=user_id).first()
+            return render_template('dashboard/index.html', users_count=users_count, articles_count=articles_count,
+                                   comments_count=comments_count, current_user=current_user)
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+
+@dashboard_bp.route('/', methods=['GET'])
+@admin_required
+def admin_user(user_id):
     try:
         return render_template('dashboard/user.html')
     except Exception as e:
@@ -681,7 +798,7 @@ def update_article_status(user_id, article_id):
             }), 500
 
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 
 @dashboard_bp.route('/article/stats', methods=['GET'])
@@ -760,28 +877,31 @@ def get_categories(user_id):
 @admin_required
 def get_authors(user_id):
     """获取作者列表"""
-    with get_db() as db:
-        try:
-            # 获取有文章的用户作为作者
-            authors = db.query(User).join(Article).distinct().all()
+    from src.extensions import db
+    db_session = db.session()
+    try:
+        # 获取有文章的用户作为作者
+        authors = db_session.query(User).join(Article).distinct().all()
 
-            authors_data = []
-            for author in authors:
-                article_count = author.articles.count()
-                authors_data.append({
-                    'id': author.id,
-                    'username': author.username,
-                    'email': author.email,
-                    'article_count': article_count
-                })
+        authors_data = []
+        for author in authors:
+            article_count = author.articles.count()
+            authors_data.append({
+                'id': author.id,
+                'username': author.username,
+                'email': author.email,
+                'article_count': article_count
+            })
 
-            return jsonify({
-                'success': True,
-                'data': authors_data
-            }), 200
+        return jsonify({
+            'success': True,
+            'data': authors_data
+        }), 200
 
-        except Exception as e:
-            return jsonify({
-                'success': False,
-                'message': f'获取作者列表失败: {str(e)}'
-            }), 500
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'获取作者列表失败: {str(e)}'
+        }), 500
+    finally:
+        db_session.close()

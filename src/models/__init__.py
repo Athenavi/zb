@@ -1,20 +1,15 @@
-from flask_sqlalchemy import SQLAlchemy
-
-# 创建共享的 db 实例
-db = SQLAlchemy()
-
-# 导入所有模型
-from .user import User, CustomField, EmailSubscription
-from .role import Role, Permission, UserRole, RolePermission
+from src.extensions import db
 from .article import Article, ArticleContent, ArticleI18n
+from .category import Category, CategorySubscription
 from .comment import Comment
 from .media import Media, FileHash
-from .category import Category, CategorySubscription
-from .notification import Notification
-from .subscription import UserSubscription
 from .misc import Event, Report, Url
-from .vip import VIPPlan, VIPSubscription, VIPFeature
+from .notification import Notification
+from .role import Role, Permission, UserRole, RolePermission
 from .social_account import SocialAccount
+from .subscription import UserSubscription
+from .user import User, CustomField, EmailSubscription
+from .vip import VIPPlan, VIPSubscription, VIPFeature
 
 __all__ = [
     'db',
