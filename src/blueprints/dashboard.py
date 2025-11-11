@@ -19,7 +19,6 @@ dashboard_bp = Blueprint('dashboard', __name__, template_folder='templates', url
 @admin_required
 def admin_comments(user_id):
     try:
-        from src.extensions import db
         # 获取当前用户信息
         current_user = db.session.query(User).filter_by(id=user_id).first()
 
@@ -887,7 +886,7 @@ def get_categories(user_id):
 @admin_required
 def get_authors(user_id):
     """获取作者列表"""
-    from src.extensions import db
+
     db_session = db.session()
     try:
         # 获取有文章的用户作为作者
@@ -998,7 +997,7 @@ def admin_categories(user_id):
 @admin_required
 def list_categories(user_id):
     try:
-        from src.extensions import db
+
         db_session = db.session()
 
         # 获取当前用户信息

@@ -6,7 +6,14 @@ from xml.etree import ElementTree as ET
 from flask import request, render_template
 
 from src.database import get_db
-from src.models import Article, ArticleContent
+from src.models import Article, ArticleContent, SearchHistory, db
+
+
+def saveSearchHistory(user_id, keyword, results_count):
+    """保存搜索历史"""
+    new_search_history = SearchHistory(user_id=user_id, keyword=keyword, results_count=results_count)
+    db.session.add(new_search_history)
+    db.session.commit()
 
 
 def search_handler(user_id, domain, global_encoding, max_cache_timestamp):
@@ -83,5 +90,6 @@ def search_handler(user_id, domain, global_encoding, max_cache_timestamp):
                 'description': item.find('description').text
             }
             matched_content.append(content)
-
+            if item:
+                saveSearchHistory(user_id, keyword, len(matched_content) or 0)
     return render_template('search.html', results=matched_content)
