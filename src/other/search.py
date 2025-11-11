@@ -16,6 +16,15 @@ def saveSearchHistory(user_id, keyword, results_count):
     db.session.commit()
 
 
+def getUserSearchHisotry(user_id):
+    history_keywords = db.session.query(SearchHistory.keyword).filter(SearchHistory.user_id == user_id).order_by(
+        SearchHistory.created_at.desc()).all()
+    # 使用集合去重
+    unique_keywords = set(keyword[0] for keyword in history_keywords)
+    # 将集合转换为列表
+    return list(unique_keywords)
+
+
 def search_handler(user_id, domain, global_encoding, max_cache_timestamp):
     matched_content = []
 
@@ -28,9 +37,11 @@ def search_handler(user_id, domain, global_encoding, max_cache_timestamp):
     if request.method == 'POST':
         with get_db() as db:
             keyword = request.form.get('keyword')  # 获取搜索关键词
+            # 对关键词进行转义，替换特殊字符
+            safe_keyword = re.sub(r'[\\/*?:"<>|]', '', keyword)
             cache_dir = os.path.join('temp', 'search')
             os.makedirs(cache_dir, exist_ok=True)
-            cache_path = os.path.join(cache_dir, keyword + '.xml')
+            cache_path = os.path.join(cache_dir, safe_keyword + '.xml')
 
             # 检查缓存是否失效
             if os.path.isfile(cache_path) and (
@@ -92,4 +103,5 @@ def search_handler(user_id, domain, global_encoding, max_cache_timestamp):
             matched_content.append(content)
             if item:
                 saveSearchHistory(user_id, keyword, len(matched_content) or 0)
-    return render_template('search.html', results=matched_content)
+    history_list = getUserSearchHisotry(user_id)
+    return render_template('search.html', historyList=history_list, results=matched_content)
