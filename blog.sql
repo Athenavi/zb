@@ -7,18 +7,18 @@ create table if not exists users
 (
     id              serial
         primary key,
-    username        varchar(255) not null unique,
-    password        varchar(255) not null,
-    email           varchar(255) not null unique,
-    created_at      timestamp default CURRENT_TIMESTAMP,
-    updated_at      timestamp default CURRENT_TIMESTAMP,
+    username       varchar(255) not null unique,
+    password       varchar(255) not null,
+    email          varchar(255) not null unique,
+    created_at     timestamp default CURRENT_TIMESTAMP,
+    updated_at     timestamp default CURRENT_TIMESTAMP,
     profile_picture varchar(255),
     bio             text,
-    register_ip     varchar(45)  not null,
-    is_2fa_enabled  boolean   default false,
+    register_ip    varchar(45)  not null,
+    is_2fa_enabled boolean   default false,
     totp_secret     varchar(32),
     backup_codes    text,
-    vip_level int default 0,
+    vip_level      int       default 0,
     vip_expires_at  timestamp,
     profile_private boolean     default false,
     last_login_at   timestamp,
@@ -142,20 +142,21 @@ create table if not exists comments
 (
     id         serial
         primary key,
-    article_id int  not null
+    article_id int                 not null
         references articles
             on delete cascade,
-    user_id    int  not null
+    user_id    int                 not null
         references users
             on delete cascade,
     parent_id  int
         references comments
             on delete cascade,
-    content    text not null,
+    content    text                not null,
     ip         varchar(50),
     user_agent varchar(255),
     created_at timestamp default CURRENT_TIMESTAMP,
-    updated_at timestamp default CURRENT_TIMESTAMP
+    updated_at timestamp default CURRENT_TIMESTAMP,
+    hidden     int       default 0 not null
 );
 
 create index if not exists idx_article_created
@@ -265,12 +266,12 @@ create table if not exists reports
 (
     id           serial
         primary key,
-    reported_by int  not null
+    reported_by  int  not null
         references users
             on delete cascade,
-    content_type int,
-    content_id  int  not null,
-    reason      text not null,
+    content_type int  not null,
+    content_id   int  not null,
+    reason       text not null,
     created_at   timestamp default CURRENT_TIMESTAMP
 );
 
@@ -482,3 +483,18 @@ alter table pages
 alter table pages
     add foreign key (parent_id) references pages;
 
+create table if not exists search_history
+(
+    id            serial,
+    user_id       integer,
+    keyword       varchar(255) not null,
+    results_count integer,
+    created_at    timestamp default CURRENT_TIMESTAMP
+);
+
+alter table search_history
+    add primary key (id);
+
+alter table search_history
+    add foreign key (user_id) references users
+        on delete set null;
