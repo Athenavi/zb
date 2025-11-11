@@ -3,7 +3,7 @@ from .article import Article, ArticleContent, ArticleI18n
 from .category import Category, CategorySubscription
 from .comment import Comment
 from .media import Media, FileHash
-from .misc import Event, Report, Url
+from .misc import Event, Report, Url, SearchHistory
 from .notification import Notification
 from .role import Role, Permission, UserRole, RolePermission
 from .social_account import SocialAccount
@@ -22,7 +22,7 @@ __all__ = [
     'Category', 'CategorySubscription',
     'Notification',
     'UserSubscription',
-    'Event', 'Report', 'Url',
+    'Event', 'Report', 'Url', 'SearchHistory',
     'VIPPlan', 'VIPSubscription', 'VIPFeature',
     'SocialAccount',
     'Menus', 'MenuItems', 'Pages', 'SystemSettings'

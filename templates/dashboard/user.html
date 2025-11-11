@@ -152,6 +152,7 @@
                             </svg>
                             <span class="hidden sm:inline">添加用户</span>
                         </button>
+                        <a href="/admin/role">角色管理</a>
                     </div>
                 </div>
             </header>
@@ -173,23 +174,6 @@
                             </div>
                         </div>
                     </div>
-
-                    <div class="card-bg rounded-lg p-4 lg:p-6 shadow-sm border border-custom">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-medium text-gray-600">本月新增</p>
-                                <p class="text-2xl font-bold" id="monthlyNewUsers">0</p>
-                            </div>
-                            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                                <svg class="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd"
-                                          d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
-                                          clip-rule="evenodd"/>
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
-
                     <div class="card-bg rounded-lg p-4 lg:p-6 shadow-sm border border-custom sm:col-span-2 lg:col-span-1">
                         <div class="flex items-center justify-between">
                             <div>
@@ -983,6 +967,11 @@
             loadAllRoles().then(() => {
                 loadUsers();
             });
+            const urlParams = new URLSearchParams(window.location.search);
+            const autoRun = urlParams.get('autoRun');
+            if (autoRun && typeof window[autoRun] === 'function') {
+                window[autoRun]();
+            }
         });
     </script>
 {% endblock %}

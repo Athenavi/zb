@@ -1066,6 +1066,12 @@
             loadCategoriesAndAuthors();
             loadArticleStats();
             loadArticles();
+            // 获取URL中的参数
+            const urlParams = new URLSearchParams(window.location.search);
+            const autoRun = urlParams.get('autoRun');
+            if (autoRun && typeof window[autoRun] === 'function') {
+                window[autoRun]();
+            }
         });
     </script>
 {% endblock %}

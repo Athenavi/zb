@@ -561,334 +561,351 @@
             </div>
         </div>
     </div>
-{% endblock %}
+    <script>
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.addEventListener('click', function () {
+                const tabId = this.getAttribute('data-tab');
 
-{% block extra_scripts %}
-    // 选项卡切换
-    document.querySelectorAll('.tab-button').forEach(button => {
-    button.addEventListener('click', function() {
-    const tabId = this.getAttribute('data-tab');
+                // 隐藏所有选项卡内容
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
 
-    // 隐藏所有选项卡内容
-    document.querySelectorAll('.tab-content').forEach(content => {
-    content.classList.remove('active');
-    });
+                // 移除所有选项卡按钮的激活状态
+                document.querySelectorAll('.tab-button').forEach(btn => {
+                    btn.classList.remove('active');
+                    btn.classList.remove('border-primary', 'text-primary');
+                    btn.classList.add('border-transparent', 'text-gray-500');
+                });
 
-    // 移除所有选项卡按钮的激活状态
-    document.querySelectorAll('.tab-button').forEach(btn => {
-    btn.classList.remove('active');
-    btn.classList.remove('border-primary', 'text-primary');
-    btn.classList.add('border-transparent', 'text-gray-500');
-    });
+                // 显示当前选项卡内容
+                document.getElementById(tabId).classList.add('active');
 
-    // 显示当前选项卡内容
-    document.getElementById(tabId).classList.add('active');
+                // 激活当前选项卡按钮
+                this.classList.add('active');
+                this.classList.add('border-primary', 'text-primary');
+                this.classList.remove('border-transparent', 'text-gray-500');
+            });
+        });
 
-    // 激活当前选项卡按钮
-    this.classList.add('active');
-    this.classList.add('border-primary', 'text-primary');
-    this.classList.remove('border-transparent', 'text-gray-500');
-    });
-    });
+        // 基本设置表单提交
+        document.getElementById('generalSettingsForm').addEventListener('submit', function (e) {
+            e.preventDefault();
 
-    // 基本设置表单提交
-    document.getElementById('generalSettingsForm').addEventListener('submit', function(e) {
-    e.preventDefault();
+            const formData = new FormData(this);
+            const settings = {};
 
-    const formData = new FormData(this);
-    const settings = {};
+            // 将表单数据转换为设置对象
+            for (let [key, value] of formData.entries()) {
+                // 处理复选框
+                if (this.elements[key] && this.elements[key].type === 'checkbox') {
+                    settings[key] = this.elements[key].checked ? 'true' : 'false';
+                } else {
+                    settings[key] = value;
+                }
+            }
 
-    // 将表单数据转换为设置对象
-    for (let [key, value] of formData.entries()) {
-    // 处理复选框
-    if (this.elements[key] && this.elements[key].type === 'checkbox') {
-    settings[key] = this.elements[key].checked ? 'true' : 'false';
-    } else {
-    settings[key] = value;
-    }
-    }
+            // 发送设置到服务器
+            fetch('{{ url_for("dashboard.admin_settings") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `settings=${encodeURIComponent(JSON.stringify(settings))}`
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('设置保存成功');
+                    } else {
+                        alert('保存失败: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('保存失败');
+                });
+        });
 
-    // 发送设置到服务器
-    fetch('{{ url_for("dashboard.admin_settings") }}', {
-    method: 'POST',
-    headers: {
-    'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: `settings=${encodeURIComponent(JSON.stringify(settings))}`
-    })
-    .then(response => response.json())
-    .then(data => {
-    if (data.success) {
-    alert('设置保存成功');
-    } else {
-    alert('保存失败: ' + data.message);
-    }
-    })
-    .catch(error => {
-    console.error('Error:', error);
-    alert('保存失败');
-    });
-    });
+        // 菜单管理功能
+        let currentMenuId = null;
 
-    // 菜单管理功能
-    let currentMenuId = null;
+        // 新建菜单
+        document.getElementById('createMenuBtn').addEventListener('click', function () {
+            document.getElementById('menuModalTitle').textContent = '新建菜单';
+            document.getElementById('menuAction').value = 'create_menu';
+            document.getElementById('menuForm').reset();
+            document.getElementById('menuId').value = '';
+            document.getElementById('menuModal').classList.remove('hidden');
+        });
 
-    // 新建菜单
-    document.getElementById('createMenuBtn').addEventListener('click', function() {
-    document.getElementById('menuModalTitle').textContent = '新建菜单';
-    document.getElementById('menuAction').value = 'create_menu';
-    document.getElementById('menuForm').reset();
-    document.getElementById('menuId').value = '';
-    document.getElementById('menuModal').classList.remove('hidden');
-    });
+        // 编辑菜单
+        document.querySelectorAll('.edit-menu').forEach(button => {
+            button.addEventListener('click', function () {
+                document.getElementById('menuModalTitle').textContent = '编辑菜单';
+                document.getElementById('menuAction').value = 'update_menu';
+                document.getElementById('menuId').value = this.getAttribute('data-id');
+                document.getElementById('menuName').value = this.getAttribute('data-name');
+                document.getElementById('menuSlug').value = this.getAttribute('data-slug');
+                document.getElementById('menuDescription').value = this.getAttribute('data-description');
+                document.getElementById('menuActive').checked = this.getAttribute('data-active') === 'True';
+                document.getElementById('menuModal').classList.remove('hidden');
+            });
+        });
 
-    // 编辑菜单
-    document.querySelectorAll('.edit-menu').forEach(button => {
-    button.addEventListener('click', function() {
-    document.getElementById('menuModalTitle').textContent = '编辑菜单';
-    document.getElementById('menuAction').value = 'update_menu';
-    document.getElementById('menuId').value = this.getAttribute('data-id');
-    document.getElementById('menuName').value = this.getAttribute('data-name');
-    document.getElementById('menuSlug').value = this.getAttribute('data-slug');
-    document.getElementById('menuDescription').value = this.getAttribute('data-description');
-    document.getElementById('menuActive').checked = this.getAttribute('data-active') === 'True';
-    document.getElementById('menuModal').classList.remove('hidden');
-    });
-    });
+        // 删除菜单
+        document.querySelectorAll('.delete-menu').forEach(button => {
+            button.addEventListener('click', function () {
+                const menuId = this.getAttribute('data-id');
+                const menuName = this.getAttribute('data-name');
 
-    // 删除菜单
-    document.querySelectorAll('.delete-menu').forEach(button => {
-    button.addEventListener('click', function() {
-    const menuId = this.getAttribute('data-id');
-    const menuName = this.getAttribute('data-name');
+                showDeleteConfirm(
+                    `您确定要删除菜单 "${menuName}" 吗？此操作将同时删除所有菜单项，且不可撤销。`,
+                    function () {
+                        const formData = new FormData();
+                        formData.append('menu_action', 'delete_menu');
+                        formData.append('menu_id', menuId);
 
-    showDeleteConfirm(
-    `您确定要删除菜单 "${menuName}" 吗？此操作将同时删除所有菜单项，且不可撤销。`,
-    function() {
-    const formData = new FormData();
-    formData.append('menu_action', 'delete_menu');
-    formData.append('menu_id', menuId);
+                        fetch('{{ url_for("dashboard.admin_settings") }}', {
+                            method: 'POST',
+                            body: formData
+                        })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    location.reload();
+                                } else {
+                                    alert('删除失败: ' + data.message);
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                                alert('删除失败');
+                            });
+                    }
+                );
+            });
+        });
 
-    fetch('{{ url_for("dashboard.admin_settings") }}', {
-    method: 'POST',
-    body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-    if (data.success) {
-    location.reload();
-    } else {
-    alert('删除失败: ' + data.message);
-    }
-    })
-    .catch(error => {
-    console.error('Error:', error);
-    alert('删除失败');
-    });
-    }
-    );
-    });
-    });
+        // 菜单表单提交
+        document.getElementById('menuForm').addEventListener('submit', function (e) {
+            e.preventDefault();
 
-    // 菜单表单提交
-    document.getElementById('menuForm').addEventListener('submit', function(e) {
-    e.preventDefault();
+            const formData = new FormData(this);
 
-    const formData = new FormData(this);
+            fetch('{{ url_for("dashboard.admin_settings") }}', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('menuModal').classList.add('hidden');
+                        location.reload();
+                    } else {
+                        alert('操作失败: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('操作失败');
+                });
+        });
 
-    fetch('{{ url_for("dashboard.admin_settings") }}', {
-    method: 'POST',
-    body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-    if (data.success) {
-    document.getElementById('menuModal').classList.add('hidden');
-    location.reload();
-    } else {
-    alert('操作失败: ' + data.message);
-    }
-    })
-    .catch(error => {
-    console.error('Error:', error);
-    alert('操作失败');
-    });
-    });
+        // 菜单项管理功能
+        // 添加菜单项
+        document.querySelectorAll('.add-menu-item').forEach(button => {
+            button.addEventListener('click', function () {
+                const menuId = this.getAttribute('data-menu-id');
+                document.getElementById('menuItemModalTitle').textContent = '添加菜单项';
+                document.getElementById('menuItemAction').value = 'create_item';
+                document.getElementById('menuItemForm').reset();
+                document.getElementById('menuItemId').value = '';
+                document.getElementById('menuItemMenuId').value = menuId;
+                document.getElementById('menuItemModal').classList.remove('hidden');
+            });
+        });
 
-    // 菜单项管理功能
-    // 添加菜单项
-    document.querySelectorAll('.add-menu-item').forEach(button => {
-    button.addEventListener('click', function() {
-    const menuId = this.getAttribute('data-menu-id');
-    document.getElementById('menuItemModalTitle').textContent = '添加菜单项';
-    document.getElementById('menuItemAction').value = 'create_item';
-    document.getElementById('menuItemForm').reset();
-    document.getElementById('menuItemId').value = '';
-    document.getElementById('menuItemMenuId').value = menuId;
-    document.getElementById('menuItemModal').classList.remove('hidden');
-    });
-    });
+        // 编辑菜单项
+        document.querySelectorAll('.edit-menu-item').forEach(button => {
+            button.addEventListener('click', function () {
+                document.getElementById('menuItemModalTitle').textContent = '编辑菜单项';
+                document.getElementById('menuItemAction').value = 'update_item';
+                document.getElementById('menuItemId').value = this.getAttribute('data-id');
+                document.getElementById('menuItemTitle').value = this.getAttribute('data-title');
+                document.getElementById('menuItemUrl').value = this.getAttribute('data-url');
+                document.getElementById('menuItemTarget').value = this.getAttribute('data-target');
+                document.getElementById('menuItemOrder').value = this.getAttribute('data-order');
+                document.getElementById('menuItemActive').checked = this.getAttribute('data-active') === 'True';
+                document.getElementById('menuItemModal').classList.remove('hidden');
+            });
+        });
 
-    // 编辑菜单项
-    document.querySelectorAll('.edit-menu-item').forEach(button => {
-    button.addEventListener('click', function() {
-    document.getElementById('menuItemModalTitle').textContent = '编辑菜单项';
-    document.getElementById('menuItemAction').value = 'update_item';
-    document.getElementById('menuItemId').value = this.getAttribute('data-id');
-    document.getElementById('menuItemTitle').value = this.getAttribute('data-title');
-    document.getElementById('menuItemUrl').value = this.getAttribute('data-url');
-    document.getElementById('menuItemTarget').value = this.getAttribute('data-target');
-    document.getElementById('menuItemOrder').value = this.getAttribute('data-order');
-    document.getElementById('menuItemActive').checked = this.getAttribute('data-active') === 'True';
-    document.getElementById('menuItemModal').classList.remove('hidden');
-    });
-    });
+        // 删除菜单项
+        document.querySelectorAll('.delete-menu-item').forEach(button => {
+            button.addEventListener('click', function () {
+                const itemId = this.getAttribute('data-id');
+                const itemTitle = this.getAttribute('data-title');
 
-    // 删除菜单项
-    document.querySelectorAll('.delete-menu-item').forEach(button => {
-    button.addEventListener('click', function() {
-    const itemId = this.getAttribute('data-id');
-    const itemTitle = this.getAttribute('data-title');
+                showDeleteConfirm(
+                    `您确定要删除菜单项 "${itemTitle}" 吗？此操作不可撤销。`,
+                    function () {
+                        const formData = new FormData();
+                        formData.append('menu_item_action', 'delete_item');
+                        formData.append('item_id', itemId);
 
-    showDeleteConfirm(
-    `您确定要删除菜单项 "${itemTitle}" 吗？此操作不可撤销。`,
-    function() {
-    const formData = new FormData();
-    formData.append('menu_item_action', 'delete_item');
-    formData.append('item_id', itemId);
+                        fetch('{{ url_for("dashboard.admin_settings") }}', {
+                            method: 'POST',
+                            body: formData
+                        })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    location.reload();
+                                } else {
+                                    alert('删除失败: ' + data.message);
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                                alert('删除失败');
+                            });
+                    }
+                );
+            });
+        });
 
-    fetch('{{ url_for("dashboard.admin_settings") }}', {
-    method: 'POST',
-    body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-    if (data.success) {
-    location.reload();
-    } else {
-    alert('删除失败: ' + data.message);
-    }
-    })
-    .catch(error => {
-    console.error('Error:', error);
-    alert('删除失败');
-    });
-    }
-    );
-    });
-    });
+        // 菜单项表单提交
+        document.getElementById('menuItemForm').addEventListener('submit', function (e) {
+            e.preventDefault();
 
-    // 菜单项表单提交
-    document.getElementById('menuItemForm').addEventListener('submit', function(e) {
-    e.preventDefault();
+            const formData = new FormData(this);
 
-    const formData = new FormData(this);
+            fetch('{{ url_for("dashboard.admin_settings") }}', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('menuItemModal').classList.add('hidden');
+                        location.reload();
+                    } else {
+                        alert('操作失败: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('操作失败');
+                });
+        });
 
-    fetch('{{ url_for("dashboard.admin_settings") }}', {
-    method: 'POST',
-    body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-    if (data.success) {
-    document.getElementById('menuItemModal').classList.add('hidden');
-    location.reload();
-    } else {
-    alert('操作失败: ' + data.message);
-    }
-    })
-    .catch(error => {
-    console.error('Error:', error);
-    alert('操作失败');
-    });
-    });
+        // 页面管理功能
+        // 新建页面
+        document.getElementById('createPageBtn').addEventListener('click', function () {
+            document.getElementById('pageModalTitle').textContent = '新建页面';
+            document.getElementById('pageAction').value = 'create_page';
+            document.getElementById('pageForm').reset();
+            document.getElementById('pageId').value = '';
+            document.getElementById('pageModal').classList.remove('hidden');
+        });
 
-    // 页面管理功能
-    // 新建页面
-    document.getElementById('createPageBtn').addEventListener('click', function() {
-    document.getElementById('pageModalTitle').textContent = '新建页面';
-    document.getElementById('pageAction').value = 'create_page';
-    document.getElementById('pageForm').reset();
-    document.getElementById('pageId').value = '';
-    document.getElementById('pageModal').classList.remove('hidden');
-    });
+        // 编辑页面
+        document.querySelectorAll('.edit-page').forEach(button => {
+            button.addEventListener('click', function () {
+                document.getElementById('pageModalTitle').textContent = '编辑页面';
+                document.getElementById('pageAction').value = 'update_page';
+                document.getElementById('pageId').value = this.getAttribute('data-id');
+                document.getElementById('pageTitle').value = this.getAttribute('data-title');
+                document.getElementById('pageSlug').value = this.getAttribute('data-slug');
+                document.getElementById('pageContent').value = this.getAttribute('data-content');
+                document.getElementById('pageExcerpt').value = this.getAttribute('data-excerpt');
+                document.getElementById('pageTemplate').value = this.getAttribute('data-template');
+                document.getElementById('pageStatus').value = this.getAttribute('data-status');
+                document.getElementById('pageOrder').value = this.getAttribute('data-order');
+                document.getElementById('pageMetaTitle').value = this.getAttribute('data-meta_title');
+                document.getElementById('pageMetaDescription').value = this.getAttribute('data-meta_description');
+                document.getElementById('pageMetaKeywords').value = this.getAttribute('data-meta_keywords');
+                document.getElementById('pageModal').classList.remove('hidden');
+            });
+        });
 
-    // 编辑页面
-    document.querySelectorAll('.edit-page').forEach(button => {
-    button.addEventListener('click', function() {
-    document.getElementById('pageModalTitle').textContent = '编辑页面';
-    document.getElementById('pageAction').value = 'update_page';
-    document.getElementById('pageId').value = this.getAttribute('data-id');
-    document.getElementById('pageTitle').value = this.getAttribute('data-title');
-    document.getElementById('pageSlug').value = this.getAttribute('data-slug');
-    document.getElementById('pageContent').value = this.getAttribute('data-content');
-    document.getElementById('pageExcerpt').value = this.getAttribute('data-excerpt');
-    document.getElementById('pageTemplate').value = this.getAttribute('data-template');
-    document.getElementById('pageStatus').value = this.getAttribute('data-status');
-    document.getElementById('pageOrder').value = this.getAttribute('data-order');
-    document.getElementById('pageMetaTitle').value = this.getAttribute('data-meta_title');
-    document.getElementById('pageMetaDescription').value = this.getAttribute('data-meta_description');
-    document.getElementById('pageMetaKeywords').value = this.getAttribute('data-meta_keywords');
-    document.getElementById('pageModal').classList.remove('hidden');
-    });
-    });
+        // 删除页面
+        document.querySelectorAll('.delete-page').forEach(button => {
+            button.addEventListener('click', function () {
+                const pageId = this.getAttribute('data-id');
+                const pageTitle = this.getAttribute('data-title');
 
-    // 删除页面
-    document.querySelectorAll('.delete-page').forEach(button => {
-    button.addEventListener('click', function() {
-    const pageId = this.getAttribute('data-id');
-    const pageTitle = this.getAttribute('data-title');
+                showDeleteConfirm(
+                    `您确定要删除页面 "${pageTitle}" 吗？此操作不可撤销。`,
+                    function () {
+                        const formData = new FormData();
+                        formData.append('page_action', 'delete_page');
+                        formData.append('page_id', pageId);
 
-    showDeleteConfirm(
-    `您确定要删除页面 "${pageTitle}" 吗？此操作不可撤销。`,
-    function() {
-    const formData = new FormData();
-    formData.append('page_action', 'delete_page');
-    formData.append('page_id', pageId);
+                        fetch('{{ url_for("dashboard.admin_settings") }}', {
+                            method: 'POST',
+                            body: formData
+                        })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    location.reload();
+                                } else {
+                                    alert('删除失败: ' + data.message);
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                                alert('删除失败');
+                            });
+                    }
+                );
+            });
+        });
 
-    fetch('{{ url_for("dashboard.admin_settings") }}', {
-    method: 'POST',
-    body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-    if (data.success) {
-    location.reload();
-    } else {
-    alert('删除失败: ' + data.message);
-    }
-    })
-    .catch(error => {
-    console.error('Error:', error);
-    alert('删除失败');
-    });
-    }
-    );
-    });
-    });
+        // 隐藏模态框的函数
+        function hideModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        }
 
-    // 页面表单提交
-    document.getElementById('pageForm').addEventListener('submit', function(e) {
-    e.preventDefault();
+        // 为关闭按钮和取消按钮添加事件监听器
+        document.querySelectorAll('.close-modal, .cancel-btn').forEach(button => {
+            button.addEventListener('click', function () {
+                // 根据按钮所在的模态框进行隐藏
+                if (document.getElementById('pageModal').contains(this)) {
+                    hideModal('pageModal');
+                } else if (document.getElementById('menuItemModal').contains(this)) {
+                    hideModal('menuItemModal');
+                } else if (document.getElementById('menuModal').contains(this)) {
+                    hideModal('menuModal');
+                }
+            });
+        });
 
-    const formData = new FormData(this);
+        // 页面表单提交
+        document.getElementById('pageForm').addEventListener('submit', function (e) {
+            e.preventDefault();
 
-    fetch('{{ url_for("dashboard.admin_settings") }}', {
-    method: 'POST',
-    body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-    if (data.success) {
-    document.getElementById('pageModal').classList.add('hidden');
-    location.reload();
-    } else {
-    alert('操作失败: ' + data.message);
-    }
-    })
-    .catch(error => {
-    console.error('Error:', error);
-    alert('操作失败');
-    });
-    });
+            const formData = new FormData(this);
+
+            fetch('{{ url_for("dashboard.admin_settings") }}', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('pageModal').classList.add('hidden');
+                        location.reload();
+                    } else {
+                        alert('操作失败: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('操作失败');
+                });
+        });
+    </script>
 {% endblock %}

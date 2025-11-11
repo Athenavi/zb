@@ -16,10 +16,6 @@
                     <p class="text-2xl font-semibold text-gray-800">{{ users_count }}</p>
                 </div>
             </div>
-            <div class="mt-4 flex items-center text-sm text-green-500">
-                <i class="fas fa-arrow-up mr-1"></i>
-                <span>较上月增长 12%</span>
-            </div>
         </div>
 
         <div class="bg-white rounded-xl shadow-sm p-6 card-hover">
@@ -32,10 +28,6 @@
                     <p class="text-2xl font-semibold text-gray-800">{{ articles_count }}</p>
                 </div>
             </div>
-            <div class="mt-4 flex items-center text-sm text-green-500">
-                <i class="fas fa-arrow-up mr-1"></i>
-                <span>较上月增长 8%</span>
-            </div>
         </div>
 
         <div class="bg-white rounded-xl shadow-sm p-6 card-hover">
@@ -47,10 +39,6 @@
                     <h2 class="text-sm font-medium text-gray-500">评论总数</h2>
                     <p class="text-2xl font-semibold text-gray-800">{{ comments_count }}</p>
                 </div>
-            </div>
-            <div class="mt-4 flex items-center text-sm text-green-500">
-                <i class="fas fa-arrow-up mr-1"></i>
-                <span>较上月增长 15%</span>
             </div>
         </div>
     </div>
@@ -101,14 +89,14 @@
         <div class="bg-white rounded-xl shadow-sm p-6">
             <h2 class="text-lg font-semibold text-gray-800 mb-6">快速操作</h2>
             <div class="grid grid-cols-2 gap-4">
-                <a href="#"
+                <a href="/admin/blog?autoRun=showArticleModal"
                    class="flex flex-col items-center justify-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                     <div class="h-12 w-12 rounded-lg bg-blue-100 flex items-center justify-center text-primary mb-2">
                         <i class="fas fa-plus text-xl"></i>
                     </div>
                     <span class="text-sm font-medium text-gray-700">新建文章</span>
                 </a>
-                <a href="#"
+                <a href="/admin?autoRun=showUserModal"
                    class="flex flex-col items-center justify-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                     <div class="h-12 w-12 rounded-lg bg-green-100 flex items-center justify-center text-success mb-2">
                         <i class="fas fa-user-plus text-xl"></i>

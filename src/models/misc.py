@@ -12,6 +12,11 @@ class Event(db.Model):
 
 class Report(db.Model):
     __tablename__ = 'reports'
+    __abstract__ = False
+    __table_args__ = (
+        db.Index('idx_reports_reported_by', 'reported_by'),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
     reported_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     content_type = db.Column(db.Integer, nullable=False)
@@ -21,10 +26,6 @@ class Report(db.Model):
 
     # 关系定义
     reporter = db.relationship('User', back_populates='reports')
-
-    __table_args__ = (
-        db.Index('idx_reports_reported_by', 'reported_by')
-    )
 
 
 class Url(db.Model):
