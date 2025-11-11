@@ -20,7 +20,10 @@ create table if not exists users
     backup_codes    text,
     vip_level int default 0,
     vip_expires_at  timestamp,
-    profile_private boolean   default false
+    profile_private boolean     default false,
+    last_login_at   timestamp,
+    last_login_ip   varchar(45),
+    locale          varchar(10) default 'zh-CN' not null
 );
 
 create table if not exists roles
