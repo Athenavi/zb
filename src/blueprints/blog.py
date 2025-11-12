@@ -6,7 +6,7 @@ from src.blog.homepage import index_page_back, tag_page_back, featured_page_back
 from src.blueprints.api import api_user_profile
 from src.error import error
 from src.extensions import cache
-from src.models import UserSubscription, Article, db, User, Notification, Pages, SystemSettings
+from src.models import UserSubscription, Article, db, User, Notification, Pages, SystemSettings, MenuItems, Menus
 from src.user.authz.decorators import jwt_required, domain
 from src.user.views import change_profiles_back, setting_profiles_back
 
@@ -225,3 +225,67 @@ def get_site_domain():
 def get_site_beian():
     """获取网站备案号"""
     return get_system_setting_value('site_beian')
+
+
+def get_menu_by_slug(slug):
+    """根据slug获取菜单及其所有菜单项"""
+    menu = Menus.query.filter_by(slug=slug, is_active=True).first()
+    if not menu:
+        return None
+
+    # 获取所有顶级菜单项（parent_id为None）
+    menu_items = MenuItems.query.filter_by(
+        menu_id=menu.id,
+        parent_id=None,
+        is_active=True
+    ).order_by(MenuItems.order_index).all()
+
+    return {
+        'menu': menu,
+        'items': menu_items
+    }
+
+
+def build_menu_tree(menu_items):
+    """递归构建菜单树"""
+    result = []
+    for item in menu_items:
+        menu_item_data = {
+            'id': item.id,
+            'title': item.title,
+            'url': item.url,
+            'target': item.target,
+            'order_index': item.order_index
+        }
+
+        # 递归处理子菜单
+        children = MenuItems.query.filter_by(
+            parent_id=item.id,
+            is_active=True
+        ).order_by(MenuItems.order_index).all()
+
+        if children:
+            menu_item_data['children'] = build_menu_tree(children)
+
+        result.append(menu_item_data)
+
+    return result
+
+
+@cache.cached(timeout=3 * 3600, key_prefix='site_menu')
+def get_site_menu(slug):
+    """获取网站菜单"""
+    menu_data = get_menu_by_slug(slug)
+    if not menu_data:
+        return None
+    # 构建菜单树
+    menu_tree = build_menu_tree(menu_data['items'])
+    print(menu_tree)
+    return menu_tree
+
+
+@cache.cached(timeout=3600, key_prefix='site_footer')
+def get_current_menu_slug():
+    """获取当前菜单的slug"""
+    menu_slug = SystemSettings.query.filter_by(key='menu_slug').first()
+    return menu_slug.value if menu_slug else None

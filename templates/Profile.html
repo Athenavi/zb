@@ -9,8 +9,8 @@
 </head>
 <body class="min-h-screen">
 <!-- 导航栏 -->
-{% from 'header.html' import SimpleHeader %}
-{{ SimpleHeader(title) }}
+{% from 'header.html' import DynamicHeader %}
+{{ DynamicHeader(title, menu) }}
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <!-- 用户信息卡片 -->
     <div class="rounded-xl shadow-sm border mb-8">

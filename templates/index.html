@@ -19,9 +19,8 @@
 </head>
 <body>
 <!-- 导航栏 -->
-{% from 'header.html' import SimpleHeader %}
-{{ SimpleHeader(title) }}
-<!-- 横幅区域 -->
+{% from 'header.html' import DynamicHeader %}
+{{ DynamicHeader(title, menu) }}
 {{ banner | safe }}
 <!-- 页面内容 -->
 <div class="container mx-auto mt-8 px-4 sm:px-6">

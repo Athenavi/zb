@@ -145,7 +145,7 @@
                                         <i class="fas {% if comment.user_id == current_user.id %}fa-user-tie{% else %}fa-user{% endif %}"></i>
                                     </div>
                                     <div class="ml-3">
-                                        <div class="text-sm font-medium text-gray-900">{{ comment.user.username }}</div>
+                                        <div class="text-sm font-medium text-gray-900">{{ comment.author.username }}</div>
                                         <div class="mt-1 text-sm text-gray-700">
                                             {{ comment.content }}
                                         </div>
@@ -179,8 +179,8 @@
                             <div class="text-sm text-gray-900">{{ comment.article.title }}</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">{{ comment.user.username }}</div>
-                            <div class="text-sm text-gray-500">{{ comment.user.email }}</div>
+                            <div class="text-sm text-gray-900">{{ comment.author.username }}</div>
+                            <div class="text-sm text-gray-500">{{ comment.author.email }}</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {{ comment.ip }}
