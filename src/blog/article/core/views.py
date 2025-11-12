@@ -215,7 +215,7 @@ def blog_detail_aid_back(aid, safeMode=True):
         try:
             article = db.query(Article).filter(
                 Article.article_id == aid,
-                Article.status == 'Published'
+                Article.status == 1
             ).first()
 
             print(article)
