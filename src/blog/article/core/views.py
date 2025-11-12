@@ -165,7 +165,7 @@ def contribute_back(aid):
             # 验证文章是否存在
             article = db.query(Article).filter(
                 Article.article_id == aid,
-                Article.status == 'Published'
+                Article.status == 1
             ).first()
             if not article:
                 return jsonify({'success': False, 'message': 'Article not found'}), 404

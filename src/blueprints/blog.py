@@ -6,7 +6,7 @@ from src.blog.homepage import index_page_back, tag_page_back, featured_page_back
 from src.blueprints.api import api_user_profile
 from src.error import error
 from src.extensions import cache
-from src.models import UserSubscription, Article, db, User, Notification
+from src.models import UserSubscription, Article, db, User, Notification, Pages, SystemSettings
 from src.user.authz.decorators import jwt_required, domain
 from src.user.views import change_profiles_back, setting_profiles_back
 
@@ -152,3 +152,59 @@ def user_space(user_id, target_user_id):
                                recent_articles=recent_articles)
     except Exception as e:
         print(f"An error occurred: {e}")
+
+
+def render_template_with_settings(template_content):
+    """
+    根据 SystemSettings 表中的所有键值对替换模板内容
+    模板中的占位符格式为 {{ key_name }}
+    """
+    if not template_content:
+        return template_content
+
+    # 获取所有系统设置
+    settings = db.session.query(SystemSettings).all()
+
+    # 构建键值对字典
+    settings_dict = {setting.key: setting.value for setting in settings}
+
+    # 替换模板中的占位符
+    for key, value in settings_dict.items():
+        placeholder = '{{ ' + key + ' }}'
+        if placeholder in template_content and value:
+            template_content = template_content.replace(placeholder, value)
+
+    return template_content
+
+
+@cache.cached(timeout=24 * 3600, key_prefix='footer')
+def get_footer():
+    footer_content = db.session.query(Pages).filter_by(slug='footer001').first()
+
+    if not footer_content:
+        return '<span>-- 我是有底线的 --</span>'
+
+    # 使用通用的模板渲染函数
+    rendered_content = render_template_with_settings(footer_content.content)
+
+    return rendered_content
+
+
+@cache.cached(timeout=24 * 3600, key_prefix='banner')
+def get_banner():
+    banner_content = db.session.query(Pages).filter_by(slug='banner001').first()
+
+    if not banner_content:
+        return ''
+
+    # 使用通用的模板渲染函数
+    rendered_content = render_template_with_settings(banner_content.content)
+
+    return rendered_content
+
+
+@cache.cached(timeout=24 * 3600, key_prefix='site_title')
+def get_site_title():
+    """获取网站标题"""
+    site_title = db.session.query(SystemSettings.value).filter_by(key='site_title').first()
+    return site_title.value or None
