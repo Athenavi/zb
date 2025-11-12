@@ -203,8 +203,25 @@ def get_banner():
     return rendered_content
 
 
+def get_system_setting_value(key):
+    """获取系统设置中的某个值"""
+    setting = db.session.query(SystemSettings.value).filter_by(key=key).first()
+    return setting.value if setting else None
+
+
 @cache.cached(timeout=24 * 3600, key_prefix='site_title')
 def get_site_title():
     """获取网站标题"""
-    site_title = db.session.query(SystemSettings.value).filter_by(key='site_title').first()
-    return site_title.value or None
+    return get_system_setting_value('site_title')
+
+
+@cache.cached(timeout=24 * 3600, key_prefix='site_domain')
+def get_site_domain():
+    """获取网站域名"""
+    return get_system_setting_value('site_domain')
+
+
+@cache.cached(timeout=24 * 3600, key_prefix='site_beian')
+def get_site_beian():
+    """获取网站备案号"""
+    return get_system_setting_value('site_beian')
