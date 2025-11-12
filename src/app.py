@@ -10,12 +10,12 @@ from src.blog.article.core.views import blog_detail_back
 from src.blueprints.admin_vip import admin_vip_bp
 from src.blueprints.api import api_bp
 from src.blueprints.auth import auth_bp
+from src.blueprints.blog import blog_bp
 from src.blueprints.category import category_bp
 from src.blueprints.dashboard import dashboard_bp
 from src.blueprints.media import media_bp
 from src.blueprints.my import my_bp
 from src.blueprints.noti import noti_bp
-from src.blueprints.other import other_bp
 from src.blueprints.relation import relation_bp
 from src.blueprints.role import role_bp
 from src.blueprints.theme import theme_bp
@@ -97,6 +97,12 @@ def register_context_processors(app, config_class):
 
 def register_direct_routes(app, config_class):
     """注册直接定义在应用上的路由"""
+    from flask import redirect
+    @app.route('/profile')
+    @jwt_required
+    def profile(user_id):
+        """当前用户的个人资料页面"""
+        return redirect(f'/space/{user_id}')
 
     @app.route('/search', methods=['GET', 'POST'])
     @jwt_required
@@ -168,7 +174,7 @@ def register_blueprints(app):
     app.register_blueprint(noti_bp)
     app.register_blueprint(plugin_bp)
     app.register_blueprint(api_bp)
-    app.register_blueprint(other_bp)
+    app.register_blueprint(blog_bp)
     app.register_blueprint(vip_bp)
     app.register_blueprint(admin_vip_bp)
 
