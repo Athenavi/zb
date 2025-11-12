@@ -36,6 +36,14 @@
                         data-tab="pages">
                     <i class="fas fa-file-alt mr-2"></i>页面管理
                 </button>
+                <button class="tab-button py-4 px-6 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 transition-colors"
+                        data-tab="themes">
+                    <i class="fas fa-paint-brush mr-2"></i>主题管理
+                </button>
+                <button class="tab-button py-4 px-6 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 transition-colors"
+                        data-tab="vipIframe">
+                    <i class="fas fa-crown mr-2"></i>会员管理
+                </button>
             </nav>
         </div>
 
@@ -63,6 +71,22 @@
                             </div>
 
                             <div>
+                                <label for="site_domain"
+                                       class="block text-sm font-medium text-gray-700">站点域名</label>
+                                <input type="text" id="site_domain" name="site_domain"
+                                       value="{{ settings.get('site_domain', '') }}"
+                                       class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary">
+                            </div>
+
+                            <div>
+                                <label for="site_beian"
+                                       class="block text-sm font-medium text-gray-700">备案号</label>
+                                <input type="text" id="site_beian" name="site_beian"
+                                       value="{{ settings.get('site_beian', '') }}"
+                                       class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary">
+                            </div>
+
+                            <div>
                                 <label for="site_keywords"
                                        class="block text-sm font-medium text-gray-700">站点关键词</label>
                                 <input type="text" id="site_keywords" name="site_keywords"
@@ -74,6 +98,20 @@
                         <!-- 系统设置 -->
                         <div class="space-y-4">
                             <h3 class="text-lg font-medium text-gray-900 border-b pb-2">系统设置</h3>
+
+                            <div>
+                                <label for="menu_slug"
+                                       class="block text-sm font-medium text-gray-700">当前菜单项</label>
+                                <select id="menu_slug" name="menu_slug"
+                                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary">
+                                    {% for menu in menus %}
+                                        <option value="{{ menu.slug }}"
+                                                {% if menu.slug == settings.get('menu_slug', 'default') %}selected{% endif %}>
+                                            {{ menu.name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
 
                             <div>
                                 <label for="posts_per_page"
@@ -346,6 +384,24 @@
                     {% endif %}
                 </div>
             </div>
+
+            <!-- 主题iframe -->
+            <div id="themes" class="tab-content">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-lg font-medium text-gray-900">主题管理</h3>
+                </div>
+                <iframe src="{{ url_for('theme.m_display') }}" frameborder="0" width="100%" height="500px"></iframe>
+            </div>
+
+            <!-- 会员管理 -->
+            <div id="vipIframe" class="tab-content">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-lg font-medium text-gray-900">会员管理</h3><i
+                        class="fa-solid fa-arrow-up-right-from-square"
+                        onclick="window.location.href='/admin/vip/index'"></i>
+                </div>
+                <iframe src="/admin/vip/index" frameborder="0" width="100%" height="500px"></iframe>
+            </div>
         </div>
     </div>
 
@@ -611,6 +667,7 @@
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
+                credentials: 'include',
                 body: `settings=${encodeURIComponent(JSON.stringify(settings))}`
             })
                 .then(response => response.json())

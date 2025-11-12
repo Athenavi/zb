@@ -10,7 +10,8 @@ from src.blog.article.core.views import blog_detail_back
 from src.blueprints.admin_vip import admin_vip_bp
 from src.blueprints.api import api_bp
 from src.blueprints.auth import auth_bp
-from src.blueprints.blog import blog_bp
+from src.blueprints.blog import blog_bp, get_footer, get_site_title, get_banner, get_site_domain, get_site_beian, \
+    get_site_menu, get_current_menu_slug
 from src.blueprints.category import category_bp
 from src.blueprints.dashboard import dashboard_bp
 from src.blueprints.media import media_bp
@@ -84,14 +85,19 @@ def create_app(config_class=app_config):
 
 def register_context_processors(app, config_class):
     """注册上下文处理器"""
+    default_menu_data = [{'id': 1, 'title': '我的', 'url': '/profile', 'target': '_blank', 'order_index': 0},
+                         {'id': 3, 'title': '推荐', 'url': '/featured', 'target': '_self', 'order_index': 1}]
 
     @app.context_processor
     def inject_variables():
         return dict(
-            beian=config_class.beian,
-            title=config_class.sitename,
+            beian=get_site_beian() or config_class.beian,
+            title=get_site_title() or config_class.sitename,
+            domain=get_site_domain() or config_class.domain,
             username=JWTHandler.get_current_username(),
-            domain=config_class.domain
+            menu=get_site_menu(get_current_menu_slug()) or default_menu_data,
+            footer=get_footer(),
+            banner=get_banner()
         )
 
 

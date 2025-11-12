@@ -6,7 +6,7 @@ from src.blog.homepage import index_page_back, tag_page_back, featured_page_back
 from src.blueprints.api import api_user_profile
 from src.error import error
 from src.extensions import cache
-from src.models import UserSubscription, Article, db, User, Notification
+from src.models import UserSubscription, Article, db, User, Notification, Pages, SystemSettings, MenuItems, Menus
 from src.user.authz.decorators import jwt_required, domain
 from src.user.views import change_profiles_back, setting_profiles_back
 
@@ -152,3 +152,140 @@ def user_space(user_id, target_user_id):
                                recent_articles=recent_articles)
     except Exception as e:
         print(f"An error occurred: {e}")
+
+
+def render_template_with_settings(template_content):
+    """
+    根据 SystemSettings 表中的所有键值对替换模板内容
+    模板中的占位符格式为 {{ key_name }}
+    """
+    if not template_content:
+        return template_content
+
+    # 获取所有系统设置
+    settings = db.session.query(SystemSettings).all()
+
+    # 构建键值对字典
+    settings_dict = {setting.key: setting.value for setting in settings}
+
+    # 替换模板中的占位符
+    for key, value in settings_dict.items():
+        placeholder = '{{ ' + key + ' }}'
+        if placeholder in template_content and value:
+            template_content = template_content.replace(placeholder, value)
+
+    return template_content
+
+
+@cache.cached(timeout=24 * 3600, key_prefix='footer')
+def get_footer():
+    footer_content = db.session.query(Pages).filter_by(slug='footer001').first()
+
+    if not footer_content:
+        return '<span>-- 我是有底线的 --</span>'
+
+    # 使用通用的模板渲染函数
+    rendered_content = render_template_with_settings(footer_content.content)
+
+    return rendered_content
+
+
+@cache.cached(timeout=24 * 3600, key_prefix='banner')
+def get_banner():
+    banner_content = db.session.query(Pages).filter_by(slug='banner001').first()
+
+    if not banner_content:
+        return ''
+
+    # 使用通用的模板渲染函数
+    rendered_content = render_template_with_settings(banner_content.content)
+
+    return rendered_content
+
+
+def get_system_setting_value(key):
+    """获取系统设置中的某个值"""
+    setting = db.session.query(SystemSettings.value).filter_by(key=key).first()
+    return setting.value if setting else None
+
+
+@cache.cached(timeout=24 * 3600, key_prefix='site_title')
+def get_site_title():
+    """获取网站标题"""
+    return get_system_setting_value('site_title')
+
+
+@cache.cached(timeout=24 * 3600, key_prefix='site_domain')
+def get_site_domain():
+    """获取网站域名"""
+    return get_system_setting_value('site_domain')
+
+
+@cache.cached(timeout=24 * 3600, key_prefix='site_beian')
+def get_site_beian():
+    """获取网站备案号"""
+    return get_system_setting_value('site_beian')
+
+
+def get_menu_by_slug(slug):
+    """根据slug获取菜单及其所有菜单项"""
+    menu = Menus.query.filter_by(slug=slug, is_active=True).first()
+    if not menu:
+        return None
+
+    # 获取所有顶级菜单项（parent_id为None）
+    menu_items = MenuItems.query.filter_by(
+        menu_id=menu.id,
+        parent_id=None,
+        is_active=True
+    ).order_by(MenuItems.order_index).all()
+
+    return {
+        'menu': menu,
+        'items': menu_items
+    }
+
+
+def build_menu_tree(menu_items):
+    """递归构建菜单树"""
+    result = []
+    for item in menu_items:
+        menu_item_data = {
+            'id': item.id,
+            'title': item.title,
+            'url': item.url,
+            'target': item.target,
+            'order_index': item.order_index
+        }
+
+        # 递归处理子菜单
+        children = MenuItems.query.filter_by(
+            parent_id=item.id,
+            is_active=True
+        ).order_by(MenuItems.order_index).all()
+
+        if children:
+            menu_item_data['children'] = build_menu_tree(children)
+
+        result.append(menu_item_data)
+
+    return result
+
+
+@cache.cached(timeout=3 * 3600, key_prefix='site_menu')
+def get_site_menu(slug):
+    """获取网站菜单"""
+    menu_data = get_menu_by_slug(slug)
+    if not menu_data:
+        return None
+    # 构建菜单树
+    menu_tree = build_menu_tree(menu_data['items'])
+    print(menu_tree)
+    return menu_tree
+
+
+@cache.cached(timeout=3600, key_prefix='site_footer')
+def get_current_menu_slug():
+    """获取当前菜单的slug"""
+    menu_slug = SystemSettings.query.filter_by(key='menu_slug').first()
+    return menu_slug.value if menu_slug else None
