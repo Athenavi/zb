@@ -100,6 +100,11 @@
                 <i class="fas fa-users mr-3"></i>
                 <span>用户管理</span>
             </a>
+            <a href="/api/plugins"
+               class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg">
+                <i class="fas fa-puzzle-piece mr-3"></i>
+                <span>插件管理</span>
+            </a>
             <a href="{{ url_for('dashboard.admin_settings') }}"
                class="flex items-center px-4 py-3 rounded-lg {% if request.endpoint == 'dashboard.admin_settings' %}text-primary bg-blue-50 font-medium{% else %}text-gray-600 hover:bg-gray-100{% endif %}">
                 <i class="fas fa-cog mr-3"></i>
