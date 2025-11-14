@@ -79,7 +79,7 @@ def blog_detail_back(blog_slug, safeMode=True):
             print(f'2. content: {content}')
             print(f'3. i18n: {i18n_versions}')
 
-            return render_template('blog_detail.html',
+            return render_template('blog/detail.html',
                                    article=article,
                                    content=content,
                                    author=author,
@@ -130,7 +130,7 @@ def contribute_back(aid):
             ).all()
             existing_languages = [t.language_code for t in existing_translations]
 
-            return render_template('contribute.html',
+            return render_template('blog/contribute.html',
                                    aid=aid,
                                    existing_languages=existing_languages,
                                    valid_language_codes=sorted(valid_language_codes))
@@ -238,7 +238,7 @@ def blog_detail_aid_back(aid, safeMode=True):
                 print(f'2. content: {content}')
                 print(f'3. i18n: {i18n_versions}')
 
-                return render_template('blog_detail.html',
+                return render_template('blog/detail.html',
                                        article=article,
                                        content=content,
                                        author=author,
@@ -341,7 +341,7 @@ def edit_article_back(user_id, article_id):
             db.session.rollback()
             print(f"保存失败: {str(e)}")
             flash(f'保存失败: {str(e)}', 'error')
-            return render_template('article_edit.html',
+            return render_template('blog/edit.html',
                                    article=article,
                                    content=content,
                                    categories=categories,
@@ -349,7 +349,7 @@ def edit_article_back(user_id, article_id):
 
         return redirect(url_for('blog.markdown_editor', aid=article_id))
 
-    return render_template('article_edit.html',
+    return render_template('blog/edit.html',
                            article=article,
                            content=content,
                            categories=categories,
@@ -396,7 +396,7 @@ def new_article_back(user_id):
             flash('文章创建成功!', 'success')
             return redirect('/my/posts')
 
-    return render_template('article_edit.html',
+    return render_template('blog/edit.html',
                            article=article,
                            content=content,
                            status_options=['Draft', 'Published'])

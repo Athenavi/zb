@@ -200,7 +200,7 @@ def confirm_password(user_id):
             session[f"tmp-change-key_{user_id}"] = True
             session[f"tmp-change-key-time_{user_id}"] = datetime.now(timezone.utc)  # 记录当前时间，并指定时区为 UTC
             return redirect(url_for('my.change_password', user_id=user_id))
-    return render_template('Authentication.html', form='confirm')
+    return render_template('my/password.html', form='confirm')
 
 
 @my_bp.route('/pw/change', methods=['GET', 'POST'])
@@ -226,6 +226,6 @@ def change_password(user_id):
             session.pop(f"tmp-change-key-time_{user_id}")
             return render_template('inform.html', status_code='200', message='密码修改成功！')
         else:
-            return render_template('Authentication.html', form='change')
+            return render_template('my/password.html', form='change')
 
-    return render_template('Authentication.html', form='change')
+    return render_template('my/password.html', form='change')
