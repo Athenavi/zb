@@ -110,3 +110,12 @@ def message_page():
 @website_bp.route('/links')
 def get_friends_link():
     return "区域还在建设中，敬请期待"
+
+
+@cache.cached(timeout=24 * 3600, key_prefix='site_img')
+@website_bp.route('/favicon.ico')
+def favicon():
+    from src.models import db, SystemSettings
+    if site_img := db.session.query(SystemSettings).filter_by(key='site_img').first():
+        return redirect(site_img.value)
+    return redirect(domain + 'static/favicon.ico')
