@@ -68,12 +68,10 @@
     </div>
 
     <!-- 导航菜单 -->
-    <!-- 导航菜单 -->
     <nav class="mt-6 px-4 flex-grow">
         <div class="space-y-2">
             <!-- 仪表板 -->
             <div class="mb-4">
-                <div class="nav-group-title px-4 py-2">概览</div>
                 <a href="{{ url_for('dashboard.admin_index') }}"
                    class="flex items-center px-4 py-3 rounded-lg {% if request.endpoint == 'dashboard.admin_index' %}text-primary bg-blue-50 font-medium{% else %}text-gray-600 hover:bg-gray-100{% endif %}">
                     <i class="fas fa-chart-pie mr-3"></i>
