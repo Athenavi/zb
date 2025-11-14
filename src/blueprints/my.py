@@ -11,6 +11,13 @@ from utils.security.ip_utils import get_client_ip
 my_bp = Blueprint('my', __name__, url_prefix='/my')
 
 
+@my_bp.route('/')
+@jwt_required
+def user_index(user_id):
+    """用户主页"""
+    return redirect("/my/posts")
+
+
 @my_bp.route('/urls')
 @jwt_required
 def user_urls(user_id):
@@ -62,14 +69,13 @@ def create_short_url(user_id):
 @jwt_required
 def delete_url(user_id, url_id):
     """删除短链接"""
-    url = Url.query.filter_by(id=url_id, user_id=user_id).first()
-    if not url:
-        flash('链接不存在', 'error')
-        return redirect(url_for('my.user_urls'))
     with get_db() as db:
+        url = db.query(Url).filter_by(id=url_id).one()
+        if not url:
+            flash('链接不存在', 'error')
+            return redirect(url_for('my.user_urls'))
         try:
             db.delete(url)
-
             flash('链接删除成功', 'success')
         except Exception as e:
             db.rollback()
