@@ -1,16 +1,17 @@
 import re
-from datetime import datetime, timedelta
+from datetime import timedelta, date
 
 import bcrypt
-from flask import Blueprint, request, jsonify, render_template, json
+from flask import Blueprint, json
 
 from src.database import get_db
 from src.models import User, Article, ArticleContent, ArticleI18n, Category, Comment, db, CategorySubscription, Menus, \
-    MenuItems, Pages, SystemSettings
+    MenuItems, Pages, SystemSettings, FileHash, Media
 # from src.error import error
 from src.user.authz.decorators import admin_required
 from src.utils.config.theme import get_all_themes
 from src.utils.security.safe import validate_email
+from update import base_dir
 
 dashboard_bp = Blueprint('dashboard', __name__, template_folder='templates', url_prefix='/admin')
 
@@ -807,7 +808,7 @@ def update_article_status(user_id, article_id):
             }), 500
 
 
-from sqlalchemy import func, or_
+from sqlalchemy import func
 
 
 @dashboard_bp.route('/article/stats', methods=['GET'])
@@ -1313,3 +1314,651 @@ def admin_settings(user_id):
 
     except Exception as e:
         return jsonify({'error': str(e)})
+
+
+from sqlalchemy import or_
+
+
+@dashboard_bp.route('/media', methods=['GET', 'DELETE'])
+@admin_required
+def admin_media(user_id):
+    try:
+        # 获取当前用户信息
+        current_user = db.session.query(User).filter_by(id=user_id).first()
+
+        # 处理删除请求
+        if request.method == 'DELETE':
+            media_hash = request.args.get('media_hash')
+            if file_record := db.session.query(FileHash).filter_by(hash=media_hash).first():
+                try:
+                    # 检查文件是否存在
+                    file_dir = Path(base_dir) / file_record.storage_path
+                    if not os.path.exists(file_dir):
+                        pass
+                    else:
+                        os.remove(file_dir)
+                except Exception as e:
+                    print(f"删除文件失败: {str(e)}")
+                db.delete(file_record)
+            db.commit()
+            return jsonify({'success': True, 'message': '附件已删除'})
+
+        # 获取查询参数
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        mime_type = request.args.get('mime_type', '')
+        user_id_filter = request.args.get('user_id', '')
+        search = request.args.get('search', '')
+        date_from = request.args.get('date_from', '')
+        date_to = request.args.get('date_to', '')
+
+        # 构建查询
+        query = db.session.query(Media).join(FileHash, Media.hash == FileHash.hash).join(User, Media.user_id == User.id)
+
+        # 应用筛选条件
+        if mime_type:
+            if mime_type == 'image':
+                query = query.filter(FileHash.mime_type.like('image/%'))
+            elif mime_type == 'video':
+                query = query.filter(FileHash.mime_type.like('video/%'))
+            elif mime_type == 'audio':
+                query = query.filter(FileHash.mime_type.like('audio/%'))
+            elif mime_type == 'document':
+                query = query.filter(or_(
+                    FileHash.mime_type.like('application/pdf'),
+                    FileHash.mime_type.like('application/msword'),
+                    FileHash.mime_type.like('application/vnd.openxmlformats-officedocument.%')
+                ))
+            else:
+                query = query.filter(FileHash.mime_type == mime_type)
+
+        if user_id_filter:
+            query = query.filter(Media.user_id == user_id_filter)
+
+        if search:
+            query = query.filter(or_(
+                FileHash.filename.ilike(f'%{search}%'),
+                Media.original_filename.ilike(f'%{search}%'),
+                User.username.ilike(f'%{search}%')
+            ))
+
+        if date_from:
+            try:
+                date_from_obj = datetime.strptime(date_from, '%Y-%m-%d')
+                query = query.filter(Media.created_at >= date_from_obj)
+            except ValueError:
+                pass
+
+        if date_to:
+            try:
+                date_to_obj = datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1)
+                query = query.filter(Media.created_at < date_to_obj)
+            except ValueError:
+                pass
+
+        # 获取用户列表用于筛选
+        users = db.session.query(User).all()
+
+        # 执行分页查询
+        media_items = query.order_by(Media.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+
+        return render_template('dashboard/media.html',
+                               media_items=media_items,
+                               users=users,
+                               current_user=current_user,
+                               mime_type=mime_type,
+                               user_id_filter=user_id_filter,
+                               search=search,
+                               date_from=date_from,
+                               date_to=date_to)
+
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+
+@dashboard_bp.route('/media/preview/<int:media_id>')
+@admin_required
+def media_preview(user_id, media_id):
+    try:
+        media = db.session.query(Media).filter_by(id=media_id).first()
+        if not media:
+            return jsonify({'error': '文件不存在'}), 404
+
+        file_record = db.session.query(FileHash).filter_by(hash=media.hash).first()
+        if not file_record:
+            return jsonify({'error': '文件哈希记录不存在'}), 404
+
+        # 检查文件是否存在
+        file_dir = Path(base_dir) / file_record.storage_path
+        if not os.path.exists(file_dir):
+            return jsonify({'error': '文件不存在'}), 404
+
+        # 根据MIME类型决定返回方式
+        file_type = 'unknown'
+        if file_record.mime_type.startswith('image/'):
+            file_type = 'image'
+        if file_record.mime_type.startswith('video/'):
+            file_type = 'video'
+        elif file_record.mime_type.startswith('text/'):
+            try:
+                with open(file_dir, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    file_type = 'text'
+                return jsonify({
+                    'type': file_type,
+                    'content': content,
+                    'mime_type': file_record.mime_type
+                })
+            except:
+                return jsonify({'error': '无法读取文本文件'}), 500
+
+        return jsonify({
+            'type': file_type,
+            'filename': file_record.filename,
+            'mime_type': file_record.mime_type,
+            'size': file_record.file_size,
+            'view_url': f'/shared?data={file_record.hash}',
+            'url': f'/admin/media/download/{media_id}'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ===============
+
+import os
+import zipfile
+from pathlib import Path
+from flask import request, jsonify, render_template, send_file
+
+
+@dashboard_bp.route('/backup', methods=['GET', 'POST'])
+@admin_required
+def backup(user_id):
+    try:
+        # 获取当前用户信息
+        current_user = db.session.query(User).filter_by(id=user_id).first()
+
+        # 处理备份请求
+        if request.method == 'POST':
+            backup_type = request.form.get('backup_type')
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+            # 确保备份目录存在
+            backup_dir = Path(base_dir) / 'backup'
+            backup_dir.mkdir(exist_ok=True)
+
+            if backup_type == 'schema':
+                # 备份表结构
+                filename = f"backup_schema_{timestamp}.sql"
+                filepath = backup_dir / filename
+                success = backup_database_schema(db, filepath)
+
+                if success:
+                    return jsonify({
+                        'success': True,
+                        'message': f'数据库结构备份成功: {filename}',
+                        'filename': filename
+                    })
+                else:
+                    return jsonify({
+                        'success': False,
+                        'message': '数据库结构备份失败'
+                    })
+
+            elif backup_type == 'data':
+                # 备份表数据
+                filename = f"backup_data_{timestamp}.sql"
+                filepath = backup_dir / filename
+                success = backup_database_data(db, filepath)
+
+                if success:
+                    return jsonify({
+                        'success': True,
+                        'message': f'数据库数据备份成功: {filename}',
+                        'filename': filename
+                    })
+                else:
+                    return jsonify({
+                        'success': False,
+                        'message': '数据库数据备份失败'
+                    })
+
+            elif backup_type == 'all':
+                # 备份完整数据库（结构和数据）
+                schema_filename = f"backup_schema_{timestamp}.sql"
+                data_filename = f"backup_data_{timestamp}.sql"
+                zip_filename = f"backup_all_{timestamp}.zip"
+
+                schema_path = backup_dir / schema_filename
+                data_path = backup_dir / data_filename
+                zip_path = backup_dir / zip_filename
+
+                # 先备份结构和数据
+                schema_success = backup_database_schema(db, schema_path)
+                data_success = backup_database_data(db, data_path)
+
+                if schema_success and data_success:
+                    # 创建ZIP文件
+                    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                        zipf.write(schema_path, schema_filename)
+                        zipf.write(data_path, data_filename)
+
+                    # 删除临时的SQL文件
+                    schema_path.unlink(missing_ok=True)
+                    data_path.unlink(missing_ok=True)
+
+                    return jsonify({
+                        'success': True,
+                        'message': f'完整数据库备份成功: {zip_filename}',
+                        'filename': zip_filename
+                    })
+                else:
+                    # 清理可能创建的部分文件
+                    schema_path.unlink(missing_ok=True)
+                    data_path.unlink(missing_ok=True)
+                    return jsonify({
+                        'success': False,
+                        'message': '完整数据库备份失败'
+                    })
+
+            elif backup_type == 'delete':
+                # 删除备份文件
+                filename = request.form.get('filename')
+                if filename and filename.endswith(('.sql', '.zip')):
+                    filepath = backup_dir / filename
+                    if filepath.exists() and filepath.parent == backup_dir:
+                        filepath.unlink()
+                        return jsonify({
+                            'success': True,
+                            'message': f'备份文件已删除: {filename}'
+                        })
+
+                return jsonify({
+                    'success': False,
+                    'message': '文件删除失败'
+                })
+
+        # GET请求 - 显示备份页面
+        backup_list = []
+        backup_dir = Path(base_dir) / 'backup'
+        if backup_dir.exists():
+            for file_path in backup_dir.iterdir():
+                if file_path.is_file() and file_path.suffix in ['.sql', '.zip']:
+                    stat = file_path.stat()
+                    file_size = stat.st_size
+                    created_at = datetime.fromtimestamp(stat.st_ctime)
+
+                    # 确定备份类型
+                    if file_path.name.startswith('backup_schema_'):
+                        backup_type = 'schema'
+                    elif file_path.name.startswith('backup_data_'):
+                        backup_type = 'data'
+                    elif file_path.name.startswith('backup_all_'):
+                        backup_type = 'all'
+                    else:
+                        backup_type = 'unknown'
+
+                    backup_list.append({
+                        'name': file_path.name,
+                        'size': file_size,
+                        'created_at': created_at,
+                        'type': backup_type
+                    })
+
+        # 按创建时间倒序排列
+        backup_list.sort(key=lambda x: x['created_at'], reverse=True)
+
+        return render_template('dashboard/backup.html',
+                               backup_list=backup_list,
+                               current_user=current_user)
+
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+
+@dashboard_bp.route('/backup/download/<filename>')
+@admin_required
+def download_backup(user_id, filename):
+    try:
+        backup_dir = Path(base_dir) / 'backup'
+        filepath = backup_dir / filename
+
+        # 安全检查：确保文件在备份目录内
+        if not filepath.exists() or filepath.parent != backup_dir:
+            return jsonify({'error': '文件不存在'}), 404
+
+        return send_file(
+            filepath,
+            as_attachment=True,
+            download_name=filename
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+from datetime import datetime
+from sqlalchemy import text
+
+
+def backup_database_schema(db, filepath):
+    """备份数据库结构"""
+    try:
+        # 检查数据库连接是否正常
+        if not db.session.bind:
+            print("Error: Database session is not bound to any engine")
+            # 尝试重新建立连接
+            try:
+                db.session.commit()  # 提交任何挂起的事务
+                db.session.close()  # 关闭会话
+                db.session.remove()  # 移除会话（对于某些配置）
+            except Exception as e:
+                print(f"Error resetting session: {e}")
+                return False
+
+        # 获取数据库方言信息
+        if hasattr(db, 'engine') and db.engine:
+            dialect_name = db.engine.dialect.name
+        elif db.session.bind:
+            dialect_name = db.session.bind.dialect.name
+        else:
+            print("Error: Cannot determine database dialect - no engine or session bind")
+            return False
+
+        print(f"Starting schema backup for database: {dialect_name}")
+
+        # 获取所有定义的表
+        metadata = db.metadata
+        all_tables = list(metadata.tables.keys())
+        print(f"All tables in metadata: {all_tables}")
+
+        # 尝试多种方式获取模型
+        tables = []
+
+        # 方法1：直接从元数据获取所有表
+        tables = all_tables
+        print(f"Using tables from metadata: {tables}")
+
+        # 方法2：如果上面不行，尝试动态导入模型
+        if not tables:
+            try:
+                from src.models import __all__ as models_list
+                print(f"Imported models: {models_list}")
+
+                for model_name in models_list:
+                    try:
+                        model = getattr(__import__('src.models', fromlist=[model_name]), model_name)
+                        if hasattr(model, '__table__'):
+                            table_name = model.__table__.name
+                            if table_name in all_tables:
+                                tables.append(table_name)
+                                print(f"Found table: {table_name}")
+                    except Exception as e:
+                        print(f"Error processing model {model_name}: {str(e)}")
+
+            except ImportError as e:
+                print(f"Import error: {e}")
+
+        schema_sql = []
+        schema_sql.append("-- Database Schema Backup")
+        schema_sql.append(f"-- Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        schema_sql.append(f"-- Database dialect: {dialect_name}")
+        schema_sql.append("")
+
+        if not tables:
+            schema_sql.append("-- No tables found to backup")
+            print("Warning: No tables found for backup")
+        else:
+            # 使用正确的数据库连接执行查询
+            connection = None
+            try:
+                # 获取数据库连接
+                if db.session.bind:
+                    connection = db.session.connection()
+                elif hasattr(db, 'engine'):
+                    connection = db.engine.connect()
+                else:
+                    schema_sql.append("-- Error: No database connection available")
+                    print("Error: No database connection available")
+                    return False
+
+                for table in tables:
+                    print(f"Processing table: {table}")
+
+                    if dialect_name == 'sqlite':
+                        # SQLite 获取表结构
+                        try:
+                            create_table_result = connection.execute(text(
+                                f"SELECT sql FROM sqlite_master WHERE type='table' AND name='{table}'"
+                            ))
+                            create_row = create_table_result.fetchone()
+                            if create_row and create_row[0]:
+                                create_sql = create_row[0]
+                                schema_sql.append(create_sql + ";")
+                                print(f"Added table SQL for {table}")
+                            else:
+                                schema_sql.append(f"-- Table {table} not found in sqlite_master")
+                                print(f"Table {table} not found in sqlite_master")
+
+                            # 获取索引
+                            indexes_result = connection.execute(text(
+                                f"SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='{table}' AND sql IS NOT NULL"
+                            ))
+                            index_count = 0
+                            for row in indexes_result:
+                                if row[0]:
+                                    schema_sql.append(row[0] + ";")
+                                    index_count += 1
+                            if index_count > 0:
+                                print(f"Added {index_count} indexes for {table}")
+
+                        except Exception as e:
+                            schema_sql.append(f"-- Error processing table {table}: {str(e)}")
+                            print(f"Error processing SQLite table {table}: {str(e)}")
+
+                    elif dialect_name == 'postgresql':
+                        # PostgreSQL 获取表结构
+                        try:
+                            create_table_result = connection.execute(text(
+                                f"SELECT column_name, data_type, is_nullable, column_default "
+                                f"FROM information_schema.columns WHERE table_name = '{table}' "
+                                f"ORDER BY ordinal_position"
+                            ))
+
+                            columns = []
+                            row_count = 0
+                            for row in create_table_result:
+                                col_def = f"{row[0]} {row[1]}"
+                                if row[2] == 'NO':
+                                    col_def += " NOT NULL"
+                                if row[3]:
+                                    col_def += f" DEFAULT {row[3]}"
+                                columns.append(col_def)
+                                row_count += 1
+
+                            if row_count > 0:
+                                schema_sql.append(f"CREATE TABLE {table} (")
+                                schema_sql.append(",\n".join(columns))
+                                schema_sql.append(");")
+                                print(f"Added PostgreSQL table {table} with {row_count} columns")
+                            else:
+                                schema_sql.append(f"-- Table {table} has no columns or not found")
+                                print(f"Table {table} has no columns in PostgreSQL")
+
+                        except Exception as e:
+                            schema_sql.append(f"-- Error processing table {table}: {str(e)}")
+                            print(f"Error processing PostgreSQL table {table}: {str(e)}")
+
+                    else:
+                        schema_sql.append(f"-- Unsupported database dialect: {dialect_name} for table {table}")
+                        print(f"Unsupported database dialect: {dialect_name}")
+
+                    schema_sql.append("")
+
+            finally:
+                # 确保连接被正确关闭
+                if connection:
+                    connection.close()
+
+        # 写入文件
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(schema_sql))
+
+        print(f"Schema backup completed. Total SQL lines: {len(schema_sql)}")
+        return True
+
+    except Exception as e:
+        print(f"Schema backup error: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        return False
+
+
+def backup_database_data(db, filepath):
+    """修复后的数据库数据备份"""
+    try:
+        # 检查数据库连接并获取方言信息
+        if hasattr(db, 'engine') and db.engine:
+            dialect_name = db.engine.dialect.name
+        elif db.session.bind:
+            dialect_name = db.session.bind.dialect.name
+        else:
+            print("Error: Cannot determine database dialect")
+            return False
+
+        print(f"Starting data backup for database: {dialect_name}")
+
+        # 统一表名获取方式（与方案一保持一致）
+        metadata = db.metadata
+        all_tables = list(metadata.tables.keys())
+        print(f"All tables in metadata: {all_tables}")
+
+        # 过滤掉不需要备份的系统表
+        tables_to_backup = []
+        for table in all_tables:
+            if table not in ['alembic_version']:  # 添加其他需要跳过的系统表
+                tables_to_backup.append(table)
+
+        print(f"Tables to backup: {tables_to_backup}")
+
+        data_sql = [
+            "-- Database Data Backup",
+            f"-- Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            f"-- Database dialect: {dialect_name}",
+            ""
+        ]
+
+        total_records = 0
+
+        # 获取数据库连接
+        connection = None
+        try:
+            if db.session.bind:
+                connection = db.session.connection()
+            elif hasattr(db, 'engine'):
+                connection = db.engine.connect()
+            else:
+                print("Error: No database connection available")
+                return False
+
+            for table_name in tables_to_backup:
+                print(f"Backing up data from table: {table_name}")
+
+                # 获取表的列信息（用于正确处理数据类型）
+                columns_info = []
+                if dialect_name == 'sqlite':
+                    result = connection.execute(text(f"PRAGMA table_info({table_name})"))
+                    columns_info = [{'name': row[1], 'type': row[2]} for row in result]
+                elif dialect_name == 'postgresql':
+                    result = connection.execute(text(
+                        f"SELECT column_name, data_type FROM information_schema.columns "
+                        f"WHERE table_name = '{table_name}' ORDER BY ordinal_position"
+                    ))
+                    columns_info = [{'name': row[0], 'type': row[1]} for row in result]
+
+                # 执行查询获取数据
+                try:
+                    result = connection.execute(text(f"SELECT * FROM {table_name}"))
+                    rows = result.fetchall()
+                except Exception as e:
+                    print(f"Error querying table {table_name}: {str(e)}")
+                    data_sql.append(f"-- Error querying table {table_name}: {str(e)}")
+                    data_sql.append("")
+                    continue
+
+                if not rows:
+                    data_sql.append(f"-- Table {table_name} is empty")
+                    data_sql.append("")
+                    continue
+
+                # 生成INSERT语句
+                table_records = 0
+                for row in rows:
+                    columns = list(row._mapping.keys())
+                    values = []
+
+                    for i, value in enumerate(row):
+                        column_name = columns[i]
+                        column_type = None
+
+                        # 查找列类型信息
+                        for col_info in columns_info:
+                            if col_info['name'] == column_name:
+                                column_type = col_info['type']
+                                break
+
+                        if value is None:
+                            values.append("NULL")
+                        elif isinstance(value, (int, float)):
+                            values.append(str(value))
+                        elif isinstance(value, bool):
+                            # 根据数据库类型处理布尔值
+                            if dialect_name == 'sqlite':
+                                values.append("1" if value else "0")
+                            else:  # PostgreSQL 和其他
+                                values.append("TRUE" if value else "FALSE")
+                        elif isinstance(value, datetime):
+                            # 统一日期时间格式
+                            if dialect_name == 'sqlite':
+                                values.append(f"'{value.isoformat()}'")
+                            else:
+                                values.append(f"'{value.isoformat()}'")
+                        elif isinstance(value, date):
+                            values.append(f"'{value.isoformat()}'")
+                        else:
+                            # 转义单引号并处理字符串
+                            escaped = str(value).replace("'", "''")
+                            values.append(f"'{escaped}'")
+
+                    insert_sql = f"INSERT INTO {table_name} ({', '.join(columns)}) VALUES ({', '.join(values)});"
+                    data_sql.append(insert_sql)
+                    total_records += 1
+                    table_records += 1
+
+                data_sql.append(f"-- {table_records} records from {table_name}")
+                data_sql.append("")
+                print(f"Backed up {table_records} records from {table_name}")
+
+            # 添加摘要信息
+            data_sql.append(f"-- Backup completed: {total_records} total records")
+
+        finally:
+            # 确保连接被正确关闭
+            if connection:
+                connection.close()
+
+        # 写入文件
+        with open(filepath, 'w', encoding='utf-8') as f:
+            content = '\n'.join(data_sql)
+            f.write(content)
+
+        print(f"Data backup completed. Total records: {total_records}, File size: {len(content)} bytes")
+        return True
+
+    except Exception as e:
+        print(f"Data backup error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return False
