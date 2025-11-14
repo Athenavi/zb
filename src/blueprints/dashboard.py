@@ -1,5 +1,5 @@
 import re
-from datetime import timedelta, date
+from datetime import timedelta, datetime
 
 import bcrypt
 from flask import Blueprint, json
@@ -1469,9 +1469,10 @@ def media_preview(user_id, media_id):
 # ===============
 
 import os
-import zipfile
-from pathlib import Path
 from flask import request, jsonify, render_template, send_file
+
+from pathlib import Path
+from src.utils.database.backup import create_backup_tool
 
 
 @dashboard_bp.route('/backup', methods=['GET', 'POST'])
@@ -1481,22 +1482,20 @@ def backup(user_id):
         # 获取当前用户信息
         current_user = db.session.query(User).filter_by(id=user_id).first()
 
+        # 初始化备份工具
+        backup_dir = Path(base_dir) / 'backup'
+        backup_tool = create_backup_tool(db, str(backup_dir))
+
         # 处理备份请求
         if request.method == 'POST':
             backup_type = request.form.get('backup_type')
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-            # 确保备份目录存在
-            backup_dir = Path(base_dir) / 'backup'
-            backup_dir.mkdir(exist_ok=True)
 
             if backup_type == 'schema':
-                # 备份表结构
-                filename = f"backup_schema_{timestamp}.sql"
-                filepath = backup_dir / filename
-                success = backup_database_schema(db, filepath)
+                # 使用工具类备份表结构
+                result = backup_tool.backup_schema()
 
-                if success:
+                if result:
+                    filename = Path(result).name
                     return jsonify({
                         'success': True,
                         'message': f'数据库结构备份成功: {filename}',
@@ -1509,12 +1508,11 @@ def backup(user_id):
                     })
 
             elif backup_type == 'data':
-                # 备份表数据
-                filename = f"backup_data_{timestamp}.sql"
-                filepath = backup_dir / filename
-                success = backup_database_data(db, filepath)
+                # 使用工具类备份表数据
+                result = backup_tool.backup_data()
 
-                if success:
+                if result:
+                    filename = Path(result).name
                     return jsonify({
                         'success': True,
                         'message': f'数据库数据备份成功: {filename}',
@@ -1527,38 +1525,17 @@ def backup(user_id):
                     })
 
             elif backup_type == 'all':
-                # 备份完整数据库（结构和数据）
-                schema_filename = f"backup_schema_{timestamp}.sql"
-                data_filename = f"backup_data_{timestamp}.sql"
-                zip_filename = f"backup_all_{timestamp}.zip"
+                # 使用工具类完整备份数据库
+                result = backup_tool.backup_all()
 
-                schema_path = backup_dir / schema_filename
-                data_path = backup_dir / data_filename
-                zip_path = backup_dir / zip_filename
-
-                # 先备份结构和数据
-                schema_success = backup_database_schema(db, schema_path)
-                data_success = backup_database_data(db, data_path)
-
-                if schema_success and data_success:
-                    # 创建ZIP文件
-                    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                        zipf.write(schema_path, schema_filename)
-                        zipf.write(data_path, data_filename)
-
-                    # 删除临时的SQL文件
-                    schema_path.unlink(missing_ok=True)
-                    data_path.unlink(missing_ok=True)
-
+                if result and 'full' in result:
+                    filename = Path(result['full']).name
                     return jsonify({
                         'success': True,
-                        'message': f'完整数据库备份成功: {zip_filename}',
-                        'filename': zip_filename
+                        'message': f'完整数据库备份成功: {filename}',
+                        'filename': filename
                     })
                 else:
-                    # 清理可能创建的部分文件
-                    schema_path.unlink(missing_ok=True)
-                    data_path.unlink(missing_ok=True)
                     return jsonify({
                         'success': False,
                         'message': '完整数据库备份失败'
@@ -1567,7 +1544,7 @@ def backup(user_id):
             elif backup_type == 'delete':
                 # 删除备份文件
                 filename = request.form.get('filename')
-                if filename and filename.endswith(('.sql', '.zip')):
+                if filename and filename.endswith(('.sql', '.sql.gz', '.zip')):
                     filepath = backup_dir / filename
                     if filepath.exists() and filepath.parent == backup_dir:
                         filepath.unlink()
@@ -1583,30 +1560,31 @@ def backup(user_id):
 
         # GET请求 - 显示备份页面
         backup_list = []
-        backup_dir = Path(base_dir) / 'backup'
         if backup_dir.exists():
-            for file_path in backup_dir.iterdir():
-                if file_path.is_file() and file_path.suffix in ['.sql', '.zip']:
-                    stat = file_path.stat()
-                    file_size = stat.st_size
-                    created_at = datetime.fromtimestamp(stat.st_ctime)
+            # 使用工具类列出备份文件
+            backups = backup_tool.list_backups()
 
-                    # 确定备份类型
-                    if file_path.name.startswith('backup_schema_'):
-                        backup_type = 'schema'
-                    elif file_path.name.startswith('backup_data_'):
-                        backup_type = 'data'
-                    elif file_path.name.startswith('backup_all_'):
-                        backup_type = 'all'
-                    else:
-                        backup_type = 'unknown'
+            for backup_info in backups:
+                filename = backup_info['name']
+                file_size = backup_info['size']
+                created_at = backup_info['modified']
 
-                    backup_list.append({
-                        'name': file_path.name,
-                        'size': file_size,
-                        'created_at': created_at,
-                        'type': backup_type
-                    })
+                # 确定备份类型
+                if filename.startswith('schema_backup_'):
+                    backup_type = 'schema'
+                elif filename.startswith('data_backup_'):
+                    backup_type = 'data'
+                elif filename.startswith('full_backup_'):
+                    backup_type = 'all'
+                else:
+                    backup_type = 'unknown'
+
+                backup_list.append({
+                    'name': filename,
+                    'size': file_size,
+                    'created_at': created_at,
+                    'type': backup_type
+                })
 
         # 按创建时间倒序排列
         backup_list.sort(key=lambda x: x['created_at'], reverse=True)
@@ -1616,7 +1594,9 @@ def backup(user_id):
                                current_user=current_user)
 
     except Exception as e:
-        return jsonify({'error': str(e)})
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 
 @dashboard_bp.route('/backup/download/<filename>')
@@ -1629,336 +1609,14 @@ def download_backup(user_id, filename):
         # 安全检查：确保文件在备份目录内
         if not filepath.exists() or filepath.parent != backup_dir:
             return jsonify({'error': '文件不存在'}), 404
-
+        # 处理压缩文件的下载名称
+        download_name = filename
         return send_file(
             filepath,
             as_attachment=True,
-            download_name=filename
+            download_name=download_name
         )
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-from datetime import datetime
-from sqlalchemy import text
-
-
-def backup_database_schema(db, filepath):
-    """备份数据库结构"""
-    try:
-        # 检查数据库连接是否正常
-        if not db.session.bind:
-            print("Error: Database session is not bound to any engine")
-            # 尝试重新建立连接
-            try:
-                db.session.commit()  # 提交任何挂起的事务
-                db.session.close()  # 关闭会话
-                db.session.remove()  # 移除会话（对于某些配置）
-            except Exception as e:
-                print(f"Error resetting session: {e}")
-                return False
-
-        # 获取数据库方言信息
-        if hasattr(db, 'engine') and db.engine:
-            dialect_name = db.engine.dialect.name
-        elif db.session.bind:
-            dialect_name = db.session.bind.dialect.name
-        else:
-            print("Error: Cannot determine database dialect - no engine or session bind")
-            return False
-
-        print(f"Starting schema backup for database: {dialect_name}")
-
-        # 获取所有定义的表
-        metadata = db.metadata
-        all_tables = list(metadata.tables.keys())
-        print(f"All tables in metadata: {all_tables}")
-
-        # 尝试多种方式获取模型
-        tables = []
-
-        # 方法1：直接从元数据获取所有表
-        tables = all_tables
-        print(f"Using tables from metadata: {tables}")
-
-        # 方法2：如果上面不行，尝试动态导入模型
-        if not tables:
-            try:
-                from src.models import __all__ as models_list
-                print(f"Imported models: {models_list}")
-
-                for model_name in models_list:
-                    try:
-                        model = getattr(__import__('src.models', fromlist=[model_name]), model_name)
-                        if hasattr(model, '__table__'):
-                            table_name = model.__table__.name
-                            if table_name in all_tables:
-                                tables.append(table_name)
-                                print(f"Found table: {table_name}")
-                    except Exception as e:
-                        print(f"Error processing model {model_name}: {str(e)}")
-
-            except ImportError as e:
-                print(f"Import error: {e}")
-
-        schema_sql = []
-        schema_sql.append("-- Database Schema Backup")
-        schema_sql.append(f"-- Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        schema_sql.append(f"-- Database dialect: {dialect_name}")
-        schema_sql.append("")
-
-        if not tables:
-            schema_sql.append("-- No tables found to backup")
-            print("Warning: No tables found for backup")
-        else:
-            # 使用正确的数据库连接执行查询
-            connection = None
-            try:
-                # 获取数据库连接
-                if db.session.bind:
-                    connection = db.session.connection()
-                elif hasattr(db, 'engine'):
-                    connection = db.engine.connect()
-                else:
-                    schema_sql.append("-- Error: No database connection available")
-                    print("Error: No database connection available")
-                    return False
-
-                for table in tables:
-                    print(f"Processing table: {table}")
-
-                    if dialect_name == 'sqlite':
-                        # SQLite 获取表结构
-                        try:
-                            create_table_result = connection.execute(text(
-                                f"SELECT sql FROM sqlite_master WHERE type='table' AND name='{table}'"
-                            ))
-                            create_row = create_table_result.fetchone()
-                            if create_row and create_row[0]:
-                                create_sql = create_row[0]
-                                schema_sql.append(create_sql + ";")
-                                print(f"Added table SQL for {table}")
-                            else:
-                                schema_sql.append(f"-- Table {table} not found in sqlite_master")
-                                print(f"Table {table} not found in sqlite_master")
-
-                            # 获取索引
-                            indexes_result = connection.execute(text(
-                                f"SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='{table}' AND sql IS NOT NULL"
-                            ))
-                            index_count = 0
-                            for row in indexes_result:
-                                if row[0]:
-                                    schema_sql.append(row[0] + ";")
-                                    index_count += 1
-                            if index_count > 0:
-                                print(f"Added {index_count} indexes for {table}")
-
-                        except Exception as e:
-                            schema_sql.append(f"-- Error processing table {table}: {str(e)}")
-                            print(f"Error processing SQLite table {table}: {str(e)}")
-
-                    elif dialect_name == 'postgresql':
-                        # PostgreSQL 获取表结构
-                        try:
-                            create_table_result = connection.execute(text(
-                                f"SELECT column_name, data_type, is_nullable, column_default "
-                                f"FROM information_schema.columns WHERE table_name = '{table}' "
-                                f"ORDER BY ordinal_position"
-                            ))
-
-                            columns = []
-                            row_count = 0
-                            for row in create_table_result:
-                                col_def = f"{row[0]} {row[1]}"
-                                if row[2] == 'NO':
-                                    col_def += " NOT NULL"
-                                if row[3]:
-                                    col_def += f" DEFAULT {row[3]}"
-                                columns.append(col_def)
-                                row_count += 1
-
-                            if row_count > 0:
-                                schema_sql.append(f"CREATE TABLE {table} (")
-                                schema_sql.append(",\n".join(columns))
-                                schema_sql.append(");")
-                                print(f"Added PostgreSQL table {table} with {row_count} columns")
-                            else:
-                                schema_sql.append(f"-- Table {table} has no columns or not found")
-                                print(f"Table {table} has no columns in PostgreSQL")
-
-                        except Exception as e:
-                            schema_sql.append(f"-- Error processing table {table}: {str(e)}")
-                            print(f"Error processing PostgreSQL table {table}: {str(e)}")
-
-                    else:
-                        schema_sql.append(f"-- Unsupported database dialect: {dialect_name} for table {table}")
-                        print(f"Unsupported database dialect: {dialect_name}")
-
-                    schema_sql.append("")
-
-            finally:
-                # 确保连接被正确关闭
-                if connection:
-                    connection.close()
-
-        # 写入文件
-        with open(filepath, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(schema_sql))
-
-        print(f"Schema backup completed. Total SQL lines: {len(schema_sql)}")
-        return True
-
-    except Exception as e:
-        print(f"Schema backup error: {str(e)}")
-        import traceback
-        print(f"Traceback: {traceback.format_exc()}")
-        return False
-
-
-def backup_database_data(db, filepath):
-    """修复后的数据库数据备份"""
-    try:
-        # 检查数据库连接并获取方言信息
-        if hasattr(db, 'engine') and db.engine:
-            dialect_name = db.engine.dialect.name
-        elif db.session.bind:
-            dialect_name = db.session.bind.dialect.name
-        else:
-            print("Error: Cannot determine database dialect")
-            return False
-
-        print(f"Starting data backup for database: {dialect_name}")
-
-        # 统一表名获取方式（与方案一保持一致）
-        metadata = db.metadata
-        all_tables = list(metadata.tables.keys())
-        print(f"All tables in metadata: {all_tables}")
-
-        # 过滤掉不需要备份的系统表
-        tables_to_backup = []
-        for table in all_tables:
-            if table not in ['alembic_version']:  # 添加其他需要跳过的系统表
-                tables_to_backup.append(table)
-
-        print(f"Tables to backup: {tables_to_backup}")
-
-        data_sql = [
-            "-- Database Data Backup",
-            f"-- Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            f"-- Database dialect: {dialect_name}",
-            ""
-        ]
-
-        total_records = 0
-
-        # 获取数据库连接
-        connection = None
-        try:
-            if db.session.bind:
-                connection = db.session.connection()
-            elif hasattr(db, 'engine'):
-                connection = db.engine.connect()
-            else:
-                print("Error: No database connection available")
-                return False
-
-            for table_name in tables_to_backup:
-                print(f"Backing up data from table: {table_name}")
-
-                # 获取表的列信息（用于正确处理数据类型）
-                columns_info = []
-                if dialect_name == 'sqlite':
-                    result = connection.execute(text(f"PRAGMA table_info({table_name})"))
-                    columns_info = [{'name': row[1], 'type': row[2]} for row in result]
-                elif dialect_name == 'postgresql':
-                    result = connection.execute(text(
-                        f"SELECT column_name, data_type FROM information_schema.columns "
-                        f"WHERE table_name = '{table_name}' ORDER BY ordinal_position"
-                    ))
-                    columns_info = [{'name': row[0], 'type': row[1]} for row in result]
-
-                # 执行查询获取数据
-                try:
-                    result = connection.execute(text(f"SELECT * FROM {table_name}"))
-                    rows = result.fetchall()
-                except Exception as e:
-                    print(f"Error querying table {table_name}: {str(e)}")
-                    data_sql.append(f"-- Error querying table {table_name}: {str(e)}")
-                    data_sql.append("")
-                    continue
-
-                if not rows:
-                    data_sql.append(f"-- Table {table_name} is empty")
-                    data_sql.append("")
-                    continue
-
-                # 生成INSERT语句
-                table_records = 0
-                for row in rows:
-                    columns = list(row._mapping.keys())
-                    values = []
-
-                    for i, value in enumerate(row):
-                        column_name = columns[i]
-                        column_type = None
-
-                        # 查找列类型信息
-                        for col_info in columns_info:
-                            if col_info['name'] == column_name:
-                                column_type = col_info['type']
-                                break
-
-                        if value is None:
-                            values.append("NULL")
-                        elif isinstance(value, (int, float)):
-                            values.append(str(value))
-                        elif isinstance(value, bool):
-                            # 根据数据库类型处理布尔值
-                            if dialect_name == 'sqlite':
-                                values.append("1" if value else "0")
-                            else:  # PostgreSQL 和其他
-                                values.append("TRUE" if value else "FALSE")
-                        elif isinstance(value, datetime):
-                            # 统一日期时间格式
-                            if dialect_name == 'sqlite':
-                                values.append(f"'{value.isoformat()}'")
-                            else:
-                                values.append(f"'{value.isoformat()}'")
-                        elif isinstance(value, date):
-                            values.append(f"'{value.isoformat()}'")
-                        else:
-                            # 转义单引号并处理字符串
-                            escaped = str(value).replace("'", "''")
-                            values.append(f"'{escaped}'")
-
-                    insert_sql = f"INSERT INTO {table_name} ({', '.join(columns)}) VALUES ({', '.join(values)});"
-                    data_sql.append(insert_sql)
-                    total_records += 1
-                    table_records += 1
-
-                data_sql.append(f"-- {table_records} records from {table_name}")
-                data_sql.append("")
-                print(f"Backed up {table_records} records from {table_name}")
-
-            # 添加摘要信息
-            data_sql.append(f"-- Backup completed: {total_records} total records")
-
-        finally:
-            # 确保连接被正确关闭
-            if connection:
-                connection.close()
-
-        # 写入文件
-        with open(filepath, 'w', encoding='utf-8') as f:
-            content = '\n'.join(data_sql)
-            f.write(content)
-
-        print(f"Data backup completed. Total records: {total_records}, File size: {len(content)} bytes")
-        return True
-
-    except Exception as e:
-        print(f"Data backup error: {str(e)}")
         import traceback
         traceback.print_exc()
-        return False
+        return jsonify({'error': str(e)}), 500
