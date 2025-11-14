@@ -1,12 +1,11 @@
 import re
-from datetime import timedelta, datetime
 
 import bcrypt
 from flask import Blueprint, json
 
 from src.database import get_db
 from src.models import User, Article, ArticleContent, ArticleI18n, Category, Comment, db, CategorySubscription, Menus, \
-    MenuItems, Pages, SystemSettings, FileHash, Media
+    MenuItems, Pages, SystemSettings, FileHash, Media, Url, SearchHistory, Event, Report
 # from src.error import error
 from src.user.authz.decorators import admin_required
 from src.utils.config.theme import get_all_themes
@@ -808,9 +807,6 @@ def update_article_status(user_id, article_id):
             }), 500
 
 
-from sqlalchemy import func
-
-
 @dashboard_bp.route('/article/stats', methods=['GET'])
 @admin_required
 def get_article_stats(user_id):
@@ -1316,9 +1312,6 @@ def admin_settings(user_id):
         return jsonify({'error': str(e)})
 
 
-from sqlalchemy import or_
-
-
 @dashboard_bp.route('/media', methods=['GET', 'DELETE'])
 @admin_required
 def admin_media(user_id):
@@ -1469,7 +1462,7 @@ def media_preview(user_id, media_id):
 # ===============
 
 import os
-from flask import request, jsonify, render_template, send_file
+from flask import send_file
 
 from pathlib import Path
 from src.utils.database.backup import create_backup_tool
@@ -1620,3 +1613,190 @@ def download_backup(user_id, filename):
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+from flask import request, jsonify, render_template
+from sqlalchemy import or_, func
+from datetime import datetime, timedelta
+
+
+@dashboard_bp.route('/misc', methods=['GET', 'POST', 'PUT', 'DELETE'])
+@admin_required
+def admin_misc(user_id):
+    try:
+        with get_db() as db:
+            # 获取当前用户信息
+            current_user = db.query(User).filter_by(id=user_id).first()
+
+            # 处理事件操作
+            if request.method == 'POST' and 'event_action' in request.form:
+                action = request.form.get('event_action')
+
+                if action == 'create_event':
+                    title = request.form.get('title')
+                    description = request.form.get('description', '')
+                    event_date = request.form.get('event_date')
+
+                    if not title or not event_date:
+                        return jsonify({'success': False, 'message': '事件标题和日期不能为空'})
+
+                    try:
+                        event_date_obj = datetime.strptime(event_date, '%Y-%m-%dT%H:%M')
+                    except ValueError:
+                        return jsonify({'success': False, 'message': '日期格式错误'})
+
+                    event = Event(
+                        title=title,
+                        description=description,
+                        event_date=event_date_obj,
+                        created_at=datetime.now()
+                    )
+                    db.add(event)
+                    db.commit()
+                    return jsonify({'success': True, 'message': '事件创建成功'})
+
+                elif action == 'update_event':
+                    event_id = request.form.get('event_id')
+                    title = request.form.get('title')
+                    description = request.form.get('description', '')
+                    event_date = request.form.get('event_date')
+
+                    event = db.query(Event).filter_by(id=event_id).first()
+                    if not event:
+                        return jsonify({'success': False, 'message': '事件不存在'})
+
+                    try:
+                        event_date_obj = datetime.strptime(event_date, '%Y-%m-%dT%H:%M')
+                    except ValueError:
+                        return jsonify({'success': False, 'message': '日期格式错误'})
+
+                    event.title = title
+                    event.description = description
+                    event.event_date = event_date_obj
+                    db.commit()
+                    return jsonify({'success': True, 'message': '事件更新成功'})
+
+                elif action == 'delete_event':
+                    event_id = request.form.get('event_id')
+                    event = db.query(Event).filter_by(id=event_id).first()
+                    if event:
+                        db.delete(event)
+                        db.commit()
+                        return jsonify({'success': True, 'message': '事件已删除'})
+                    return jsonify({'success': False, 'message': '事件不存在'})
+
+            # 处理举报操作
+            if request.method == 'POST' and 'report_action' in request.form:
+                action = request.form.get('report_action')
+
+                if action == 'delete_report':
+                    report_id = request.form.get('report_id')
+                    report = db.query(Report).filter_by(id=report_id).first()
+                    if report:
+                        db.delete(report)
+                        db.commit()
+                        return jsonify({'success': True, 'message': '举报记录已删除'})
+                    return jsonify({'success': False, 'message': '举报记录不存在'})
+
+                elif action == 'process_report':
+                    report_id = request.form.get('report_id')
+                    # 这里可以添加处理举报的逻辑，比如标记为已处理
+                    return jsonify({'success': True, 'message': '举报已处理'})
+
+            # 处理短链接操作
+            if request.method == 'POST' and 'url_action' in request.form:
+                action = request.form.get('url_action')
+
+                if action == 'create_url':
+                    long_url = request.form.get('long_url')
+                    short_url = request.form.get('short_url')
+                    user_id_url = request.form.get('user_id')
+
+                    if not long_url or not short_url:
+                        return jsonify({'success': False, 'message': '长链接和短链接不能为空'})
+
+                    # 检查短链接是否已存在
+                    existing_url = db.query(Url).filter_by(short_url=short_url).first()
+                    if existing_url:
+                        return jsonify({'success': False, 'message': '短链接已存在'})
+
+                    url = Url(
+                        long_url=long_url,
+                        short_url=short_url,
+                        user_id=user_id_url,
+                        created_at=datetime.now()
+                    )
+                    db.add(url)
+                    db.commit()
+                    return jsonify({'success': True, 'message': '短链接创建成功'})
+
+                elif action == 'delete_url':
+                    url_id = request.form.get('url_id')
+                    url = db.query(Url).filter_by(id=url_id).first()
+                    if url:
+                        db.delete(url)
+                        db.commit()
+                        return jsonify({'success': True, 'message': '短链接已删除'})
+                    return jsonify({'success': False, 'message': '短链接不存在'})
+
+            # 处理搜索历史操作
+            if request.method == 'POST' and 'search_history_action' in request.form:
+                action = request.form.get('search_history_action')
+
+                if action == 'delete_history':
+                    history_id = request.form.get('history_id')
+                    history = db.query(SearchHistory).filter_by(id=history_id).first()
+                    if history:
+                        db.delete(history)
+                        db.commit()
+                        return jsonify({'success': True, 'message': '搜索记录已删除'})
+                    return jsonify({'success': False, 'message': '搜索记录不存在'})
+
+                elif action == 'clear_user_history':
+                    user_id_history = request.form.get('user_id')
+                    db.query(SearchHistory).filter_by(user_id=user_id_history).delete()
+                    db.commit()
+                    return jsonify({'success': True, 'message': '用户搜索记录已清空'})
+
+                elif action == 'clear_all_history':
+                    db.query(SearchHistory).delete()
+                    db.commit()
+                    return jsonify({'success': True, 'message': '所有搜索记录已清空'})
+
+            # GET请求 - 显示杂项管理页面
+            # 获取事件列表
+            events = db.query(Event).order_by(Event.event_date.desc()).all()
+
+            # 获取举报列表
+            reports = db.query(Report).join(User, Report.reported_by == User.id) \
+                .order_by(Report.created_at.desc()).all()
+
+            # 获取短链接列表
+            urls = db.query(Url).join(User, Url.user_id == User.id) \
+                .order_by(Url.created_at.desc()).all()
+
+            # 获取搜索历史列表
+            search_history = db.query(SearchHistory).order_by(SearchHistory.created_at.desc()).all()
+
+            # 获取用户列表用于筛选
+            users = db.query(User).all()
+
+            # 获取搜索统计
+            search_stats = db.query(
+                SearchHistory.keyword,
+                func.count(SearchHistory.id).label('search_count')
+            ).group_by(SearchHistory.keyword) \
+                .order_by(func.count(SearchHistory.id).desc()) \
+                .limit(10).all()
+
+            return render_template('dashboard/misc.html',
+                                   events=events,
+                                   reports=reports,
+                                   urls=urls,
+                                   search_history=search_history,
+                                   search_stats=search_stats,
+                                   users=users,
+                                   current_user=current_user)
+
+    except Exception as e:
+        return jsonify({'error': str(e)})
