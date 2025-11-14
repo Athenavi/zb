@@ -104,7 +104,7 @@ def redirect_to_long_url_route(short_url):
 
 @website_bp.route('/message')
 def message_page():
-    return render_template('Message.html')
+    return render_template('my/messages.html')
 
 
 @website_bp.route('/links')

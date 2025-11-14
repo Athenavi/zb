@@ -92,7 +92,7 @@ def blog_detail_back(blog_slug, safeMode=True):
 
 def blog_detail_i18n(aid, blog_slug, i18n_code):
     if request.method == 'GET':
-        return render_template('zyDetail.html', articleName=blog_slug, url_for=url_for,
+        return render_template('blog/i18n_detail.html', articleName=blog_slug, url_for=url_for,
                                i18n_code=i18n_code, aid=aid)
     return error(message='Invalid request', status_code=400)
 
@@ -368,7 +368,7 @@ def new_article_back(user_id):
         content = request.form.get('content')
         tags = request.form.get('tags')
         is_featured = True if request.form.get('is_featured') else False
-        #status = request.form.get('status', 0)
+        # status = request.form.get('status', 0)
         article_ad = request.form.get('article_ad')
         cover_image = request.form.get('cover_image')
         # 创建新文章
