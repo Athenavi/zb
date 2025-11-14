@@ -1,7 +1,7 @@
 {% extends "dashboard/base.html" %}
 
-{% block title %}管理后台 - 杂项管理{% endblock %}
-{% block page_title %}杂项管理{% endblock %}
+{% block title %}管理后台 - 更多管理{% endblock %}
+{% block page_title %}更多管理{% endblock %}
 
 {% block extra_css %}
     .tab-content {
@@ -32,6 +32,28 @@
     border-radius: 0.25rem;
     font-size: 0.875rem;
     }
+    .pagination {
+    display: flex;
+    justify-content: center;
+    margin-top: 1.5rem;
+    }
+    .pagination a, .pagination span {
+    margin: 0 0.25rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    text-decoration: none;
+    color: #374151;
+    font-size: 0.875rem;
+    }
+    .pagination a:hover {
+    background-color: #f3f4f6;
+    }
+    .pagination .current {
+    background-color: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+    }
 {% endblock %}
 
 {% block content %}
@@ -42,18 +64,22 @@
                 <button class="tab-button py-4 px-6 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 transition-colors active"
                         data-tab="events">
                     <i class="fas fa-calendar-alt mr-2"></i>事件管理
+                    <span class="ml-1 bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">{{ events_pagination.total }}</span>
                 </button>
                 <button class="tab-button py-4 px-6 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 transition-colors"
                         data-tab="reports">
                     <i class="fas fa-flag mr-2"></i>举报管理
+                    <span class="ml-1 bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded-full">{{ reports_pagination.total }}</span>
                 </button>
                 <button class="tab-button py-4 px-6 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 transition-colors"
                         data-tab="urls">
                     <i class="fas fa-link mr-2"></i>短链接管理
+                    <span class="ml-1 bg-purple-100 text-purple-800 text-xs px-2 py-0.5 rounded-full">{{ urls_pagination.total }}</span>
                 </button>
                 <button class="tab-button py-4 px-6 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 transition-colors"
                         data-tab="search">
                     <i class="fas fa-search mr-2"></i>搜索历史
+                    <span class="ml-1 bg-yellow-100 text-yellow-800 text-xs px-2 py-0.5 rounded-full">{{ search_history_pagination.total }}</span>
                 </button>
             </nav>
         </div>
@@ -71,7 +97,7 @@
 
                 <!-- 事件列表 -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {% for event in events %}
+                    {% for event in events_pagination.items %}
                         <div class="misc-card bg-white border border-gray-200 rounded-lg overflow-hidden">
                             <div class="p-4">
                                 <div class="flex justify-between items-start mb-2">
@@ -107,7 +133,7 @@
                         </div>
                     {% endfor %}
 
-                    {% if events|length == 0 %}
+                    {% if events_pagination.items|length == 0 %}
                         <div class="col-span-full text-center py-8">
                             <div class="text-gray-400 mb-4">
                                 <i class="fas fa-calendar-times text-5xl"></i>
@@ -117,6 +143,38 @@
                         </div>
                     {% endif %}
                 </div>
+
+                <!-- 事件分页 -->
+                {% if events_pagination.pages > 1 %}
+                    <div class="mt-6">
+                        <div class="flex justify-between items-center">
+                            <div class="text-sm text-gray-500">
+                                显示 {{ events_pagination.items|length }} 个，共 {{ events_pagination.total }} 个事件
+                            </div>
+                            <div class="pagination">
+                                {% if events_pagination.has_prev %}
+                                    <a href="{{ url_for('dashboard.admin_misc', page_events=events_pagination.prev_num, page_reports=page_reports, page_urls=page_urls, page_search=page_search) }}">上一页</a>
+                                {% endif %}
+
+                                {% for page_num in events_pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                                    {% if page_num %}
+                                        {% if page_num == events_pagination.page %}
+                                            <span class="current">{{ page_num }}</span>
+                                        {% else %}
+                                            <a href="{{ url_for('dashboard.admin_misc', page_events=page_num, page_reports=page_reports, page_urls=page_urls, page_search=page_search) }}">{{ page_num }}</a>
+                                        {% endif %}
+                                    {% else %}
+                                        <span>...</span>
+                                    {% endif %}
+                                {% endfor %}
+
+                                {% if events_pagination.has_next %}
+                                    <a href="{{ url_for('dashboard.admin_misc', page_events=events_pagination.next_num, page_reports=page_reports, page_urls=page_urls, page_search=page_search) }}">下一页</a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
             </div>
 
             <!-- 举报管理 -->
@@ -124,7 +182,7 @@
                 <div class="flex justify-between items-center mb-6">
                     <h3 class="text-lg font-medium text-gray-900">举报管理</h3>
                     <div class="text-sm text-gray-500">
-                        共 <span class="font-semibold">{{ reports|length }}</span> 条举报
+                        共 <span class="font-semibold">{{ reports_pagination.total }}</span> 条举报
                     </div>
                 </div>
 
@@ -156,7 +214,7 @@
                         </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
-                        {% for report in reports %}
+                        {% for report in reports_pagination.items %}
                             <tr class="hover:bg-gray-50 transition-colors">
                                 <td class="px-6 py-4">
                                     <div class="text-sm font-medium text-gray-900">内容ID: {{ report.content_id }}</div>
@@ -205,7 +263,7 @@
                         </tbody>
                     </table>
 
-                    {% if reports|length == 0 %}
+                    {% if reports_pagination.items|length == 0 %}
                         <div class="text-center py-8">
                             <div class="text-gray-400 mb-4">
                                 <i class="fas fa-flag text-5xl"></i>
@@ -214,6 +272,38 @@
                         </div>
                     {% endif %}
                 </div>
+
+                <!-- 举报分页 -->
+                {% if reports_pagination.pages > 1 %}
+                    <div class="mt-6">
+                        <div class="flex justify-between items-center">
+                            <div class="text-sm text-gray-500">
+                                显示 {{ reports_pagination.items|length }} 条，共 {{ reports_pagination.total }} 条举报
+                            </div>
+                            <div class="pagination">
+                                {% if reports_pagination.has_prev %}
+                                    <a href="{{ url_for('dashboard.admin_misc', page_events=page_events, page_reports=reports_pagination.prev_num, page_urls=page_urls, page_search=page_search) }}">上一页</a>
+                                {% endif %}
+
+                                {% for page_num in reports_pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                                    {% if page_num %}
+                                        {% if page_num == reports_pagination.page %}
+                                            <span class="current">{{ page_num }}</span>
+                                        {% else %}
+                                            <a href="{{ url_for('dashboard.admin_misc', page_events=page_events, page_reports=page_num, page_urls=page_urls, page_search=page_search) }}">{{ page_num }}</a>
+                                        {% endif %}
+                                    {% else %}
+                                        <span>...</span>
+                                    {% endif %}
+                                {% endfor %}
+
+                                {% if reports_pagination.has_next %}
+                                    <a href="{{ url_for('dashboard.admin_misc', page_events=page_events, page_reports=reports_pagination.next_num, page_urls=page_urls, page_search=page_search) }}">下一页</a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
             </div>
 
             <!-- 短链接管理 -->
@@ -254,7 +344,7 @@
                         </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
-                        {% for url in urls %}
+                        {% for url in urls_pagination.items %}
                             <tr class="hover:bg-gray-50 transition-colors">
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="url-short">{{ url.short_url }}</div>
@@ -285,7 +375,7 @@
                         </tbody>
                     </table>
 
-                    {% if urls|length == 0 %}
+                    {% if urls_pagination.items|length == 0 %}
                         <div class="text-center py-8">
                             <div class="text-gray-400 mb-4">
                                 <i class="fas fa-link text-5xl"></i>
@@ -295,6 +385,38 @@
                         </div>
                     {% endif %}
                 </div>
+
+                <!-- 短链接分页 -->
+                {% if urls_pagination.pages > 1 %}
+                    <div class="mt-6">
+                        <div class="flex justify-between items-center">
+                            <div class="text-sm text-gray-500">
+                                显示 {{ urls_pagination.items|length }} 个，共 {{ urls_pagination.total }} 个短链接
+                            </div>
+                            <div class="pagination">
+                                {% if urls_pagination.has_prev %}
+                                    <a href="{{ url_for('dashboard.admin_misc', page_events=page_events, page_reports=page_reports, page_urls=urls_pagination.prev_num, page_search=page_search) }}">上一页</a>
+                                {% endif %}
+
+                                {% for page_num in urls_pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                                    {% if page_num %}
+                                        {% if page_num == urls_pagination.page %}
+                                            <span class="current">{{ page_num }}</span>
+                                        {% else %}
+                                            <a href="{{ url_for('dashboard.admin_misc', page_events=page_events, page_reports=page_reports, page_urls=page_num, page_search=page_search) }}">{{ page_num }}</a>
+                                        {% endif %}
+                                    {% else %}
+                                        <span>...</span>
+                                    {% endif %}
+                                {% endfor %}
+
+                                {% if urls_pagination.has_next %}
+                                    <a href="{{ url_for('dashboard.admin_misc', page_events=page_events, page_reports=page_reports, page_urls=urls_pagination.next_num, page_search=page_search) }}">下一页</a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
             </div>
 
             <!-- 搜索历史 -->
@@ -356,7 +478,7 @@
                         </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
-                        {% for history in search_history %}
+                        {% for history in search_history_pagination.items %}
                             <tr class="hover:bg-gray-50 transition-colors">
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                     {{ history.user_id }}
@@ -383,7 +505,7 @@
                         </tbody>
                     </table>
 
-                    {% if search_history|length == 0 %}
+                    {% if search_history_pagination.items|length == 0 %}
                         <div class="text-center py-8">
                             <div class="text-gray-400 mb-4">
                                 <i class="fas fa-search text-5xl"></i>
@@ -392,6 +514,39 @@
                         </div>
                     {% endif %}
                 </div>
+
+                <!-- 搜索历史分页 -->
+                {% if search_history_pagination.pages > 1 %}
+                    <div class="mt-6">
+                        <div class="flex justify-between items-center">
+                            <div class="text-sm text-gray-500">
+                                显示 {{ search_history_pagination.items|length }}
+                                条，共 {{ search_history_pagination.total }} 条搜索记录
+                            </div>
+                            <div class="pagination">
+                                {% if search_history_pagination.has_prev %}
+                                    <a href="{{ url_for('dashboard.admin_misc', page_events=page_events, page_reports=page_reports, page_urls=page_urls, page_search=search_history_pagination.prev_num) }}">上一页</a>
+                                {% endif %}
+
+                                {% for page_num in search_history_pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                                    {% if page_num %}
+                                        {% if page_num == search_history_pagination.page %}
+                                            <span class="current">{{ page_num }}</span>
+                                        {% else %}
+                                            <a href="{{ url_for('dashboard.admin_misc', page_events=page_events, page_reports=page_reports, page_urls=page_urls, page_search=page_num) }}">{{ page_num }}</a>
+                                        {% endif %}
+                                    {% else %}
+                                        <span>...</span>
+                                    {% endif %}
+                                {% endfor %}
+
+                                {% if search_history_pagination.has_next %}
+                                    <a href="{{ url_for('dashboard.admin_misc', page_events=page_events, page_reports=page_reports, page_urls=page_urls, page_search=search_history_pagination.next_num) }}">下一页</a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -468,9 +623,7 @@
                         <select id="urlUserId" name="user_id" required
                                 class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary">
                             <option value="">选择用户</option>
-                            {% for user in users %}
-                                <option value="{{ user.id }}">{{ user.username }}</option>
-                            {% endfor %}
+                            <option value="{{ current_user.id }}">{{ current_user.username }}</option>
                         </select>
                     </div>
                     <div class="flex justify-end space-x-3 pt-4 border-t">
@@ -675,21 +828,15 @@
                 const shortUrl = this.getAttribute('data-url');
                 const fullUrl = `${window.location.origin}/${shortUrl}`;
 
+                // 使用现代的剪贴板 API
                 navigator.clipboard.writeText(fullUrl).then(function () {
                     alert('短链接已复制到剪贴板: ' + fullUrl);
-                }).catch(function () {
-                    // 降级方案
-                    const textArea = document.createElement('textarea');
-                    textArea.value = fullUrl;
-                    document.body.appendChild(textArea);
-                    textArea.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(textArea);
-                    alert('短链接已复制到剪贴板: ' + fullUrl);
+                }).catch(function (err) {
+                    console.error('无法使用剪贴板 API 复制: ', err);
+                    // 这里可以考虑提供一个手动复制的选项，或者提示用户手动复制链接
                 });
             });
         });
-
         // 删除短链接
         document.querySelectorAll('.delete-url').forEach(button => {
             button.addEventListener('click', function () {

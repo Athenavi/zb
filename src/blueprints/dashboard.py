@@ -1624,179 +1624,203 @@ from datetime import datetime, timedelta
 @admin_required
 def admin_misc(user_id):
     try:
-        with get_db() as db:
-            # 获取当前用户信息
-            current_user = db.query(User).filter_by(id=user_id).first()
+        db_session = db.session()
+        # 获取当前用户信息
+        current_user = db_session.query(User).filter_by(id=user_id).first()
 
-            # 处理事件操作
-            if request.method == 'POST' and 'event_action' in request.form:
-                action = request.form.get('event_action')
+        # 获取分页参数
+        page_events = request.args.get('page_events', 1, type=int)
+        page_reports = request.args.get('page_reports', 1, type=int)
+        page_urls = request.args.get('page_urls', 1, type=int)
+        page_search = request.args.get('page_search', 1, type=int)
 
-                if action == 'create_event':
-                    title = request.form.get('title')
-                    description = request.form.get('description', '')
-                    event_date = request.form.get('event_date')
+        per_page = 10  # 每页显示数量
 
-                    if not title or not event_date:
-                        return jsonify({'success': False, 'message': '事件标题和日期不能为空'})
+        # 处理事件操作
+        if request.method == 'POST' and 'event_action' in request.form:
+            action = request.form.get('event_action')
 
-                    try:
-                        event_date_obj = datetime.strptime(event_date, '%Y-%m-%dT%H:%M')
-                    except ValueError:
-                        return jsonify({'success': False, 'message': '日期格式错误'})
+            if action == 'create_event':
+                title = request.form.get('title')
+                description = request.form.get('description', '')
+                event_date = request.form.get('event_date')
 
-                    event = Event(
-                        title=title,
-                        description=description,
-                        event_date=event_date_obj,
-                        created_at=datetime.now()
-                    )
-                    db.add(event)
-                    db.commit()
-                    return jsonify({'success': True, 'message': '事件创建成功'})
+                if not title or not event_date:
+                    return jsonify({'success': False, 'message': '事件标题和日期不能为空'})
 
-                elif action == 'update_event':
-                    event_id = request.form.get('event_id')
-                    title = request.form.get('title')
-                    description = request.form.get('description', '')
-                    event_date = request.form.get('event_date')
+                try:
+                    event_date_obj = datetime.strptime(event_date, '%Y-%m-%dT%H:%M')
+                except ValueError:
+                    return jsonify({'success': False, 'message': '日期格式错误'})
 
-                    event = db.query(Event).filter_by(id=event_id).first()
-                    if not event:
-                        return jsonify({'success': False, 'message': '事件不存在'})
+                event = Event(
+                    title=title,
+                    description=description,
+                    event_date=event_date_obj,
+                    created_at=datetime.now()
+                )
+                db_session.add(event)
+                db_session.commit()
+                return jsonify({'success': True, 'message': '事件创建成功'})
 
-                    try:
-                        event_date_obj = datetime.strptime(event_date, '%Y-%m-%dT%H:%M')
-                    except ValueError:
-                        return jsonify({'success': False, 'message': '日期格式错误'})
+            elif action == 'update_event':
+                event_id = request.form.get('event_id')
+                title = request.form.get('title')
+                description = request.form.get('description', '')
+                event_date = request.form.get('event_date')
 
-                    event.title = title
-                    event.description = description
-                    event.event_date = event_date_obj
-                    db.commit()
-                    return jsonify({'success': True, 'message': '事件更新成功'})
-
-                elif action == 'delete_event':
-                    event_id = request.form.get('event_id')
-                    event = db.query(Event).filter_by(id=event_id).first()
-                    if event:
-                        db.delete(event)
-                        db.commit()
-                        return jsonify({'success': True, 'message': '事件已删除'})
+                event = db_session.query(Event).filter_by(id=event_id).first()
+                if not event:
                     return jsonify({'success': False, 'message': '事件不存在'})
 
-            # 处理举报操作
-            if request.method == 'POST' and 'report_action' in request.form:
-                action = request.form.get('report_action')
+                try:
+                    event_date_obj = datetime.strptime(event_date, '%Y-%m-%dT%H:%M')
+                except ValueError:
+                    return jsonify({'success': False, 'message': '日期格式错误'})
 
-                if action == 'delete_report':
-                    report_id = request.form.get('report_id')
-                    report = db.query(Report).filter_by(id=report_id).first()
-                    if report:
-                        db.delete(report)
-                        db.commit()
-                        return jsonify({'success': True, 'message': '举报记录已删除'})
-                    return jsonify({'success': False, 'message': '举报记录不存在'})
+                event.title = title
+                event.description = description
+                event.event_date = event_date_obj
+                db_session.commit()
+                return jsonify({'success': True, 'message': '事件更新成功'})
 
-                elif action == 'process_report':
-                    report_id = request.form.get('report_id')
-                    # 这里可以添加处理举报的逻辑，比如标记为已处理
-                    return jsonify({'success': True, 'message': '举报已处理'})
+            elif action == 'delete_event':
+                event_id = request.form.get('event_id')
+                event = db_session.query(Event).filter_by(id=event_id).first()
+                if event:
+                    db_session.delete(event)
+                    db_session.commit()
+                    return jsonify({'success': True, 'message': '事件已删除'})
+                return jsonify({'success': False, 'message': '事件不存在'})
 
-            # 处理短链接操作
-            if request.method == 'POST' and 'url_action' in request.form:
-                action = request.form.get('url_action')
+        # 处理举报操作
+        if request.method == 'POST' and 'report_action' in request.form:
+            action = request.form.get('report_action')
 
-                if action == 'create_url':
-                    long_url = request.form.get('long_url')
-                    short_url = request.form.get('short_url')
-                    user_id_url = request.form.get('user_id')
+            if action == 'delete_report':
+                report_id = request.form.get('report_id')
+                report = db_session.query(Report).filter_by(id=report_id).first()
+                if report:
+                    db_session.delete(report)
+                    db_session.commit()
+                    return jsonify({'success': True, 'message': '举报记录已删除'})
+                return jsonify({'success': False, 'message': '举报记录不存在'})
 
-                    if not long_url or not short_url:
-                        return jsonify({'success': False, 'message': '长链接和短链接不能为空'})
+            elif action == 'process_report':
+                report_id = request.form.get('report_id')
+                # 这里可以添加处理举报的逻辑，比如标记为已处理
+                return jsonify({'success': True, 'message': '举报已处理'})
 
-                    # 检查短链接是否已存在
-                    existing_url = db.query(Url).filter_by(short_url=short_url).first()
-                    if existing_url:
-                        return jsonify({'success': False, 'message': '短链接已存在'})
+        # 处理短链接操作
+        if request.method == 'POST' and 'url_action' in request.form:
+            action = request.form.get('url_action')
 
-                    url = Url(
-                        long_url=long_url,
-                        short_url=short_url,
-                        user_id=user_id_url,
-                        created_at=datetime.now()
-                    )
-                    db.add(url)
-                    db.commit()
-                    return jsonify({'success': True, 'message': '短链接创建成功'})
+            if action == 'create_url':
+                long_url = request.form.get('long_url')
+                short_url = request.form.get('short_url')
+                user_id_url = request.form.get('user_id')
 
-                elif action == 'delete_url':
-                    url_id = request.form.get('url_id')
-                    url = db.query(Url).filter_by(id=url_id).first()
-                    if url:
-                        db.delete(url)
-                        db.commit()
-                        return jsonify({'success': True, 'message': '短链接已删除'})
-                    return jsonify({'success': False, 'message': '短链接不存在'})
+                if not long_url or not short_url:
+                    return jsonify({'success': False, 'message': '长链接和短链接不能为空'})
 
-            # 处理搜索历史操作
-            if request.method == 'POST' and 'search_history_action' in request.form:
-                action = request.form.get('search_history_action')
+                # 检查短链接是否已存在
+                existing_url = db_session.query(Url).filter_by(short_url=short_url).first()
+                if existing_url:
+                    return jsonify({'success': False, 'message': '短链接已存在'})
 
-                if action == 'delete_history':
-                    history_id = request.form.get('history_id')
-                    history = db.query(SearchHistory).filter_by(id=history_id).first()
-                    if history:
-                        db.delete(history)
-                        db.commit()
-                        return jsonify({'success': True, 'message': '搜索记录已删除'})
-                    return jsonify({'success': False, 'message': '搜索记录不存在'})
+                url = Url(
+                    long_url=long_url,
+                    short_url=short_url,
+                    user_id=user_id_url,
+                    created_at=datetime.now()
+                )
+                db_session.add(url)
+                db_session.commit()
+                return jsonify({'success': True, 'message': '短链接创建成功'})
 
-                elif action == 'clear_user_history':
-                    user_id_history = request.form.get('user_id')
-                    db.query(SearchHistory).filter_by(user_id=user_id_history).delete()
-                    db.commit()
-                    return jsonify({'success': True, 'message': '用户搜索记录已清空'})
+            elif action == 'delete_url':
+                url_id = request.form.get('url_id')
+                url = db_session.query(Url).filter_by(id=url_id).first()
+                if url:
+                    db_session.delete(url)
+                    db_session.commit()
+                    return jsonify({'success': True, 'message': '短链接已删除'})
+                return jsonify({'success': False, 'message': '短链接不存在'})
 
-                elif action == 'clear_all_history':
-                    db.query(SearchHistory).delete()
-                    db.commit()
-                    return jsonify({'success': True, 'message': '所有搜索记录已清空'})
+        # 处理搜索历史操作
+        if request.method == 'POST' and 'search_history_action' in request.form:
+            action = request.form.get('search_history_action')
 
-            # GET请求 - 显示杂项管理页面
-            # 获取事件列表
-            events = db.query(Event).order_by(Event.event_date.desc()).all()
+            if action == 'delete_history':
+                history_id = request.form.get('history_id')
+                history = db_session.query(SearchHistory).filter_by(id=history_id).first()
+                if history:
+                    db_session.delete(history)
+                    db_session.commit()
+                    return jsonify({'success': True, 'message': '搜索记录已删除'})
+                return jsonify({'success': False, 'message': '搜索记录不存在'})
 
-            # 获取举报列表
-            reports = db.query(Report).join(User, Report.reported_by == User.id) \
-                .order_by(Report.created_at.desc()).all()
+            elif action == 'clear_user_history':
+                user_id_history = request.form.get('user_id')
+                db_session.query(SearchHistory).filter_by(user_id=user_id_history).delete()
+                db_session.commit()
+                return jsonify({'success': True, 'message': '用户搜索记录已清空'})
 
-            # 获取短链接列表
-            urls = db.query(Url).join(User, Url.user_id == User.id) \
-                .order_by(Url.created_at.desc()).all()
+            elif action == 'clear_all_history':
+                db_session.query(SearchHistory).delete()
+                db_session.commit()
+                return jsonify({'success': True, 'message': '所有搜索记录已清空'})
 
-            # 获取搜索历史列表
-            search_history = db.query(SearchHistory).order_by(SearchHistory.created_at.desc()).all()
+        # GET请求 - 显示杂项管理页面
+        # 获取事件列表（带分页）
+        events_query = db_session.query(Event).order_by(Event.event_date.desc())
+        events_pagination = events_query.paginate(
+            page=page_events, per_page=per_page, error_out=False
+        )
 
-            # 获取用户列表用于筛选
-            users = db.query(User).all()
+        # 获取举报列表（带分页）
+        reports_query = db_session.query(Report).join(User, Report.reported_by == User.id) \
+            .order_by(Report.created_at.desc())
+        reports_pagination = reports_query.paginate(
+            page=page_reports, per_page=per_page, error_out=False
+        )
 
-            # 获取搜索统计
-            search_stats = db.query(
-                SearchHistory.keyword,
-                func.count(SearchHistory.id).label('search_count')
-            ).group_by(SearchHistory.keyword) \
-                .order_by(func.count(SearchHistory.id).desc()) \
-                .limit(10).all()
+        # 获取短链接列表（带分页）
+        urls_query = db_session.query(Url).join(User, Url.user_id == User.id) \
+            .order_by(Url.created_at.desc())
+        urls_pagination = urls_query.paginate(
+            page=page_urls, per_page=per_page, error_out=False
+        )
 
-            return render_template('dashboard/misc.html',
-                                   events=events,
-                                   reports=reports,
-                                   urls=urls,
-                                   search_history=search_history,
-                                   search_stats=search_stats,
-                                   users=users,
-                                   current_user=current_user)
+        # 获取搜索历史列表（带分页）
+        search_history_query = db_session.query(SearchHistory).order_by(SearchHistory.created_at.desc())
+        search_history_pagination = search_history_query.paginate(
+            page=page_search, per_page=per_page, error_out=False
+        )
+
+        # 获取用户列表用于筛选
+        # users = db_session.query(User).all()
+
+        # 获取搜索统计（前10个热门关键词）
+        search_stats = db_session.query(
+            SearchHistory.keyword,
+            func.count(SearchHistory.id).label('search_count')
+        ).group_by(SearchHistory.keyword) \
+            .order_by(func.count(SearchHistory.id).desc()) \
+            .limit(10).all()
+
+        return render_template('dashboard/misc.html',
+                               events_pagination=events_pagination,
+                               reports_pagination=reports_pagination,
+                               urls_pagination=urls_pagination,
+                               search_history_pagination=search_history_pagination,
+                               search_stats=search_stats,
+                               # users=users,
+                               current_user=current_user,
+                               page_events=page_events,
+                               page_reports=page_reports,
+                               page_urls=page_urls,
+                               page_search=page_search)
 
     except Exception as e:
         return jsonify({'error': str(e)})
