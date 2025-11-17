@@ -9,7 +9,7 @@ from src.models import User, Article, ArticleContent, ArticleI18n, Category, Com
 # from src.error import error
 from src.user.authz.decorators import admin_required
 from src.utils.config.theme import get_all_themes
-from src.utils.security.safe import validate_email
+from src.utils.security.safe import validate_email_base
 from update import base_dir
 
 dashboard_bp = Blueprint('dashboard', __name__, template_folder='templates', url_prefix='/admin')
@@ -236,7 +236,7 @@ def create_user(user_id):
                     }), 400
 
             # 验证邮箱格式
-            if not validate_email(data['email']):
+            if not validate_email_base(data['email']):
                 return jsonify({
                     'success': False,
                     'message': '邮箱格式不正确'
@@ -310,7 +310,7 @@ def update_user(user_id, user_id2):
 
             # 更新邮箱
             if 'email' in data:
-                if not validate_email(data['email']):
+                if not validate_email_base(data['email']):
                     return jsonify({
                         'success': False,
                         'message': '邮箱格式不正确'
