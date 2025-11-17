@@ -1,6 +1,6 @@
 from functools import wraps
 
-from flask import abort, make_response, render_template
+from flask import abort, make_response
 from flask import request, redirect, url_for
 
 from src.setting import app_config
@@ -32,7 +32,7 @@ def jwt_required(f):
                 user_id = JWTHandler.authenticate_refresh_token(refresh_token)
 
             if user_id is None:
-                return render_template('auth/login.html', callback=callback_endpoint)
+                return redirect("/login?callback=" + callback_endpoint)
 
             # 使用make_response确保response是Response对象
             resp = f(user_id, *args, **kwargs)
