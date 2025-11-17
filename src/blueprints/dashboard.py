@@ -250,10 +250,10 @@ def create_user(user_id):
                 }), 400
 
             # 验证密码强度
-            if len(data['password']) < 6:
+            if len(data['password']) < 8:
                 return jsonify({
                     'success': False,
-                    'message': '密码长度至少6个字符'
+                    'message': '密码长度至少8个字符'
                 }), 400
 
             hashed_password = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt())

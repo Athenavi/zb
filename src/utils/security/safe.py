@@ -2,12 +2,6 @@ import random
 import re
 import string
 
-
-def clean_html_format(text):
-    clean_text = re.sub('<.*?>', '', str(text))
-    return clean_text
-
-
 def load_sensitive_words(file_path):
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
