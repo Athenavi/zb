@@ -189,18 +189,30 @@ def my_posts(user_id):
 
 from flask import session, redirect, request, render_template, url_for
 from datetime import datetime, timedelta, timezone
+from flask_wtf import FlaskForm
+from wtforms import PasswordField
+from wtforms.validators import DataRequired, Length, EqualTo
+
+
+class ChangePasswordForm(FlaskForm):
+    new_password = PasswordField('新密码', validators=[DataRequired(), Length(min=6, max=32)])
+    confirm_password = PasswordField('确认密码', validators=[DataRequired(), EqualTo('new_password')])
+
+
+class ConfirmPasswordForm(FlaskForm):
+    password = PasswordField('密码', validators=[DataRequired()])
 
 
 @my_bp.route('/pw/confirm', methods=['GET', 'POST'])
 @jwt_required
 def confirm_password(user_id):
-    if request.method == 'POST':
-        if validate_password(user_id):
-            session.permanent = True  # 使 session 持久化
-            session[f"tmp-change-key_{user_id}"] = True
-            session[f"tmp-change-key-time_{user_id}"] = datetime.now(timezone.utc)  # 记录当前时间，并指定时区为 UTC
-            return redirect(url_for('my.change_password', user_id=user_id))
-    return render_template('my/password.html', form='confirm')
+    if request.method == 'POST' and validate_password(user_id):
+        session.permanent = True
+        session[f"tmp-change-key_{user_id}"] = True
+        session[f"tmp-change-key-time_{user_id}"] = datetime.now(timezone.utc)
+        return redirect(url_for('my.change_password', user_id=user_id))
+    form = ConfirmPasswordForm()
+    return render_template('my/password.html', form_type='confirm', form=form, user_id=user_id)
 
 
 @my_bp.route('/pw/change', methods=['GET', 'POST'])
@@ -209,23 +221,20 @@ def change_password(user_id):
     if not session.get(f"tmp-change-key_{user_id}"):
         return redirect(url_for('my.confirm_password', user_id=user_id))
 
-    # 检查时间戳是否超过 15 分钟
     confirm_time = session.get(f"tmp-change-key-time_{user_id}")
-    if confirm_time is None or datetime.now(timezone.utc) - confirm_time > timedelta(
-            minutes=15):  # 使用 timezone.utc 以确保时区一致
+    if confirm_time is None or datetime.now(timezone.utc) - confirm_time > timedelta(minutes=15):
         session.pop(f"tmp-change-key_{user_id}", None)
         session.pop(f"tmp-change-key-time_{user_id}", None)
         return redirect(url_for('my.confirm_password', user_id=user_id))
 
     if request.method == 'POST':
-        ip = get_client_ip(request)
-        new_pass = request.form.get('new_password')
-        repeat_pass = request.form.get('confirm_password')
-        if update_password(user_id, new_password=new_pass, confirm_password=repeat_pass, ip=ip):
-            session.pop(f"tmp-change-key_{user_id}")
-            session.pop(f"tmp-change-key-time_{user_id}")
-            return render_template('inform.html', status_code='200', message='密码修改成功！')
-        else:
-            return render_template('my/password.html', form='change')
-
-    return render_template('my/password.html', form='change')
+        form = ChangePasswordForm(request.form)
+        if form.validate_on_submit():
+            ip = get_client_ip(request)
+            if update_password(user_id, new_password=form.new_password.data,
+                               confirm_password=form.confirm_password.data, ip=ip):
+                session.pop(f"tmp-change-key_{user_id}")
+                session.pop(f"tmp-change-key-time_{user_id}")
+                return render_template('inform.html', status_code='200', message='密码修改成功！')
+    form = ChangePasswordForm()
+    return render_template('my/password.html', form_type='change', form=form, user_id=user_id)

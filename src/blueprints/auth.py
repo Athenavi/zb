@@ -217,13 +217,11 @@ class LoginForm(FlaskForm):
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
+    form = LoginForm()
     try:
         # 获取并正确解析callback参数
         raw_callback = request.args.get('callback') or '/profile'
         callback_url = resolve_callback(raw_callback, 'profile')
-
-        # 创建 LoginForm 实例
-        form = LoginForm()
 
         if request.method == 'GET':
             user_agent = request.headers.get('User-Agent', '')
