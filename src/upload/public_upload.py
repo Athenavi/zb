@@ -150,7 +150,9 @@ def handle_user_upload(user_id, allowed_size, allowed_mimes, check_existing=Fals
 
 
 def file_handler(user_id, check_existing=False, allowed_size=1024 * 1024 * 10,
-                 allowed_mimes={'image/jpeg', 'image/png'}):
+                 allowed_mimes=None):
+    if allowed_mimes is None:
+        allowed_mimes = {'image/jpeg', 'image/png'}
     uploaded_files = []
     reused_count = 0
     errors = []
@@ -293,7 +295,6 @@ def file_handler(user_id, check_existing=False, allowed_size=1024 * 1024 * 10,
 def handle_duplicate_upload(user_id, file_hash, filename, db_session):
     """处理重复文件上传，避免会话冲突"""
     try:
-        # 使用新的查询确保对象在当前会话中
         file_hash_obj = db_session.query(FileHash).filter_by(hash=file_hash).first()
 
         if file_hash_obj:

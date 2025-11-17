@@ -51,7 +51,7 @@ def temp_view():
     if aid is None:
         return jsonify({"message": "Temporary URL expired or invalid"}), 404
     else:
-        return blog_detail_aid_back(aid=aid, safeMode=False)
+        return blog_detail_aid_back(aid=aid, safe_mode=False)
 
 
 @blog_bp.route('/new', methods=['GET', 'POST'])
@@ -293,7 +293,7 @@ def get_current_menu_slug():
 
 @cache.cached(timeout=3600, key_prefix='selfDefined_page')
 @blog_bp.route('/page/<string:slug>.html', methods=['GET'])
-def get_selfDefined_page(slug):
+def get_self_defined_page(slug):
     """获取自定义页面"""
     page = Pages.query.filter_by(slug=f"{slug}.html").first()
     if not page:

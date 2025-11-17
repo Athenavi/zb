@@ -18,12 +18,12 @@ def index():
             return redirect(url_for('auth.login'))
         current_user = User.query.filter_by(id=user_id).first()
         if current_user.vip_expires_at is None:
-            activeStatus = False
+            active_status = False
         else:
-            activeStatus = bool(current_user.vip_level != 0 and current_user.vip_expires_at > datetime.now())
+            active_status = bool(current_user.vip_level != 0 and current_user.vip_expires_at > datetime.now())
         return render_template('vip/index.html',
                                current_user=current_user,
-                               activeStatus=activeStatus)
+                               activeStatus=active_status)
 
     except Exception as ex:
         print(f"Error in VIP index: {str(ex)}")
@@ -213,11 +213,11 @@ def premium_content():
 
         # 检查 user.vip_expires_at 是否为 None
         if user.vip_expires_at is not None:
-            activeStatus = bool(user.vip_level != 0 and user.vip_expires_at > datetime.now())
+            active_status = bool(user.vip_level != 0 and user.vip_expires_at > datetime.now())
         else:
-            activeStatus = False
+            active_status = False
 
-        return render_template('vip/premium_content.html', current_user=user, activeStatus=activeStatus,
+        return render_template('vip/premium_content.html', current_user=user, activeStatus=active_status,
                                articles=premium_articles)
     except Exception as ex:
         return jsonify({'error': str(ex)})

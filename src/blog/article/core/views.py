@@ -37,7 +37,7 @@ def is_owner_or_vip(user_id, article):
         return False, '权限验证失败，请稍后重试'
 
 
-def blog_detail_back(blog_slug, safeMode=True):
+def blog_detail_back(blog_slug, safe_mode=True):
     try:
         with get_db() as db:
             # 尝试作为文章slug查找
@@ -51,7 +51,7 @@ def blog_detail_back(blog_slug, safeMode=True):
             if not article:
                 return error(message='Article not found', status_code=404)
 
-            if safeMode:
+            if safe_mode:
                 # 仅在安全模式下检查是否隐藏
                 if article.hidden:
                     return render_template('inform.html', aid=article.article_id)
@@ -105,19 +105,19 @@ def blog_detail_i18n_list(aid, i18n_code):
         return error(message='Article not found', status_code=404)
     if article.status != 1:
         return error(message='Article not published', status_code=403)
-    articleI18n = ArticleI18n.query.filter_by(article_id=aid, language_code=i18n_code).all()
-    if not articleI18n:
+    article_i18n = ArticleI18n.query.filter_by(article_id=aid, language_code=i18n_code).all()
+    if not article_i18n:
         return error(message=f'Article not found for language {i18n_code}', status_code=404)
 
     # 生成包含链接的HTML代码
     html_links = "<ul>"
-    for i in articleI18n:
+    for i in article_i18n:
         link = f"/{aid}.html/{i18n_code}/{i.slug}"
         html_links += f"<li><a href='{link}'>{i.language_code}: {i.title}-{i.slug}</a></li>"
     html_links += "</ul>"
 
     return render_template('inform.html',
-                           status_code=f"This article contains {len(articleI18n)} international translations.（{i18n_code}）",
+                           status_code=f"This article contains {len(article_i18n)} international translations.（{i18n_code}）",
                            message=html_links)
 
 
@@ -210,7 +210,7 @@ def contribute_back(aid):
         return jsonify({'success': False, 'message': 'Invalid request method'}), 400
 
 
-def blog_detail_aid_back(aid, safeMode=True):
+def blog_detail_aid_back(aid, safe_mode=True):
     with get_db() as db:
         try:
             article = db.query(Article).filter(
@@ -221,7 +221,7 @@ def blog_detail_aid_back(aid, safeMode=True):
             print(article)
 
             if article:
-                if safeMode:
+                if safe_mode:
                     # 仅在安全模式下检查是否隐藏
                     if article.hidden:
                         return render_template('inform.html', aid=article.article_id)
