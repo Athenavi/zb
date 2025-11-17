@@ -7,7 +7,7 @@ from flask import url_for, flash, redirect
 from src.blog.article.security.password import get_article_password
 from src.blog.homepage import index_page_back, tag_page_back, featured_page_back
 from src.error import error
-from src.extensions import cache
+from src.extensions import cache, csrf
 from src.models import Article, ArticleContent, ArticleI18n, User, db, Category, VIPPlan
 from src.models import UserSubscription, Notification, Pages, SystemSettings, MenuItems, Menus
 from src.user.authz.decorators import jwt_required, domain, get_current_user_id
@@ -372,6 +372,7 @@ def setting_profiles(user_id):
 
 
 @blog_bp.route('/setting/profiles', methods=['PUT'])
+@csrf.exempt
 @jwt_required
 def change_profiles(user_id):
     return change_profiles_back(user_id, cache, domain)
