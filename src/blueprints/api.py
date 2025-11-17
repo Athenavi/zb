@@ -4,7 +4,6 @@ from flask import Blueprint, jsonify, current_app, render_template, request, red
 from sqlalchemy import select, func
 
 from src.blog.article.core.content import get_i18n_content_by_aid
-from src.blog.article.core.views import blog_tmp_url
 from src.blog.article.security.password import check_apw_form, get_apw_form
 from src.blog.comment import create_comment_with_anti_spam, comment_page_get
 from src.database import get_db
@@ -48,6 +47,7 @@ def api_blog_i18n_content(iso, aid):
 
 @api_bp.route('/article/unlock', methods=['GET', 'POST'])
 def api_article_unlock():
+    from src.blueprints.blog import blog_tmp_url
     return blog_tmp_url(domain=domain, cache_instance=cache)
 
 

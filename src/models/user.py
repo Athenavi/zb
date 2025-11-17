@@ -66,6 +66,9 @@ class User(db.Model):
             'vip_expires_at': self.vip_expires_at.isoformat() if self.vip_expires_at else None
         }
 
+    def __init__(self, id, username=None):
+        self.id = id
+        self.username = username
 
 class CustomField(db.Model):
     __tablename__ = 'custom_fields'

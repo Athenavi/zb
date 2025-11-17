@@ -5,6 +5,9 @@ import bcrypt
 from flask import Blueprint, make_response, current_app
 from flask import render_template, jsonify, flash
 from flask_bcrypt import check_password_hash
+from flask_wtf import FlaskForm
+from wtforms import StringField, PasswordField, BooleanField
+from wtforms.validators import DataRequired, Email, Length
 
 from src.database import get_db
 from src.models import User
@@ -140,12 +143,21 @@ def resolve_callback(callback, default='profile'):
         return url_for(default)
 
 
+class LoginForm(FlaskForm):
+    email = StringField('Email', validators=[DataRequired(), Email(), Length(max=120)])
+    password = PasswordField('Password', validators=[DataRequired(), Length(min=6)])
+    remember_me = BooleanField('Remember Me')
+
+
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     try:
         # 获取并正确解析callback参数
         raw_callback = request.args.get('callback') or '/profile'
         callback_url = resolve_callback(raw_callback, 'profile')
+
+        # 创建 LoginForm 实例
+        form = LoginForm()
 
         if request.method == 'GET':
             user_agent = request.headers.get('User-Agent', '')
@@ -160,8 +172,8 @@ def login():
                 email = data.get('email')
                 password = data.get('password')
             else:
-                email = request.form.get('email')
-                password = request.form.get('password')
+                email = form.email.data
+                password = form.password.data
 
             user = User.query.filter_by(email=email).first()
 
@@ -195,7 +207,7 @@ def login():
                 else:
                     flash('无效的电子邮件或密码', 'error')
                     # 传递原始callback用于表单
-                    return render_template('auth/login.html', email=email, callback=raw_callback)
+                    return render_template('auth/login.html', form=form, email=email, callback=raw_callback)
 
         # 检查是否已登录
         if jwt_cookie := request.cookies.get('jwt'):
@@ -206,11 +218,11 @@ def login():
                 flash('您的登录已过期，请重新登录', 'error')
 
         # 传递原始callback用于表单
-        return render_template('auth/login.html', callback=raw_callback)
+        return render_template('auth/login.html', form=form, callback=raw_callback)
     except Exception as e:
         flash('登录过程中发生错误，请稍后再试', 'error')
         current_app.logger.error(f"Login error: {str(e)}")
-        return render_template('auth/login.html')
+        return render_template('auth/login.html', form=form)
 
 
 # 移动设备检测函数
@@ -230,4 +242,3 @@ def logout():
     response.set_cookie('jwt', '', expires=0)
     response.set_cookie('refresh_token', '', expires=0)
     return response
-
