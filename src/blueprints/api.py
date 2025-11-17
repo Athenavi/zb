@@ -345,3 +345,19 @@ def upload_user_path(user_id):
                                   allowed_mimes=current_app.config['ALLOWED_MIMES'], check_existing=False)
     except Exception as e:
         print(e)
+
+
+@cache.cached(timeout=300)
+@api_bp.route('/check-username')
+def check_username():
+    username = request.args.get('username')
+    exists = User.query.filter_by(username=username).first() is not None
+    return jsonify({'exists': exists})
+
+
+@cache.cached(timeout=300)
+@api_bp.route('/check-email')
+def check_email():
+    email = request.args.get('email')
+    exists = User.query.filter_by(email=email).first() is not None
+    return jsonify({'exists': exists})
