@@ -122,6 +122,20 @@ class BaseConfig:
     MAX_LINE = 1000
     MAX_CACHE_TIMESTAMP = 7200
     USER_FREE_STORAGE_LIMIT = 0.5 * 1024 * 1024 * 1024  # 512MB 用户免费空间限制
+    RATELIMIT_DEFAULT = "10/second"
+    # 邮件配置
+    # MAIL_SERVER = os.environ.get('MAIL_SERVER', 'smtp.example.com')
+    MAIL_PORT = int(os.environ.get('MAIL_PORT', 587))
+    MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS', True)
+    MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
+    MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
+
+    # 安全头配置（Talisman）
+    TALISMAN_CONTENT_SECURITY_POLICY = {
+        'default-src': "'self'",
+        'script-src': ["'self'", "cdn.example.com"],
+        'style-src': ["'self'", "'unsafe-inline'"]
+    }
 
 
 class AppConfig(BaseConfig):

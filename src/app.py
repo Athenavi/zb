@@ -1,17 +1,15 @@
 from datetime import datetime, timezone
 
 from flask import Flask, jsonify
-from flask_migrate import Migrate
 from jinja2 import select_autoescape
 from werkzeug.exceptions import NotFound
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from src.blog.article.core.views import blog_detail_back
 from src.blueprints.admin_vip import admin_vip_bp
 from src.blueprints.api import api_bp
 from src.blueprints.auth import auth_bp
 from src.blueprints.blog import blog_bp, get_footer, get_site_title, get_banner, get_site_domain, get_site_beian, \
-    get_site_menu, get_current_menu_slug
+    get_site_menu, get_current_menu_slug, blog_detail_back
 from src.blueprints.category import category_bp
 from src.blueprints.dashboard import dashboard_bp
 from src.blueprints.media import media_bp
@@ -23,8 +21,7 @@ from src.blueprints.theme import theme_bp
 from src.blueprints.vip_routes import vip_bp
 from src.blueprints.website import website_bp
 from src.error import error
-from src.extensions import cache
-from src.models import db
+from src.extensions import init_extensions, login_manager, csrf
 from src.other.filters import json_filter, string_split, article_author, md2html, relative_time_filter, category_filter, \
     f2list
 from src.other.search import search_handler
@@ -46,11 +43,7 @@ def create_app(config_class=app_config):
     app.config.from_object(config_class)
 
     # 初始化扩展
-    db.init_app(app)
-    cache.init_app(app)
-
-    # 初始化 Migrate（需要在 db.init_app 之后）
-    Migrate(app, db)
+    init_extensions(app)
 
     # 配置代理中间件
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)
@@ -103,7 +96,15 @@ def register_context_processors(app, config_class):
 
 def register_direct_routes(app, config_class):
     """注册直接定义在应用上的路由"""
+
+    @login_manager.user_loader
+    @jwt_required
+    def load_user(user_id):
+        from src.models import User
+        return User.get(user_id)
+
     from flask import redirect
+    @app.route('/space')
     @app.route('/profile')
     @jwt_required
     def profile(user_id):
@@ -164,21 +165,30 @@ def register_template_filters(app):
 
 def register_blueprints(app):
     """注册所有蓝图"""
-    app.register_blueprint(media_bp)
-    app.register_blueprint(theme_bp)
-    app.register_blueprint(website_bp)
+    blueprints = [
+        media_bp,
+        theme_bp,
+        website_bp,
+        dashboard_bp,
+        my_bp,
+        relation_bp,
+        role_bp,
+        category_bp,
+        noti_bp,
+        plugin_bp,
+        api_bp,
+        blog_bp,
+        vip_bp,
+        admin_vip_bp
+    ]
+
+    for bp in blueprints:
+        app.register_blueprint(bp)
+        app.logger.info(f"=====Blueprint {bp.name} load success.=====")
+        if bp != auth_bp:
+            csrf.exempt(bp)
+
     app.register_blueprint(auth_bp)
-    app.register_blueprint(dashboard_bp)
-    app.register_blueprint(my_bp)
-    app.register_blueprint(relation_bp)
-    app.register_blueprint(role_bp)
-    app.register_blueprint(category_bp)
-    app.register_blueprint(noti_bp)
-    app.register_blueprint(plugin_bp)
-    app.register_blueprint(api_bp)
-    app.register_blueprint(blog_bp)
-    app.register_blueprint(vip_bp)
-    app.register_blueprint(admin_vip_bp)
 
 
 def configure_logging(app):

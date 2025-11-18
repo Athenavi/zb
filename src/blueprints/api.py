@@ -4,12 +4,11 @@ from flask import Blueprint, jsonify, current_app, render_template, request, red
 from sqlalchemy import select, func
 
 from src.blog.article.core.content import get_i18n_content_by_aid
-from src.blog.article.core.views import blog_tmp_url
 from src.blog.article.security.password import check_apw_form, get_apw_form
 from src.blog.comment import create_comment_with_anti_spam, comment_page_get
-from src.database import get_db
-from src.extensions import cache
-from src.models import Article, User
+# from src.database import get_db
+from src.extensions import cache, csrf
+from src.models import Article, User, db
 from src.other.filters import f2list
 from src.other.report import report_back
 from src.setting import app_config
@@ -47,7 +46,9 @@ def api_blog_i18n_content(iso, aid):
 
 
 @api_bp.route('/article/unlock', methods=['GET', 'POST'])
+@csrf.exempt
 def api_article_unlock():
+    from src.blueprints.blog import blog_tmp_url
     return blog_tmp_url(domain=domain, cache_instance=cache)
 
 
@@ -96,22 +97,21 @@ def suggest_tags():
 
     if not unique_tags:
         print("缓存未命中，从数据库加载标签...")
-        with get_db() as db:
-            # 获取所有文章的标签字符串
-            tags_results = db.execute(select(func.distinct(Article.tags))).scalars().all()
+        # 获取所有文章的标签字符串
+        tags_results = db.session.execute(select(func.distinct(Article.tags))).scalars().all()
 
-            # 处理标签数据
-            all_tags = []
-            for tag_string in tags_results:
-                if tag_string:  # 确保不是空字符串
-                    all_tags.extend(f2list(tag_string.strip()))
+        # 处理标签数据
+        all_tags = []
+        for tag_string in tags_results:
+            if tag_string:  # 确保不是空字符串  
+                all_tags.extend(f2list(tag_string.strip()))
 
-            # 去重并排序
-            unique_tags = sorted(set(all_tags))
-            print(f"加载并处理完成，唯一标签数量: {len(unique_tags)}")
+        # 去重并排序
+        unique_tags = sorted(set(all_tags))
+        print(f"加载并处理完成，唯一标签数量: {len(unique_tags)}")
 
-            # 缓存处理后的结果，避免重复处理
-            cache.set(cache_key, unique_tags, timeout=1200)
+        # 缓存处理后的结果，避免重复处理
+        cache.set(cache_key, unique_tags, timeout=1200)
 
     # 过滤出匹配前缀的标签
     matched_tags = [tag for tag in unique_tags if tag.startswith(prefix)]
@@ -137,31 +137,29 @@ def get_current_theme():
 @cache.cached(timeout=300, key_prefix='all_users')
 def get_all_users():
     all_users = {}
-    with get_db() as session:
-        try:
-            users = session.query(User.username, User.id).all()
-            for username, user_id in users:
-                all_users[username] = str(user_id)
-        except Exception as e:
-            print(f"An error occurred: {e}")
-        finally:
-            return all_users
+    try:
+        users = db.session.query(User.username, User.id).all()
+        for username, user_id in users:
+            all_users[username] = str(user_id)
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        return all_users
 
 
 @cache.cached(timeout=3600, key_prefix='all_emails')
 def get_all_emails():
     all_emails = []
-    with get_db() as session:
-        try:
-            # 查询所有用户邮箱
-            results = session.query(User.email).all()
-            for result in results:
-                email = result[0]
-                all_emails.append(email)
-        except Exception as e:
-            print(f"An error occurred: {e}")
-        finally:
-            return all_emails
+    try:
+        # 查询所有用户邮箱
+        results = db.session.query(User.email).all()
+        for result in results:
+            email = result[0]
+            all_emails.append(email)
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        return all_emails
 
 
 @api_bp.route('/email-exists', methods=['GET'])
@@ -210,19 +208,18 @@ from datetime import datetime
 @jwt_required
 def update_article_status(user_id, article_id):
     """更新文章状态"""
-    with get_db() as db:
-        article = db.query(Article).filter_by(article_id=article_id, user_id=user_id).first()
-        if not article:
-            return jsonify({'success': False, 'message': '文章不存在'}), 404
+    article = db.query(Article).filter_by(article_id=article_id, user_id=user_id).first()
+    if not article:
+        return jsonify({'success': False, 'message': '文章不存在'}), 404
 
-        new_status = int(request.json.get('status'))
-        if not isinstance(new_status, int):
-            return jsonify({'success': False, 'message': '状态必须是整数类型'}), 400
+    new_status = int(request.json.get('status'))
+    if not isinstance(new_status, int):
+        return jsonify({'success': False, 'message': '状态必须是整数类型'}), 400
 
-        article.status = new_status
-        article.updated_at = datetime.now()
+    article.status = new_status
+    article.updated_at = datetime.now()
 
-        return jsonify({'success': True, 'message': f'文章已{new_status}'})
+    return jsonify({'success': True, 'message': f'文章已{new_status}'})
 
 
 @api_bp.route('/upload/cover', methods=['POST'])
@@ -345,3 +342,19 @@ def upload_user_path(user_id):
                                   allowed_mimes=current_app.config['ALLOWED_MIMES'], check_existing=False)
     except Exception as e:
         print(e)
+
+
+@cache.cached(timeout=300)
+@api_bp.route('/check-username')
+def check_username():
+    username = request.args.get('username')
+    exists = User.query.filter_by(username=username).first() is not None
+    return jsonify({'exists': exists})
+
+
+@cache.cached(timeout=300)
+@api_bp.route('/check-email')
+def check_email():
+    email = request.args.get('email')
+    exists = User.query.filter_by(email=email).first() is not None
+    return jsonify({'exists': exists})

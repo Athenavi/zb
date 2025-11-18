@@ -11,6 +11,11 @@ from datetime import datetime, date
 from sqlalchemy import text
 
 
+def _get_timestamp():
+    """获取当前时间戳字符串"""
+    return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+
 class DatabaseBackup:
     """数据库备份工具类"""
 
@@ -76,10 +81,6 @@ class DatabaseBackup:
             escaped = str(value).replace("'", "''")
             return f"'{escaped}'"
 
-    def _get_timestamp(self):
-        """获取当前时间戳字符串"""
-        return datetime.now().strftime("%Y%m%d_%H%M%S")
-
     def backup_schema(self, filepath=None, compress=False):
         """
         备份数据库结构
@@ -92,7 +93,7 @@ class DatabaseBackup:
             str: 备份文件路径
         """
         if filepath is None:
-            timestamp = self._get_timestamp()
+            timestamp = _get_timestamp()
             filename = f"schema_backup_{timestamp}.sql"
             filepath = os.path.join(self.backup_dir, filename)
 
@@ -105,11 +106,9 @@ class DatabaseBackup:
             tables = self._get_tables()
             print(f"找到 {len(tables)} 个表需要备份")
 
-            schema_sql = []
-            schema_sql.append("-- Database Schema Backup")
-            schema_sql.append(f"-- Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-            schema_sql.append(f"-- Database dialect: {self.dialect_name}")
-            schema_sql.append("")
+            schema_sql = ["-- Database Schema Backup",
+                          f"-- Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                          f"-- Database dialect: {self.dialect_name}", ""]
 
             connection = self._get_connection()
 
@@ -202,7 +201,7 @@ class DatabaseBackup:
             str: 备份文件路径
         """
         if filepath is None:
-            timestamp = self._get_timestamp()
+            timestamp = _get_timestamp()
             filename = f"data_backup_{timestamp}.sql"
             filepath = os.path.join(self.backup_dir, filename)
 
@@ -303,7 +302,7 @@ class DatabaseBackup:
         Returns:
             dict: 包含备份文件路径的字典
         """
-        timestamp = self._get_timestamp()
+        timestamp = _get_timestamp()
 
         # 分别备份结构和数据
         schema_file = self.backup_schema(
