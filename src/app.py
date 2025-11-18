@@ -21,7 +21,7 @@ from src.blueprints.theme import theme_bp
 from src.blueprints.vip_routes import vip_bp
 from src.blueprints.website import website_bp
 from src.error import error
-from src.extensions import init_extensions, login_manager
+from src.extensions import init_extensions, login_manager, csrf
 from src.other.filters import json_filter, string_split, article_author, md2html, relative_time_filter, category_filter, \
     f2list
 from src.other.search import search_handler
@@ -165,21 +165,30 @@ def register_template_filters(app):
 
 def register_blueprints(app):
     """注册所有蓝图"""
-    app.register_blueprint(media_bp)
-    app.register_blueprint(theme_bp)
-    app.register_blueprint(website_bp)
+    blueprints = [
+        media_bp,
+        theme_bp,
+        website_bp,
+        dashboard_bp,
+        my_bp,
+        relation_bp,
+        role_bp,
+        category_bp,
+        noti_bp,
+        plugin_bp,
+        api_bp,
+        blog_bp,
+        vip_bp,
+        admin_vip_bp
+    ]
+
+    for bp in blueprints:
+        app.register_blueprint(bp)
+        app.logger.info(f"=====Blueprint {bp.name} load success.=====")
+        if bp != auth_bp:
+            csrf.exempt(bp)
+
     app.register_blueprint(auth_bp)
-    app.register_blueprint(dashboard_bp)
-    app.register_blueprint(my_bp)
-    app.register_blueprint(relation_bp)
-    app.register_blueprint(role_bp)
-    app.register_blueprint(category_bp)
-    app.register_blueprint(noti_bp)
-    app.register_blueprint(plugin_bp)
-    app.register_blueprint(api_bp)
-    app.register_blueprint(blog_bp)
-    app.register_blueprint(vip_bp)
-    app.register_blueprint(admin_vip_bp)
 
 
 def configure_logging(app):

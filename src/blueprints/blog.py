@@ -20,11 +20,11 @@ blog_bp = Blueprint('blog', __name__)
 
 
 def edit_article_back(user_id, article_id):
-    auth = auth_by_uid(article_id, user_id)
-    if not auth:
+    auth_article = auth_by_uid(article_id, user_id)
+    if auth_article is None:
         return jsonify({"message": "Authentication failed"}), 401
 
-    article = Article.query.get_or_404(article_id)
+    article = auth_article
     content_obj = ArticleContent.query.filter_by(aid=article_id).first()
     content = content_obj.content if content_obj else ""
     categories = Category.query.all()
@@ -34,7 +34,7 @@ def edit_article_back(user_id, article_id):
 
         try:
             # 更新文章基本信息
-            print(request.form)
+            # print(request.form)
             article.title = request.form.get('title')
             article.slug = request.form.get('slug')
             article.excerpt = request.form.get('excerpt')
