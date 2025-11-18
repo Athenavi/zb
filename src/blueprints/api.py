@@ -201,14 +201,11 @@ def api_username_check(username):
     return username_exists(username)
 
 
-from datetime import datetime
-
-
 @api_bp.route('/article/<int:article_id>/status', methods=['POST'])
 @jwt_required
 def update_article_status(user_id, article_id):
     """更新文章状态"""
-    article = db.query(Article).filter_by(article_id=article_id, user_id=user_id).first()
+    article = db.session.query(Article).filter_by(article_id=article_id, user_id=user_id).first()
     if not article:
         return jsonify({'success': False, 'message': '文章不存在'}), 404
 
@@ -217,8 +214,8 @@ def update_article_status(user_id, article_id):
         return jsonify({'success': False, 'message': '状态必须是整数类型'}), 400
 
     article.status = new_status
-    article.updated_at = datetime.now()
-
+    # article.updated_at = datetime.now()
+    db.session.commit()
     return jsonify({'success': True, 'message': f'文章已{new_status}'})
 
 
