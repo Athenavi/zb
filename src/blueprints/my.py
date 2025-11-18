@@ -1,8 +1,8 @@
 from flask import Blueprint, flash
 
-from src.database import get_db
+# from src.database import get_db
 from src.models import Article
-from src.models import Url, Comment
+from src.models import Url, Comment, db
 from src.user.authz.decorators import jwt_required
 from src.utils.shortener.links import generate_short_url
 from user.authz.password import validate_password, update_password
@@ -37,51 +37,49 @@ def user_urls(user_id):
 @jwt_required
 def create_short_url(user_id):
     """创建短链接"""
-    with get_db() as db:
-        long_url = request.form.get('long_url')
+    long_url = request.form.get('long_url')
 
-        if not long_url:
-            flash('请输入有效的URL', 'error')
-            return redirect(url_for('my.user_urls'))
-
-        # 生成短链接
-        short_code = generate_short_url()
-        while Url.query.filter_by(short_url=short_code).first():
-            short_code = generate_short_url()
-
-        try:
-            new_url = Url(
-                long_url=long_url,
-                short_url=short_code,
-                user_id=user_id
-            )
-            db.add(new_url)
-
-            flash('短链接创建成功', 'success')
-        except Exception as e:
-            db.rollback()
-            flash(f'创建失败: {str(e)}', 'error')
-
+    if not long_url:
+        flash('请输入有效的URL', 'error')
         return redirect(url_for('my.user_urls'))
+
+    # 生成短链接
+    short_code = generate_short_url()
+    while Url.query.filter_by(short_url=short_code).first():
+        short_code = generate_short_url()
+
+    try:
+        new_url = Url(
+            long_url=long_url,
+            short_url=short_code,
+            user_id=user_id
+        )
+        db.session.add(new_url)
+
+        flash('短链接创建成功', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'创建失败: {str(e)}', 'error')
+
+    return redirect(url_for('my.user_urls'))
 
 
 @my_bp.route('/urls/delete/<int:url_id>', methods=['POST'])
 @jwt_required
 def delete_url(user_id, url_id):
     """删除短链接"""
-    with get_db() as db:
-        url = db.query(Url).filter_by(id=url_id).one()
-        if not url:
-            flash('链接不存在', 'error')
-            return redirect(url_for('my.user_urls'))
-        try:
-            db.delete(url)
-            flash('链接删除成功', 'success')
-        except Exception as e:
-            db.rollback()
-            flash(f'删除失败: {str(e)}', 'error')
-
+    url = db.session.query(Url).filter_by(id=url_id).one()
+    if not url:
+        flash('链接不存在', 'error')
         return redirect(url_for('my.user_urls'))
+    try:
+        db.session.delete(url)
+        flash('链接删除成功', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'删除失败: {str(e)}', 'error')
+
+    return redirect(url_for('my.user_urls'))
 
 
 @my_bp.route('/comments')
@@ -101,48 +99,46 @@ def user_comments(user_id):
 @jwt_required
 def edit_comment(user_id, comment_id):
     """编辑评论"""
-    with get_db() as db:
-        # 获取要编辑的评论
-        comment = db.query(Comment).filter_by(id=comment_id, user_id=user_id).first()
+    # 获取要编辑的评论
+    comment = db.session.query(Comment).filter_by(id=comment_id, user_id=user_id).first()
 
-        if not comment:
-            flash('评论不存在', 'error')
+    if not comment:
+        flash('评论不存在', 'error')
+        return redirect(url_for('my.user_comments'))
+
+    if request.method == 'POST':
+        # 检查该评论是否有回复
+        has_replies = Comment.query.filter_by(parent_id=comment_id).first() is not None
+        if has_replies:
+            flash('不允许编辑已经存在回复的评论', 'error')
             return redirect(url_for('my.user_comments'))
-
-        if request.method == 'POST':
-            # 检查该评论是否有回复
-            has_replies = Comment.query.filter_by(parent_id=comment_id).first() is not None
-            if has_replies:
-                flash('不允许编辑已经存在回复的评论', 'error')
-                return redirect(url_for('my.user_comments'))
-            content = request.form.get('content')
-            if content:
-                comment.content = content
-                comment.updated_at = datetime.now()
-                flash('评论更新成功', 'success')
-                return redirect(url_for('my.user_comments'))
-        return render_template('my/edit_comment.html', comment=comment)
+        content = request.form.get('content')
+        if content:
+            comment.content = content
+            comment.updated_at = datetime.now()
+            flash('评论更新成功', 'success')
+            return redirect(url_for('my.user_comments'))
+    return render_template('my/edit_comment.html', comment=comment)
 
 
 @my_bp.route('/comments/delete/<int:comment_id>', methods=['POST'])
 @jwt_required
 def delete_comment(user_id, comment_id):
     """删除评论"""
-    with get_db() as db:
-        comment = db.query(Comment).filter_by(id=comment_id, user_id=user_id).first()
-        if not comment:
-            flash('评论不存在', 'error')
-            return redirect(url_for('my.user_comments'))
-
-        try:
-            db.delete(comment)
-
-            flash('评论删除成功', 'success')
-        except Exception as e:
-            db.rollback()
-            flash(f'删除失败: {str(e)}', 'error')
-
+    comment = db.session.query(Comment).filter_by(id=comment_id, user_id=user_id).first()
+    if not comment:
+        flash('评论不存在', 'error')
         return redirect(url_for('my.user_comments'))
+
+    try:
+        db.session.delete(comment)
+
+        flash('评论删除成功', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'删除失败: {str(e)}', 'error')
+
+    return redirect(url_for('my.user_comments'))
 
 
 @my_bp.route('/posts')

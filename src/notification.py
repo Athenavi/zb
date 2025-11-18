@@ -7,8 +7,8 @@ from email.mime.text import MIMEText
 from flask import Flask, jsonify
 from flask_caching import Cache
 
-from src.database import get_db, redis_client, get_cache_status
-from src.models import Notification
+from src.database import redis_client, get_cache_status
+from src.models import Notification, db
 from src.setting import app_config
 from src.utils.config.mail import get_mail_conf
 
@@ -60,17 +60,16 @@ def send_change_mail(content, kind):
 
 def read_all_notifications(user_id):
     success = False
-    with get_db() as session:
-        try:
-            # 批量更新所有未读通知
-            updated_count = session.query(Notification).filter(Notification.user_id == user_id,
-                                                               Notification.is_read == False).update(
-                {Notification.is_read: True})
-            session.commit()
-            success = True
-        except Exception as e:
-            print(f"批量更新已读状态失败: {e}")
-            session.rollback()
+    try:
+        # 批量更新所有未读通知
+        updated_count = db.session.query(Notification).filter(Notification.user_id == user_id,
+                                                              Notification.is_read == False).update(
+            {Notification.is_read: True})
+        db.session.commit()
+        success = True
+    except Exception as e:
+        print(f"批量更新已读状态失败: {e}")
+        db.session.rollback()
 
     response = jsonify({"success": success, "updated_count": updated_count if success else 0})
     response.headers.add("Access-Control-Allow-Origin", "*")
@@ -79,15 +78,14 @@ def read_all_notifications(user_id):
 
 def get_notifications(user_id):
     messages = []
-    with get_db() as session:
-        try:
-            # 获取用户的所有通知
-            notifications = session.query(Notification).filter(Notification.user_id == user_id).all()
-            messages = [{"id": n.id, "user_id": n.user_id, "message": n.message, "is_read": n.is_read,
-                         "created_at": n.created_at.strftime("%Y-%m-%d %H:%M:%S"), 'type': n.type} for n in
-                        notifications]
-        except Exception as e:
-            print(f"获取消息时发生错误: {e}")
+    try:
+        # 获取用户的所有通知
+        notifications = db.session.query(Notification).filter(Notification.user_id == user_id).all()
+        messages = [{"id": n.id, "user_id": n.user_id, "message": n.message, "is_read": n.is_read,
+                     "created_at": n.created_at.strftime("%Y-%m-%d %H:%M:%S"), 'type': n.type} for n in
+                    notifications]
+    except Exception as e:
+        print(f"获取消息时发生错误: {e}")
 
     response = jsonify(messages)
     response.headers.add("Access-Control-Allow-Origin", "*")
@@ -96,17 +94,16 @@ def get_notifications(user_id):
 
 def read_current_notification(user_id, notification_id):
     success = False
-    with get_db() as session:
-        try:
-            # 更新特定通知的已读状态
-            updated_count = session.query(Notification).filter(Notification.id == notification_id,
-                                                               Notification.user_id == user_id).update(
-                {Notification.is_read: True})
-            session.commit()
-            success = True
-        except Exception as e:
-            print(f"更新通知已读状态失败: {e}")
-            session.rollback()
+    try:
+        # 更新特定通知的已读状态
+        updated_count = db.session.query(Notification).filter(Notification.id == notification_id,
+                                                              Notification.user_id == user_id).update(
+            {Notification.is_read: True})
+        db.session.commit()
+        success = True
+    except Exception as e:
+        print(f"更新通知已读状态失败: {e}")
+        db.session.rollback()
 
     response = jsonify({"success": success})
     response.headers.add("Access-Control-Allow-Origin", "*")
