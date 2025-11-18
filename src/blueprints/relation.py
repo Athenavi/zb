@@ -72,6 +72,7 @@ def follow_user(user_id, target_user_id):
         subscribed_user_id=target_user_id,
     )
     db.session.add(subscription)
+    db.session.commit()
 
     return jsonify({'success': True, 'message': '关注成功'})
 
@@ -88,6 +89,7 @@ def unfollow_user(user_id, target_user_id):
     if not subscription:
         return jsonify({'success': False, 'message': '未关注该用户'}), 400
     db.session.delete(subscription)
+    db.session.commit()
     return jsonify({'success': True, 'message': '取消关注成功'})
 
 

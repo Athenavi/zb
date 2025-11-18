@@ -55,7 +55,7 @@ def create_short_url(user_id):
             user_id=user_id
         )
         db.session.add(new_url)
-
+        db.session.commit()
         flash('短链接创建成功', 'success')
     except Exception as e:
         db.session.rollback()
@@ -74,6 +74,7 @@ def delete_url(user_id, url_id):
         return redirect(url_for('my.user_urls'))
     try:
         db.session.delete(url)
+        db.session.commit()
         flash('链接删除成功', 'success')
     except Exception as e:
         db.session.rollback()
@@ -117,6 +118,7 @@ def edit_comment(user_id, comment_id):
             comment.content = content
             comment.updated_at = datetime.now()
             flash('评论更新成功', 'success')
+            db.session.commit()
             return redirect(url_for('my.user_comments'))
     return render_template('my/edit_comment.html', comment=comment)
 
@@ -132,7 +134,7 @@ def delete_comment(user_id, comment_id):
 
     try:
         db.session.delete(comment)
-
+        db.session.commit()
         flash('评论删除成功', 'success')
     except Exception as e:
         db.session.rollback()

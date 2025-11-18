@@ -81,6 +81,7 @@ def create_role():
         )
 
         db.session.add(new_role)
+        db.session.commit()
         db.session.flush()
 
         # 添加权限关联
@@ -201,6 +202,7 @@ def delete_role(role_id):
 
         role_name = role.name
         db.session.delete(role)
+        db.session.commit()
 
         return jsonify({
             'success': True,
@@ -295,6 +297,7 @@ def create_permission():
         )
 
         db.session.add(new_permission)
+        db.session.commit()
 
         return jsonify({
             'success': True,
@@ -365,6 +368,7 @@ def delete_permission(permission_id):
 
         permission_code = permission.code
         db.session.delete(permission)
+        db.session.commit()
 
         return jsonify({
             'success': True,

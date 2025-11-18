@@ -264,6 +264,7 @@ def create_user(user_id):
         )
 
         db.session.add(new_user)
+        db.session.commit()
         db.session.flush()  # 确保 new_user.id 和 created_at 已经被设置
 
         return jsonify({
@@ -366,6 +367,7 @@ def delete_user(user_id, user_id2):
 
         username = user.username
         db.session.delete(user)
+        db.session.commit()
 
         return jsonify({
             'success': True,
@@ -537,63 +539,80 @@ def get_articles(user_id):
 @admin_required
 def create_article(user_id):
     """创建新文章"""
-
     try:
+        print("[1] 开始处理请求，获取JSON数据...")
         data = request.get_json()
-        print(data)
+        print(f"[1] 接收数据：{data}")
 
         # 验证必填字段
+        print("[2] 验证必填字段...")
         required_fields = ['title', 'author_id']
         for field in required_fields:
             if not data.get(field):
-                return jsonify({
-                    'success': False,
-                    'message': f'缺少必填字段: {field}'
-                }), 400
+                print(f"[2] 缺失字段：{field}")
+                return jsonify({'success': False, 'message': f'缺少必填字段: {field}'}), 400
+        print("[2] 必填字段验证通过")
 
         # 验证作者是否存在
+        print(f"[3] 验证作者ID {data['author_id']} 是否存在...")
         author = User.query.get(data['author_id'])
         if not author:
-            return jsonify({
-                'success': False,
-                'message': '作者不存在'
-            }), 404
+            print("[3] 作者不存在")
+            return jsonify({'success': False, 'message': '作者不存在'}), 404
+        print(f"[3] 作者验证通过：{author.username}")
 
+        # 生成slug
+        print("[4] 生成slug...")
         import re
-        slug = re.sub(r'[^\w\s-]', '', data['title']).strip().lower()
-        slug = re.sub(r'[-\s]+', '-', slug)
+        raw_slug = re.sub(r'[^\w\s-]', '', data['title']).strip().lower()
+        slug = re.sub(r'[-\s]+', '-', raw_slug)
+        print(f"[4] 原始slug：{slug}")
 
         # 确保slug唯一
+        print("[5] 检查slug唯一性...")
         base_slug = slug
         counter = 1
         while Article.query.filter_by(slug=slug).first():
+            print(f"[5] slug冲突：{slug}")
             slug = f"{base_slug}-{counter}"
             counter += 1
+        print(f"[5] 最终slug：{slug}")
 
         # 创建新文章
+        print("[6] 创建文章对象...")
         new_article = Article(
             title=data['title'],
             slug=slug,
             user_id=data['author_id'] or user_id,
-            excerpt=data.get('excerpt', ''),
-            cover_image=data.get('cover_image'),
-            tags=data.get('tags', ''),
-            status=data.get('status', 'Draft'),
+            excerpt=data.get('summary', '-'),
+            cover_image=data.get('featured_image'),
+            tags=data.get('tags', '-'),
+            status=0 if data.get('status') == 'Draft' else 1,
             is_featured=data.get('is_featured', False),
             category_id=data.get('category_id', None)
         )
-
         db.session.add(new_article)
-        db.session.flush()  # 获取文章ID
+        db.session.flush()
+        print(f"[6] 文章ID已生成：{new_article.article_id}")
 
-        # 创建文章内容
-        if data.get('content'):
-            article_content = ArticleContent(
-                aid=new_article.article_id,
-                content=data['content'],
-                language_code=data.get('language_code', 'zh-CN')
-            )
-            db.session.add(article_content)
+        # 创建文章内容（带安全校验）
+        print("[7] 添加文章内容...")
+        content = data.get('content') or '此文章由系统生成，请编辑后发布。'
+        if not content.strip():
+            print("[7] 警告：文章内容为空，使用默认提示")
+            content = '此文章由系统生成，请编辑后发布。'
+
+        article_content = ArticleContent(
+            aid=new_article.article_id,
+            content=content,
+            language_code=data.get('language_code', 'zh-CN')
+        )
+        db.session.add(article_content)
+
+        # 统一提交
+        print("[8] 执行数据库写入...")
+        db.session.commit()  # 关键点3：单次提交
+        print(f"[8] 文章创建成功，ID：{new_article.article_id}")
 
         return jsonify({
             'success': True,
@@ -607,6 +626,9 @@ def create_article(user_id):
         }), 201
 
     except Exception as e:
+        import traceback
+        print(f"[ERROR] 发生异常：{str(e)}")
+        print(traceback.format_exc())
         db.session.rollback()
         return jsonify({
             'success': False,
@@ -684,7 +706,12 @@ def update_article(user_id, article_id):
         if 'hidden' in data:
             article.hidden = data['hidden']
         if 'status' in data:
-            article.status = data['status'] or 'Draft'
+            status_mapping = {
+                'Draft': 0,
+                'Published': 1,
+                'Deleted': -1
+            }
+            article.status = status_mapping.get(data['status']) if data['status'] in status_mapping else 0
         if 'category_id' in data:
             article.category_id = data.get('category_id', None)
 
@@ -692,7 +719,7 @@ def update_article(user_id, article_id):
         print(f"Article {article_id} updated successfully")
 
         # 保存更改到数据库
-        db.session.session.commit()
+        db.session.commit()
 
         return jsonify({
             'success': True,
@@ -752,33 +779,41 @@ def delete_article(user_id, article_id):
 @admin_required
 def update_article_status(user_id, article_id):
     """更新文章状态"""
-
     try:
         article = Article.query.filter_by(article_id=article_id).first_or_404()
         data = request.get_json()
 
+        # 参数检查强化
         if 'status' not in data:
+            return jsonify({'success': False, 'message': '缺少状态参数'}), 400
+
+        # 定义状态映射关系
+        status_mapping = {
+            'Draft': 0,
+            'Published': 1,
+            'Deleted': -1
+        }
+
+        # 双重验证：输入值必须为合法字符串，且能在映射表中找到
+        input_status = data['status']
+        if not isinstance(input_status, str) or input_status not in status_mapping:
             return jsonify({
                 'success': False,
-                'message': '缺少状态参数'
+                'message': f'无效的状态值，有效值为: {", ".join(status_mapping.keys())}'
             }), 400
 
-        valid_statuses = ['Draft', 'Published', 'Deleted']
-        if data['status'] not in valid_statuses:
-            return jsonify({
-                'success': False,
-                'message': f'无效的状态值，有效值为: {", ".join(valid_statuses)}'
-            }), 400
+        # 执行状态转换
+        article.status = status_mapping[input_status]
 
-        article.status = data['status']
-        article.updated_at = datetime.today()
+        db.session.commit()
 
         return jsonify({
             'success': True,
-            'message': f'文章状态已更新为: {data["status"]}',
+            'message': f'文章状态已更新为: {input_status}',
             'data': {
                 'id': article.article_id,
-                'status': article.status
+                'status_code': article.status,  # 返回整型状态码
+                'status_label': input_status  # 返回可读状态标签
             }
         }), 200
 
@@ -794,12 +829,11 @@ def update_article_status(user_id, article_id):
 @admin_required
 def get_article_stats(user_id):
     """获取文章统计信息"""
-
     try:
         total_articles = Article.query.count()
-        published_articles = Article.query.filter_by(status='Published').count()
-        draft_articles = Article.query.filter_by(status='Draft').count()
-        deleted_articles = Article.query.filter_by(status='Deleted').count()
+        published_articles = Article.query.filter_by(status=1).count()
+        draft_articles = Article.query.filter_by(status=0).count()
+        deleted_articles = Article.query.filter_by(status=-1).count()
 
         # 本月新增文章
         current_month_start = datetime.today().replace(day=1, hour=0, minute=0, second=0, microsecond=0)

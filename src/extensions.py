@@ -12,7 +12,24 @@ from flask_wtf.csrf import CSRFProtect
 # --------------------------
 # 扩展实例化
 # --------------------------
-db = SQLAlchemy(engine_options={"pool_pre_ping": True})  # 带连接池优化的 SQLAlchemy
+db = SQLAlchemy(
+    engine_options={
+        # 基础连接池设置
+        "pool_size": 5,  # 常驻连接数
+        "max_overflow": 10,  # 最大临时连接数
+        "pool_recycle": 300,  # 5分钟回收连接(需小于数据库的wait_timeout)
+        "pool_timeout": 15,  # 获取连接超时时间(秒)
+
+        # 连接健康检查
+        "pool_pre_ping": True,  # 执行前检查连接活性
+
+        # 服务端连接保持
+        "connect_args": {
+            "options": "-c statement_timeout=30s"  # PostgreSQL查询超时
+            # MySQL需在连接参数添加：connect_timeout=15
+        }
+    }
+)
 cache = Cache()
 login_manager = LoginManager()
 csrf = CSRFProtect()
