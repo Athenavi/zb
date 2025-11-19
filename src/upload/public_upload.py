@@ -96,10 +96,38 @@ class ChunkedUploadProcessor:
         self.temp_dir = "upload_chunks"
         os.makedirs(self.temp_dir, exist_ok=True)
 
-    def init_upload(self, filename, total_size, total_chunks, file_hash=None):
-        """初始化上传任务"""
+    def init_upload(self, filename, total_size, total_chunks, file_hash=None, existing_upload_id=None):
+        """初始化上传任务，支持断点续传"""
         with get_db() as db:
             try:
+                # 如果提供了现有的upload_id，检查是否可以进行断点续传
+                if existing_upload_id:
+                    # 使用当前会话查询现有任务
+                    existing_task = db.query(UploadTask).filter_by(
+                        id=existing_upload_id,
+                        user_id=self.user_id,
+                        filename=filename,
+                        total_size=total_size,
+                        total_chunks=total_chunks
+                    ).first()
+
+                    if existing_task:
+                        # 获取已上传的分块信息
+                        uploaded_chunks = db.query(UploadChunk.chunk_index).filter_by(
+                            upload_id=existing_upload_id
+                        ).all()
+                        uploaded_chunk_indices = [chunk.chunk_index for chunk in uploaded_chunks]
+
+                        return {
+                            'success': True,
+                            'upload_id': existing_upload_id,
+                            'file_exists': False,
+                            'resume_upload': True,
+                            'uploaded_chunks': uploaded_chunk_indices,
+                            'uploaded_count': len(uploaded_chunk_indices),
+                            'total_chunks': total_chunks
+                        }
+
                 upload_id = str(uuid.uuid4())
 
                 # 如果提供了文件哈希，检查是否已存在
@@ -130,7 +158,8 @@ class ChunkedUploadProcessor:
                 return {
                     'success': True,
                     'upload_id': upload_id,
-                    'file_exists': False
+                    'file_exists': False,
+                    'resume_upload': False
                 }
             except Exception as e:
                 db.rollback()
@@ -284,6 +313,43 @@ class ChunkedUploadProcessor:
                     os.remove(merged_file_path)
                 return {'success': False, 'error': str(e)}
 
+    def get_uploaded_chunks(self, upload_id):
+        """获取已上传的分块列表"""
+        with get_db() as db:
+            try:
+                # 检查上传任务是否存在
+                task = db.query(UploadTask).filter_by(id=upload_id, user_id=self.user_id).first()
+                if not task:
+                    return {'success': False, 'error': '上传任务不存在'}
+
+                # 获取已上传的分块信息
+                uploaded_chunks = db.query(UploadChunk.chunk_index, UploadChunk.chunk_hash,
+                                           UploadChunk.chunk_size).filter_by(
+                    upload_id=upload_id
+                ).order_by(UploadChunk.chunk_index).all()
+
+                uploaded_chunk_list = [
+                    {
+                        'chunk_index': chunk.chunk_index,
+                        'chunk_hash': chunk.chunk_hash,
+                        'chunk_size': chunk.chunk_size
+                    }
+                    for chunk in uploaded_chunks
+                ]
+
+                return {
+                    'success': True,
+                    'upload_id': upload_id,
+                    'uploaded_chunks': uploaded_chunk_list,
+                    'uploaded_count': len(uploaded_chunk_list),
+                    'total_chunks': task.total_chunks,
+                    'progress': round((len(uploaded_chunk_list) / task.total_chunks) * 100,
+                                      2) if task.total_chunks > 0 else 0
+                }
+
+            except Exception as e:
+                return {'success': False, 'error': str(e)}
+
     def cancel_upload(self, upload_id):
         """取消上传任务"""
         with get_db() as db:
@@ -368,19 +434,20 @@ def handle_user_upload(user_id, allowed_size=10 * 1024 * 1024, allowed_mimes=Non
 @jwt_required
 # 大文件分块上传接口
 def handle_chunked_upload_init(user_id):
-    """初始化分块上传"""
+    """初始化分块上传，支持断点续传"""
     try:
         data = request.get_json()
         filename = data.get('filename')
         total_size = data.get('total_size')
         total_chunks = data.get('total_chunks')
         file_hash = data.get('file_hash')  # 可选，用于秒传
+        existing_upload_id = data.get('existing_upload_id')  # 可选，用于断点续传
 
         if not all([filename, total_size, total_chunks]):
             return jsonify({'success': False, 'error': '缺少必要参数'}), 400
 
         processor = ChunkedUploadProcessor(user_id)
-        result = processor.init_upload(filename, total_size, total_chunks, file_hash)
+        result = processor.init_upload(filename, total_size, total_chunks, file_hash, existing_upload_id)
 
         return jsonify(result), 200 if result['success'] else 400
 
@@ -605,3 +672,20 @@ def _process_multiple_files(user_id, allowed_size, allowed_mimes, check_existing
 
     status_code = 200 if not errors else 207
     return jsonify(response_data), status_code
+
+
+@jwt_required
+def handle_chunked_upload_chunks(user_id):
+    """获取已上传的分块列表"""
+    try:
+        upload_id = request.args.get('upload_id')
+        if not upload_id:
+            return jsonify({'success': False, 'error': '缺少upload_id'}), 400
+
+        processor = ChunkedUploadProcessor(user_id)
+        result = processor.get_uploaded_chunks(upload_id)
+
+        return jsonify(result), 200 if result['success'] else 400
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500

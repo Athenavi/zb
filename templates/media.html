@@ -560,6 +560,20 @@
             });
         }
 
+        // 获取已上传的分块列表
+        async getUploadedChunks() {
+            if (!this.uploadId) return [];
+
+            try {
+                const response = await fetch(`/api/upload/chunked/chunks?upload_id=${this.uploadId}`);
+                const data = await response.json();
+                return data.uploaded_chunks || [];
+            } catch (error) {
+                console.error('获取已上传分块列表失败:', error);
+                return [];
+            }
+        }
+
         // 获取上传进度
         async getProgress() {
             if (!this.uploadId) return null;
@@ -890,7 +904,10 @@
         uploader.startTime = Date.now();
 
         try {
-            // 1. 初始化上传
+            // 1. 计算文件哈希用于断点续传检查
+            const fileHash = await uploader.calculateFileHash(file);
+
+            // 2. 初始化上传，支持断点续传
             const initResult = await uploader.initUpload(file);
 
             if (initResult.instant) {
@@ -899,10 +916,24 @@
                 return;
             }
 
-            // 2. 上传所有分块
+            // 3. 获取已上传的分块列表（断点续传）
+            const uploadedChunks = await uploader.getUploadedChunks();
+            const uploadedChunkIndices = uploadedChunks.map(chunk => chunk.chunk_index);
+
+            console.log(`已上传分块: ${uploadedChunkIndices.join(', ')}`);
+
+            // 4. 上传缺失的分块
+            let uploadedCount = uploadedChunkIndices.length; // 已上传的分块数
+            
             for (let chunkIndex = 0; chunkIndex < uploader.totalChunks; chunkIndex++) {
                 if (!uploader.isUploading) {
                     throw new Error('上传已取消');
+                }
+
+                // 如果分块已经上传过，跳过
+                if (uploadedChunkIndices.includes(chunkIndex)) {
+                    console.log(`分块 ${chunkIndex} 已上传，跳过`);
+                    continue;
                 }
 
                 let success = await uploader.uploadChunk(chunkIndex);
@@ -922,16 +953,19 @@
                     }
                 }
 
+                // 成功上传一个分块，增加计数
+                uploadedCount++;
+                
                 // 更新进度
-                const progress = ((chunkIndex + 1) / uploader.totalChunks) * 100;
-                const uploadedBytes = Math.min((chunkIndex + 1) * uploader.chunkSize, file.size);
-                updateProgressBar(progress, uploadedBytes, file.size, chunkIndex + 1, uploader.totalChunks);
+                const progress = (uploadedCount / uploader.totalChunks) * 100;
+                const uploadedBytes = Math.min(uploadedCount * uploader.chunkSize, file.size);
+                updateProgressBar(progress, uploadedBytes, file.size, uploadedCount, uploader.totalChunks);
 
                 // 添加小延迟，避免请求过于频繁
                 await new Promise(resolve => setTimeout(resolve, 100));
             }
 
-            // 3. 完成上传
+            // 5. 完成上传
             const completeResult = await uploader.completeUpload();
             if (!completeResult.success) {
                 throw new Error(completeResult.error);
