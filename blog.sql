@@ -498,3 +498,43 @@ alter table search_history
 alter table search_history
     add foreign key (user_id) references users
         on delete set null;
+
+create table if not exists upload_tasks
+(
+    id              uuid        default gen_random_uuid() not null,
+    user_id         integer                               not null,
+    filename        varchar(255)                          not null,
+    total_size      bigint                                not null,
+    total_chunks    integer                               not null,
+    uploaded_chunks integer     default 0,
+    file_hash       varchar(64),
+    status          varchar(20) default 'initialized'::character varying,
+    created_at      timestamp   default CURRENT_TIMESTAMP not null,
+    updated_at      timestamp   default CURRENT_TIMESTAMP not null
+);
+
+alter table upload_tasks
+    add primary key (id);
+
+alter table upload_tasks
+    add foreign key (user_id) references users;
+
+create table if not exists upload_chunks
+(
+    id          serial,
+    upload_id   uuid                                not null,
+    chunk_index integer                             not null,
+    chunk_hash  varchar(64)                         not null,
+    chunk_size  integer                             not null,
+    chunk_path  varchar(500)                        not null,
+    created_at  timestamp default CURRENT_TIMESTAMP not null
+);
+
+alter table upload_chunks
+    add primary key (id);
+
+alter table upload_chunks
+    add unique (upload_id, chunk_index);
+
+alter table upload_chunks
+    add foreign key (upload_id) references upload_tasks;

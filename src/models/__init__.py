@@ -9,6 +9,7 @@ from .role import Role, Permission, UserRole, RolePermission
 from .social_account import SocialAccount
 from .subscription import UserSubscription
 from .system import Menus, MenuItems, Pages, SystemSettings
+from .upload import UploadChunk, UploadTask
 from .user import User, CustomField, EmailSubscription
 from .vip import VIPPlan, VIPSubscription, VIPFeature
 
@@ -25,5 +26,6 @@ __all__ = [
     'Event', 'Report', 'Url', 'SearchHistory',
     'VIPPlan', 'VIPSubscription', 'VIPFeature',
     'SocialAccount',
-    'Menus', 'MenuItems', 'Pages', 'SystemSettings'
+    'Menus', 'MenuItems', 'Pages', 'SystemSettings',
+    'UploadChunk', 'UploadTask',
 ]

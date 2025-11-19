@@ -20,11 +20,11 @@ blog_bp = Blueprint('blog', __name__)
 
 
 def edit_article_back(user_id, article_id):
-    auth_article = auth_by_uid(article_id, user_id)
-    if auth_article is None:
+    auth = auth_by_uid(article_id, user_id)
+    if auth is None:
         return jsonify({"message": "Authentication failed"}), 401
 
-    article = auth_article
+    article = Article.query.filter_by(article_id=article_id).first()
     content_obj = ArticleContent.query.filter_by(aid=article_id).first()
     content = content_obj.content if content_obj else ""
     categories = Category.query.all()

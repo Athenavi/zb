@@ -141,10 +141,9 @@ def get_all_users():
         users = db.session.query(User.username, User.id).all()
         for username, user_id in users:
             all_users[username] = str(user_id)
+        return all_users
     except Exception as e:
         print(f"An error occurred: {e}")
-    finally:
-        return all_users
 
 
 @cache.cached(timeout=3600, key_prefix='all_emails')
@@ -156,10 +155,9 @@ def get_all_emails():
         for result in results:
             email = result[0]
             all_emails.append(email)
+        return all_emails
     except Exception as e:
         print(f"An error occurred: {e}")
-    finally:
-        return all_emails
 
 
 @api_bp.route('/email-exists', methods=['GET'])
@@ -201,14 +199,11 @@ def api_username_check(username):
     return username_exists(username)
 
 
-from datetime import datetime
-
-
 @api_bp.route('/article/<int:article_id>/status', methods=['POST'])
 @jwt_required
 def update_article_status(user_id, article_id):
     """更新文章状态"""
-    article = db.query(Article).filter_by(article_id=article_id, user_id=user_id).first()
+    article = db.session.query(Article).filter_by(article_id=article_id, user_id=user_id).first()
     if not article:
         return jsonify({'success': False, 'message': '文章不存在'}), 404
 
@@ -217,8 +212,8 @@ def update_article_status(user_id, article_id):
         return jsonify({'success': False, 'message': '状态必须是整数类型'}), 400
 
     article.status = new_status
-    article.updated_at = datetime.now()
-
+    # article.updated_at = datetime.now()
+    db.session.commit()
     return jsonify({'success': True, 'message': f'文章已{new_status}'})
 
 
@@ -342,6 +337,23 @@ def upload_user_path(user_id):
                                   allowed_mimes=current_app.config['ALLOWED_MIMES'], check_existing=False)
     except Exception as e:
         print(e)
+
+
+from src.upload.public_upload import handle_chunked_upload_init, handle_chunked_upload_chunk, \
+    handle_chunked_upload_complete, handle_chunked_upload_progress, handle_chunked_upload_cancel, \
+    handle_chunked_upload_chunks
+
+# 大文件分块上传路由
+api_bp.add_url_rule('/upload/chunked/init', 'chunked_upload_init', handle_chunked_upload_init, methods=['POST'])
+api_bp.add_url_rule('/upload/chunked/chunk', 'chunked_upload_chunk', handle_chunked_upload_chunk, methods=['POST'])
+api_bp.add_url_rule('/upload/chunked/complete', 'chunked_upload_complete', handle_chunked_upload_complete,
+                    methods=['POST'])
+api_bp.add_url_rule('/upload/chunked/progress', 'chunked_upload_progress', handle_chunked_upload_progress,
+                    methods=['GET'])
+api_bp.add_url_rule('/upload/chunked/chunks', 'chunked_upload_chunks', handle_chunked_upload_chunks,
+                    methods=['GET'])
+api_bp.add_url_rule('/upload/chunked/cancel', 'chunked_upload_cancel', handle_chunked_upload_cancel,
+                    methods=['POST'])
 
 
 @cache.cached(timeout=300)
