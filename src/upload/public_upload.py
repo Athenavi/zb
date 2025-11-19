@@ -135,11 +135,22 @@ class ChunkedUploadProcessor:
                     # 使用当前会话查询
                     existing_file = db.query(FileHash).filter_by(hash=file_hash).first()
                     if existing_file:
+                        # 为用户创建媒体记录
+                        file_processor = FileProcessor(self.user_id)
+                        media_record = file_processor.create_media_record(db, file_hash, filename, check_existing=True)
+
+                        # 增加文件哈希的引用计数
+                        existing_file.reference_count += 1
+
+                        db.commit()
+                        
                         return {
                             'success': True,
                             'upload_id': upload_id,
                             'file_exists': True,
-                            'file_hash': file_hash
+                            'file_hash': file_hash,
+                            'media_id': media_record.id,
+                            'instant': True
                         }
 
                 task = UploadTask(

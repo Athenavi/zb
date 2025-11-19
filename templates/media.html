@@ -912,8 +912,9 @@
 
             if (initResult.instant) {
                 // 秒传成功
+                uploader.showResultMessage(`文件 ${file.name} 秒传成功！`, 'green');
                 resetProgressBar();
-                return;
+                return true; // 返回true表示秒传成功
             }
 
             // 3. 获取已上传的分块列表（断点续传）
