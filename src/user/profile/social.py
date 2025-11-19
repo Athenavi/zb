@@ -23,7 +23,7 @@ def get_user_name_by_id(user_id):
         user = db.session.query(User).filter(User.id == user_id).first()
         if user:
             author_name = user.username
+            return author_name
+
     except (ValueError, TypeError) as e:
         pass
-    finally:
-        return author_name

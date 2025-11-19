@@ -141,10 +141,9 @@ def get_all_users():
         users = db.session.query(User.username, User.id).all()
         for username, user_id in users:
             all_users[username] = str(user_id)
+        return all_users
     except Exception as e:
         print(f"An error occurred: {e}")
-    finally:
-        return all_users
 
 
 @cache.cached(timeout=3600, key_prefix='all_emails')
@@ -156,10 +155,9 @@ def get_all_emails():
         for result in results:
             email = result[0]
             all_emails.append(email)
+        return all_emails
     except Exception as e:
         print(f"An error occurred: {e}")
-    finally:
-        return all_emails
 
 
 @api_bp.route('/email-exists', methods=['GET'])

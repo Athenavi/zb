@@ -10,11 +10,10 @@ def report_add(user_id, reported_type, reported_id, reason):
                             reason=reason)
         db.session.add(new_report)
         reported = True
+        return reported
     except Exception as e:
         print(f'Error: {e}')
         db.session.rollback()
-    finally:
-        return reported
 
 
 def report_back(user_id):
