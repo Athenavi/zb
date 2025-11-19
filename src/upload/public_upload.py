@@ -1,5 +1,6 @@
 import hashlib
 import os
+import shutil
 import uuid
 
 import magic
@@ -7,8 +8,9 @@ from flask import jsonify, request
 from werkzeug.utils import secure_filename
 
 from src.database import get_db
-from src.models import Media, FileHash
+from src.models import Media, FileHash, UploadChunk, UploadTask
 from src.utils.shortener.links import create_special_url
+from user.authz.decorators import jwt_required
 
 
 class FileProcessor:
@@ -52,7 +54,8 @@ class FileProcessor:
 
     def create_file_hash_record(self, db, file_hash, filename, file_size, mime_type, storage_path, reference_count=1):
         """创建文件哈希记录"""
-        existing = FileHash.query.filter_by(hash=file_hash, mime_type=mime_type).first()
+        # 使用当前会话查询，避免会话冲突
+        existing = db.query(FileHash).filter_by(hash=file_hash, mime_type=mime_type).first()
         if existing:
             existing.reference_count += reference_count
             return existing
@@ -71,7 +74,7 @@ class FileProcessor:
     def create_media_record(self, db, file_hash, filename, check_existing=False):
         """创建媒体记录"""
         if check_existing:
-            existing = Media.query.filter_by(user_id=self.user_id, hash=file_hash).first()
+            existing = db.query(Media).filter_by(user_id=self.user_id, hash=file_hash).first()
             if existing:
                 return existing
 
@@ -84,8 +87,233 @@ class FileProcessor:
         return new_media
 
 
+class ChunkedUploadProcessor:
+    """分块上传处理器"""
+
+    def __init__(self, user_id, chunk_size=5 * 1024 * 1024):  # 默认5MB每块
+        self.user_id = user_id
+        self.chunk_size = chunk_size
+        self.temp_dir = "upload_chunks"
+        os.makedirs(self.temp_dir, exist_ok=True)
+
+    def init_upload(self, filename, total_size, total_chunks, file_hash=None):
+        """初始化上传任务"""
+        with get_db() as db:
+            try:
+                upload_id = str(uuid.uuid4())
+
+                # 如果提供了文件哈希，检查是否已存在
+                if file_hash:
+                    # 使用当前会话查询
+                    existing_file = db.query(FileHash).filter_by(hash=file_hash).first()
+                    if existing_file:
+                        return {
+                            'success': True,
+                            'upload_id': upload_id,
+                            'file_exists': True,
+                            'file_hash': file_hash
+                        }
+
+                task = UploadTask(
+                    id=upload_id,
+                    user_id=self.user_id,
+                    filename=filename,
+                    total_size=total_size,
+                    total_chunks=total_chunks,
+                    uploaded_chunks=0,
+                    file_hash=file_hash,
+                    status='initialized'
+                )
+                db.add(task)
+                db.commit()
+
+                return {
+                    'success': True,
+                    'upload_id': upload_id,
+                    'file_exists': False
+                }
+            except Exception as e:
+                db.rollback()
+                return {'success': False, 'error': str(e)}
+
+    def upload_chunk(self, upload_id, chunk_index, chunk_data, chunk_hash):
+        """上传单个分块"""
+        with get_db() as db:
+            try:
+                # 获取上传任务 - 使用当前会话查询
+                task = db.query(UploadTask).filter_by(id=upload_id, user_id=self.user_id).first()
+                if not task:
+                    return {'success': False, 'error': '上传任务不存在'}
+
+                # 检查分块是否已上传 - 使用当前会话查询
+                existing_chunk = db.query(UploadChunk).filter_by(
+                    upload_id=upload_id,
+                    chunk_index=chunk_index
+                ).first()
+
+                if existing_chunk:
+                    # 验证分块哈希是否匹配
+                    if existing_chunk.chunk_hash != chunk_hash:
+                        return {'success': False, 'error': '分块哈希不匹配'}
+                    return {'success': True, 'message': '分块已存在'}
+
+                # 保存分块文件
+                chunk_filename = f"{upload_id}_{chunk_index}.chunk"
+                chunk_path = os.path.join(self.temp_dir, chunk_filename)
+
+                with open(chunk_path, 'wb') as f:
+                    f.write(chunk_data)
+
+                # 记录分块信息
+                chunk_record = UploadChunk(
+                    upload_id=upload_id,
+                    chunk_index=chunk_index,
+                    chunk_hash=chunk_hash,
+                    chunk_size=len(chunk_data),
+                    chunk_path=chunk_path
+                )
+                db.add(chunk_record)
+
+                # 更新任务进度
+                task.uploaded_chunks += 1
+                task.status = 'uploading'
+                db.commit()
+
+                return {'success': True, 'message': '分块上传成功'}
+
+            except Exception as e:
+                db.rollback()
+                return {'success': False, 'error': str(e)}
+
+    def get_upload_progress(self, upload_id):
+        """获取上传进度"""
+        with get_db() as db:
+            # 使用当前会话查询
+            task = db.query(UploadTask).filter_by(id=upload_id, user_id=self.user_id).first()
+            if not task:
+                return {'success': False, 'error': '上传任务不存在'}
+
+            uploaded_chunks = db.query(UploadChunk).filter_by(upload_id=upload_id).count()
+
+            return {
+                'success': True,
+                'upload_id': upload_id,
+                'total_chunks': task.total_chunks,
+                'uploaded_chunks': uploaded_chunks,
+                'progress': round((uploaded_chunks / task.total_chunks) * 100, 2) if task.total_chunks > 0 else 0,
+                'status': task.status
+            }
+
+    def complete_upload(self, upload_id, file_hash, mime_type):
+        """完成上传，合并所有分块"""
+        with get_db() as db:
+            try:
+                # 使用当前会话查询
+                task = db.query(UploadTask).filter_by(id=upload_id, user_id=self.user_id).first()
+                if not task:
+                    return {'success': False, 'error': '上传任务不存在'}
+
+                # 检查是否所有分块都已上传
+                uploaded_count = db.query(UploadChunk).filter_by(upload_id=upload_id).count()
+                if uploaded_count != task.total_chunks:
+                    return {
+                        'success': False,
+                        'error': f'分块不完整: {uploaded_count}/{task.total_chunks}'
+                    }
+
+                # 获取所有分块并按索引排序 - 使用当前会话查询
+                chunks = db.query(UploadChunk).filter_by(upload_id=upload_id).order_by(UploadChunk.chunk_index).all()
+
+                # 合并分块
+                merged_file_path = os.path.join(self.temp_dir, f"{upload_id}_merged")
+                with open(merged_file_path, 'wb') as merged_file:
+                    for chunk in chunks:
+                        with open(chunk.chunk_path, 'rb') as chunk_file:
+                            shutil.copyfileobj(chunk_file, merged_file)
+
+                # 验证最终文件哈希
+                with open(merged_file_path, 'rb') as f:
+                    final_hash = hashlib.sha256(f.read()).hexdigest()
+
+                if final_hash != file_hash:
+                    os.remove(merged_file_path)
+                    return {'success': False, 'error': '文件哈希验证失败'}
+
+                # 读取合并后的文件数据
+                with open(merged_file_path, 'rb') as f:
+                    file_data = f.read()
+
+                # 保存到最终位置
+                processor = FileProcessor(self.user_id)
+                storage_path = processor.save_file(file_hash, file_data, task.filename)
+
+                # 创建文件记录
+                file_hash_record = processor.create_file_hash_record(
+                    db, file_hash, task.filename, task.total_size, mime_type, storage_path
+                )
+
+                # 创建媒体记录
+                processor.create_media_record(db, file_hash, task.filename)
+
+                # 更新任务状态
+                task.status = 'completed'
+                task.file_hash = file_hash
+
+                # 清理分块文件
+                for chunk in chunks:
+                    if os.path.exists(chunk.chunk_path):
+                        os.remove(chunk.chunk_path)
+                    db.delete(chunk)
+
+                # 清理合并的临时文件
+                if os.path.exists(merged_file_path):
+                    os.remove(merged_file_path)
+
+                db.commit()
+
+                return {
+                    'success': True,
+                    'file_hash': file_hash,
+                    'message': '文件上传完成'
+                }
+
+            except Exception as e:
+                db.rollback()
+                # 清理临时文件
+                if 'merged_file_path' in locals() and os.path.exists(merged_file_path):
+                    os.remove(merged_file_path)
+                return {'success': False, 'error': str(e)}
+
+    def cancel_upload(self, upload_id):
+        """取消上传任务"""
+        with get_db() as db:
+            try:
+                # 使用当前会话查询
+                task = db.query(UploadTask).filter_by(id=upload_id, user_id=self.user_id).first()
+                if not task:
+                    return {'success': False, 'error': '上传任务不存在'}
+
+                # 删除所有分块文件 - 使用当前会话查询
+                chunks = db.query(UploadChunk).filter_by(upload_id=upload_id).all()
+                for chunk in chunks:
+                    if os.path.exists(chunk.chunk_path):
+                        os.remove(chunk.chunk_path)
+                    db.delete(chunk)
+
+                # 删除任务记录
+                db.delete(task)
+                db.commit()
+
+                return {'success': True, 'message': '上传任务已取消'}
+
+            except Exception as e:
+                db.rollback()
+                return {'success': False, 'error': str(e)}
+
+
+# 原有的小文件上传函数保持不变
 def upload_cover_back(user_id, base_path, domain):
-    """上传封面图片"""
+    """上传封面图片（小文件）"""
     if 'cover_image' not in request.files:
         return jsonify({"code": 400, "msg": "未上传文件"}), 400
 
@@ -126,7 +354,7 @@ def upload_cover_back(user_id, base_path, domain):
 
 
 def handle_user_upload(user_id, allowed_size=10 * 1024 * 1024, allowed_mimes=None, check_existing=False):
-    """处理用户文件上传"""
+    """处理用户文件上传（小文件）"""
     if not request.files.getlist('file'):
         return jsonify({'message': 'no files uploaded'}), 400
 
@@ -137,6 +365,124 @@ def handle_user_upload(user_id, allowed_size=10 * 1024 * 1024, allowed_mimes=Non
         return jsonify({'message': 'failed', 'error': str(e)}), 500
 
 
+@jwt_required
+# 大文件分块上传接口
+def handle_chunked_upload_init(user_id):
+    """初始化分块上传"""
+    try:
+        data = request.get_json()
+        filename = data.get('filename')
+        total_size = data.get('total_size')
+        total_chunks = data.get('total_chunks')
+        file_hash = data.get('file_hash')  # 可选，用于秒传
+
+        if not all([filename, total_size, total_chunks]):
+            return jsonify({'success': False, 'error': '缺少必要参数'}), 400
+
+        processor = ChunkedUploadProcessor(user_id)
+        result = processor.init_upload(filename, total_size, total_chunks, file_hash)
+
+        return jsonify(result), 200 if result['success'] else 400
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@jwt_required
+def handle_chunked_upload_chunk(user_id):
+    """上传文件分块"""
+    try:
+        upload_id = request.form.get('upload_id')
+        chunk_index = int(request.form.get('chunk_index'))
+        chunk_hash = request.form.get('chunk_hash')
+
+        if 'chunk' not in request.files:
+            return jsonify({'success': False, 'error': '未找到分块文件'}), 400
+
+        chunk_file = request.files['chunk']
+        chunk_data = chunk_file.read()
+
+        # 验证分块哈希
+        actual_chunk_hash = hashlib.sha256(chunk_data).hexdigest()
+        if actual_chunk_hash != chunk_hash:
+            return jsonify({'success': False, 'error': '分块哈希验证失败'}), 400
+
+        processor = ChunkedUploadProcessor(user_id)
+        result = processor.upload_chunk(upload_id, chunk_index, chunk_data, chunk_hash)
+
+        return jsonify(result), 200 if result['success'] else 400
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@jwt_required
+def handle_chunked_upload_complete(user_id):
+    """完成分块上传"""
+    try:
+        data = request.get_json()
+        upload_id = data.get('upload_id')
+        file_hash = data.get('file_hash')
+        mime_type = data.get('mime_type')
+
+        if not all([upload_id, file_hash, mime_type]):
+            return jsonify({'success': False, 'error': '缺少必要参数'}), 400
+
+        processor = ChunkedUploadProcessor(user_id)
+        result = processor.complete_upload(upload_id, file_hash, mime_type)
+
+        if result['success']:
+            # 创建短链接（如果需要）
+            domain = request.host_url
+            s_url = create_special_url(
+                domain + "file?hash=" + result['file_hash'],
+                user_id=user_id
+            )
+            result['short_url'] = "/s/" + s_url
+
+        return jsonify(result), 200 if result['success'] else 400
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@jwt_required
+def handle_chunked_upload_progress(user_id):
+    """获取上传进度"""
+    try:
+        upload_id = request.args.get('upload_id')
+        if not upload_id:
+            return jsonify({'success': False, 'error': '缺少upload_id'}), 400
+
+        processor = ChunkedUploadProcessor(user_id)
+        result = processor.get_upload_progress(upload_id)
+
+        return jsonify(result), 200 if result['success'] else 400
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@jwt_required
+def handle_chunked_upload_cancel(user_id):
+    """取消上传"""
+    try:
+        data = request.get_json()
+        upload_id = data.get('upload_id')
+
+        if not upload_id:
+            return jsonify({'success': False, 'error': '缺少upload_id'}), 400
+
+        processor = ChunkedUploadProcessor(user_id)
+        result = processor.cancel_upload(upload_id)
+
+        return jsonify(result), 200 if result['success'] else 400
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# 原有的辅助函数保持不变
 def _process_single_file(processor, file_data, filename):
     """处理单个文件的核心逻辑"""
     with get_db() as db:
@@ -151,8 +497,8 @@ def _process_single_file(processor, file_data, filename):
             mime_type = validation_result['mime_type']
             file_size = validation_result['file_size']
 
-            # 检查文件是否已存在
-            existing_file_hash = FileHash.query.filter_by(
+            # 检查文件是否已存在 - 使用当前会话查询
+            existing_file_hash = db.query(FileHash).filter_by(
                 hash=file_hash, mime_type=mime_type
             ).first()
 
@@ -214,8 +560,8 @@ def _process_multiple_files(user_id, allowed_size, allowed_mimes, check_existing
             try:
                 first_file = file_group[0]
 
-                # 检查文件是否已存在
-                existing_file_hash = FileHash.query.filter_by(
+                # 检查文件是否已存在 - 使用当前会话查询
+                existing_file_hash = db.query(FileHash).filter_by(
                     hash=file_hash, mime_type=first_file['mime_type']
                 ).first()
 

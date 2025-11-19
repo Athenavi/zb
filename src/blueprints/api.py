@@ -341,6 +341,20 @@ def upload_user_path(user_id):
         print(e)
 
 
+from src.upload.public_upload import handle_chunked_upload_init, handle_chunked_upload_chunk, \
+    handle_chunked_upload_complete, handle_chunked_upload_progress, handle_chunked_upload_cancel
+
+# 大文件分块上传路由
+api_bp.add_url_rule('/upload/chunked/init', 'chunked_upload_init', handle_chunked_upload_init, methods=['POST'])
+api_bp.add_url_rule('/upload/chunked/chunk', 'chunked_upload_chunk', handle_chunked_upload_chunk, methods=['POST'])
+api_bp.add_url_rule('/upload/chunked/complete', 'chunked_upload_complete', handle_chunked_upload_complete,
+                    methods=['POST'])
+api_bp.add_url_rule('/upload/chunked/progress', 'chunked_upload_progress', handle_chunked_upload_progress,
+                    methods=['GET'])
+api_bp.add_url_rule('/upload/chunked/cancel', 'chunked_upload_cancel', handle_chunked_upload_cancel,
+                    methods=['POST'])
+
+
 @cache.cached(timeout=300)
 @api_bp.route('/check-username')
 def check_username():
