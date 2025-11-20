@@ -39,3 +39,4 @@ flask_wtf==1.2.2
 # linux libmagic
 # windows python-magic-bin
 opencv-python
+wsgidav

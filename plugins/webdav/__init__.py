@@ -57,7 +57,13 @@ def register_plugin(app):
         def handle_request(self, path, method, user_info):
             """Handle WebDAV requests"""
             try:
-                path_parts = [p for p in path.strip('/').split('/') if p]
+                # 添加边界检查
+                if not path:
+                    path_parts = []
+                else:
+                    path_parts = [p for p in path.strip('/').split('/') if p]
+
+                logger.info(f"Processing path: '{path}', parts: {path_parts}, method: {method}")
 
                 if len(path_parts) == 0:
                     # Root directory
@@ -65,12 +71,19 @@ def register_plugin(app):
                 elif len(path_parts) == 1:
                     # User directory
                     if path_parts[0] != user_info['username']:
+                        logger.warning(
+                            f"User mismatch: requested {path_parts[0]}, authenticated {user_info['username']}")
                         return self.not_found()
 
                     return self.handle_user_directory(method, user_info)
                 else:
                     # File or special request
                     if path_parts[0] != user_info['username']:
+                        return self.not_found()
+
+                    # 添加边界检查
+                    if len(path_parts) < 2:
+                        logger.error(f"Insufficient path parts: {path_parts}")
                         return self.not_found()
 
                     # Check for special path
@@ -81,7 +94,8 @@ def register_plugin(app):
 
             except Exception as e:
                 logger.error(f"WebDAV request error: {e}", exc_info=True)
-                return self.error_response(500, str(e))
+                logger.error(f"Path: {path}, Method: {method}, User: {user_info}")
+                return self.error_response(500, "Internal Server Error")
 
         def _generate_filetype_report(self, media_files, user_info):
             """生成文件类型报告"""
@@ -228,8 +242,8 @@ def register_plugin(app):
                 'username': user_info['username'],
                 'vip_level': user_info['vip_level'],
                 'total_files': total_files,
-                'total_storage_used': float(user_info['disk_used']),
-                'storage_limit': float(user_info['disk_limit']),
+                'total_storage_used': int(float(user_info['disk_used'])),
+                'storage_limit': int(float(user_info['disk_limit'])),
                 'actual_file_size': total_size,
                 'storage_efficiency': f"{(1 - total_size / float(user_info['disk_used'])) * 100:.1f}%" if user_info[
                                                                                                               'disk_used'] > 0 else "100%",
@@ -396,10 +410,9 @@ def register_plugin(app):
                             <div class="card">
                                 <h3>Quick Access</h3>
                                 <p>
-                                    <a href="/dav/{user_info['username']}/" class="btn">Browse Files</a>
-                                    <a href="/dav/{user_info['username']}/.search" class="btn">Search Files</a>
-                                    <a href="/dav/{user_info['username']}/.reports" class="btn">View Reports</a>
-                                    <a href="/dav/{user_info['username']}/.info" class="btn">Account Info</a>
+                                    <a href="/dav/index.html" class="btn">Browse Files</a>
+                                    <a href="/dav/.reports" class="btn">View Reports</a>
+                                    <a href="/dav/.info" class="btn">Account Info</a>
                                 </p>
                             </div>
 
@@ -417,13 +430,17 @@ def register_plugin(app):
         def get_disk_usage(self, user_info):
             """Get user's total, used and available disk space"""
             if user_info:
-                disk_used = Decimal(str(user_info['disk_used']))
-                disk_limit = Decimal(str(user_info['disk_limit']))
-                disk_available = disk_limit - disk_used
-                return disk_limit, disk_used, disk_available
+                try:
+                    disk_used = Decimal(str(user_info['disk_used']))
+                    disk_limit = Decimal(str(user_info['disk_limit']))
+                    disk_available = disk_limit - disk_used
+                    return int(disk_limit), int(disk_used), int(disk_available)
+                except (ValueError, TypeError) as e:
+                    logger.error(f"Error calculating disk usage: {e}")
+                    return 0, 0, 0
             else:
                 logger.error("Failed to get user info")
-                return Decimal(0), Decimal(0), Decimal(0)
+                return 0, 0, 0
 
         def handle_root_request(self, method, user_info):
             """Handle root directory requests"""
@@ -895,18 +912,33 @@ def register_plugin(app):
         # 特殊功能处理方法
         def _handle_special_request(self, path_parts, method, user_info):
             """处理特殊功能请求"""
-            special_command = path_parts[1]
+            try:
+                # 添加边界检查
+                if len(path_parts) < 2:
+                    logger.error(f"Special request with insufficient parts: {path_parts}")
+                    return self.not_found()
 
-            if special_command == '.search':
-                return self._handle_search_request(path_parts[2:], method, user_info)
-            elif special_command == '.reports':
-                return self._handle_reports_request(path_parts[2:], method, user_info)
-            elif special_command == '.thumbnails':
-                return self.handle_thumbnail_request(path_parts[2:], method, user_info)
-            elif special_command == '.info':
-                return self.handle_info_request(path_parts[2:], method, user_info)
-            else:
-                return self.not_found()
+                special_command = path_parts[1]
+
+                # 根据特殊命令处理，确保有足够的路径部分
+                if special_command == '.search':
+                    remaining_parts = path_parts[2:] if len(path_parts) > 2 else []
+                    return self._handle_search_request(remaining_parts, method, user_info)
+                elif special_command == '.reports':
+                    remaining_parts = path_parts[2:] if len(path_parts) > 2 else []
+                    return self._handle_reports_request(remaining_parts, method, user_info)
+                elif special_command == '.thumbnails':
+                    remaining_parts = path_parts[2:] if len(path_parts) > 2 else []
+                    return self.handle_thumbnail_request(remaining_parts, method, user_info)
+                elif special_command == '.info':
+                    remaining_parts = path_parts[2:] if len(path_parts) > 2 else []
+                    return self.handle_info_request(remaining_parts, method, user_info)
+                else:
+                    logger.warning(f"Unknown special command: {special_command}")
+                    return self.not_found()
+            except Exception as e:
+                logger.error(f"Error in special request handling: {e}", exc_info=True)
+                return self.error_response(500, "Internal Server Error")
 
         def _handle_search_request(self, query_parts, method, user_info):
             """处理搜索请求"""
@@ -970,8 +1002,8 @@ def register_plugin(app):
                 'user': user_info['username'],
                 'total_files': len(media_files),
                 'total_size': total_size,
-                'disk_used': float(user_info['disk_used']),
-                'disk_limit': float(user_info['disk_limit']),
+                'disk_used': int(float(user_info['disk_used'])),
+                'disk_limit': int(float(user_info['disk_limit'])),
                 'file_type_breakdown': file_types,
                 'generated_at': datetime.now().isoformat()
             }
@@ -1094,21 +1126,62 @@ def register_plugin(app):
 
         def handle_standard_request(self, path_parts, method, user_info):
             """处理标准WebDAV请求"""
-            if method == 'PROPFIND':
-                # 处理PROPFIND请求
+            try:
+                # 添加边界检查
                 if not path_parts:
-                    # 根目录请求
-                    items = [{
-                        'href': f'/dav/{user_info["username"]}/',
-                        'displayname': user_info['username'],
-                        'collection': True,
-                        'creationdate': '2025-10-01T00:00:00Z',
-                        'getlastmodified': safe_date_string,
-                        'getcontentlength': 0
-                    }]
-                else:
-                    # 文件/子目录请求
-                    filename = '/'.join(path_parts)
+                    logger.error("Empty path_parts in standard request")
+                    return self.not_found()
+
+                if method == 'PROPFIND':
+                    # 处理PROPFIND请求
+                    if len(path_parts) == 1 and path_parts[0] == user_info['username']:
+                        # 用户目录请求
+                        return self.handle_propfind_user_dir(user_info)
+                    else:
+                        # 文件/子目录请求
+                        filename = '/'.join(path_parts[1:]) if len(path_parts) > 1 else ''
+                        if not filename:
+                            # 如果只有用户名，返回用户目录
+                            return self.handle_propfind_user_dir(user_info)
+
+                        original_filename = urllib.parse.unquote(filename)
+
+                        with get_db() as db:
+                            media = db.query(Media).filter(
+                                Media.user_id == user_info['id'],
+                                Media.original_filename == original_filename
+                            ).first()
+
+                            if not media:
+                                return self.not_found()
+
+                            file_hash = db.query(FileHash).filter(FileHash.hash == media.hash).first()
+                            if not file_hash:
+                                return self.not_found()
+
+                            items = [{
+                                'href': f'/dav/{user_info["username"]}/{filename}',
+                                'displayname': original_filename,
+                                'collection': False,
+                                'creationdate': media.created_at.isoformat() + 'Z' if media.created_at else '2025-10-01T00:00:00Z',
+                                'getlastmodified': media.updated_at.isoformat() + 'Z' if media.updated_at else safe_date_string,
+                                'getcontentlength': file_hash.file_size,
+                                'getcontenttype': file_hash.mime_type or 'application/octet-stream'
+                            }]
+
+                        xml_response = self.generate_xml_response(items)
+                        return Response(
+                            response=xml_response,
+                            status=207,
+                            content_type='application/xml; charset="utf-8"',
+                            headers={'DAV': '1, 2'}
+                        )
+                elif method in ('GET', 'HEAD'):
+                    # 处理文件下载请求
+                    if len(path_parts) < 2:
+                        return self.not_found()
+
+                    filename = '/'.join(path_parts[1:])
                     original_filename = urllib.parse.unquote(filename)
 
                     with get_db() as db:
@@ -1124,47 +1197,13 @@ def register_plugin(app):
                         if not file_hash:
                             return self.not_found()
 
-                        items = [{
-                            'href': f'/dav/{user_info["username"]}/{filename}',
-                            'displayname': original_filename,
-                            'collection': False,
-                            'creationdate': media.created_at.isoformat() + 'Z' if media.created_at else '2025-10-01T00:00:00Z',
-                            'getlastmodified': media.updated_at.isoformat() + 'Z' if media.updated_at else safe_date_string,
-                            'getcontentlength': file_hash.file_size,
-                            'getcontenttype': file_hash.mime_type or 'application/octet-stream'
-                        }]
+                        return self.serve_file(file_hash, original_filename)
+                else:
+                    return self.method_not_allowed()
 
-                xml_response = self.generate_xml_response(items)
-                return Response(
-                    response=xml_response,
-                    status=207,
-                    content_type='application/xml; charset="utf-8"',
-                    headers={'DAV': '1, 2'}
-                )
-            elif method in ('GET', 'HEAD'):
-                # 处理文件下载请求
-                if not path_parts:
-                    return self.not_found()
-
-                filename = '/'.join(path_parts)
-                original_filename = urllib.parse.unquote(filename)
-
-                with get_db() as db:
-                    media = db.query(Media).filter(
-                        Media.user_id == user_info['id'],
-                        Media.original_filename == original_filename
-                    ).first()
-
-                    if not media:
-                        return self.not_found()
-
-                    file_hash = db.query(FileHash).filter(FileHash.hash == media.hash).first()
-                    if not file_hash:
-                        return self.not_found()
-
-                    return self.serve_file(file_hash, original_filename)
-            else:
-                return self.method_not_allowed()
+            except Exception as e:
+                logger.error(f"Error in handle_standard_request: {e}", exc_info=True)
+                return self.error_response(500, "Internal Server Error")
 
     # 创建处理器实例
     handler = WebDAVHandler(app)
@@ -1175,85 +1214,56 @@ def register_plugin(app):
     @bp.route('/dav/<path:path>',
               methods=['OPTIONS', 'GET', 'HEAD', 'PROPFIND', 'PUT', 'DELETE', 'MKCOL', 'MOVE', 'COPY'])
     def webdav_handler(path=''):
-        # Authenticate user
-        user_info = handler.authenticate_user()
-        if not user_info:
+        try:
+            # Authenticate user
+            user_info = handler.authenticate_user()
+            if not user_info:
+                return Response(
+                    response="Authentication required",
+                    status=401,
+                    headers={'WWW-Authenticate': 'Basic realm="WebDAV"'},
+                    content_type='text/plain'
+                )
+
+            # Handle OPTIONS request
+            if request.method == 'OPTIONS':
+                return handler.build_options_response()
+
+            # Split path into components with safety checks
+            path_parts = []
+            if path:
+                path_parts = [p for p in path.split('/') if p]  # 过滤空字符串
+
+            logger.info(f"WebDAV request: {request.method} {request.path}, path_parts: {path_parts}")
+
+            # 根据路径类型路由请求
+            if not path_parts:
+                # 根目录请求
+                return handler.handle_root_request(request.method, user_info)
+            elif path_parts[0].startswith('.'):
+                # 特殊请求
+                return handler._handle_special_request([''] + path_parts, request.method, user_info)
+            else:
+                # 标准请求
+                return handler.handle_standard_request(path_parts, request.method, user_info)
+
+        except Exception as e:
+            logger.error(f"Unhandled error in webdav_handler: {e}", exc_info=True)
             return Response(
-                response="Authentication required",
-                status=401,
-                headers={'WWW-Authenticate': 'Basic realm="WebDAV"'},
+                response="Internal Server Error",
+                status=500,
                 content_type='text/plain'
             )
-
-        # Handle OPTIONS request
-        if request.method == 'OPTIONS':
-            return handler.build_options_response()
-
-        # Split path into components
-        path_parts = path.split('/') if path else []
-
-        # Handle different request types
-        if path_parts and path_parts[0].startswith('.'):
-            return handler._handle_special_request(path_parts, request.method, user_info)
-        else:
-            # Handle standard WebDAV requests
-            return handler.handle_standard_request(path_parts, request.method, user_info)
 
     # 增强的 WebDAV 发现页面
     @bp.route('/dav/index.html', methods=['GET'])
     def webdav_root():
-        return """
-            <html>
-                <head>
-                    <title>Enhanced WebDAV Media Server</title>
-                    <style>
-                        body { font-family: Arial, sans-serif; margin: 40px; }
-                        h1 { color: #333; }
-                        .info { background: #f5f5f5; padding: 20px; border-radius: 8px; }
-                        .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin: 20px 0; }
-                        .feature-card { background: white; padding: 15px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-                    </style>
-                </head>
-                <body>
-                    <h1>Enhanced WebDAV Media Server</h1>
-                    <div class="info">
-                        <p>Your media files are available via WebDAV protocol with enhanced features.</p>
-
-                        <div class="feature-grid">
-                            <div class="feature-card">
-                                <h3>🔍 Advanced Search</h3>
-                                <p>Search files by name, type, and date ranges</p>
-                            </div>
-                            <div class="feature-card">
-                                <h3>📊 Storage Analytics</h3>
-                                <p>Detailed reports on storage usage and file types</p>
-                            </div>
-                            <div class="feature-card">
-                                <h3>🖼️ Thumbnail Generation</h3>
-                                <p>Automatic image previews and thumbnails</p>
-                            </div>
-                            <div class="feature-card">
-                                <h3>🌐 Web Interface</h3>
-                                <p>Browser-based file management and browsing</p>
-                            </div>
-                        </div>
-
-                        <p><strong>Authentication methods:</strong></p>
-                        <ul>
-                            <li>Browser: Automatic Cookie-based authentication</li>
-                            <li>WebDAV Clients: HTTP Basic Auth (username + refresh_token)</li>
-                        </ul>
-                        <p><strong>Supported WebDAV methods:</strong> OPTIONS, GET, HEAD, PROPFIND, PUT, DELETE, MOVE, COPY</p>
-                        <p><strong>Enhanced features:</strong> Search, Reports, Thumbnails, Analytics</p>
-                        <p><a href="/dav/">Access your enhanced WebDAV server</a></p>
-                    </div>
-                </body>
-            </html>
-            """
+        user_info = handler.authenticate_user()
+        return handler._serve_user_web_interface(user_info=user_info)
 
     plugin = type('Plugin', (), {
         'name': 'Enhanced WebDAV Media Server',
-        'version': '3.0.0',
+        'version': '0.0.1',
         'description': '支持丰富功能的 WebDAV 媒体服务器，包含搜索、报表、缩略图等增强功能',
         'author': 'System',
         'blueprint': bp,
