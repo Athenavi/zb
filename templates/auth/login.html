@@ -1,7 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}登录 - 认证系统{% endblock %}
+{% block title %}{{ _('Login - Authentication System') }}{% endblock %}
 {% block content %}
+    {% from "macros/_i18n.html" import language_selector %}
+    <div class="absolute top-4 right-4">
+        {{ language_selector() }}
+    </div>
     <div class="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">
         <div class="sm:mx-auto sm:w-full sm:max-w-md">
             <div class="flex justify-center">
@@ -10,12 +14,12 @@
                 </div>
             </div>
             <h2 class="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
-                登录您的账户
+                {{ _('Sign in to your account') }}
             </h2>
             <p class="mt-2 text-center text-sm text-gray-600">
-                或者
+                {{ _('Or') }}
                 <a href="{{ url_for('auth.register') }}" class="font-medium text-primary-600 hover:text-primary-500">
-                    创建新账户
+                    {{ _('Create new account') }}
                 </a>
             </p>
         </div>
@@ -27,11 +31,11 @@
                     <div class="flex rounded-lg bg-gray-100 p-1">
                         <button id="traditional-tab"
                                 class="flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors duration-200 bg-white text-gray-900 shadow-sm">
-                            <i class="fas fa-envelope mr-2"></i>密码登录
+                            <i class="fas fa-envelope mr-2"></i>{{ _('Password Login') }}
                         </button>
                         <button id="qr-tab"
                                 class="flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors duration-200 text-gray-500 hover:text-gray-700">
-                            <i class="fas fa-qrcode mr-2"></i>扫码登录
+                            <i class="fas fa-qrcode mr-2"></i>{{ _('QR Code Login') }}
                         </button>
                     </div>
                 </div>
@@ -43,7 +47,7 @@
                         <div>
                             {{ form.hidden_tag() }}
                             <label for="email" class="block text-sm font-medium text-gray-700">
-                                邮箱地址
+                                {{ _('Email address') }}
                             </label>
                             <div class="mt-1 relative">
                                 {{ form.email(class_="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm", placeholder="请输入邮箱地址", value=email) }}
@@ -55,7 +59,7 @@
 
                         <div>
                             <label for="password" class="block text-sm font-medium text-gray-700">
-                                密码
+                                {{ _('Password') }}
                             </label>
                             <div class="mt-1 relative">
                                 {{ form.password(class_="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm", placeholder="请输入密码") }}
@@ -70,13 +74,13 @@
                             <div class="flex items-center">
                                 {{ form.remember_me(class_="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500") }}
                                 <label for="remember-me" class="ml-2 block text-sm text-gray-900">
-                                    记住我
+                                    {{ _('Remember me') }}
                                 </label>
                             </div>
 
                             <div class="text-sm">
                                 <a href="#" class="font-medium text-primary-600 hover:text-primary-500">
-                                    忘记密码？
+                                    {{ _('Forgot password?') }}
                                 </a>
                             </div>
                         </div>
@@ -85,7 +89,7 @@
                             <button type="submit"
                                     class="flex w-full justify-center rounded-md border border-transparent bg-primary-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors duration-200">
                                 <i class="fas fa-sign-in-alt mr-2"></i>
-                                登录
+                                {{ _('Sign in') }}
                             </button>
                         </div>
                     </form>
@@ -95,15 +99,15 @@
                 <div id="qr-login" class="login-method hidden">
                     <div class="text-center">
                         <div class="mb-4">
-                            <h3 class="text-lg font-medium text-gray-900 mb-2">扫码登录</h3>
-                            <p class="text-sm text-gray-600">使用手机扫描二维码快速登录</p>
+                            <h3 class="text-lg font-medium text-gray-900 mb-2">{{ _('QR Code Login') }}</h3>
+                            <p class="text-sm text-gray-600">{{ _('Scan QR code with your phone to login quickly') }}</p>
                         </div>
 
                         <!-- QR Code Display -->
                         <div id="qr-container" class="flex flex-col items-center">
                             <div id="qr-loading" class="flex flex-col items-center">
                                 <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-primary-600 mb-4"></div>
-                                <p class="text-sm text-gray-600">正在生成二维码...</p>
+                                <p class="text-sm text-gray-600">{{ _('Generating QR code...') }}</p>
                             </div>
 
                             <div id="qr-display" class="hidden">
@@ -113,10 +117,11 @@
                                 <div class="text-center">
                                     <p class="text-sm text-gray-600 mb-2">
                                         <i class="fas fa-mobile-alt mr-1"></i>
-                                        请使用手机扫描二维码
+                                        {{ _('Please scan the QR code with your phone') }}
                                     </p>
                                     <div id="qr-timer" class="text-xs text-gray-500">
-                                        二维码将在 <span id="countdown">180</span> 秒后过期
+                                        {{ _('QR code will expire in') }} <span
+                                            id="countdown">180</span> {{ _('seconds') }}
                                     </div>
                                 </div>
                             </div>
@@ -124,29 +129,29 @@
                             <div id="qr-error" class="hidden text-center">
                                 <div class="text-red-500 mb-4">
                                     <i class="fas fa-exclamation-triangle text-4xl mb-2"></i>
-                                    <p class="text-sm">二维码生成失败</p>
+                                    <p class="text-sm">{{ _('Failed to generate QR code') }}</p>
                                 </div>
                                 <button id="retry-qr"
                                         class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors">
-                                    <i class="fas fa-redo mr-2"></i>重新生成
+                                    <i class="fas fa-redo mr-2"></i>{{ _('Regenerate') }}
                                 </button>
                             </div>
 
                             <div id="qr-expired" class="hidden text-center">
                                 <div class="text-yellow-500 mb-4">
                                     <i class="fas fa-clock text-4xl mb-2"></i>
-                                    <p class="text-sm">二维码已过期</p>
+                                    <p class="text-sm">{{ _('QR code has expired') }}</p>
                                 </div>
                                 <button id="refresh-qr"
                                         class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors">
-                                    <i class="fas fa-refresh mr-2"></i>刷新二维码
+                                    <i class="fas fa-refresh mr-2"></i>{{ _('Refresh QR code') }}
                                 </button>
                             </div>
 
                             <div id="qr-success" class="hidden text-center">
                                 <div class="text-green-500 mb-4">
                                     <i class="fas fa-check-circle text-4xl mb-2"></i>
-                                    <p class="text-sm">扫码成功，正在登录...</p>
+                                    <p class="text-sm">{{ _('Scan successful, logging in...') }}</p>
                                 </div>
                             </div>
                         </div>
@@ -160,7 +165,7 @@
                             <div class="w-full border-t border-gray-300"></div>
                         </div>
                         <div class="relative flex justify-center text-sm">
-                            <span class="bg-white px-2 text-gray-500">或者使用第三方账号登录</span>
+                            <span class="bg-white px-2 text-gray-500">{{ _('Or sign in with third-party account') }}</span>
                         </div>
                     </div>
 

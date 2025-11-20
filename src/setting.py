@@ -131,6 +131,7 @@ class BaseConfig:
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
     BABEL_DEFAULT_LOCALE = 'zh_CN'
     BABEL_DEFAULT_TIMEZONE = 'Asia/Shanghai'
+    BABEL_SUPPORTED_LOCALES = ['zh_CN', "en"]
 
     # 安全头配置（Talisman）
     TALISMAN_CONTENT_SECURITY_POLICY = {

@@ -1,8 +1,11 @@
 {% extends "base.html" %}
-
-{% block title %}注册 - 认证系统{% endblock %}
+{% block title %}{{ _('Register - Authentication System') }}{% endblock %}
 
 {% block content %}
+    {% from "macros/_i18n.html" import language_selector %}
+    <div class="absolute top-4 right-4">
+        {{ language_selector() }}
+    </div>
     <div class="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">
         <div class="sm:mx-auto sm:w-full sm:max-w-md">
             <div class="flex justify-center">
@@ -11,12 +14,12 @@
                 </div>
             </div>
             <h2 class="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
-                创建新账户
+                {{ _('Create new account') }}
             </h2>
             <p class="mt-2 text-center text-sm text-gray-600">
                 已有账户？
                 <a href="{{ url_for('auth.login') }}" class="font-medium text-primary-600 hover:text-primary-500">
-                    立即登录
+                    {{ _('Sign in now') }}
                 </a>
             </p>
         </div>
@@ -26,7 +29,7 @@
                 <!-- Registration Progress -->
                 <div class="mb-6">
                     <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-medium text-primary-600">注册进度</span>
+                        <span class="text-xs font-medium text-primary-600">{{ _('Registration progress') }}</span>
                         <span class="text-xs font-medium text-primary-600" id="progress-text">1/4</span>
                     </div>
                     <div class="w-full bg-gray-200 rounded-full h-2">
@@ -43,7 +46,7 @@
                         <div class="space-y-4">
                             <div>
                                 <label for="username" class="block text-sm font-medium text-gray-700">
-                                    用户名 <span class="text-red-500">*</span>
+                                    {{ _('Username') }} <span class="text-red-500">*</span>
                                 </label>
                                 <div class="mt-1 relative">
                                     {{ form.username(class="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm", placeholder="请输入用户名（3-20个字符）") }}
@@ -56,7 +59,7 @@
 
                             <div>
                                 <label for="email" class="block text-sm font-medium text-gray-700">
-                                    邮箱地址 <span class="text-red-500">*</span>
+                                    {{ _('Email address') }} <span class="text-red-500">*</span>
                                 </label>
                                 <div class="mt-1 relative">
                                     {{ form.email(class="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm", placeholder="请输入邮箱地址") }}
@@ -74,7 +77,7 @@
                         <div class="space-y-4">
                             <div>
                                 <label for="password" class="block text-sm font-medium text-gray-700">
-                                    密码 <span class="text-red-500">*</span>
+                                    {{ _('Password') }} <span class="text-red-500">*</span>
                                 </label>
                                 <div class="mt-1 relative">
                                     {{ form.password(class="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm", placeholder="请输入密码（至少8个字符）") }}
@@ -87,7 +90,7 @@
                                 <!-- Password Strength Indicator -->
                                 <div class="mt-2">
                                     <div class="flex items-center justify-between mb-1">
-                                        <span class="text-xs text-gray-600">密码强度</span>
+                                        <span class="text-xs text-gray-600">{{ _('Password strength') }}</span>
                                         <span id="strength-text" class="text-xs font-medium"></span>
                                     </div>
                                     <div class="w-full bg-gray-200 rounded-full h-1">
@@ -98,23 +101,23 @@
                                     <div id="password-requirements" class="mt-2 space-y-1">
                                         <div class="flex items-center text-xs">
                                             <i id="req-length" class="fas fa-times text-red-500 w-4"></i>
-                                            <span class="ml-2 text-gray-600">至少8个字符</span>
+                                            <span class="ml-2 text-gray-600">{{ _('At least 8 characters') }}</span>
                                         </div>
                                         <div class="flex items-center text-xs">
                                             <i id="req-uppercase" class="fas fa-times text-red-500 w-4"></i>
-                                            <span class="ml-2 text-gray-600">包含大写字母</span>
+                                            <span class="ml-2 text-gray-600">{{ _('Contains uppercase letter') }}</span>
                                         </div>
                                         <div class="flex items-center text-xs">
                                             <i id="req-lowercase" class="fas fa-times text-red-500 w-4"></i>
-                                            <span class="ml-2 text-gray-600">包含小写字母</span>
+                                            <span class="ml-2 text-gray-600">{{ _('Contains lowercase letter') }}</span>
                                         </div>
                                         <div class="flex items-center text-xs">
                                             <i id="req-number" class="fas fa-times text-red-500 w-4"></i>
-                                            <span class="ml-2 text-gray-600">包含数字</span>
+                                            <span class="ml-2 text-gray-600">{{ _('Contains number') }}</span>
                                         </div>
                                         <div class="flex items-center text-xs">
                                             <i id="req-special" class="fas fa-times text-red-500 w-4"></i>
-                                            <span class="ml-2 text-gray-600">包含特殊字符</span>
+                                            <span class="ml-2 text-gray-600">{{ _('Contains special character') }}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -122,7 +125,7 @@
 
                             <div>
                                 <label for="confirm_password" class="block text-sm font-medium text-gray-700">
-                                    确认密码 <span class="text-red-500">*</span>
+                                    {{ _('Confirm password') }} <span class="text-red-500">*</span>
                                 </label>
                                 <div class="mt-1 relative">
                                     {{ form.confirm_password(class="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm", placeholder="请再次输入密码") }}
@@ -140,7 +143,7 @@
                         <div class="space-y-4">
                             <div>
                                 <label for="display_name" class="block text-sm font-medium text-gray-700">
-                                    显示名称
+                                    {{ _('Display name') }}
                                 </label>
                                 <div class="mt-1">
                                     {{ form.display_name(class="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm", placeholder="请输入显示名称（可选）") }}
@@ -149,7 +152,7 @@
 
                             <div>
                                 <label for="bio" class="block text-sm font-medium text-gray-700">
-                                    个人简介
+                                    {{ _('Bio') }}
                                 </label>
                                 <div class="mt-1">
                                     {{ form.bio(rows=3, class="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm", placeholder="简单介绍一下自己...") }}
@@ -159,7 +162,7 @@
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
                                     <label for="location" class="block text-sm font-medium text-gray-700">
-                                        所在地
+                                        {{ _('Location') }}
                                     </label>
                                     <div class="mt-1">
                                         {{ form.location(class="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm", placeholder="例如：北京") }}
@@ -168,7 +171,7 @@
 
                                 <div>
                                     <label for="website" class="block text-sm font-medium text-gray-700">
-                                        个人网站
+                                        {{ _('Website') }}
                                     </label>
                                     <div class="mt-1">
                                         {{ form.website(class="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm", placeholder="https://") }}
@@ -183,7 +186,7 @@
                         <div class="space-y-4">
                             <div>
                                 <label for="locale" class="block text-sm font-medium text-gray-700">
-                                    语言偏好
+                                    {{ _('Language preference') }}
                                 </label>
                                 <div class="mt-1">
                                     {{ form.locale(class="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm") }}
@@ -197,7 +200,7 @@
                                     </div>
                                     <div class="ml-3 text-sm">
                                         <label for="profile_private" class="text-gray-700">
-                                            私密资料（其他人无法查看你的个人信息）
+                                            {{ _('Private profile (others cannot view your personal information)') }}
                                         </label>
                                     </div>
                                 </div>
@@ -208,7 +211,7 @@
                                     </div>
                                     <div class="ml-3 text-sm">
                                         <label for="newsletter" class="text-gray-700">
-                                            订阅新闻通讯，获取最新更新
+                                            {{ _('Subscribe to newsletter for updates') }}
                                         </label>
                                     </div>
                                 </div>
@@ -219,7 +222,7 @@
                                     </div>
                                     <div class="ml-3 text-sm">
                                         <label for="marketing_emails" class="text-gray-700">
-                                            接收产品推荐和营销邮件
+                                            {{ _('Receive product recommendations and marketing emails') }}
                                         </label>
                                     </div>
                                 </div>
@@ -230,10 +233,10 @@
                                     </div>
                                     <div class="ml-3 text-sm">
                                         <label for="terms" class="text-gray-700">
-                                            我已阅读并同意
+                                            {{ _('I have read and agree to') }}
                                             <a href="#"
                                                class="font-medium text-primary-600 hover:text-primary-500">服务条款</a>
-                                            和
+                                            {{ _('and') }}
                                             <a href="#"
                                                class="font-medium text-primary-600 hover:text-primary-500">隐私政策</a>
                                             <span class="text-red-500">*</span>
@@ -248,19 +251,19 @@
                     <div class="flex justify-between pt-4">
                         <button type="button" id="prev-btn"
                                 class="hidden px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200">
-                            <i class="fas fa-arrow-left mr-2"></i>上一步
+                            <i class="fas fa-arrow-left mr-2"></i>{{ _('Previous') }}
                         </button>
 
                         <div class="flex-1"></div>
 
                         <button type="button" id="next-btn"
                                 class="px-4 py-2 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200">
-                            下一步<i class="fas fa-arrow-right ml-2"></i>
+                            {{ _('Next') }}<i class="fas fa-arrow-right ml-2"></i>
                         </button>
 
                         <button type="submit" id="submit-btn"
                                 class="hidden px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-200">
-                            <i class="fas fa-user-plus mr-2"></i>创建账户
+                            <i class="fas fa-user-plus mr-2"></i>{{ _('Create account') }}
                         </button>
                     </div>
                 </form>
@@ -272,7 +275,7 @@
                             <div class="w-full border-t border-gray-300"></div>
                         </div>
                         <div class="relative flex justify-center text-sm">
-                            <span class="bg-white px-2 text-gray-500">或者使用</span>
+                            <span class="bg-white px-2 text-gray-500">{{ _('Or use') }}</span>
                         </div>
                     </div>
 

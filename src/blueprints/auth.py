@@ -2,7 +2,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
-from flask import Blueprint, make_response, current_app
+from flask import Blueprint
 from flask import render_template, jsonify, flash
 from flask_bcrypt import check_password_hash
 
@@ -13,6 +13,29 @@ auth_bp = Blueprint('auth', __name__, template_folder='templates')
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, TextAreaField, BooleanField, SelectField
 from wtforms.validators import DataRequired, Length, EqualTo, Regexp, Optional, Email
+
+from flask import url_for
+from urllib.parse import urlparse, urljoin
+
+from functools import wraps
+from flask import request, make_response, redirect, current_app
+
+
+def babel_language_switch(view_func):
+    """装饰器：用于URL参数语言切换"""
+
+    @wraps(view_func)
+    def wrapped_view(*args, **kwargs):
+        response = make_response(view_func(*args, **kwargs))
+
+        # 如果通过URL参数切换语言，则设置cookie
+        lang_from_request = request.args.get('lang')
+        if lang_from_request in ['zh_CN', 'en']:
+            response.set_cookie('lang', lang_from_request, max_age=30 * 24 * 60 * 60)
+
+        return response
+
+    return wrapped_view
 
 
 def email_validator(form, field):
@@ -88,6 +111,7 @@ class RegisterForm(FlaskForm):
 
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
+@babel_language_switch
 def register():
     from src.models import db, EmailSubscription  # 移动导入语句
     form = RegisterForm()
@@ -164,10 +188,6 @@ def register():
     return render_template('auth/register.html', form=form)
 
 
-from flask import request, redirect, url_for
-from urllib.parse import urlparse, urljoin
-
-
 def is_safe_url(target):
     """检查URL是否安全（同源）"""
     ref_url = urlparse(request.host_url)
@@ -216,6 +236,7 @@ class LoginForm(FlaskForm):
 
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
+@babel_language_switch
 def login():
     form = LoginForm()
     try:
@@ -228,7 +249,11 @@ def login():
             if is_mobile_device(user_agent):
                 # 对于移动端，传递原始callback参数
                 mobile_callback = raw_callback or 'profile'
-                return redirect(f'/api/mobile/scanner?callback={mobile_callback}')
+                return redirect(f'/api/mobile/login?callback={mobile_callback}')
+
+        # 设置双语标题
+        title = "登录 - 认证系统"
+        title_en = "Login - Authentication System"
 
         if request.method == 'POST':
             if request.is_json:
@@ -287,6 +312,23 @@ def login():
         flash('登录过程中发生错误，请稍后再试', 'error')
         current_app.logger.error(f"Login error: {str(e)}")
         return render_template('auth/login.html', form=form)
+
+
+@auth_bp.route('/api/i18n/set_language', methods=['POST'])
+def set_language():
+    """处理语言切换请求"""
+    from flask import jsonify, make_response
+    data = request.get_json()
+    if not data or 'language' not in data:
+        return jsonify({'success': False, 'message': 'Invalid request'}), 400
+
+    lang = data['language']
+    if lang not in ['en', 'zh_CN']:
+        return jsonify({'success': False, 'message': 'Unsupported language'}), 400
+
+    response = make_response(jsonify({'success': True, 'message': 'Language updated'}))
+    response.set_cookie('lang', lang, max_age=31536000)  # 1年有效期
+    return response
 
 
 # 移动设备检测函数

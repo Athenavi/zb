@@ -70,7 +70,6 @@ def create_app(config_class=app_config):
     # 配置日志
     configure_logging(app)
 
-    # 打印运行信息
     print_startup_info(config_class)
 
     return app
