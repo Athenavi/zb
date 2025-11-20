@@ -10,7 +10,6 @@ from flask_caching import Cache
 from src.database import redis_client, get_cache_status
 from src.models import Notification, db
 from src.setting import app_config
-from src.utils.config.mail import get_mail_conf
 
 noti = Flask(__name__, template_folder='../templates')
 # socketio = flask_socketio.SocketIO(noti, cors_allowed_origins='*')
@@ -42,16 +41,21 @@ def send_email(sender_email, password, receiver_email, smtp_server, smtp_port, s
         print(f"邮件发送失败: {e}")
 
 
+from src.extensions import mail
+from flask_mail import Message
+
+
 def send_change_mail(content, kind):
     try:
         if content and kind:
             subject = "数据变化通知"
             body = f"来自{kind}新的内容: {content}"
-            smtp_server, stmp_port, sender_email, password = get_mail_conf()
-            receiver_email = sender_email
-            send_email(sender_email, password, receiver_email, smtp_server, smtp_port=int(stmp_port),
-                       subject=subject,
-                       body=body)
+            # smtp_server, stmp_port, sender_email, password = get_mail_conf()
+
+            msg = Message(subject=subject,
+                          recipients=[app_config.MAIL_USERNAME],
+                          body=body)
+            mail.send(msg)
     except Exception as e:
         print(f"An error occurred: {e}")
     finally:

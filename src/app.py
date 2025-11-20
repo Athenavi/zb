@@ -130,6 +130,17 @@ def register_direct_routes(app, config_class):
             "timestamp": datetime.now(timezone.utc).isoformat()
         }), 200
 
+    from flask_login import login_required
+    @app.route('/debug')
+    @login_required
+    def debug_point():
+        """调试端点"""
+        return jsonify({
+            "status": "debug",
+            "message": "Debug point",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }), 200
+
     @app.errorhandler(404)
     @app.errorhandler(500)
     @app.errorhandler(Exception)

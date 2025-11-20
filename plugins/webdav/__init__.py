@@ -1,14 +1,16 @@
 import hashlib
 import json
 import logging
+import mimetypes
 import os
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, time
 from decimal import Decimal
 
 from flask import Blueprint, Response, send_file, request
 
 from blueprints.media import get_user_storage_used
+from extensions import csrf
 from src.database import get_db
 from src.models import Media, FileHash, User, db
 from src.setting import app_config
@@ -17,6 +19,7 @@ from src.utils.security.jwt_handler import JWTHandler
 logger = logging.getLogger(__name__)
 
 
+@csrf.exempt
 def register_plugin(app):
     bp = Blueprint('webdav_plugin', __name__)
 
@@ -359,7 +362,7 @@ def register_plugin(app):
                 status=200,
                 headers={
                     'DAV': '1, 2, 3',
-                    'Allow': 'OPTIONS, GET, HEAD, PROPFIND, PUT, DELETE, MKCOL, MOVE, COPY',
+                    'Allow': 'OPTIONS, GET, HEAD, PROPFIND, PUT, POST, DELETE, MKCOL, MOVE, COPY',
                     'MS-Author-Via': 'DAV',
                     'X-WebDAV-Features': 'search, reports, thumbnails, analytics',
                 }
@@ -702,9 +705,29 @@ def register_plugin(app):
                 }
             )
 
+        def __init__(self, app):
+            self.app = app
+            self.base_dir = app_config.base_dir or os.getcwd()
+            self.upload_dir = os.path.join(self.base_dir, 'hashed_files')
+            self.temp_dir = os.path.join(self.base_dir, 'temp_uploads')
+            self.thumbnail_dir = os.path.join(self.base_dir, 'thumbnails')
+            self.trash_dir = os.path.join(self.base_dir, 'trash')  # 添加回收站目录
+
+            print(f"WebDAV base dir: {self.base_dir}")
+            print(f"WebDAV upload dir: {self.upload_dir}")
+
+            # 确保必要目录存在
+            for directory in [self.upload_dir, self.temp_dir, self.thumbnail_dir, self.trash_dir]:
+                os.makedirs(directory, exist_ok=True)
+
         def handle_delete_file(self, filename, user_info):
-            """Handle file deletion"""
+            """Handle file deletion with trash and confirmation"""
             try:
+                # 检查确认参数
+                confirm = request.args.get('confirm', 'false').lower() == 'true'
+                if not confirm:
+                    return self.error_response(400, "Delete requires confirmation")
+
                 original_filename = urllib.parse.unquote(filename)
 
                 with get_db() as db:
@@ -717,19 +740,41 @@ def register_plugin(app):
                         return self.not_found()
 
                     file_hash_value = media.hash
+                    file_hash_record = db.query(FileHash).filter(FileHash.hash == file_hash_value).first()
+
+                    if not file_hash_record:
+                        return self.not_found()
+
+                    # 移动文件到回收站而不是直接删除
+                    original_path = os.path.join(self.base_dir, file_hash_record.storage_path)
+                    if os.path.exists(original_path):
+                        # 创建回收站子目录
+                        user_trash_dir = os.path.join(self.trash_dir, str(user_info['id']))
+                        os.makedirs(user_trash_dir, exist_ok=True)
+
+                        # 移动文件到回收站
+                        trash_path = os.path.join(user_trash_dir, f"{file_hash_value}_{int(time.time())}")
+                        os.rename(original_path, trash_path)
+
+                    # 记录删除日志
+                    deletion_log = {
+                        'user_id': user_info['id'],
+                        'filename': original_filename,
+                        'hash': file_hash_value,
+                        'deleted_at': datetime.now().isoformat(),
+                        'size': file_hash_record.file_size if file_hash_record else 0
+                    }
+                    log_file = os.path.join(self.trash_dir, 'deletion_log.json')
+                    with open(log_file, 'a') as f:
+                        f.write(json.dumps(deletion_log) + '\n')
+
+                    # 删除数据库记录
                     db.delete(media)
 
-                    # Check if file is still referenced by other users
+                    # 检查是否还有其他引用
                     other_media = db.query(Media).filter(Media.hash == file_hash_value).first()
-
-                    if not other_media:
-                        # Delete file and hash record if no other references
-                        file_hash_record = db.query(FileHash).filter(FileHash.hash == file_hash_value).first()
-                        if file_hash_record:
-                            file_path = os.path.join(self.base_dir, file_hash_record.storage_path)
-                            if os.path.exists(file_path):
-                                os.remove(file_path)
-                            db.delete(file_hash_record)
+                    if not other_media and file_hash_record:
+                        db.delete(file_hash_record)
 
                     db.commit()
 
@@ -1155,27 +1200,135 @@ def register_plugin(app):
                             if not media:
                                 return self.not_found()
 
-                            file_hash = db.query(FileHash).filter(FileHash.hash == media.hash).first()
-                            if not file_hash:
-                                return self.not_found()
+                elif method == 'PUT':
+                    # 处理文件上传
+                    if len(path_parts) < 2:
+                        return self.bad_request()
 
-                            items = [{
-                                'href': f'/dav/{user_info["username"]}/{filename}',
-                                'displayname': original_filename,
-                                'collection': False,
-                                'creationdate': media.created_at.isoformat() + 'Z' if media.created_at else '2025-10-01T00:00:00Z',
-                                'getlastmodified': media.updated_at.isoformat() + 'Z' if media.updated_at else safe_date_string,
-                                'getcontentlength': file_hash.file_size,
-                                'getcontenttype': file_hash.mime_type or 'application/octet-stream'
-                            }]
+                    filename = '/'.join(path_parts[1:])
+                    original_filename = urllib.parse.unquote(filename)
+                    file_data = request.get_data()
 
-                        xml_response = self.generate_xml_response(items)
-                        return Response(
-                            response=xml_response,
-                            status=207,
-                            content_type='application/xml; charset="utf-8"',
-                            headers={'DAV': '1, 2'}
+                    if not file_data:
+                        return self.bad_request("Empty file content")
+
+                    # 计算文件哈希
+                    file_hash = hashlib.sha256(file_data).hexdigest()
+                    file_size = len(file_data)
+                    mime_type = mimetypes.guess_type(original_filename)[0] or 'application/octet-stream'
+
+                    with get_db() as db:
+                        # 检查文件是否已存在
+                        file_hash_record = db.query(FileHash).filter_by(hash=file_hash).first()
+
+                        if not file_hash_record:
+                            # 存储文件
+                            storage_dir = os.path.join(self.base_dir, 'hashed_files', file_hash[:2], file_hash[2:4])
+                            os.makedirs(storage_dir, exist_ok=True)
+                            storage_path = os.path.join(storage_dir, file_hash)
+
+                            with open(storage_path, 'wb') as f:
+                                f.write(file_data)
+
+                            # 创建FileHash记录
+                            file_hash_record = FileHash(
+                                hash=file_hash,
+                                filename=original_filename,
+                                file_size=file_size,
+                                mime_type=mime_type,
+                                storage_path=storage_path
+                            )
+                            db.add(file_hash_record)
+                        else:
+                            # 增加引用计数
+                            file_hash_record.reference_count += 1
+
+                        # 创建Media记录
+                        media = Media(
+                            user_id=user_info['id'],
+                            hash=file_hash,
+                            original_filename=original_filename
                         )
+                        db.add(media)
+                        db.commit()
+
+                        return Response(status=201)
+
+                elif method == 'DELETE':
+                    # 处理文件删除
+                    if len(path_parts) < 2:
+                        return self.bad_request()
+
+                    filename = '/'.join(path_parts[1:])
+                    original_filename = urllib.parse.unquote(filename)
+
+                    with get_db() as db:
+                        # 查找Media记录
+                        media = db.query(Media).filter(
+                            Media.user_id == user_info['id'],
+                            Media.original_filename == original_filename
+                        ).first()
+
+                        if not media:
+                            return self.not_found()
+
+                        # 查找FileHash记录
+                        file_hash = db.query(FileHash).filter_by(hash=media.hash).first()
+
+                        # 删除Media记录
+                        db.delete(media)
+
+                        # 更新引用计数
+                        file_hash.reference_count -= 1
+
+                        # 如果引用计数为0，删除物理文件和FileHash记录
+                        if file_hash.reference_count <= 0:
+                            try:
+                                os.remove(file_hash.storage_path)
+                            except OSError:
+                                pass
+                            db.delete(file_hash)
+
+                        db.commit()
+
+                        file_hash = db.query(FileHash).filter(FileHash.hash == media.hash).first()
+                        if not file_hash:
+                            return self.not_found()
+
+                        items = [{
+                            'href': f'/dav/{user_info["username"]}/{filename}',
+                            'displayname': original_filename,
+                            'collection': False,
+                            'creationdate': media.created_at.isoformat() + 'Z' if media.created_at else '2025-10-01T00:00:00Z',
+                            'getlastmodified': media.updated_at.isoformat() + 'Z' if media.updated_at else safe_date_string,
+                            'getcontentlength': file_hash.file_size,
+                            'getcontenttype': file_hash.mime_type or 'application/octet-stream'
+                        }]
+
+                    xml_response = self.generate_xml_response(items)
+                    return Response(
+                        response=xml_response,
+                        status=207,
+                        content_type='application/xml; charset="utf-8"',
+                        headers={'DAV': '1, 2'}
+                    )
+                elif method == 'POST':
+                    # 处理粘贴上传
+                    if 'file' in request.files:
+                        # 处理multipart/form-data上传
+                        file = request.files['file']
+                        if not file.filename:
+                            return self.error_response(400, "No file selected")
+
+                        filename = '/'.join(path_parts[1:]) if len(path_parts) > 1 else file.filename
+                        return self.handle_put_file(filename, user_info)
+                    elif request.content_type == 'application/octet-stream':
+                        # 处理二进制流上传
+                        filename = '/'.join(path_parts[1:]) if len(path_parts) > 1 else 'pasted_file.bin'
+                        return self.handle_put_file(filename, user_info)
+                    else:
+                        return self.method_not_allowed()
+
                 elif method in ('GET', 'HEAD'):
                     # 处理文件下载请求
                     if len(path_parts) < 2:
@@ -1198,6 +1351,7 @@ def register_plugin(app):
                             return self.not_found()
 
                         return self.serve_file(file_hash, original_filename)
+
                 else:
                     return self.method_not_allowed()
 
@@ -1210,9 +1364,9 @@ def register_plugin(app):
 
     # WebDAV routes
     @bp.route('/dav/', defaults={'path': ''},
-              methods=['OPTIONS', 'GET', 'HEAD', 'PROPFIND', 'PUT', 'DELETE', 'MKCOL', 'MOVE', 'COPY'])
+              methods=['OPTIONS', 'GET', 'HEAD', 'PROPFIND', 'PUT', 'POST', 'DELETE', 'MKCOL', 'MOVE', 'COPY'])
     @bp.route('/dav/<path:path>',
-              methods=['OPTIONS', 'GET', 'HEAD', 'PROPFIND', 'PUT', 'DELETE', 'MKCOL', 'MOVE', 'COPY'])
+              methods=['OPTIONS', 'GET', 'HEAD', 'PROPFIND', 'PUT', 'POST', 'DELETE', 'MKCOL', 'MOVE', 'COPY'])
     def webdav_handler(path=''):
         try:
             # Authenticate user
@@ -1255,7 +1409,8 @@ def register_plugin(app):
                 content_type='text/plain'
             )
 
-    # 增强的 WebDAV 发现页面
+        # 增强的 WebDAV 发现页面
+
     @bp.route('/dav/index.html', methods=['GET'])
     def webdav_root():
         user_info = handler.authenticate_user()
@@ -1278,5 +1433,5 @@ def register_plugin(app):
             'reports_generation'
         ]
     })()
-
+    csrf.exempt(bp)
     return plugin

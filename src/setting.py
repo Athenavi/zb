@@ -129,6 +129,8 @@ class BaseConfig:
     MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS', True)
     MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
+    BABEL_DEFAULT_LOCALE = 'zh_CN'
+    BABEL_DEFAULT_TIMEZONE = 'Asia/Shanghai'
 
     # 安全头配置（Talisman）
     TALISMAN_CONTENT_SECURITY_POLICY = {
