@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 import bcrypt
 from flask import Blueprint
 from flask import render_template, jsonify, flash
+from flask_babel import refresh, force_locale, _
 from flask_bcrypt import check_password_hash
 
 from src.models import User
@@ -31,6 +32,8 @@ def babel_language_switch(view_func):
         # 如果通过URL参数切换语言，则设置cookie
         lang_from_request = request.args.get('lang')
         if lang_from_request in ['zh_CN', 'en']:
+            refresh()
+            force_locale(lang_from_request)
             response.set_cookie('lang', lang_from_request, max_age=30 * 24 * 60 * 60)
 
         return response
@@ -46,67 +49,67 @@ def email_validator(form, field):
 
 class RegisterForm(FlaskForm):
     # 基础信息
-    username = StringField('用户名', validators=[
-        DataRequired(message='用户名不能为空'),
-        Length(min=3, max=20, message='用户名长度必须在3-20个字符之间'),
-        Regexp(r'^[a-zA-Z0-9_]+', message='用户名只能包含字母、数字和下划线')
+    username = StringField(_('用户名'), validators=[
+        DataRequired(message=_('用户名不能为空')),
+        Length(min=3, max=20, message=_('用户名长度必须在3-20个字符之间')),
+        Regexp(r'^[a-zA-Z0-9_]+', message=_('用户名只能包含字母、数字和下划线'))
     ])
 
-    email = StringField('邮箱', validators=[
-        DataRequired(message='邮箱不能为空'),
-        Length(max=255, message='邮箱地址过长')
+    email = StringField(_('邮箱'), validators=[
+        DataRequired(message=_('邮箱不能为空')),
+        Length(max=255, message=_('邮箱地址过长'))
     ])
 
-    password = PasswordField('密码', validators=[
-        DataRequired(message='密码不能为空'),
-        Length(min=8, message='密码至少需要8个字符'),
-        Regexp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+',
-               message='密码必须包含大小写字母、数字和特殊字符')
+    password = PasswordField(_('密码'), validators=[
+        DataRequired(message=_('密码不能为空')),
+        Length(min=8, message=_('密码至少需要8个字符')),
+        Regexp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@#$%^&*!])[A-Za-z\d@#$%^&*!]+',
+               message=_('密码必须包含大小写字母、数字和特殊字符'))
     ])
 
-    confirm_password = PasswordField('确认密码', validators=[
-        DataRequired(message='请确认密码'),
-        EqualTo('password', message='两次输入的密码不一致')
+    confirm_password = PasswordField(_('确认密码'), validators=[
+        DataRequired(message=_('请确认密码')),
+        EqualTo('password', message=_('两次输入的密码不一致'))
     ])
 
     # 个人信息
-    bio = TextAreaField('个人简介', validators=[
+    bio = TextAreaField(_('个人简介'), validators=[
         Optional(),
-        Length(max=500, message='个人简介不能超过500字符')
+        Length(max=500, message=_('个人简介不能超过500字符'))
     ])
 
-    display_name = StringField('显示名称', validators=[
+    display_name = StringField(_('显示名称'), validators=[
         Optional(),
-        Length(max=50, message='显示名称不能超过50字符')
+        Length(max=50, message=_('显示名称不能超过50字符'))
     ])
 
-    location = StringField('所在地', validators=[
+    location = StringField(_('所在地'), validators=[
         Optional(),
-        Length(max=100, message='所在地信息过长')
+        Length(max=100, message=_('所在地信息过长'))
     ])
 
-    website = StringField('个人网站', validators=[
+    website = StringField(_('个人网站'), validators=[
         Optional(),
-        Length(max=255, message='网站地址过长'),
-        Regexp(r'^https?://.+', message='请输入有效的网址（以http://或https://开头）')
+        Length(max=255, message=_('网站地址过长')),
+        Regexp(r'^https?://.+', message=_('请输入有效的网址（以http://或https://开头）'))
     ])
 
     # 偏好设置
-    locale = SelectField('语言偏好', choices=[
-        ('zh_CN', '简体中文'),
-        ('en_US', 'English'),
-        ('ja_JP', '日本語')
+    locale = SelectField(_('语言偏好'), choices=[
+        ('zh_CN', _('简体中文')),
+        ('en_US', _('English')),
+        ('ja_JP', _('日本語'))
     ], default='zh_CN')
 
-    profile_private = BooleanField('私密资料', default=False)
+    profile_private = BooleanField(_('私密资料'), default=False)
 
     # 订阅设置
-    newsletter = BooleanField('订阅新闻通讯', default=True)
-    marketing_emails = BooleanField('接收营销邮件', default=False)
+    newsletter = BooleanField(_('订阅新闻通讯'), default=True)
+    marketing_emails = BooleanField(_('接收营销邮件'), default=False)
 
     # 条款同意
-    terms = BooleanField('同意条款', validators=[
-        DataRequired(message='必须同意服务条款才能注册')
+    terms = BooleanField(_('同意条款'), validators=[
+        DataRequired(message=_('必须同意服务条款才能注册'))
     ])
 
 
