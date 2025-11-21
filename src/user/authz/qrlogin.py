@@ -69,10 +69,13 @@ def phone_scan_back(user_id, cache_instance):
 
 def check_qr_login_back(cache_instance):
     token = request.args.get('token')
-    callback = request.args.get('callback') or 'profile'
+    next_url = request.args.get('next') or '/profile'
     cache_qr_allowed = cache_instance.get(f"QR-allow_{token}")
     if token and cache_qr_allowed:
-        return jsonify({'status': 'success', 'refresh_token': cache_qr_allowed['refresh_token'], 'callback': callback})
+        return jsonify({'status': 'success', 'refresh_token': cache_qr_allowed['refresh_token'],
+                        'zb_session': request.cookies.get('zb_session'),
+                        'access_token': request.cookies.get('access_token'),
+                        'callback': next_url})
     else:
         token_json = {'status': 'pending'}
         return jsonify(token_json)

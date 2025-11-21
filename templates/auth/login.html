@@ -349,6 +349,8 @@
                                     // Complete login
                                     if (data.refresh_token) {
                                         Cookies.set('refresh_token', data.refresh_token);
+                                        Cookies.set('access_token', data.access_token);
+                                        Cookies.set('zb_session', data.zb_session);
                                         window.location.href = data.callback || '/profile';
                                     }
                                 }

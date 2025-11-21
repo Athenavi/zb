@@ -241,6 +241,11 @@ class LoginForm(FlaskForm):
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
+    if next_url := request.args.get('next', '/profile'):
+        next_url = resolve_callback(next_url, default='profile')
+    from flask_login import current_user
+    if current_user.is_authenticated:
+        return redirect(next_url)
     form = LoginForm()
     mobile_device = False
     try:
@@ -283,9 +288,6 @@ def login():
                 else:
                     expires = datetime.now(timezone.utc) + app_config.JWT_ACCESS_TOKEN_EXPIRES
                     refresh_expires = datetime.now(timezone.utc) + app_config.JWT_REFRESH_TOKEN_EXPIRES
-
-                    next_url = request.args.get('next', '/profile')
-                    next_url = resolve_callback(next_url, default='profile')
                     response = make_response(redirect(next_url))
 
                     # 设置 Session Cookie（Flask-Login 会自动处理）
