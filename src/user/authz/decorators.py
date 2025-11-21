@@ -2,7 +2,9 @@ from functools import wraps
 
 from flask import abort, make_response
 from flask import request, redirect, url_for
+from flask_login import login_user
 
+from src.models import User
 from src.setting import app_config
 from src.utils.security.jwt_handler import JWTHandler
 
@@ -34,15 +36,16 @@ def jwt_required(f):
             if user_id is None:
                 return redirect("/login?callback=" + callback_endpoint)
 
-            # 使用make_response确保response是Response对象
+            # 仅在刷新令牌验证成功后设置用户会话
+            user = User.get(user_id)
+            login_user(user)
+
             resp = f(user_id, *args, **kwargs)
             response = make_response(resp)
-            updated_response = JWTHandler.update_jwt_cookies(response, user_id)
-            return updated_response if updated_response is not None else response
+            return JWTHandler.update_jwt_cookies(response, user_id) or response
 
-        # 确保普通情况下的返回也是Response对象
-        resp = f(user_id, *args, **kwargs)
-        return make_response(resp)
+        # 普通JWT验证成功，直接传递user_id
+        return f(user_id, *args, **kwargs)
 
     return decorated_function
 

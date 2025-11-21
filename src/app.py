@@ -97,7 +97,6 @@ def register_direct_routes(app, config_class):
     """注册直接定义在应用上的路由"""
 
     @login_manager.user_loader
-    @jwt_required
     def load_user(user_id):
         from src.models import User
         return User.get(user_id)
