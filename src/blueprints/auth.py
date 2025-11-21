@@ -284,6 +284,7 @@ def login():
                     refresh_expires = datetime.now(timezone.utc) + app_config.JWT_REFRESH_TOKEN_EXPIRES
 
                     next_url = request.args.get('next', '/profile')
+                    next_url = resolve_callback(next_url, default='profile')
                     response = make_response(redirect(next_url))
 
                     # 设置 Session Cookie（Flask-Login 会自动处理）
