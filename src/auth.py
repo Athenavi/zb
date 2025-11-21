@@ -2,7 +2,7 @@ import functools
 from datetime import datetime, timezone
 from urllib.parse import urlparse, urljoin
 
-from flask import request, redirect, url_for, g, current_app
+from flask import request, redirect, url_for, g, current_app, flash
 from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity, decode_token, create_access_token
 from flask_jwt_extended.exceptions import NoAuthorizationError, JWTDecodeError
 from flask_login import current_user as s_current_user
@@ -79,14 +79,19 @@ def jwt_required(f):
         except (NoAuthorizationError, JWTDecodeError) as e:
             # JWT 验证失败，尝试刷新
             current_app.logger.warning(f"JWT verification failed: {str(e)}")
+
+            # 尝试刷新令牌
             refresh_tokens_if_needed()
 
-            # 刷新后再次尝试验证
+            # 如果刷新后仍然失败，显示错误页面
             try:
                 verify_jwt_in_request(locations=['cookies'])
                 current_app.logger.debug("JWT verified after refresh")
-            except (NoAuthorizationError, JWTDecodeError):
-                current_app.logger.warning("JWT still invalid after refresh attempt")
+            except (NoAuthorizationError, JWTDecodeError) as refresh_error:
+                current_app.logger.error(f"JWT still invalid after refresh: {str(refresh_error)}")
+                # 显示自定义错误页面而不是 JSON 响应
+                flash("身份验证失败，请重新登录", 'error')
+                return redirect(url_for('auth.login'))
 
         # 传递 user_id 参数给视图函数
         return f(s_current_user.id, *args, **kwargs)

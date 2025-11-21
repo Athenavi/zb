@@ -260,10 +260,10 @@ def blog_detail_aid_back(aid, safe_mode=True):
                                    author=author,
                                    i18n_versions=i18n_versions,
                                    )
-        return None
+        return error(message='Article not found', status_code=404)
     except Exception as e:
         print(f"Template error: {str(e)}")
-        return str(e), 500
+        return error(message=f'Internal server error: {str(e)}', status_code=500)
 
 
 @blog_bp.route('/<int:aid>.html/<string:iso>/<string:slug_name>', methods=['GET', 'POST'])
