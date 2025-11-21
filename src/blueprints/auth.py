@@ -6,7 +6,7 @@ from flask import Blueprint
 from flask import render_template, jsonify, flash
 from flask_babel import refresh, _
 from flask_bcrypt import check_password_hash
-from flask_login import login_user
+from flask_login import login_user, logout_user
 
 from setting import app_config
 from src.models import User
@@ -356,7 +356,9 @@ def is_mobile_device(user_agent):
 
 @auth_bp.route('/logout')
 def logout():
-    response = make_response(redirect('/login'))
-    response.set_cookie('jwt', '', expires=0)
-    response.set_cookie('refresh_token', '', expires=0)
+    response = make_response(redirect('/profile'))
+    cookies_to_clear = ['jwt', 'refresh_token', 'access_token', 'zb_session']
+    for cookie_name in cookies_to_clear:
+        response.set_cookie(cookie_name, '', expires=0)
+    logout_user()
     return response
