@@ -242,11 +242,12 @@ class LoginForm(FlaskForm):
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     form = LoginForm()
+    mobile_device = False
     try:
         if request.method == 'GET':
             user_agent = request.headers.get('User-Agent', '')
             if is_mobile_device(user_agent):
-                return redirect('/api/mobile/login')
+                mobile_device = True
 
         if request.method == 'POST':
             if request.is_json:
@@ -313,13 +314,14 @@ def login():
                     }), 401
                 else:
                     flash('无效的电子邮件或密码', 'error')
-                    return render_template('auth/login.html', form=form, email=email)
+                    return render_template('auth/login.html', form=form, email=email, mobile_device=mobile_device)
 
-        return render_template('auth/login.html', form=form, next=request.args.get('next', '/profile'))
+        return render_template('auth/login.html', form=form, next=request.args.get('next', '/profile'),
+                               mobile_device=mobile_device)
     except Exception as e:
         flash('登录过程中发生错误，请稍后再试', 'error')
         current_app.logger.error(f"Login error: {str(e)}")
-        return render_template('auth/login.html', form=form)
+        return render_template('auth/login.html', form=form, mobile_device=mobile_device)
 
 
 @auth_bp.route('/api/i18n/set_language', methods=['POST'])

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from flask import Blueprint, jsonify, current_app, render_template, request, redirect, make_response
+from flask import Blueprint, jsonify, current_app, request
 from sqlalchemy import select, func
 
 from src.auth import jwt_required, admin_required, origin_required
@@ -287,44 +287,6 @@ def phone_scan(user_id):
 def check_qr_status():
     """Check QR code login status"""
     return check_qr_login_back(cache)
-
-
-@api_bp.route('/mobile/login', methods=['GET', 'POST'])
-def mobile_login():
-    """Mobile login page for QR scanning"""
-    if request.method == 'POST':
-        data = request.get_json() if request.is_json else request.form
-        email = data.get('email')
-        password = data.get('password')
-
-        from flask_bcrypt import check_password_hash
-        user = User.query.filter_by(email=email).first()
-
-        if user and check_password_hash(user.password, password):
-            # Generate JWT tokens
-            # jwt_token = JWTHandler.generate_token(user.id, user.username)
-            # refresh_token = JWTHandler.generate_refresh_token(user.id)
-            # Set cookies for mobile QR scanning
-            response = make_response(jsonify({
-                'success': True,
-                'message': 'Login successful',
-                'user': user.to_dict()
-            }) if request.is_json else redirect('/profile'))
-
-            # response.set_cookie('jwt', jwt_token, httponly=True, secure=False, max_age=3600)
-            # response.set_cookie('refresh_token', refresh_token, httponly=True, secure=False, max_age=604800)
-
-            return response
-        else:
-            if request.is_json:
-                return jsonify({
-                    'success': False,
-                    'message': 'Invalid email or password'
-                }), 401
-            else:
-                return render_template('mobile/login.html', error='Invalid email or password')
-
-    return render_template('mobile/login.html')
 
 
 @api_bp.route('/media/upload', methods=['POST'])
