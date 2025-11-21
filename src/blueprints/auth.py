@@ -292,7 +292,6 @@ def login():
                         'access_token',
                         access_token,
                         httponly=True,
-                        secure=app_config.SECURE_COOKIES,
                         samesite='Lax',
                         expires=expires
                     )
@@ -300,7 +299,6 @@ def login():
                         'refresh_token',
                         refresh_token,
                         httponly=True,
-                        secure=app_config.SECURE_COOKIES,
                         samesite='Lax',
                         expires=refresh_expires
                     )
@@ -316,7 +314,7 @@ def login():
                     flash('无效的电子邮件或密码', 'error')
                     return render_template('auth/login.html', form=form, email=email)
 
-        return render_template('auth/login.html', form=form)
+        return render_template('auth/login.html', form=form, next=request.args.get('next', '/profile'))
     except Exception as e:
         flash('登录过程中发生错误，请稍后再试', 'error')
         current_app.logger.error(f"Login error: {str(e)}")

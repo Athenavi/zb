@@ -63,7 +63,8 @@ def init_extensions(app):
     babel.init_app(app)
 
     # 登录管理器额外配置
-    login_manager.login_view = 'auth.login'  # 设置登录路由
+    login_manager.login_view = 'auth.login'
+    login_manager.login_message = '请先登录'
 
     # JWT配置
     jwt.init_app(app)

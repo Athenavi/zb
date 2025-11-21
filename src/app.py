@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, g
 from jinja2 import select_autoescape
 from werkzeug.exceptions import NotFound
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -100,6 +100,18 @@ def register_direct_routes(app, config_class):
         from src.models.user import User, db
         user = db.session.query(User).filter_by(id=user_id).first()
         return user
+
+    @app.after_request
+    def after_request(response):
+        # 设置新的 access_token 如果存在
+        if hasattr(g, 'new_access_token'):
+            response.set_cookie(
+                'access_token',
+                g.new_access_token,
+                httponly=True,
+                secure=app.config.get('PREFER_SECURE', False)
+            )
+        return response
 
     from flask import redirect
     @app.route('/space')

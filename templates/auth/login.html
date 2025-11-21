@@ -43,7 +43,7 @@
                 <!-- Traditional Login Form -->
                 <div id="traditional-login" class="login-method">
                     <form class="space-y-6" method="POST"
-                          action="{{ url_for('auth.login') }}?callback={{ callback }}">
+                          action="{{ url_for('auth.login') }}?next={{ callback }}{{ next }}">
                         <div>
                             {{ form.hidden_tag() }}
                             <label for="email" class="block text-sm font-medium text-gray-700">
