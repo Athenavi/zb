@@ -8,11 +8,11 @@ import humanize
 from flask import Blueprint, request, render_template, abort, jsonify, send_file, current_app
 from sqlalchemy import func
 
+from src.auth import jwt_required
 # from src.database import get_db
 from src.extensions import cache
 from src.models import Media, FileHash, db
 from src.setting import AppConfig, BaseConfig
-from src.user.authz.decorators import jwt_required
 from src.utils.image.processing import generate_video_thumbnail, generate_thumbnail
 from src.utils.security.safe import is_valid_hash
 

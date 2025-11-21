@@ -1,9 +1,9 @@
 from flask import Blueprint, flash
 
+from src.auth import jwt_required
 # from src.database import get_db
 from src.models import Article
 from src.models import Url, Comment, db
-from src.user.authz.decorators import jwt_required
 from src.utils.shortener.links import generate_short_url
 from user.authz.password import validate_password, update_password
 from utils.security.ip_utils import get_client_ip

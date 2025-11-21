@@ -3,14 +3,16 @@ import re
 from flask import Blueprint
 from flask import request, render_template, jsonify, current_app
 from flask import url_for, flash, redirect
+from flask_jwt_extended import current_user
 
+from blueprints.api import domain
+from src.auth import jwt_required
 from src.blog.article.security.password import get_article_password
 from src.blog.homepage import index_page_back, tag_page_back, featured_page_back
 from src.error import error
 from src.extensions import cache, csrf
 from src.models import Article, ArticleContent, ArticleI18n, User, db, Category, VIPPlan
 from src.models import UserSubscription, Notification, Pages, SystemSettings, MenuItems, Menus
-from src.user.authz.decorators import jwt_required, domain, get_current_user_id
 from src.user.entities import auth_by_uid
 from src.user.views import change_profiles_back, setting_profiles_back
 from src.utils.security.safe import random_string
@@ -501,6 +503,15 @@ def get_site_domain():
     return get_system_setting_value('site_domain')
 
 
+@jwt_required
+@cache.cached(timeout=24 * 3600, key_prefix='site_slug')
+def get_username(user_id):
+    if user_id:
+        return User.query.filter_by(id=user_id).first().username
+    else:
+        return '未登录'
+
+
 @cache.cached(timeout=24 * 3600, key_prefix='site_beian')
 def get_site_beian():
     """获取网站备案号"""
@@ -625,7 +636,7 @@ def blog_detail_back(blog_slug, safe_mode=True):
                 return render_template('inform.html', aid=article.article_id)
 
             if article.is_vip_only:
-                user_id = get_current_user_id()
+                user_id = current_user.id
                 result, message = is_owner_or_vip(article=article, user_id=user_id)
                 if not result:
                     return render_template('inform.html', status_code=403, message=message)

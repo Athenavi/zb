@@ -1,15 +1,15 @@
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import bcrypt
 from flask import Blueprint
 from flask import render_template, jsonify, flash
 from flask_babel import refresh, _
 from flask_bcrypt import check_password_hash
+from flask_login import login_user
 
 from setting import app_config
 from src.models import User
-from src.utils.security.jwt_handler import JWTHandler, JWT_EXPIRATION_DELTA, REFRESH_TOKEN_EXPIRATION_DELTA
 
 auth_bp = Blueprint('auth', __name__, template_folder='templates')
 from flask_wtf import FlaskForm
@@ -240,24 +240,13 @@ class LoginForm(FlaskForm):
 
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
-@babel_language_switch
 def login():
     form = LoginForm()
     try:
-        # 获取并正确解析callback参数
-        raw_callback = request.args.get('callback') or '/profile'
-        callback_url = resolve_callback(raw_callback, 'profile')
-
         if request.method == 'GET':
             user_agent = request.headers.get('User-Agent', '')
             if is_mobile_device(user_agent):
-                # 对于移动端，传递原始callback参数
-                mobile_callback = raw_callback or 'profile'
-                return redirect(f'/api/mobile/login?callback={mobile_callback}')
-
-        # 设置双语标题
-        title = "登录 - 认证系统"
-        title_en = "Login - Authentication System"
+                return redirect('/api/mobile/login')
 
         if request.method == 'POST':
             if request.is_json:
@@ -271,24 +260,50 @@ def login():
             user = User.query.filter_by(email=email).first()
 
             if user and check_password_hash(user.password, password):
-                token = JWTHandler.generate_token(user_id=user.id, username=user.username)
-                refresh_token = JWTHandler.generate_refresh_token(user_id=user.id)
+                # 1. 创建 Session 登录
+                login_user(user, remember=True)
+
+                # 2. 生成双 JWT token
+                from flask_jwt_extended import create_access_token, create_refresh_token
+                access_token = create_access_token(
+                    identity=str(user.id),
+                    additional_claims={'user_id': user.id, 'email': user.email}
+                )
+                refresh_token = create_refresh_token(identity=str(user.id))
 
                 if request.is_json:
                     return jsonify({
                         'success': True,
                         'message': '登录成功',
                         'user': user.to_dict(),
-                        'access_token': token,
-                        'refresh_token': refresh_token
+                        'access_token': access_token,
+                        'refresh_token': refresh_token,
                     })
                 else:
-                    expires = datetime.now(timezone.utc) + timedelta(seconds=JWT_EXPIRATION_DELTA)
-                    refresh_expires = datetime.now(timezone.utc) + timedelta(seconds=REFRESH_TOKEN_EXPIRATION_DELTA)
+                    expires = datetime.now(timezone.utc) + app_config.JWT_ACCESS_TOKEN_EXPIRES
+                    refresh_expires = datetime.now(timezone.utc) + app_config.JWT_REFRESH_TOKEN_EXPIRES
 
-                    response = make_response(redirect(callback_url))
-                    response.set_cookie('jwt', token, httponly=True, expires=expires)
-                    response.set_cookie('refresh_token', refresh_token, httponly=True, expires=refresh_expires)
+                    next_url = request.args.get('next', '/profile')
+                    response = make_response(redirect(next_url))
+
+                    # 设置 Session Cookie（Flask-Login 会自动处理）
+                    # 设置 JWT Cookies
+                    response.set_cookie(
+                        'access_token',
+                        access_token,
+                        httponly=True,
+                        secure=app_config.SECURE_COOKIES,
+                        samesite='Lax',
+                        expires=expires
+                    )
+                    response.set_cookie(
+                        'refresh_token',
+                        refresh_token,
+                        httponly=True,
+                        secure=app_config.SECURE_COOKIES,
+                        samesite='Lax',
+                        expires=refresh_expires
+                    )
                     flash('登录成功', 'success')
                     return response
             else:
@@ -299,19 +314,9 @@ def login():
                     }), 401
                 else:
                     flash('无效的电子邮件或密码', 'error')
-                    # 传递原始callback用于表单
-                    return render_template('auth/login.html', form=form, email=email, callback=raw_callback)
+                    return render_template('auth/login.html', form=form, email=email)
 
-        # 检查是否已登录
-        if jwt_cookie := request.cookies.get('jwt'):
-            try:
-                JWTHandler.authenticate_token(jwt_cookie)
-                return redirect(callback_url)
-            except Exception:
-                flash('您的登录已过期，请重新登录', 'error')
-
-        # 传递原始callback用于表单
-        return render_template('auth/login.html', form=form, callback=raw_callback)
+        return render_template('auth/login.html', form=form)
     except Exception as e:
         flash('登录过程中发生错误，请稍后再试', 'error')
         current_app.logger.error(f"Login error: {str(e)}")

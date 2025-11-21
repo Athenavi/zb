@@ -1,9 +1,9 @@
 from flask import Blueprint, jsonify
 
+from src.auth import jwt_required
 # from src.database import get_db
 from src.models import Notification, db
 from src.notification import read_current_notification, get_notifications, read_all_notifications
-from src.user.authz.decorators import jwt_required
 
 noti_bp = Blueprint('noti', __name__, url_prefix='/noti')
 

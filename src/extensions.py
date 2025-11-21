@@ -1,13 +1,16 @@
 # extensions.py
+
 from flask_babel import Babel
 from flask_caching import Cache
 from flask_cors import CORS
+from flask_jwt_extended import JWTManager
 from flask_login import LoginManager
 from flask_mail import Mail
 from flask_migrate import Migrate
 from flask_restful import Api
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
+
 # --------------------------
 # 扩展实例化
 # --------------------------
@@ -31,6 +34,7 @@ db = SQLAlchemy(
 )
 cache = Cache()
 login_manager = LoginManager()
+jwt = JWTManager()
 csrf = CSRFProtect()
 mail = Mail()
 api = Api()
@@ -60,3 +64,6 @@ def init_extensions(app):
 
     # 登录管理器额外配置
     login_manager.login_view = 'auth.login'  # 设置登录路由
+
+    # JWT配置
+    jwt.init_app(app)

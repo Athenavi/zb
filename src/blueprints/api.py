@@ -3,6 +3,7 @@ from pathlib import Path
 from flask import Blueprint, jsonify, current_app, render_template, request, redirect, make_response
 from sqlalchemy import select, func
 
+from src.auth import jwt_required, admin_required, origin_required
 from src.blog.article.core.content import get_i18n_content_by_aid
 from src.blog.article.security.password import check_apw_form, get_apw_form
 from src.blog.comment import create_comment_with_anti_spam, comment_page_get
@@ -14,14 +15,12 @@ from src.other.report import report_back
 from src.setting import app_config
 from src.upload.admin_upload import admin_upload_file
 from src.upload.public_upload import upload_cover_back, handle_user_upload
-from src.user.authz.decorators import jwt_required, admin_required, origin_required
 from src.user.authz.qrlogin import check_qr_login_back, phone_scan_back, qr_login
 from src.user.entities import get_avatar
 from src.user.profile.social import get_user_info
 from src.user.views import confirm_email_back
 from src.utils.config.theme import get_all_themes
 from src.utils.http.generate_response import send_chunk_md
-from src.utils.security.jwt_handler import JWTHandler
 from src.utils.security.safe import is_valid_iso_language_code
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
@@ -303,8 +302,8 @@ def mobile_login():
 
         if user and check_password_hash(user.password, password):
             # Generate JWT tokens
-            jwt_token = JWTHandler.generate_token(user.id, user.username)
-            refresh_token = JWTHandler.generate_refresh_token(user.id)
+            # jwt_token = JWTHandler.generate_token(user.id, user.username)
+            # refresh_token = JWTHandler.generate_refresh_token(user.id)
             # Set cookies for mobile QR scanning
             response = make_response(jsonify({
                 'success': True,
@@ -312,8 +311,8 @@ def mobile_login():
                 'user': user.to_dict()
             }) if request.is_json else redirect('/profile'))
 
-            response.set_cookie('jwt', jwt_token, httponly=True, secure=False, max_age=3600)
-            response.set_cookie('refresh_token', refresh_token, httponly=True, secure=False, max_age=604800)
+            # response.set_cookie('jwt', jwt_token, httponly=True, secure=False, max_age=3600)
+            # response.set_cookie('refresh_token', refresh_token, httponly=True, secure=False, max_age=604800)
 
             return response
         else:

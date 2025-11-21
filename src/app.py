@@ -5,11 +5,12 @@ from jinja2 import select_autoescape
 from werkzeug.exceptions import NotFound
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+from auth import jwt_required
 from src.blueprints.admin_vip import admin_vip_bp
 from src.blueprints.api import api_bp
 from src.blueprints.auth import auth_bp
 from src.blueprints.blog import blog_bp, get_footer, get_site_title, get_banner, get_site_domain, get_site_beian, \
-    get_site_menu, get_current_menu_slug, blog_detail_back
+    get_site_menu, get_current_menu_slug, blog_detail_back, get_username
 from src.blueprints.category import category_bp
 from src.blueprints.dashboard import dashboard_bp
 from src.blueprints.media import media_bp
@@ -27,8 +28,6 @@ from src.other.filters import json_filter, string_split, article_author, md2html
 from src.other.search import search_handler
 from src.plugin import plugin_bp, init_plugin_manager
 from src.setting import app_config
-from src.user.authz.decorators import jwt_required
-from src.utils.security.jwt_handler import JWTHandler
 
 
 def create_app(config_class=app_config):
@@ -86,7 +85,7 @@ def register_context_processors(app, config_class):
             beian=get_site_beian() or config_class.beian,
             title=get_site_title() or config_class.sitename,
             domain=get_site_domain() or config_class.domain,
-            username=JWTHandler.get_current_username(),
+            username=get_username(),
             menu=get_site_menu(get_current_menu_slug()) or default_menu_data,
             footer=get_footer(),
             banner=get_banner()
@@ -98,8 +97,9 @@ def register_direct_routes(app, config_class):
 
     @login_manager.user_loader
     def load_user(user_id):
-        from src.models import User
-        return User.get(user_id)
+        from src.models.user import User, db
+        user = db.session.query(User).filter_by(id=user_id).first()
+        return user
 
     from flask import redirect
     @app.route('/space')

@@ -10,7 +10,6 @@ from werkzeug.utils import secure_filename
 from src.database import get_db
 from src.models import Media, FileHash, UploadChunk, UploadTask
 from src.utils.shortener.links import create_special_url
-from user.authz.decorators import jwt_required
 
 
 class FileProcessor:
@@ -442,7 +441,7 @@ def handle_user_upload(user_id, allowed_size=10 * 1024 * 1024, allowed_mimes=Non
         return jsonify({'message': 'failed', 'error': str(e)}), 500
 
 
-@jwt_required
+# @jwt_required
 # 大文件分块上传接口
 def handle_chunked_upload_init(user_id):
     """初始化分块上传，支持断点续传"""
@@ -466,7 +465,7 @@ def handle_chunked_upload_init(user_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@jwt_required
+#@jwt_required
 def handle_chunked_upload_chunk(user_id):
     """上传文件分块"""
     try:
@@ -494,7 +493,7 @@ def handle_chunked_upload_chunk(user_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@jwt_required
+#@jwt_required
 def handle_chunked_upload_complete(user_id):
     """完成分块上传"""
     try:
@@ -524,7 +523,7 @@ def handle_chunked_upload_complete(user_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@jwt_required
+#@jwt_required
 def handle_chunked_upload_progress(user_id):
     """获取上传进度"""
     try:
@@ -541,7 +540,7 @@ def handle_chunked_upload_progress(user_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@jwt_required
+#@jwt_required
 def handle_chunked_upload_cancel(user_id):
     """取消上传"""
     try:
@@ -685,7 +684,7 @@ def _process_multiple_files(user_id, allowed_size, allowed_mimes, check_existing
     return jsonify(response_data), status_code
 
 
-@jwt_required
+#@jwt_required
 def handle_chunked_upload_chunks(user_id):
     """获取已上传的分块列表"""
     try:
