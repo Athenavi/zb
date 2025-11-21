@@ -4,9 +4,10 @@ from datetime import datetime, timedelta, timezone
 import bcrypt
 from flask import Blueprint
 from flask import render_template, jsonify, flash
-from flask_babel import refresh, force_locale, _
+from flask_babel import refresh, _
 from flask_bcrypt import check_password_hash
 
+from setting import app_config
 from src.models import User
 from src.utils.security.jwt_handler import JWTHandler, JWT_EXPIRATION_DELTA, REFRESH_TOKEN_EXPIRATION_DELTA
 
@@ -18,8 +19,8 @@ from wtforms.validators import DataRequired, Length, EqualTo, Regexp, Optional, 
 from flask import url_for
 from urllib.parse import urlparse, urljoin
 
+from flask import redirect, current_app, request, make_response
 from functools import wraps
-from flask import request, make_response, redirect, current_app
 
 
 def babel_language_switch(view_func):
@@ -32,8 +33,8 @@ def babel_language_switch(view_func):
         # 如果通过URL参数切换语言，则设置cookie
         lang_from_request = request.args.get('lang')
         if lang_from_request in ['zh_CN', 'en']:
+            app_config.BABEL_DEFAULT_LOCALE = lang_from_request  # 使用属性而不是字典键赋值
             refresh()
-            force_locale(lang_from_request)
             response.set_cookie('lang', lang_from_request, max_age=30 * 24 * 60 * 60)
 
         return response

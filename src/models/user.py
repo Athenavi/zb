@@ -1,9 +1,10 @@
+from flask_login import UserMixin
 from sqlalchemy.sql.functions import current_timestamp
 
 from . import db
 
 
-class User(db.Model):
+class User(db.Model, UserMixin):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True, doc='用户ID')
     username = db.Column(db.String(255), nullable=False, unique=True, doc='用户名')
