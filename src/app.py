@@ -18,6 +18,7 @@ from src.blueprints.my import my_bp
 from src.blueprints.noti import noti_bp
 from src.blueprints.relation import relation_bp
 from src.blueprints.role import role_bp
+from src.blueprints.session_views import session_bp
 from src.blueprints.theme import theme_bp
 from src.blueprints.vip_routes import vip_bp
 from src.blueprints.website import website_bp
@@ -212,7 +213,8 @@ def register_blueprints(app):
         api_bp,
         blog_bp,
         vip_bp,
-        admin_vip_bp
+        admin_vip_bp,
+        session_bp
     ]
 
     for bp in blueprints:

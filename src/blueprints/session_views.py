@@ -1,21 +1,11 @@
-from flask import Blueprint, jsonify, session as flask_session
-from flask_login import login_required, current_user
+from datetime import datetime
 
-from src.models import UserSession
+from flask import Blueprint, session as flask_session
+from flask_login import login_required
+
+from src.models import UserSession, User, db
 
 session_bp = Blueprint('session', __name__)
-
-
-@session_bp.route('/api/sessions', methods=['GET'])
-@login_required
-def get_my_sessions():
-    """获取当前用户的所有活跃会话"""
-    active_sessions = UserSession.get_active_sessions(current_user.id)
-
-    return jsonify({
-        'sessions': [s.to_dict() for s in active_sessions],
-        'total_count': len(active_sessions)
-    })
 
 
 @session_bp.route('/api/sessions/<session_id>', methods=['DELETE'])
@@ -43,13 +33,72 @@ def logout_other_sessions():
     })
 
 
-@session_bp.route('/api/sessions/current', methods=['GET'])
-@login_required
-def get_current_session():
-    """获取当前会话信息"""
-    current_session = current_user.get_current_session()
+from flask import render_template, request, jsonify
+from flask_login import login_required, current_user
 
-    if current_session:
-        return jsonify({'session': current_session.to_dict()})
-    else:
-        return jsonify({'error': '未找到当前会话'}), 404
+
+# 管理员权限
+# admin_permission = Permission(RoleNeed('admin'))
+
+
+@session_bp.route('/sessions')
+@login_required
+def user_sessions():
+    """用户查看自己的会话"""
+    sessions = UserSession.get_active_sessions(current_user.id)
+    return render_template('session/user.html', sessions=sessions)
+
+
+@session_bp.route('/admin/sessions')
+@login_required
+# @admin_permission.require()
+def admin_sessions():
+    """管理员查看所有用户会话"""
+    page = request.args.get('page', 1, type=int)
+    search = request.args.get('search', '')
+    device_type = request.args.get('device_type', '')
+    status = request.args.get('status', '')
+
+    # 构建查询
+    query = UserSession.query.join(User)
+
+    if search:
+        query = query.filter(
+            (User.username.ilike(f'%{search}%')) |
+            (User.email.ilike(f'%{search}%'))
+        )
+
+    if device_type:
+        query = query.filter(UserSession.device_type == device_type)
+
+    if status == 'active':
+        query = query.filter(UserSession.is_active == True)
+    elif status == 'inactive':
+        query = query.filter(UserSession.is_active == False)
+
+    # 分页
+    pagination = query.order_by(UserSession.last_activity.desc()).paginate(
+        page=page, per_page=20, error_out=False
+    )
+
+    # 统计数据
+    total_sessions = UserSession.query.count()
+    active_sessions = UserSession.query.filter_by(is_active=True).count()
+    online_users = db.session.query(db.func.count(db.distinct(UserSession.user_id))).filter_by(is_active=True).scalar()
+    mobile_sessions = UserSession.query.filter_by(device_type='mobile').count()
+    today_sessions = UserSession.query.filter(
+        UserSession.last_activity >= datetime.now().date()
+    ).count()
+    total_users = User.query.count()
+
+    return render_template(
+        'session/admin.html',
+        sessions=pagination.items,
+        pagination=pagination,
+        total_sessions=total_sessions,
+        active_sessions=active_sessions,
+        online_users=online_users,
+        mobile_sessions=mobile_sessions,
+        today_sessions=today_sessions,
+        total_users=total_users
+    )

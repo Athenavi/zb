@@ -45,7 +45,6 @@ class UserSession(db.Model):
         self.access_token = access_token
         self.refresh_token = refresh_token
         self.ip_address = ip_address
-        self.login_time = datetime.now()
         self.last_activity = datetime.now()
         self.expiry_time = datetime.now() + timedelta(hours=expiry_hours)
         self.is_active = True
@@ -119,8 +118,8 @@ class UserSession(db.Model):
     def duration(self):
         """获取会话持续时间"""
         if self.is_active:
-            return datetime.now() - self.login_time
-        return self.last_activity - self.login_time
+            return datetime.now() - self.last_activity
+        return self.last_activity
 
     def to_dict(self):
         """转换为字典格式，用于API响应"""
