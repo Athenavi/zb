@@ -11,6 +11,7 @@ from .subscription import UserSubscription
 from .system import Menus, MenuItems, Pages, SystemSettings
 from .upload import UploadChunk, UploadTask
 from .user import User, CustomField, EmailSubscription
+from .userSession import UserSession
 from .vip import VIPPlan, VIPSubscription, VIPFeature
 
 __all__ = [
@@ -28,4 +29,5 @@ __all__ = [
     'SocialAccount',
     'Menus', 'MenuItems', 'Pages', 'SystemSettings',
     'UploadChunk', 'UploadTask',
+    'UserSession'
 ]

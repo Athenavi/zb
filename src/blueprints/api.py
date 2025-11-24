@@ -331,3 +331,53 @@ def check_email():
     email = request.args.get('email')
     exists = User.query.filter_by(email=email).first() is not None
     return jsonify({'exists': exists})
+
+
+from src.security import admin_permission, role_required, permission_required, create_permission
+
+
+# 需要管理员角色
+@api_bp.route('/admin/dashboard')
+@admin_permission.require()  # 或者使用 @role_required('admin')
+def admin_dashboard():
+    return jsonify({'message': '管理员面板'})
+
+
+# 需要经理角色
+@api_bp.route('/manager/reports')
+@role_required('manager')
+def manager_reports():
+    return jsonify({'message': '经理报告'})
+
+
+# 需要特定权限
+@api_bp.route('/user/create')
+@permission_required(create_permission('user_create'))
+def create_user():
+    return jsonify({'message': '创建用户'})
+
+
+# 多个权限之一
+@api_bp.route('/content/edit')
+def edit_content():
+    edit_perm = create_permission('content_edit')
+    publish_perm = create_permission('content_publish')
+
+    if edit_perm.can() or publish_perm.can():
+        return jsonify({'message': '编辑内容'})
+    else:
+        return jsonify({'error': '权限不足'}), 403
+
+
+# 在视图函数中检查权限
+@api_bp.route('/analytics')
+def analytics():
+    from flask_principal import Permission, RoleNeed
+
+    # 动态检查权限
+    if Permission(RoleNeed('admin')).can():
+        return jsonify({'data': '完整分析数据'})
+    elif Permission(RoleNeed('manager')).can():
+        return jsonify({'data': '基础分析数据'})
+    else:
+        return jsonify({'error': '无权访问分析数据'}), 403

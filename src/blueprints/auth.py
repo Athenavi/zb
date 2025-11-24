@@ -9,7 +9,7 @@ from flask_bcrypt import check_password_hash
 from flask_login import login_user, logout_user
 
 from setting import app_config
-from src.models import User
+from src.models import User, UserSession, db
 
 auth_bp = Blueprint('auth', __name__, template_folder='templates')
 from flask_wtf import FlaskForm
@@ -21,6 +21,7 @@ from urllib.parse import urlparse, urljoin
 
 from flask import redirect, current_app, request, make_response
 from functools import wraps
+from flask_principal import identity_changed, AnonymousIdentity
 
 
 def babel_language_switch(view_func):
@@ -255,73 +256,7 @@ def login():
                 mobile_device = True
 
         if request.method == 'POST':
-            if request.is_json:
-                data = request.get_json()
-                email = data.get('email')
-                password = data.get('password')
-            else:
-                email = form.email.data
-                password = form.password.data
-
-            user = User.query.filter_by(email=email).first()
-
-            if user and check_password_hash(user.password, password):
-                # 1. 创建 Session 登录
-                remember_me = form.remember_me.data
-                login_user(user, remember=remember_me)
-
-                # 2. 生成双 JWT token
-                from flask_jwt_extended import create_access_token, create_refresh_token
-                access_token = create_access_token(
-                    identity=str(user.id),
-                    additional_claims={'user_id': user.id, 'email': user.email},
-                    expires_delta=app_config.JWT_ACCESS_TOKEN_EXPIRES
-                )
-                refresh_token = create_refresh_token(identity=str(user.id),
-                                                     expires_delta=app_config.JWT_REFRESH_TOKEN_EXPIRES)
-
-                if request.is_json:
-                    return jsonify({
-                        'success': True,
-                        'message': '登录成功',
-                        'user': user.to_dict(),
-                        'access_token': access_token,
-                        'refresh_token': refresh_token,
-                    })
-                else:
-                    expires = datetime.now(timezone.utc) + app_config.JWT_ACCESS_TOKEN_EXPIRES
-                    refresh_expires = datetime.now(
-                        timezone.utc) + app_config.JWT_REFRESH_TOKEN_EXPIRES if form.remember_me else None
-                    response = make_response(redirect(next_url))
-
-                    # 设置 Session Cookie（Flask-Login 会自动处理）
-                    # 设置 JWT Cookies
-                    response.set_cookie(
-                        'access_token',
-                        access_token,
-                        httponly=True,
-                        samesite='Lax',
-                        expires=expires
-                    )
-                    if remember_me:
-                        response.set_cookie(
-                            'refresh_token',
-                            refresh_token,
-                            httponly=True,
-                            samesite='Lax',
-                            expires=refresh_expires
-                        )
-                    flash('登录成功', 'success')
-                    return response
-            else:
-                if request.is_json:
-                    return jsonify({
-                        'success': False,
-                        'message': '无效的电子邮件或密码'
-                    }), 401
-                else:
-                    flash('无效的电子邮件或密码', 'error')
-                    return render_template('auth/login.html', form=form, email=email, mobile_device=mobile_device)
+            return login_post_response(form, mobile_device=mobile_device, next_url=next_url)
 
         return render_template('auth/login.html', form=form, next=request.args.get('next', '/profile'),
                                mobile_device=mobile_device)
@@ -365,4 +300,92 @@ def logout():
     for cookie_name in cookies_to_clear:
         response.set_cookie(cookie_name, '', expires=0)
     logout_user()
+    # 告诉 Flask-Principal 用户已登出
+    identity_changed.send(current_app._get_current_object(),
+                          identity=AnonymousIdentity())
     return response
+
+
+def login_post_response(form, mobile_device=False, next_url=None):
+    if request.is_json:
+        data = request.get_json()
+        email = data.get('email')
+        password = data.get('password')
+    else:
+        email = form.email.data
+        password = form.password.data
+
+    user = User.query.filter_by(email=email).first()
+
+    if user and check_password_hash(user.password, password):
+        from flask_jwt_extended import create_access_token, create_refresh_token
+        # 0. 生成双 JWT token
+
+        access_token = create_access_token(
+            identity=str(user.id),
+            additional_claims={'user_id': user.id, 'email': user.email},
+            expires_delta=app_config.JWT_ACCESS_TOKEN_EXPIRES
+        )
+        refresh_token = create_refresh_token(identity=str(user.id),
+                                             expires_delta=app_config.JWT_REFRESH_TOKEN_EXPIRES)
+        try:
+            # 1. 创建 Session 登录
+            remember_me = form.remember_me.data
+            login_user(user, remember=remember_me)
+
+            if request.is_json:
+                return jsonify({
+                    'success': True,
+                    'message': '登录成功',
+                    'user': user.to_dict(),
+                    'access_token': access_token,
+                    'refresh_token': refresh_token,
+                })
+            else:
+                expires = datetime.now(timezone.utc) + app_config.JWT_ACCESS_TOKEN_EXPIRES
+                refresh_expires = datetime.now(
+                    timezone.utc) + app_config.JWT_REFRESH_TOKEN_EXPIRES if form.remember_me else None
+                response = make_response(redirect(next_url))
+
+                # 设置 Session Cookie（Flask-Login 会自动处理）
+                # 设置 JWT Cookies
+                response.set_cookie(
+                    'access_token',
+                    access_token,
+                    httponly=True,
+                    samesite='Lax',
+                    expires=expires
+                )
+                if remember_me:
+                    response.set_cookie(
+                        'refresh_token',
+                        refresh_token,
+                        httponly=True,
+                        samesite='Lax',
+                        expires=refresh_expires
+                    )
+                flash('登录成功', 'success')
+                return response
+        except Exception as e:
+            print(e)
+        finally:
+            new_session = UserSession(
+                user_id=user.id,
+                session_id=request.cookies.get('zb_session'),
+                device_info=request.headers.get('User-Agent'),  # 只需传递原始字符串
+                ip_address=request.remote_addr,  # 记录登录 IP 地址
+                access_token=access_token,
+                refresh_token=refresh_token,
+                expiry_hours=3 if form.remember_me else 720,
+            )
+            db.session.add(new_session)
+            db.session.commit()
+    else:
+        if request.is_json:
+            return jsonify({
+                'success': False,
+                'message': '无效的电子邮件或密码'
+            }), 401
+        else:
+            flash('无效的电子邮件或密码', 'error')
+            return render_template('auth/login.html', form=form, email=email, mobile_device=mobile_device)

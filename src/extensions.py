@@ -7,6 +7,7 @@ from flask_jwt_extended import JWTManager
 from flask_login import LoginManager
 from flask_mail import Mail
 from flask_migrate import Migrate
+from flask_principal import Principal
 from flask_restful import Api
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
@@ -43,6 +44,7 @@ migrate = Migrate()
 # talisman = Talisman()
 # limiter = Limiter()
 babel = Babel()
+principal = Principal()
 
 
 # --------------------------
@@ -61,6 +63,7 @@ def init_extensions(app):
     # talisman.init_app(app)
     # limiter.init_app(app)
     babel.init_app(app)
+    principal.init_app(app)
 
     # 登录管理器额外配置
     login_manager.login_view = 'auth.login'

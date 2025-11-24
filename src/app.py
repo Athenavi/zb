@@ -27,6 +27,7 @@ from src.other.filters import json_filter, string_split, article_author, md2html
     f2list
 from src.other.search import search_handler
 from src.plugin import plugin_bp, init_plugin_manager
+from src.scheduler import session_scheduler
 from src.setting import app_config
 
 
@@ -43,6 +44,8 @@ def create_app(config_class=app_config):
 
     # 初始化扩展
     init_extensions(app)
+    # 初始化定时任务
+    session_scheduler.init_app(app)
 
     # 配置代理中间件
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)
@@ -165,6 +168,15 @@ def register_direct_routes(app, config_class):
         else:
             # 返回 500 错误页面或 JSON 响应
             return error(500, "Internal Server Error")
+
+    from flask_principal import PermissionDenied
+
+    @app.errorhandler(PermissionDenied)
+    def handle_permission_denied(error):
+        return jsonify({
+            'error': '权限不足',
+            'message': '您没有执行此操作的权限'
+        }), 403
 
     @app.route('/<path:undefined_path>')
     def undefined_route(undefined_path):
