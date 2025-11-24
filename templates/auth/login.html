@@ -193,178 +193,186 @@
     {% if not mobile_device %}
         <script>
             document.addEventListener('DOMContentLoaded', function () {
-                // Tab switching
-                const traditionalTab = document.getElementById('traditional-tab');
-                const qrTab = document.getElementById('qr-tab');
-                const traditionalLogin = document.getElementById('traditional-login');
-                const qrLogin = document.getElementById('qr-login');
+                    // Tab switching
+                    const traditionalTab = document.getElementById('traditional-tab');
+                    const qrTab = document.getElementById('qr-tab');
+                    const traditionalLogin = document.getElementById('traditional-login');
+                    const qrLogin = document.getElementById('qr-login');
 
-                let qrToken = null;
-                let qrInterval = null;
-                let countdownInterval = null;
+                    let qrToken = null;
+                    let qrInterval = null;
+                    let countdownInterval = null;
 
-                traditionalTab.addEventListener('click', function () {
-                    switchToTraditional();
-                });
+                    traditionalTab.addEventListener('click', function () {
+                        switchToTraditional();
+                    });
 
-                qrTab.addEventListener('click', function () {
-                    switchToQR();
-                });
+                    qrTab.addEventListener('click', function () {
+                        switchToQR();
+                    });
 
-                function switchToTraditional() {
-                    traditionalTab.classList.add('bg-white', 'text-gray-900', 'shadow-sm');
-                    traditionalTab.classList.remove('text-gray-500');
-                    qrTab.classList.remove('bg-white', 'text-gray-900', 'shadow-sm');
-                    qrTab.classList.add('text-gray-500');
+                    function switchToTraditional() {
+                        traditionalTab.classList.add('bg-white', 'text-gray-900', 'shadow-sm');
+                        traditionalTab.classList.remove('text-gray-500');
+                        qrTab.classList.remove('bg-white', 'text-gray-900', 'shadow-sm');
+                        qrTab.classList.add('text-gray-500');
 
-                    traditionalLogin.classList.remove('hidden');
-                    qrLogin.classList.add('hidden');
+                        traditionalLogin.classList.remove('hidden');
+                        qrLogin.classList.add('hidden');
 
-                    // Clear QR intervals
-                    if (qrInterval) clearInterval(qrInterval);
-                    if (countdownInterval) clearInterval(countdownInterval);
-                }
-
-                function switchToQR() {
-                    qrTab.classList.add('bg-white', 'text-gray-900', 'shadow-sm');
-                    qrTab.classList.remove('text-gray-500');
-                    traditionalTab.classList.remove('bg-white', 'text-gray-900', 'shadow-sm');
-                    traditionalTab.classList.add('text-gray-500');
-
-                    qrLogin.classList.remove('hidden');
-                    traditionalLogin.classList.add('hidden');
-
-                    generateQRCode();
-                }
-
-                // Password toggle
-                const togglePassword = document.getElementById('toggle-password');
-                const passwordInput = document.getElementById('password');
-
-                togglePassword.addEventListener('click', function () {
-                    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-                    passwordInput.setAttribute('type', type);
-
-                    const icon = this.querySelector('i');
-                    if (type === 'password') {
-                        icon.classList.remove('fa-eye-slash');
-                        icon.classList.add('fa-eye');
-                    } else {
-                        icon.classList.remove('fa-eye');
-                        icon.classList.add('fa-eye-slash');
+                        // Clear QR intervals
+                        if (qrInterval) clearInterval(qrInterval);
+                        if (countdownInterval) clearInterval(countdownInterval);
                     }
-                });
 
-                // QR Code functionality
-                function generateQRCode() {
-                    showQRLoading();
+                    function switchToQR() {
+                        qrTab.classList.add('bg-white', 'text-gray-900', 'shadow-sm');
+                        qrTab.classList.remove('text-gray-500');
+                        traditionalTab.classList.remove('bg-white', 'text-gray-900', 'shadow-sm');
+                        traditionalTab.classList.add('text-gray-500');
 
-                    fetch('/api/qr/generate')
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.success) {
-                                qrToken = data.token;
-                                showQRCode(data.qr_code);
-                                startCountdown(180);
-                                startStatusCheck();
-                            } else {
-                                showQRError();
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error generating QR code:', error);
-                            showQRError();
-                        });
-                }
+                        qrLogin.classList.remove('hidden');
+                        traditionalLogin.classList.add('hidden');
 
-                function showQRLoading() {
-                    document.getElementById('qr-loading').classList.remove('hidden');
-                    document.getElementById('qr-display').classList.add('hidden');
-                    document.getElementById('qr-error').classList.add('hidden');
-                    document.getElementById('qr-expired').classList.add('hidden');
-                    document.getElementById('qr-success').classList.add('hidden');
-                }
+                        generateQRCode();
+                    }
 
-                function showQRCode(qrCodeData) {
-                    document.getElementById('qr-image').src = qrCodeData;
-                    document.getElementById('qr-loading').classList.add('hidden');
-                    document.getElementById('qr-display').classList.remove('hidden');
-                    document.getElementById('qr-error').classList.add('hidden');
-                    document.getElementById('qr-expired').classList.add('hidden');
-                    document.getElementById('qr-success').classList.add('hidden');
-                }
+                    // Password toggle
+                    const togglePassword = document.getElementById('toggle-password');
+                    const passwordInput = document.getElementById('password');
 
-                function showQRError() {
-                    document.getElementById('qr-loading').classList.add('hidden');
-                    document.getElementById('qr-display').classList.add('hidden');
-                    document.getElementById('qr-error').classList.remove('hidden');
-                    document.getElementById('qr-expired').classList.add('hidden');
-                    document.getElementById('qr-success').classList.add('hidden');
-                }
+                    togglePassword.addEventListener('click', function () {
+                        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                        passwordInput.setAttribute('type', type);
 
-                function showQRExpired() {
-                    document.getElementById('qr-loading').classList.add('hidden');
-                    document.getElementById('qr-display').classList.add('hidden');
-                    document.getElementById('qr-error').classList.add('hidden');
-                    document.getElementById('qr-expired').classList.remove('hidden');
-                    document.getElementById('qr-success').classList.add('hidden');
-                }
-
-                function showQRSuccess() {
-                    document.getElementById('qr-loading').classList.add('hidden');
-                    document.getElementById('qr-display').classList.add('hidden');
-                    document.getElementById('qr-error').classList.add('hidden');
-                    document.getElementById('qr-expired').classList.add('hidden');
-                    document.getElementById('qr-success').classList.remove('hidden');
-                }
-
-                function startCountdown(seconds) {
-                    let timeLeft = seconds;
-                    const countdownElement = document.getElementById('countdown');
-
-                    countdownInterval = setInterval(() => {
-                        timeLeft--;
-                        countdownElement.textContent = timeLeft;
-
-                        if (timeLeft <= 0) {
-                            clearInterval(countdownInterval);
-                            clearInterval(qrInterval);
-                            showQRExpired();
+                        const icon = this.querySelector('i');
+                        if (type === 'password') {
+                            icon.classList.remove('fa-eye-slash');
+                            icon.classList.add('fa-eye');
+                        } else {
+                            icon.classList.remove('fa-eye');
+                            icon.classList.add('fa-eye-slash');
                         }
-                    }, 1000);
-                }
+                    });
 
-                function startStatusCheck() {
-                    qrInterval = setInterval(() => {
-                        if (!qrToken) return;
+                    // QR Code functionality
+                    function generateQRCode() {
+                        showQRLoading();
 
-                        fetch(`/api/qr/status?token=${qrToken}`)
+                        fetch('/api/qr/generate')
                             .then(response => response.json())
                             .then(data => {
+                                if (data.success) {
+                                    qrToken = data.token;
+                                    showQRCode(data.qr_code);
+                                    startCountdown(180);
+                                    startStatusCheck();
+                                } else {
+                                    showQRError();
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error generating QR code:', error);
+                                showQRError();
+                            });
+                    }
+
+                    function showQRLoading() {
+                        document.getElementById('qr-loading').classList.remove('hidden');
+                        document.getElementById('qr-display').classList.add('hidden');
+                        document.getElementById('qr-error').classList.add('hidden');
+                        document.getElementById('qr-expired').classList.add('hidden');
+                        document.getElementById('qr-success').classList.add('hidden');
+                    }
+
+                    function showQRCode(qrCodeData) {
+                        document.getElementById('qr-image').src = qrCodeData;
+                        document.getElementById('qr-loading').classList.add('hidden');
+                        document.getElementById('qr-display').classList.remove('hidden');
+                        document.getElementById('qr-error').classList.add('hidden');
+                        document.getElementById('qr-expired').classList.add('hidden');
+                        document.getElementById('qr-success').classList.add('hidden');
+                    }
+
+                    function showQRError() {
+                        document.getElementById('qr-loading').classList.add('hidden');
+                        document.getElementById('qr-display').classList.add('hidden');
+                        document.getElementById('qr-error').classList.remove('hidden');
+                        document.getElementById('qr-expired').classList.add('hidden');
+                        document.getElementById('qr-success').classList.add('hidden');
+                    }
+
+                    function showQRExpired() {
+                        document.getElementById('qr-loading').classList.add('hidden');
+                        document.getElementById('qr-display').classList.add('hidden');
+                        document.getElementById('qr-error').classList.add('hidden');
+                        document.getElementById('qr-expired').classList.remove('hidden');
+                        document.getElementById('qr-success').classList.add('hidden');
+                    }
+
+                    function showQRSuccess() {
+                        document.getElementById('qr-loading').classList.add('hidden');
+                        document.getElementById('qr-display').classList.add('hidden');
+                        document.getElementById('qr-error').classList.add('hidden');
+                        document.getElementById('qr-expired').classList.add('hidden');
+                        document.getElementById('qr-success').classList.remove('hidden');
+                    }
+
+                    function startCountdown(seconds) {
+                        let timeLeft = seconds;
+                        const countdownElement = document.getElementById('countdown');
+
+                        countdownInterval = setInterval(() => {
+                            timeLeft--;
+                            countdownElement.textContent = timeLeft;
+
+                            if (timeLeft <= 0) {
+                                clearInterval(countdownInterval);
+                                clearInterval(qrInterval);
+                                showQRExpired();
+                            }
+                        }, 1000);
+                    }
+
+                    function startStatusCheck() {
+                        qrInterval = setInterval(async () => {
+                            if (!qrToken) return;
+
+                            try {
+                                const response = await fetch(`/api/qr/status?token=${qrToken}`);
+                                const data = await response.json();
+
                                 if (data.status === 'success') {
                                     clearInterval(qrInterval);
                                     clearInterval(countdownInterval);
                                     showQRSuccess();
 
-                                    // Complete login
-                                    if (data.refresh_token) {
-                                        Cookies.set('refresh_token', data.refresh_token);
-                                        Cookies.set('access_token', data.access_token);
-                                        Cookies.set('zb_session', data.zb_session);
-                                        window.location.href = data.callback || '/profile';
-                                    }
+                                    // 完成登录流程
+                                    // 短暂延迟确保cookie设置完成
+                                    setTimeout(() => {
+                                        window.location.href = '/profile';
+                                    }, 500);
+                                    // 完成登录流程
+                                } else if (data.status === 'error') {
+                                    clearInterval(qrInterval);
+                                    clearInterval(countdownInterval);
+                                    showQRError(data.message || '登录失败');
                                 }
-                            })
-                            .catch(error => {
-                                console.error('Error checking QR status:', error);
-                            });
-                    }, 2000);
-                }
+                            } catch (error) {
+                                console.error('检查QR状态错误:', error);
+                                clearInterval(qrInterval);
+                                clearInterval(countdownInterval);
+                                showQRError('网络错误，请重试');
+                            }
+                        }, 2000);
+                    }
 
-                // Retry and refresh buttons
-                document.getElementById('retry-qr').addEventListener('click', generateQRCode);
-                document.getElementById('refresh-qr').addEventListener('click', generateQRCode);
-            });
+                    // Retry and refresh buttons
+                    document.getElementById('retry-qr').addEventListener('click', generateQRCode);
+                    document.getElementById('refresh-qr').addEventListener('click', generateQRCode);
+                }
+            )
+
         </script>
     {% endif %}
     <script src="https://cdn.jsdelivr.net/npm/js-cookie@3.0.1/dist/js.cookie.min.js"></script>
