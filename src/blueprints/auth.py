@@ -267,15 +267,18 @@ def login():
 
             if user and check_password_hash(user.password, password):
                 # 1. 创建 Session 登录
-                login_user(user, remember=True)
+                remember_me = form.remember_me.data
+                login_user(user, remember=remember_me)
 
                 # 2. 生成双 JWT token
                 from flask_jwt_extended import create_access_token, create_refresh_token
                 access_token = create_access_token(
                     identity=str(user.id),
-                    additional_claims={'user_id': user.id, 'email': user.email}
+                    additional_claims={'user_id': user.id, 'email': user.email},
+                    expires_delta=app_config.JWT_ACCESS_TOKEN_EXPIRES
                 )
-                refresh_token = create_refresh_token(identity=str(user.id))
+                refresh_token = create_refresh_token(identity=str(user.id),
+                                                     expires_delta=app_config.JWT_REFRESH_TOKEN_EXPIRES)
 
                 if request.is_json:
                     return jsonify({
@@ -287,7 +290,8 @@ def login():
                     })
                 else:
                     expires = datetime.now(timezone.utc) + app_config.JWT_ACCESS_TOKEN_EXPIRES
-                    refresh_expires = datetime.now(timezone.utc) + app_config.JWT_REFRESH_TOKEN_EXPIRES
+                    refresh_expires = datetime.now(
+                        timezone.utc) + app_config.JWT_REFRESH_TOKEN_EXPIRES if form.remember_me else None
                     response = make_response(redirect(next_url))
 
                     # 设置 Session Cookie（Flask-Login 会自动处理）
@@ -299,13 +303,14 @@ def login():
                         samesite='Lax',
                         expires=expires
                     )
-                    response.set_cookie(
-                        'refresh_token',
-                        refresh_token,
-                        httponly=True,
-                        samesite='Lax',
-                        expires=refresh_expires
-                    )
+                    if remember_me:
+                        response.set_cookie(
+                            'refresh_token',
+                            refresh_token,
+                            httponly=True,
+                            samesite='Lax',
+                            expires=refresh_expires
+                        )
                     flash('登录成功', 'success')
                     return response
             else:

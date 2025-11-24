@@ -12,6 +12,9 @@ from setting import app_config
 
 def refresh_tokens_if_needed():
     """在请求前自动刷新即将过期的 token"""
+    refresh_token = request.cookies.get('refresh_token')
+    if not refresh_token:
+        return
     access_token = request.cookies.get('access_token')
     if not access_token:
         return

@@ -143,6 +143,9 @@ class BaseConfig:
     JWT_COOKIE_SECURE = False
     JWT_COOKIE_CSRF_PROTECT = False
     JWT_SESSION_COOKIE = False
+    REMEMBER_COOKIE_DURATION = timedelta(days=30)  # 记住登录状态30天
+    PERMANENT_SESSION_LIFETIME = timedelta(days=30)
+
 
     # 安全头配置（Talisman）
     TALISMAN_CONTENT_SECURITY_POLICY = {
