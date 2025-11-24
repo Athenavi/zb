@@ -7,10 +7,10 @@ import magic
 from flask import jsonify, request
 from werkzeug.utils import secure_filename
 
+from auth import jwt_required
 from src.database import get_db
 from src.models import Media, FileHash, UploadChunk, UploadTask
 from src.utils.shortener.links import create_special_url
-from user.authz.decorators import jwt_required
 
 
 class FileProcessor:

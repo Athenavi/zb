@@ -1,8 +1,9 @@
 from pathlib import Path
 
-from flask import Blueprint, jsonify, current_app, render_template, request, redirect, make_response
+from flask import Blueprint, jsonify, current_app, request
 from sqlalchemy import select, func
 
+from src.auth import jwt_required, admin_required, origin_required
 from src.blog.article.core.content import get_i18n_content_by_aid
 from src.blog.article.security.password import check_apw_form, get_apw_form
 from src.blog.comment import create_comment_with_anti_spam, comment_page_get
@@ -14,14 +15,12 @@ from src.other.report import report_back
 from src.setting import app_config
 from src.upload.admin_upload import admin_upload_file
 from src.upload.public_upload import upload_cover_back, handle_user_upload
-from src.user.authz.decorators import jwt_required, admin_required, origin_required
 from src.user.authz.qrlogin import check_qr_login_back, phone_scan_back, qr_login
 from src.user.entities import get_avatar
 from src.user.profile.social import get_user_info
 from src.user.views import confirm_email_back
 from src.utils.config.theme import get_all_themes
 from src.utils.http.generate_response import send_chunk_md
-from src.utils.security.jwt_handler import JWTHandler
 from src.utils.security.safe import is_valid_iso_language_code
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
@@ -290,44 +289,6 @@ def check_qr_status():
     return check_qr_login_back(cache)
 
 
-@api_bp.route('/mobile/login', methods=['GET', 'POST'])
-def mobile_login():
-    """Mobile login page for QR scanning"""
-    if request.method == 'POST':
-        data = request.get_json() if request.is_json else request.form
-        email = data.get('email')
-        password = data.get('password')
-
-        from flask_bcrypt import check_password_hash
-        user = User.query.filter_by(email=email).first()
-
-        if user and check_password_hash(user.password, password):
-            # Generate JWT tokens
-            jwt_token = JWTHandler.generate_token(user.id, user.username)
-            refresh_token = JWTHandler.generate_refresh_token(user.id)
-            # Set cookies for mobile QR scanning
-            response = make_response(jsonify({
-                'success': True,
-                'message': 'Login successful',
-                'user': user.to_dict()
-            }) if request.is_json else redirect('/profile'))
-
-            response.set_cookie('jwt', jwt_token, httponly=True, secure=False, max_age=3600)
-            response.set_cookie('refresh_token', refresh_token, httponly=True, secure=False, max_age=604800)
-
-            return response
-        else:
-            if request.is_json:
-                return jsonify({
-                    'success': False,
-                    'message': 'Invalid email or password'
-                }), 401
-            else:
-                return render_template('mobile/login.html', error='Invalid email or password')
-
-    return render_template('mobile/login.html')
-
-
 @api_bp.route('/media/upload', methods=['POST'])
 @jwt_required
 def upload_user_path(user_id):
@@ -370,3 +331,53 @@ def check_email():
     email = request.args.get('email')
     exists = User.query.filter_by(email=email).first() is not None
     return jsonify({'exists': exists})
+
+
+from src.security import admin_permission, role_required, permission_required, create_permission
+
+
+# 需要管理员角色
+@api_bp.route('/admin/dashboard')
+@admin_permission.require()  # 或者使用 @role_required('admin')
+def admin_dashboard():
+    return jsonify({'message': '管理员面板'})
+
+
+# 需要经理角色
+@api_bp.route('/manager/reports')
+@role_required('manager')
+def manager_reports():
+    return jsonify({'message': '经理报告'})
+
+
+# 需要特定权限
+@api_bp.route('/user/create')
+@permission_required(create_permission('user_create'))
+def create_user():
+    return jsonify({'message': '创建用户'})
+
+
+# 多个权限之一
+@api_bp.route('/content/edit')
+def edit_content():
+    edit_perm = create_permission('content_edit')
+    publish_perm = create_permission('content_publish')
+
+    if edit_perm.can() or publish_perm.can():
+        return jsonify({'message': '编辑内容'})
+    else:
+        return jsonify({'error': '权限不足'}), 403
+
+
+# 在视图函数中检查权限
+@api_bp.route('/analytics')
+def analytics():
+    from flask_principal import Permission, RoleNeed
+
+    # 动态检查权限
+    if Permission(RoleNeed('admin')).can():
+        return jsonify({'data': '完整分析数据'})
+    elif Permission(RoleNeed('manager')).can():
+        return jsonify({'data': '基础分析数据'})
+    else:
+        return jsonify({'error': '无权访问分析数据'}), 403

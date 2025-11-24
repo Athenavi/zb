@@ -1,8 +1,8 @@
 from flask import Blueprint, jsonify, render_template, request
 
 from plugins.manager import PluginManager
+from src.auth import admin_required
 from src.models import User
-from user.authz.decorators import admin_required
 
 plugin_bp = Blueprint('plugin_bp', __name__, url_prefix='/api/plugins')
 

@@ -1,8 +1,8 @@
 from flask import Blueprint, request, render_template
 from flask import jsonify
 
+from src.auth import admin_required
 from src.models import User, Role, Permission, UserRole, RolePermission, db
-from user.authz.decorators import admin_required
 
 role_bp = Blueprint('role', __name__, template_folder='templates')
 

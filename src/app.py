@@ -1,15 +1,16 @@
 from datetime import datetime, timezone
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, g
 from jinja2 import select_autoescape
 from werkzeug.exceptions import NotFound
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+from auth import jwt_required
 from src.blueprints.admin_vip import admin_vip_bp
 from src.blueprints.api import api_bp
 from src.blueprints.auth import auth_bp
 from src.blueprints.blog import blog_bp, get_footer, get_site_title, get_banner, get_site_domain, get_site_beian, \
-    get_site_menu, get_current_menu_slug, blog_detail_back
+    get_site_menu, get_current_menu_slug, blog_detail_back, get_username
 from src.blueprints.category import category_bp
 from src.blueprints.dashboard import dashboard_bp
 from src.blueprints.media import media_bp
@@ -17,6 +18,7 @@ from src.blueprints.my import my_bp
 from src.blueprints.noti import noti_bp
 from src.blueprints.relation import relation_bp
 from src.blueprints.role import role_bp
+from src.blueprints.session_views import session_bp
 from src.blueprints.theme import theme_bp
 from src.blueprints.vip_routes import vip_bp
 from src.blueprints.website import website_bp
@@ -26,9 +28,8 @@ from src.other.filters import json_filter, string_split, article_author, md2html
     f2list
 from src.other.search import search_handler
 from src.plugin import plugin_bp, init_plugin_manager
+from src.scheduler import session_scheduler
 from src.setting import app_config
-from src.user.authz.decorators import jwt_required
-from src.utils.security.jwt_handler import JWTHandler
 
 
 def create_app(config_class=app_config):
@@ -44,6 +45,8 @@ def create_app(config_class=app_config):
 
     # 初始化扩展
     init_extensions(app)
+    # 初始化定时任务
+    session_scheduler.init_app(app)
 
     # 配置代理中间件
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)
@@ -86,7 +89,7 @@ def register_context_processors(app, config_class):
             beian=get_site_beian() or config_class.beian,
             title=get_site_title() or config_class.sitename,
             domain=get_site_domain() or config_class.domain,
-            username=JWTHandler.get_current_username(),
+            username=get_username(),
             menu=get_site_menu(get_current_menu_slug()) or default_menu_data,
             footer=get_footer(),
             banner=get_banner()
@@ -98,8 +101,21 @@ def register_direct_routes(app, config_class):
 
     @login_manager.user_loader
     def load_user(user_id):
-        from src.models import User
-        return User.get(user_id)
+        from src.models.user import User, db
+        user = db.session.query(User).filter_by(id=user_id).first()
+        return user
+
+    @app.after_request
+    def after_request(response):
+        # 设置新的 access_token 如果存在
+        if hasattr(g, 'new_access_token'):
+            response.set_cookie(
+                'access_token',
+                g.new_access_token,
+                httponly=True,
+                secure=app.config.get('PREFER_SECURE', False)
+            )
+        return response
 
     from flask import redirect
     @app.route('/space')
@@ -154,6 +170,15 @@ def register_direct_routes(app, config_class):
             # 返回 500 错误页面或 JSON 响应
             return error(500, "Internal Server Error")
 
+    from flask_principal import PermissionDenied
+
+    @app.errorhandler(PermissionDenied)
+    def handle_permission_denied(error):
+        return jsonify({
+            'error': '权限不足',
+            'message': '您没有执行此操作的权限'
+        }), 403
+
     @app.route('/<path:undefined_path>')
     def undefined_route(undefined_path):
         error_message = f"Undefined path: {undefined_path}"
@@ -188,7 +213,8 @@ def register_blueprints(app):
         api_bp,
         blog_bp,
         vip_bp,
-        admin_vip_bp
+        admin_vip_bp,
+        session_bp
     ]
 
     for bp in blueprints:

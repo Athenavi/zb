@@ -3,10 +3,10 @@ import re
 import bcrypt
 from flask import Blueprint, json
 
+from src.auth import admin_required
 from src.models import User, Article, ArticleContent, ArticleI18n, Category, Comment, db, CategorySubscription, Menus, \
     MenuItems, Pages, SystemSettings, FileHash, Media, Url, SearchHistory, Event, Report
 # from src.error import error
-from src.user.authz.decorators import admin_required
 from src.utils.config.theme import get_all_themes
 from src.utils.security.safe import validate_email_base
 from update import base_dir

@@ -133,6 +133,19 @@ class BaseConfig:
     BABEL_DEFAULT_TIMEZONE = 'Asia/Shanghai'
     BABEL_SUPPORTED_LOCALES = ['zh_CN', "en"]
     BABEL_TRANSLATION_DIRECTORIES = 'translations'
+    # jwt
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or generate_random_text(32)
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(seconds=JWT_EXPIRATION_DELTA)
+    JWT_REFRESH_TOKEN_EXPIRES = timedelta(seconds=REFRESH_TOKEN_EXPIRATION_DELTA)
+    JWT_ACCESS_COOKIE_NAME = 'access_token'
+    JWT_REFRESH_COOKIE_NAME = 'refresh_token'
+    JWT_TOKEN_LOCATION = ['cookies']
+    JWT_COOKIE_SECURE = False
+    JWT_COOKIE_CSRF_PROTECT = False
+    JWT_SESSION_COOKIE = False
+    REMEMBER_COOKIE_DURATION = timedelta(days=30)  # 记住登录状态30天
+    PERMANENT_SESSION_LIFETIME = timedelta(days=30)
+
 
     # 安全头配置（Talisman）
     TALISMAN_CONTENT_SECURITY_POLICY = {

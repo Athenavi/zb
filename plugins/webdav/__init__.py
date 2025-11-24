@@ -11,10 +11,10 @@ from flask import Blueprint, Response, send_file, request
 
 from blueprints.media import get_user_storage_used
 from extensions import csrf
+from src.auth import jwt_required
 from src.database import get_db
 from src.models import Media, FileHash, User, db
 from src.setting import app_config
-from src.utils.security.jwt_handler import JWTHandler
 
 logger = logging.getLogger(__name__)
 
@@ -301,7 +301,8 @@ def register_plugin(app):
                 i += 1
             return f"{size_bytes:.1f} {size_names[i]}"
 
-        def authenticate_user(self):
+        @jwt_required
+        def authenticate_user(self, user_id):
             """Authenticate user using Basic Auth with refresh token"""
             auth_header = request.headers.get('Authorization', '')
             if not auth_header.startswith('Basic '):
@@ -313,7 +314,6 @@ def register_plugin(app):
                 username, refresh_token = auth_decoded.split(':', 1)
 
                 with get_db() as db:
-                    user_id = JWTHandler.authenticate_refresh_token(refresh_token)
                     user = db.query(User).filter(User.id == user_id).first()
 
                     if user and user.username == username:

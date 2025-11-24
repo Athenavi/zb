@@ -1,9 +1,9 @@
 from flask import Blueprint, flash
 
+from src.auth import jwt_required
 # from src.database import get_db
 from src.models import Article
 from src.models import Url, Comment, db
-from src.user.authz.decorators import jwt_required
 from src.utils.shortener.links import generate_short_url
 from user.authz.password import validate_password, update_password
 from utils.security.ip_utils import get_client_ip
@@ -233,6 +233,8 @@ def change_password(user_id):
                                confirm_password=form.confirm_password.data, ip=ip):
                 session.pop(f"tmp-change-key_{user_id}")
                 session.pop(f"tmp-change-key-time_{user_id}")
-                return render_template('inform.html', status_code='200', message='密码修改成功！')
+                from flask_login import logout_user
+                logout_user()
+                return render_template('inform.html', status_code='200', message='密码修改成功！现在需要重新登录。')
     form = ChangePasswordForm()
     return render_template('my/password.html', form_type='change', form=form, user_id=user_id)

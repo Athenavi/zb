@@ -1,11 +1,11 @@
 from flask import Blueprint
 from flask import render_template, jsonify
 
+from src.auth import jwt_required
 from src.blog.homepage import get_articles_with_filters, proces_page_data, create_response
 from src.error import error
 from src.models import Category, CategorySubscription
 from src.models import db, Article
-from src.user.authz.decorators import jwt_required
 
 category_bp = Blueprint('category', __name__, url_prefix='/category')
 
