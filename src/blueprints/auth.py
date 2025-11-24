@@ -1,4 +1,5 @@
 import re
+import uuid
 from datetime import datetime, timezone
 
 import bcrypt
@@ -323,11 +324,13 @@ def login_post_response(form, mobile_device=False, next_url=None):
 
         access_token = create_access_token(
             identity=str(user.id),
-            additional_claims={'user_id': user.id, 'email': user.email},
+            additional_claims={'user_id': user.id, 'email': user.email, 'jti': str(uuid.uuid4()), },
             expires_delta=app_config.JWT_ACCESS_TOKEN_EXPIRES
         )
         refresh_token = create_refresh_token(identity=str(user.id),
-                                             expires_delta=app_config.JWT_REFRESH_TOKEN_EXPIRES)
+                                             expires_delta=app_config.JWT_REFRESH_TOKEN_EXPIRES,
+                                             additional_claims={'created_at': str(user.created_at)}
+                                             )
         try:
             # 1. 创建 Session 登录
             remember_me = form.remember_me.data

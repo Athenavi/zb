@@ -76,8 +76,11 @@ def admin_sessions():
     elif status == 'inactive':
         query = query.filter(UserSession.is_active == False)
 
-    # 分页
-    pagination = query.order_by(UserSession.last_activity.desc()).paginate(
+    # 分页 - 按用户名排序，然后按最后活动时间排序，以便前端可以正确分组
+    pagination = query.order_by(
+        User.username,
+        UserSession.last_activity.desc()
+    ).paginate(
         page=page, per_page=20, error_out=False
     )
 

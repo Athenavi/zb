@@ -233,6 +233,8 @@ def change_password(user_id):
                                confirm_password=form.confirm_password.data, ip=ip):
                 session.pop(f"tmp-change-key_{user_id}")
                 session.pop(f"tmp-change-key-time_{user_id}")
-                return render_template('inform.html', status_code='200', message='密码修改成功！')
+                from flask_login import logout_user
+                logout_user()
+                return render_template('inform.html', status_code='200', message='密码修改成功！现在需要重新登录。')
     form = ChangePasswordForm()
     return render_template('my/password.html', form_type='change', form=form, user_id=user_id)
