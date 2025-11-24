@@ -67,7 +67,7 @@ def phone_scan_back(user_id, cache_instance):
         return jsonify(token_json)
 
 
-from flask import redirect, request, make_response, jsonify, flash
+from flask import request, make_response, jsonify, flash
 from flask_jwt_extended import create_access_token
 from flask_login import login_user
 from datetime import datetime, timezone
@@ -120,7 +120,8 @@ def check_qr_login_back(cache_instance):
         db.session.add(new_session)
         db.session.commit()
         expires = datetime.now(timezone.utc) + app_config.JWT_ACCESS_TOKEN_EXPIRES
-        response = make_response(redirect(next_url))
+        login_sann_json = jsonify({'status': 'success', 'next_url': next_url})
+        response = make_response(login_sann_json)
         # 设置 JWT Cookies
         response.set_cookie(
             'access_token',

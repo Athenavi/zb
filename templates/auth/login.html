@@ -350,7 +350,7 @@
                                     // 完成登录流程
                                     // 短暂延迟确保cookie设置完成
                                     setTimeout(() => {
-                                        window.location.href = '/profile';
+                                        window.location.href = data.next_url || '/profile';
                                     }, 500);
                                     // 完成登录流程
                                 } else if (data.status === 'error') {
