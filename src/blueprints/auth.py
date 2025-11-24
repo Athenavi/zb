@@ -349,14 +349,13 @@ def set_language():
 
 
 # 移动设备检测函数
+from user_agents import parse
+
+
 def is_mobile_device(user_agent):
     """检查User-Agent判断是否为移动设备"""
-    mobile_keywords = [
-        'mobile', 'android', 'iphone', 'ipad', 'ipod',
-        'blackberry', 'windows phone', 'opera mini', 'iemobile'
-    ]
-    user_agent = user_agent.lower()
-    return any(keyword in user_agent for keyword in mobile_keywords)
+    user_agent = parse(user_agent)
+    return user_agent.is_mobile
 
 
 @auth_bp.route('/logout')
