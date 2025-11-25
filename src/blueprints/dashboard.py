@@ -1,3 +1,4 @@
+import inspect
 import re
 
 import bcrypt
@@ -211,6 +212,10 @@ def get_users(user_id):
             'success': False,
             'message': f'获取用户列表失败: {str(e)}'
         }), 500
+    finally:
+        current_func_name = inspect.currentframe().f_code.co_name
+        # 输出当前视图名称和操作人ID
+        print(f"==>{current_func_name}, User ID: {user_id}")
 
 
 @admin_bp.route('/user', methods=['POST'])
@@ -284,6 +289,10 @@ def create_user(user_id):
             'success': False,
             'message': f'创建用户失败: {str(e)}'
         }), 500
+    finally:
+        current_func_name = inspect.currentframe().f_code.co_name
+        # 输出当前视图名称和操作人ID
+        print(f"==>{current_func_name}, User ID: {user_id}")
 
 
 @admin_bp.route('/user/<int:user_id2>', methods=['PUT'])
@@ -380,6 +389,10 @@ def delete_user(user_id, user_id2):
             'success': False,
             'message': f'删除用户失败: {str(e)}'
         }), 500
+    finally:
+        current_func_name = inspect.currentframe().f_code.co_name
+        # 输出当前视图名称和操作人ID
+        print(f"==>{current_func_name}, User ID: {user_id}")
 
 
 @admin_bp.route('/user/<int:user_id2>', methods=['GET'])
@@ -410,6 +423,10 @@ def get_user(user_id, user_id2):
             'success': False,
             'message': f'获取用户详情失败: {str(e)}'
         }), 500
+    finally:
+        current_func_name = inspect.currentframe().f_code.co_name
+        # 输出当前视图名称和操作人ID
+        print(f"==>{current_func_name}, User ID: {user_id}")
 
 
 @admin_bp.route('/stats', methods=['GET'])
@@ -436,6 +453,10 @@ def get_stats(user_id):
             'success': False,
             'message': f'获取统计数据失败: {str(e)}'
         }), 500
+    finally:
+        current_func_name = inspect.currentframe().f_code.co_name
+        # 输出当前视图名称和操作人ID
+        print(f"==>{current_func_name}, User ID: {user_id}")
 
 
 @admin_bp.route('/display', methods=['GET'])
@@ -533,6 +554,10 @@ def get_articles(user_id):
             'success': False,
             'message': f'获取文章列表失败: {str(e)}'
         }), 500
+    finally:
+        current_func_name = inspect.currentframe().f_code.co_name
+        # 输出当前视图名称和操作人ID
+        print(f"==>{current_func_name}, User ID: {user_id}")
 
 
 @admin_bp.route('/article', methods=['POST'])
@@ -634,6 +659,10 @@ def create_article(user_id):
             'success': False,
             'message': f'创建文章失败: {str(e)}'
         }), 500
+    finally:
+        current_func_name = inspect.currentframe().f_code.co_name
+        # 输出当前视图名称和操作人ID
+        print(f"==>{current_func_name}, User ID: {user_id}")
 
 
 @admin_bp.route('/article/<int:article_id>', methods=['GET'])
@@ -682,6 +711,10 @@ def get_article(user_id, article_id):
             'success': False,
             'message': f'获取文章详情失败: {str(e)}'
         }), 500
+    finally:
+        current_func_name = inspect.currentframe().f_code.co_name
+        # 输出当前视图名称和操作人ID
+        print(f"==>{current_func_name}, User ID: {user_id}")
 
 
 @admin_bp.route('/article/<int:article_id>', methods=['PUT'])
@@ -773,6 +806,10 @@ def delete_article(user_id, article_id):
             'success': False,
             'message': f'删除文章失败: {str(e)}'
         }), 500
+    finally:
+        current_func_name = inspect.currentframe().f_code.co_name
+        # 输出当前视图名称和操作人ID
+        print(f"==>{current_func_name}, User ID: {user_id}")
 
 
 @admin_bp.route('/article/<int:article_id>/status', methods=['PUT'])
@@ -823,6 +860,10 @@ def update_article_status(user_id, article_id):
             'success': False,
             'message': f'更新文章状态失败: {str(e)}'
         }), 500
+    finally:
+        current_func_name = inspect.currentframe().f_code.co_name
+        # 输出当前视图名称和操作人ID
+        print(f"==>{current_func_name}, User ID: {user_id}")
 
 
 @admin_bp.route('/article/stats', methods=['GET'])
@@ -866,6 +907,10 @@ def get_article_stats(user_id):
             'success': False,
             'message': f'获取文章统计失败: {str(e)}'
         }), 500
+    finally:
+        current_func_name = inspect.currentframe().f_code.co_name
+        # 输出当前视图名称和操作人ID
+        print(f"==>{current_func_name}, User ID: {user_id}")
 
 
 @admin_bp.route('/categories', methods=['GET'])
@@ -894,6 +939,10 @@ def get_categories(user_id):
             'success': False,
             'message': f'获取分类列表失败: {str(e)}'
         }), 500
+    finally:
+        current_func_name = inspect.currentframe().f_code.co_name
+        # 输出当前视图名称和操作人ID
+        print(f"==>{current_func_name}, User ID: {user_id}")
 
 
 @admin_bp.route('/authors', methods=['GET'])
@@ -928,6 +977,9 @@ def get_authors(user_id):
         }), 500
     finally:
         db_session.close()
+        current_func_name = inspect.currentframe().f_code.co_name
+        # 输出当前视图名称和操作人ID
+        print(f"==>{current_func_name}, User ID: {user_id}")
 
 
 @admin_bp.route('/categories', methods=['POST', 'PUT', 'DELETE'])
@@ -1004,6 +1056,10 @@ def admin_categories(user_id):
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    finally:
+        current_func_name = inspect.currentframe().f_code.co_name
+        # 输出当前视图名称和操作人ID
+        print(f"==>{current_func_name}, User ID: {user_id}")
 
 
 @admin_bp.route('/category', methods=['GET'])
@@ -1047,6 +1103,10 @@ def list_categories(user_id):
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    finally:
+        current_func_name = inspect.currentframe().f_code.co_name
+        # 输出当前视图名称和操作人ID
+        print(f"==>{current_func_name}, User ID: {user_id}")
 
 
 @admin_bp.route('/settings', methods=['GET', 'POST', 'PUT', 'DELETE'])
@@ -1325,6 +1385,10 @@ def admin_settings(user_id):
 
     except Exception as e:
         return jsonify({'error': str(e)})
+    finally:
+        current_func_name = inspect.currentframe().f_code.co_name
+        # 输出当前视图名称和操作人ID
+        print(f"==>{current_func_name}, User ID: {user_id}")
 
 
 @admin_bp.route('/media', methods=['GET', 'DELETE'])
@@ -1424,6 +1488,10 @@ def admin_media(user_id):
 
     except Exception as e:
         return jsonify({'error': str(e)})
+    finally:
+        current_func_name = inspect.currentframe().f_code.co_name
+        # 输出当前视图名称和操作人ID
+        print(f"==>{current_func_name}, User ID: {user_id}")
 
 
 @admin_bp.route('/media/preview/<int:media_id>')
@@ -1471,6 +1539,10 @@ def media_preview(user_id, media_id):
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    finally:
+        current_func_name = inspect.currentframe().f_code.co_name
+        # 输出当前视图名称和操作人ID
+        print(f"==>{current_func_name}, User ID: {user_id}")
 
 
 # ===============
@@ -1604,6 +1676,10 @@ def backup(user_id):
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+    finally:
+        current_func_name = inspect.currentframe().f_code.co_name
+        # 输出当前视图名称和操作人ID
+        print(f"==>{current_func_name}, User ID: {user_id}")
 
 
 @admin_bp.route('/backup/download/<filename>')
@@ -1627,6 +1703,10 @@ def download_backup(user_id, filename):
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+    finally:
+        current_func_name = inspect.currentframe().f_code.co_name
+        # 输出当前视图名称和操作人ID
+        print(f"==>{current_func_name}, User ID: {user_id}")
 
 
 from flask import request, jsonify, render_template
@@ -1838,3 +1918,7 @@ def admin_misc(user_id):
 
     except Exception as e:
         return jsonify({'error': str(e)})
+    finally:
+        current_func_name = inspect.currentframe().f_code.co_name
+        # 输出当前视图名称和操作人ID
+        print(f"==>{current_func_name}, User ID: {user_id}")

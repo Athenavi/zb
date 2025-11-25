@@ -1,7 +1,7 @@
 from flask import Blueprint, flash
+from flask_login import login_required
 
 from src.auth import jwt_required
-# from src.database import get_db
 from src.models import Article
 from src.models import Url, Comment, db
 from src.utils.shortener.links import generate_short_url
@@ -12,8 +12,8 @@ my_bp = Blueprint('my', __name__, url_prefix='/my')
 
 
 @my_bp.route('/')
-@jwt_required
-def user_index(user_id):
+@login_required
+def user_index():
     """用户主页"""
     return redirect("/my/posts")
 
@@ -68,7 +68,7 @@ def create_short_url(user_id):
 @jwt_required
 def delete_url(user_id, url_id):
     """删除短链接"""
-    url = db.session.query(Url).filter_by(id=url_id).one()
+    url = db.session.query(Url).filter_by(id=url_id, user_id=user_id).one()
     if not url:
         flash('链接不存在', 'error')
         return redirect(url_for('my.user_urls'))

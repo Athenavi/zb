@@ -11,6 +11,7 @@ def load_sensitive_words(file_path):
     except FileNotFoundError:
         return set()
     except IOError as e:
+        print(e)
         return set()
 
 

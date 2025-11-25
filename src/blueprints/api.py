@@ -59,9 +59,9 @@ def api_comment(user_id, article_id):
 
 
 @api_bp.route("/comment/<article_id>", methods=['GET'])
-@jwt_required
-def comment(user_id, article_id):
-    return comment_page_get(user_id, article_id)
+@login_required
+def comment(article_id):
+    return comment_page_get(article_id)
 
 
 @api_bp.route('/report', methods=['POST'])

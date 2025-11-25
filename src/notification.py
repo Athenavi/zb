@@ -98,6 +98,7 @@ def get_notifications(user_id):
 
 
 def read_current_notification(user_id, notification_id):
+    updated_count = 0
     success = False
     try:
         # 更新特定通知的已读状态
@@ -110,7 +111,7 @@ def read_current_notification(user_id, notification_id):
         print(f"更新通知已读状态失败: {e}")
         db.session.rollback()
 
-    response = jsonify({"success": success})
+    response = jsonify({"success": success, 'updated_count': updated_count})
     response.headers.add("Access-Control-Allow-Origin", "*")
     return response, 200
 

@@ -68,7 +68,7 @@ def create_comment_with_anti_spam(user_id, article_id):
 from sqlalchemy.orm import joinedload
 
 
-def comment_page_get(user_id, article_id):
+def comment_page_get(article_id):
     article = Article.query.filter_by(article_id=article_id).first()
     if not article:
         abort(404, "Article not found")

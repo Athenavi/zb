@@ -36,4 +36,5 @@ def api_mail(user_id, body_content, site_name='系统通知'):
 
     # 发送邮件
     mail.send(msg)
+    print(f"邮件派送人: {user_id if user_id != 0 else '系统'}")
     return True
