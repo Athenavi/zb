@@ -12,7 +12,7 @@ from src.blueprints.auth import auth_bp
 from src.blueprints.blog import blog_bp, get_footer, get_site_title, get_banner, get_site_domain, get_site_beian, \
     get_site_menu, get_current_menu_slug, blog_detail_back, get_username
 from src.blueprints.category import category_bp
-from src.blueprints.dashboard import dashboard_bp
+from src.blueprints.dashboard import admin_bp
 from src.blueprints.media import media_bp
 from src.blueprints.my import my_bp
 from src.blueprints.noti import noti_bp
@@ -203,7 +203,7 @@ def register_blueprints(app):
         media_bp,
         theme_bp,
         website_bp,
-        dashboard_bp,
+        admin_bp,
         my_bp,
         relation_bp,
         role_bp,

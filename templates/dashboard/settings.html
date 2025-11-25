@@ -675,7 +675,7 @@
             }
 
             // 发送设置到服务器
-            fetch('{{ url_for("dashboard.admin_settings") }}', {
+            fetch('{{ url_for("admin.admin_settings") }}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
@@ -736,7 +736,7 @@
                         formData.append('menu_action', 'delete_menu');
                         formData.append('menu_id', menuId);
 
-                        fetch('{{ url_for("dashboard.admin_settings") }}', {
+                        fetch('{{ url_for("admin.admin_settings") }}', {
                             method: 'POST',
                             body: formData
                         })
@@ -763,7 +763,7 @@
 
             const formData = new FormData(this);
 
-            fetch('{{ url_for("dashboard.admin_settings") }}', {
+            fetch('{{ url_for("admin.admin_settings") }}', {
                 method: 'POST',
                 body: formData
             })
@@ -824,7 +824,7 @@
                         formData.append('menu_item_action', 'delete_item');
                         formData.append('item_id', itemId);
 
-                        fetch('{{ url_for("dashboard.admin_settings") }}', {
+                        fetch('{{ url_for("admin.admin_settings") }}', {
                             method: 'POST',
                             body: formData
                         })
@@ -851,7 +851,7 @@
 
             const formData = new FormData(this);
 
-            fetch('{{ url_for("dashboard.admin_settings") }}', {
+            fetch('{{ url_for("admin.admin_settings") }}', {
                 method: 'POST',
                 body: formData
             })
@@ -913,7 +913,7 @@
                         formData.append('page_action', 'delete_page');
                         formData.append('page_id', pageId);
 
-                        fetch('{{ url_for("dashboard.admin_settings") }}', {
+                        fetch('{{ url_for("admin.admin_settings") }}', {
                             method: 'POST',
                             body: formData
                         })
@@ -959,7 +959,7 @@
 
             const formData = new FormData(this);
 
-            fetch('{{ url_for("dashboard.admin_settings") }}', {
+            fetch('{{ url_for("admin.admin_settings") }}', {
                 method: 'POST',
                 body: formData
             })

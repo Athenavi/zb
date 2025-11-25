@@ -1,5 +1,6 @@
 # extensions.py
 
+import flask_monitoringdashboard as dashboard
 from flask_babel import Babel
 from flask_caching import Cache
 from flask_cors import CORS
@@ -64,10 +65,16 @@ def init_extensions(app):
     # limiter.init_app(app)
     babel.init_app(app)
     principal.init_app(app)
-
     # 登录管理器额外配置
     login_manager.login_view = 'auth.login'
     login_manager.login_message = '请先登录'
 
     # JWT配置
     jwt.init_app(app)
+
+    # 配置监控面板
+    dashboard.config.init_from(file='dashboard_config.cfg')
+
+    # 绑定应用
+    dashboard.bind(app)
+    csrf.exempt(dashboard.blueprint)

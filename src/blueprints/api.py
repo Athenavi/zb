@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from flask import Blueprint, jsonify, current_app, request
+from flask_login import login_required
 from sqlalchemy import select, func
 
 from src.auth import jwt_required, admin_required, origin_required
@@ -225,15 +226,15 @@ def upload_cover(user_id):
 
 
 @api_bp.route('/article/password-form/<int:aid>', methods=['GET'])
-@jwt_required
-def get_password_form(user_id, aid):
+@login_required
+def get_password_form(aid):
     return get_apw_form(aid)
 
 
 # 密码更改 API
 @api_bp.route('/article/password/<int:aid>', methods=['POST'])
-@jwt_required
-def api_update_article_password(user_id, aid):
+@login_required
+def api_update_article_password(aid):
     return check_apw_form(aid)
 
 

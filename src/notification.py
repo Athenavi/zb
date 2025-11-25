@@ -63,6 +63,7 @@ def send_change_mail(content, kind):
 
 
 def read_all_notifications(user_id):
+    updated_count = 0
     success = False
     try:
         # 批量更新所有未读通知
@@ -75,7 +76,7 @@ def read_all_notifications(user_id):
         print(f"批量更新已读状态失败: {e}")
         db.session.rollback()
 
-    response = jsonify({"success": success, "updated_count": updated_count if success else 0})
+    response = jsonify({"success": success, "updated_count": updated_count})
     response.headers.add("Access-Control-Allow-Origin", "*")
     return response
 

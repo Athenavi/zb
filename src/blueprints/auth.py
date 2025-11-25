@@ -1,4 +1,3 @@
-import re
 import uuid
 from datetime import datetime, timezone
 
@@ -42,12 +41,6 @@ def babel_language_switch(view_func):
         return response
 
     return wrapped_view
-
-
-def email_validator(form, field):
-    email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    if not re.match(email_regex, field.data):
-        raise ValueError('请输入有效的邮箱地址')
 
 
 class RegisterForm(FlaskForm):

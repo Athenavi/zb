@@ -2,6 +2,7 @@ import random
 import re
 import string
 
+
 def load_sensitive_words(file_path):
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
@@ -9,7 +10,7 @@ def load_sensitive_words(file_path):
         return sensitive_words
     except FileNotFoundError:
         return set()
-    except Exception as e:
+    except IOError as e:
         return set()
 
 

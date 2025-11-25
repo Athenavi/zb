@@ -5,40 +5,6 @@ from src.models import Comment, Article, Notification, db
 from src.notification import should_send_notification, update_notification_cache
 
 
-def create_comment(user_id, article_id):
-    data = request.get_json()
-    # print(data)
-    user_agent_str = str(request.user_agent)
-    try:
-        parent_id = data['parent_id'] if 'parent_id' in data and data['parent_id'] else None
-        new_comment = Comment(
-            user_id=int(user_id),
-            article_id=int(article_id),
-            content=data['content'],
-            ip=request.remote_addr,
-            user_agent=user_agent_str,
-            parent_id=parent_id
-        )
-        db.session.add(new_comment)
-        if parent_id:
-            comment = db.session.query(Comment).filter_by(id=int(parent_id)).first()
-            if comment:
-                notification = Notification(
-                    user_id=comment.user_id,
-                    type='system',
-                    message=f"您在《{comment.article.title}》的评论有新的回复",
-                    is_read=False
-                )
-                db.session.add(notification)
-        db.session.commit()
-
-        return jsonify({"message": "评论成功"}), 201
-    except Exception as e:
-        print(f'Error: {e}')
-        db.session.rollback()
-        return jsonify({"message": "评论失败"}), 500
-
-
 def create_comment_with_anti_spam(user_id, article_id):
     """
     带有防轰炸功能的评论创建函数
