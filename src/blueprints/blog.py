@@ -5,18 +5,18 @@ from flask import request, render_template, jsonify, current_app
 from flask import url_for, flash, redirect
 from flask_jwt_extended import current_user
 
-from blog.article.password import get_article_password
-from blueprints.api import domain
 from src.auth import jwt_required
+from src.blog.article.password import get_article_password
 from src.blog.homepage import index_page_back, tag_page_back, featured_page_back
+from src.blueprints.api import domain
 from src.error import error
 from src.extensions import cache, csrf
 from src.models import Article, ArticleContent, ArticleI18n, User, db, Category, VIPPlan
 from src.models import UserSubscription, Notification, Pages, SystemSettings, MenuItems, Menus
 from src.user.entities import auth_by_uid
 from src.user.views import change_profiles_back, setting_profiles_back
+from src.utils.security.safe import is_valid_iso_language_code, valid_language_codes
 from src.utils.security.safe import random_string
-from utils.security.safe import is_valid_iso_language_code, valid_language_codes
 
 blog_bp = Blueprint('blog', __name__)
 

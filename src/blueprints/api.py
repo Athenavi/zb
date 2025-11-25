@@ -4,8 +4,8 @@ from flask import Blueprint, jsonify, current_app, request
 from flask_login import login_required
 from sqlalchemy import select, func
 
-from blog.article.password import check_apw_form, get_apw_form
 from src.auth import jwt_required, admin_required, origin_required
+from src.blog.article.password import check_apw_form, get_apw_form
 from src.blog.comment import create_comment_with_anti_spam, comment_page_get
 from src.extensions import cache, csrf
 from src.models import ArticleI18n, Article, User, db
