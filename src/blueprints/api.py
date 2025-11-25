@@ -4,13 +4,11 @@ from flask import Blueprint, jsonify, current_app, request
 from flask_login import login_required
 from sqlalchemy import select, func
 
+from blog.article.password import check_apw_form, get_apw_form
 from src.auth import jwt_required, admin_required, origin_required
-from src.blog.article.core.content import get_i18n_content_by_aid
-from src.blog.article.security.password import check_apw_form, get_apw_form
 from src.blog.comment import create_comment_with_anti_spam, comment_page_get
-# from src.database import get_db
 from src.extensions import cache, csrf
-from src.models import Article, User, db
+from src.models import ArticleI18n, Article, User, db
 from src.other.filters import f2list
 from src.other.report import report_back
 from src.setting import app_config
@@ -41,8 +39,12 @@ def api_theme_upload(user_id):
 def api_blog_i18n_content(iso, aid):
     if not is_valid_iso_language_code(iso):
         return jsonify({"error": "Invalid language code"}), 400
-    content = get_i18n_content_by_aid(iso=iso, aid=aid)
-    return send_chunk_md(content, aid, iso)
+    content = db.session.query(ArticleI18n.content).filter(
+        ArticleI18n.article_id == aid, ArticleI18n.language_code == iso).first()
+    if content:
+        return send_chunk_md(content, aid, iso)
+    else:
+        return jsonify({"error": "Article not found"}), 404
 
 
 @api_bp.route('/article/unlock', methods=['GET', 'POST'])
