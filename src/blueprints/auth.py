@@ -21,7 +21,7 @@ from urllib.parse import urlparse, urljoin
 
 from flask import redirect, current_app, request, make_response
 from functools import wraps
-from flask_principal import identity_changed, AnonymousIdentity
+from flask_principal import identity_changed, AnonymousIdentity, Identity
 
 
 def babel_language_switch(view_func):
@@ -328,6 +328,9 @@ def login_post_response(form, mobile_device=False, next_url=None):
             # 1. 创建 Session 登录
             remember_me = form.remember_me.data
             login_user(user, remember=remember_me)
+            # Tell Flask-Principal the identity changed
+            identity_changed.send(current_app._get_current_object(),
+                                  identity=Identity(user.id))
 
             if request.is_json:
                 return jsonify({

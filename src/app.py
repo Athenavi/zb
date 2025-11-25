@@ -1,11 +1,13 @@
 from datetime import datetime, timezone
 
 from flask import Flask, jsonify, g
+from flask_principal import identity_loaded, RoleNeed
 from jinja2 import select_autoescape
 from werkzeug.exceptions import NotFound
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from auth import jwt_required
+from security import PermissionNeed
 from src.blueprints.admin_vip import admin_vip_bp
 from src.blueprints.api import api_bp
 from src.blueprints.auth import auth_bp
@@ -104,6 +106,25 @@ def register_direct_routes(app, config_class):
         from src.models.user import User, db
         user = db.session.query(User).filter_by(id=user_id).first()
         return user
+
+    # 身份加载信号处理器
+    @identity_loaded.connect_via(app)
+    def on_identity_loaded(sender, identity):
+        """当身份加载时，设置用户拥有的角色和权限"""
+        if hasattr(identity, 'id') and identity.id:
+            from src.models import User
+            user = User.query.get(identity.id)
+            if user:
+                # 添加用户角色
+                identity.provides.add(RoleNeed('authenticated'))
+
+                # 添加用户拥有的所有角色
+                for role in user.roles:
+                    identity.provides.add(RoleNeed(role.name))
+
+                    # 添加角色对应的所有权限
+                    for permission in role.permissions:
+                        identity.provides.add(PermissionNeed(permission.code))
 
     @app.after_request
     def after_request(response):

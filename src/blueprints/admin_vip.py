@@ -11,13 +11,18 @@ admin_vip_bp = Blueprint('admin_vip', __name__, url_prefix='/admin/vip')
 
 
 @admin_vip_bp.route('/index', methods=['GET'])
-@admin_permission.require()
+# @admin_permission.require()
 def admin_vip_index():
-    return render_template('dashboard/vip.html')
+    from flask_principal import Permission
+    from flask_principal import RoleNeed
+    if Permission(RoleNeed('admin')).can():
+        return render_template('dashboard/vip.html')
+    return "_('Please Create Admin Role First And added Permission named `admin`')"
 
 
 # VIP套餐管理路由
 @admin_vip_bp.route('/plans', methods=['GET'])
+@admin_permission.require()
 def get_vip_plans():
     """获取所有VIP套餐（分页）"""
 
@@ -47,6 +52,7 @@ def get_vip_plans():
 
 
 @admin_vip_bp.route('/plans/<int:plan_id>', methods=['GET'])
+@admin_permission.require()
 def get_vip_plan(plan_id):
     """获取指定VIP套餐"""
 
@@ -66,6 +72,7 @@ def get_vip_plan(plan_id):
 
 
 @admin_vip_bp.route('/plans', methods=['POST'])
+@admin_permission.require()
 def create_vip_plan():
     """创建VIP套餐"""
 
@@ -111,6 +118,7 @@ def create_vip_plan():
 
 
 @admin_vip_bp.route('/plans/<int:plan_id>', methods=['PUT'])
+@admin_permission.require()
 def update_vip_plan(plan_id):
     """更新VIP套餐"""
 
@@ -157,6 +165,7 @@ def update_vip_plan(plan_id):
 
 
 @admin_vip_bp.route('/plans/<int:plan_id>', methods=['DELETE'])
+@admin_permission.require()
 def delete_vip_plan(plan_id):
     """删除VIP套餐"""
 
@@ -183,6 +192,7 @@ def delete_vip_plan(plan_id):
 
 # VIP订阅管理路由
 @admin_vip_bp.route('/subscriptions', methods=['GET'])
+@admin_permission.require()
 def get_vip_subscriptions():
     """获取VIP订阅列表"""
 
@@ -225,6 +235,7 @@ def get_vip_subscriptions():
 
 
 @admin_vip_bp.route('/subscriptions/<int:subscription_id>', methods=['GET'])
+@admin_permission.require()
 def get_vip_subscription(subscription_id):
     """获取指定订阅详情"""
 
@@ -245,6 +256,7 @@ def get_vip_subscription(subscription_id):
 
 
 @admin_vip_bp.route('/subscriptions/<int:subscription_id>', methods=['PUT'])
+@admin_permission.require()
 def update_vip_subscription(subscription_id):
     """更新VIP订阅"""
 
@@ -281,6 +293,7 @@ def update_vip_subscription(subscription_id):
 
 # VIP功能管理路由
 @admin_vip_bp.route('/features', methods=['GET'])
+@admin_permission.require()
 def get_vip_features():
     """获取所有VIP功能（分页）"""
 
@@ -307,6 +320,7 @@ def get_vip_features():
 
 
 @admin_vip_bp.route('/features', methods=['POST'])
+@admin_permission.require()
 def create_vip_feature():
     """创建VIP功能"""
 
@@ -353,6 +367,7 @@ def create_vip_feature():
 
 
 @admin_vip_bp.route('/features/<int:feature_id>', methods=['PUT'])
+@admin_permission.require()
 def update_vip_feature(feature_id):
     """更新VIP功能"""
 
@@ -398,6 +413,7 @@ def update_vip_feature(feature_id):
 
 
 @admin_vip_bp.route('/features/<int:feature_id>', methods=['DELETE'])
+@admin_permission.require()
 def delete_vip_feature(feature_id):
     """删除VIP功能"""
 
