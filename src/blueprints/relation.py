@@ -1,8 +1,8 @@
 from flask import Blueprint, render_template
 from flask import jsonify
 
+from src.auth import jwt_required
 from src.models import User, UserSubscription, db
-from src.user.authz.decorators import jwt_required
 
 relation_bp = Blueprint('relation', __name__, template_folder='templates')
 

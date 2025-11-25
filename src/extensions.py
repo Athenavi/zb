@@ -1,10 +1,14 @@
 # extensions.py
+
+import flask_monitoringdashboard as dashboard
 from flask_babel import Babel
 from flask_caching import Cache
 from flask_cors import CORS
+from flask_jwt_extended import JWTManager
 from flask_login import LoginManager
 from flask_mail import Mail
 from flask_migrate import Migrate
+from flask_principal import Principal
 from flask_restful import Api
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
@@ -32,6 +36,7 @@ db = SQLAlchemy(
 )
 cache = Cache()
 login_manager = LoginManager()
+jwt = JWTManager()
 csrf = CSRFProtect()
 mail = Mail()
 api = Api()
@@ -40,6 +45,7 @@ migrate = Migrate()
 # talisman = Talisman()
 # limiter = Limiter()
 babel = Babel()
+principal = Principal()
 
 
 # --------------------------
@@ -58,6 +64,17 @@ def init_extensions(app):
     # talisman.init_app(app)
     # limiter.init_app(app)
     babel.init_app(app)
-
+    principal.init_app(app)
     # 登录管理器额外配置
-    login_manager.login_view = 'auth.login'  # 设置登录路由
+    login_manager.login_view = 'auth.login'
+    login_manager.login_message = '请先登录'
+
+    # JWT配置
+    jwt.init_app(app)
+
+    # 配置监控面板
+    dashboard.config.init_from(file='dashboard_config.cfg')
+
+    # 绑定应用
+    dashboard.bind(app)
+    csrf.exempt(dashboard.blueprint)

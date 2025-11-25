@@ -1,8 +1,8 @@
 from flask import Blueprint, jsonify, render_template, request
 
 from plugins.manager import PluginManager
+from src.auth import admin_required
 from src.models import User
-from user.authz.decorators import admin_required
 
 plugin_bp = Blueprint('plugin_bp', __name__, url_prefix='/api/plugins')
 
@@ -33,7 +33,7 @@ def uninstall_plugin(plugin_name):  # 修复：添加缺失的参数
     # 实际应用中这里应该处理插件的卸载
     return jsonify({
         'status': 'error',
-        'message': 'Plugin uninstallation not implemented yet'
+        'message': f'Plugin {plugin_name} uninstallation not implemented yet'
     })
 
 

@@ -131,8 +131,8 @@ def check_apw_form(aid):
             </div>
         </div>
         '''
-    except Exception as e:
-        # app.logger.error(f"更新密码失败: {str(e)}")
+    except (TypeError, AttributeError) as e:
+        print(e)
         return '''
         <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
             <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">

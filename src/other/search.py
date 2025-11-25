@@ -4,6 +4,7 @@ import time
 from xml.etree import ElementTree as ET
 
 from flask import request, render_template
+from flask_wtf.csrf import validate_csrf
 
 from src.database import get_db
 from src.models import Article, ArticleContent, SearchHistory, db
@@ -16,7 +17,7 @@ def save_search_history(user_id, keyword, results_count):
     db.session.commit()
 
 
-def getUserSearchHistory(user_id):
+def get_user_search_history(user_id):
     history_keywords = db.session.query(SearchHistory.keyword).filter(SearchHistory.user_id == user_id).order_by(
         SearchHistory.created_at.desc()).all()
     # 使用集合去重
@@ -35,6 +36,11 @@ def search_handler(user_id, domain, global_encoding, max_cache_timestamp):
         return re.sub('<[^<]+?>', '', text)
 
     if request.method == 'POST':
+        # 验证CSRF token
+        if not validate_csrf(request.form.get('csrf_token')):
+            from flask import abort
+            abort(400, description="The CSRF token is missing or invalid.")
+
         with get_db() as db:
             keyword = request.form.get('keyword')  # 获取搜索关键词
             # 对关键词进行转义，替换特殊字符
@@ -102,5 +108,9 @@ def search_handler(user_id, domain, global_encoding, max_cache_timestamp):
             matched_content.append(content)
             if item:
                 save_search_history(user_id, keyword, len(matched_content) or 0)
-    history_list = getUserSearchHistory(user_id)
-    return render_template('search.html', historyList=history_list, results=matched_content)
+    history_list = get_user_search_history(user_id)
+    from flask_wtf.csrf import generate_csrf
+    return render_template('search.html',
+                           historyList=history_list,
+                           results=matched_content,
+                           csrf_token=generate_csrf())

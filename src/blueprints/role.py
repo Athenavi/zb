@@ -1,8 +1,8 @@
 from flask import Blueprint, request, render_template
 from flask import jsonify
 
+from src.auth import admin_required
 from src.models import User, Role, Permission, UserRole, RolePermission, db
-from user.authz.decorators import admin_required
 
 role_bp = Blueprint('role', __name__, template_folder='templates')
 
@@ -329,7 +329,7 @@ def update_permission(permission_id):
             permission.code = data['code']
         if 'description' in data:
             permission.description = data['description']
-
+        db.session.commit()
         return jsonify({
             'success': True,
             'message': '权限更新成功',
@@ -386,7 +386,6 @@ def delete_permission(permission_id):
 @role_bp.route('/admin/user/<int:user_id>/roles', methods=['GET'])
 def get_user_roles(user_id):
     """获取用户的角色"""
-
     try:
         user = db.session.query(User).get(user_id)
 
@@ -423,7 +422,6 @@ def get_user_roles(user_id):
 @role_bp.route('/admin/user/<int:user_id>/roles', methods=['PUT'])
 def update_user_roles(user_id):
     """更新用户角色"""
-
     try:
         user = db.session.query(User).get(user_id)
         if user is None:
@@ -447,7 +445,7 @@ def update_user_roles(user_id):
             role = db.session.query(Role).get(role_id)
             if role:
                 user.roles.append(role)
-
+        db.session.commit()
         return jsonify({
             'success': True,
             'message': '用户角色更新成功',

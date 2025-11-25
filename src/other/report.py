@@ -4,7 +4,6 @@ from src.models import Report, db
 
 
 def report_add(user_id, reported_type, reported_id, reason):
-    reported = False
     try:
         new_report = Report(reported_by=int(user_id), content_type=reported_type, content_id=reported_id,
                             reason=reason)

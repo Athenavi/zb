@@ -5,8 +5,8 @@ from flask import Blueprint, render_template, request, current_app
 from blueprints.api import api_user_avatar, api_user_profile, api_user_bio, username_exists
 from extensions import cache
 from plugins.diySpace.diy import diy_space_put
+from src.auth import jwt_required
 from update import base_dir
-from user.authz.decorators import jwt_required
 
 TemplateDir = Path(base_dir) / 'plugins' / 'diySpace' / 'templates'
 diySpace_bp = Blueprint('diySpace', __name__, template_folder=str(TemplateDir))
