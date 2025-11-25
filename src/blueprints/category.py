@@ -56,7 +56,7 @@ def category_list(user_id):
         )
 
         # 获取用户已订阅的分类ID
-        subscribed_ids = set()
+        # subscribed_ids = set()
         subscriptions = CategorySubscription.query.filter_by(
             subscriber_id=user_id
         ).all()

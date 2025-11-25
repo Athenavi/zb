@@ -5,7 +5,8 @@ import secrets
 import time
 
 import qrcode
-from flask import render_template
+from flask import render_template, current_app
+from flask_principal import identity_changed, Identity
 
 
 def gen_qr_token(user_agent, timestamp, sys_version, encoding):
@@ -106,6 +107,8 @@ def check_qr_login_back(cache_instance):
 
         # 用户登录
         login_user(scan_user, remember=True)
+        identity_changed.send(current_app._get_current_object(),
+                              identity=Identity(scan_user.id))
 
         # 记录用户会话
         new_session = UserSession(

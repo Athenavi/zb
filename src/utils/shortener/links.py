@@ -1,6 +1,8 @@
 import random
 import string
 
+from sqlalchemy.exc import SQLAlchemyError
+
 # from src.database import get_db
 from src.models import Url, db
 
@@ -37,8 +39,8 @@ def redirect_to_long_url(short_url):
             return long_url
         else:
             return None
-    except Exception as e:
-        db.session.rollback()
+    except SQLAlchemyError as e:
+        print(f"Not Found {e}")
         return None
 
 

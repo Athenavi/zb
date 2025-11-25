@@ -42,6 +42,7 @@ class FileProcessor:
 
     def save_file(self, file_hash, file_data, original_filename):
         """保存文件到存储系统"""
+        print(f"save file: {original_filename}")
         hash_prefix = file_hash[:2]
         hash_subdir = os.path.join('hashed_files', hash_prefix)
         os.makedirs(hash_subdir, exist_ok=True)
@@ -647,7 +648,7 @@ def _process_multiple_files(user_id, allowed_size, allowed_mimes, check_existing
                     # 更新引用计数
                     existing_file_hash.reference_count += len(file_group)
                     reused_count += len(file_group)
-                    storage_path = existing_file_hash.storage_path
+                    # storage_path = existing_file_hash.storage_path
                 else:
                     # 保存新文件
                     storage_path = processor.save_file(file_hash, first_file['file_data'], first_file['filename'])

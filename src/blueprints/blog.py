@@ -5,9 +5,9 @@ from flask import request, render_template, jsonify, current_app
 from flask import url_for, flash, redirect
 from flask_jwt_extended import current_user
 
+from blog.article.password import get_article_password
 from blueprints.api import domain
 from src.auth import jwt_required
-from src.blog.article.security.password import get_article_password
 from src.blog.homepage import index_page_back, tag_page_back, featured_page_back
 from src.error import error
 from src.extensions import cache, csrf

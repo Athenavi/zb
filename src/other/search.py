@@ -17,7 +17,7 @@ def save_search_history(user_id, keyword, results_count):
     db.session.commit()
 
 
-def getUserSearchHistory(user_id):
+def get_user_search_history(user_id):
     history_keywords = db.session.query(SearchHistory.keyword).filter(SearchHistory.user_id == user_id).order_by(
         SearchHistory.created_at.desc()).all()
     # 使用集合去重
@@ -108,7 +108,7 @@ def search_handler(user_id, domain, global_encoding, max_cache_timestamp):
             matched_content.append(content)
             if item:
                 save_search_history(user_id, keyword, len(matched_content) or 0)
-    history_list = getUserSearchHistory(user_id)
+    history_list = get_user_search_history(user_id)
     from flask_wtf.csrf import generate_csrf
     return render_template('search.html',
                            historyList=history_list,

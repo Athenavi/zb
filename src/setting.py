@@ -168,6 +168,7 @@ class AppConfig(BaseConfig):
     db_pool_size = int(db_pool_size_env) if db_pool_size_env is not None else 16
 
     # 配置连接池参数
+    # noinspection PyPep8Naming
     @property
     def SQLALCHEMY_DATABASE_URI(self):
         """动态获取数据库URI"""

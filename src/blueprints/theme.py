@@ -70,6 +70,8 @@ def delete_theme(user_id):
 
     except Exception as e:
         return jsonify({'error': f'Deletion failed: {str(e)}'}), 500
+    finally:
+        print(f'Deleting theme {theme_id} user: {user_id} ')
 
 
 @theme_bp.route('/theme/display', methods=['GET'])

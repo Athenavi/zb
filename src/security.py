@@ -1,7 +1,6 @@
 from functools import wraps
 
-from flask import current_app
-from flask_principal import Permission, RoleNeed, identity_loaded
+from flask_principal import Permission, RoleNeed
 
 # 定义权限需求
 # 基于角色的权限
@@ -65,24 +64,3 @@ def role_required(role_name):
         return decorated_function
 
     return decorator
-
-
-# 身份加载信号处理器
-@identity_loaded.connect_via(current_app)
-def on_identity_loaded(sender, identity):
-    """当身份加载时，设置用户拥有的角色和权限"""
-    from src.models import User
-
-    if hasattr(identity, 'id') and identity.id:
-        user = User.query.get(identity.id)
-        if user:
-            # 添加用户角色
-            identity.provides.add(RoleNeed('authenticated'))
-
-            # 添加用户拥有的所有角色
-            for role in user.roles:
-                identity.provides.add(RoleNeed(role.name))
-
-                # 添加角色对应的所有权限
-                for permission in role.permissions:
-                    identity.provides.add(PermissionNeed(permission.code))
