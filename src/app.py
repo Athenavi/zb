@@ -6,8 +6,7 @@ from jinja2 import select_autoescape
 from werkzeug.exceptions import NotFound
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from auth import jwt_required
-from security import PermissionNeed
+from src.auth import jwt_required
 from src.blueprints.admin_vip import admin_vip_bp
 from src.blueprints.api import api_bp
 from src.blueprints.auth import auth_bp
@@ -31,6 +30,7 @@ from src.other.filters import json_filter, string_split, article_author, md2html
 from src.other.search import search_handler
 from src.plugin import plugin_bp, init_plugin_manager
 from src.scheduler import session_scheduler
+from src.security import PermissionNeed
 from src.setting import app_config
 
 
