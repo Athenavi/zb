@@ -82,6 +82,13 @@
         .dark-mode .voice-option {
             border-bottom-color: #374151;
         }
+
+        :fullscreen .markdown-content {
+            overflow-y: auto;
+            width: 100vw;
+            margin: 0;
+            padding: 0;
+        }
     </style>
     <script>
         tailwind.config = {
@@ -257,7 +264,7 @@
 
                     <!-- 文章内容 -->
                     <!-- 添加 content 存在性检查 -->
-                    <div id="article-content" class="prose max-w-none mb-8">
+                    <div id="article-content">
                         {% if content and content.content %}
                             {{ content.content|md2html|safe }}
                         {% else %}
@@ -295,11 +302,38 @@
                                     </a>
                                 </div>
                             </div>
-                            {#<button class="flex items-center text-gray-600 hover:text-green-500"
-                                    onclick="window.open('/p/{{ article.slug }}.md/fullscreen', '_blank');">
+                            <button class="flex items-center text-gray-600 hover:text-green-500"
+                                    onclick="toggleFullScreen()">
                                 <i class="fa-brands fa-readme mr-1"></i>
-                                阅读器模式（beta）
-                            </button>#}
+                                全屏模式（beta）
+                            </button>
+                            <script>
+                                function toggleFullScreen() {
+                                    var articleContent = document.getElementsByClassName('markdown-content')[0];
+
+                                    if (!document.fullscreenElement) {
+                                        // 进入全屏模式
+                                        articleContent.requestFullscreen().catch(err => {
+                                            alert(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+                                        });
+                                    } else {
+                                        // 退出全屏模式
+                                        document.exitFullscreen().catch(err => {
+                                            alert(`Error attempting to exit full-screen mode: ${err.message} (${err.name})`);
+                                        });
+                                    }
+                                }
+
+                                // 添加键盘事件监听器，用于检测ESC键
+                                document.addEventListener('keydown', (event) => {
+                                    if (event.key === 'Escape' && document.fullscreenElement) {
+                                        document.exitFullscreen().catch(err => {
+                                            alert(`Error attempting to exit full-screen mode: ${err.message} (${err.name})`);
+                                        });
+                                    }
+                                });
+                            </script>
+
                             <!-- 分享按钮 -->
                             <button class="flex items-center text-gray-600 hover:text-green-500">
                                 <i class="fas fa-share-alt mr-1"></i>
@@ -585,13 +619,11 @@
         // 预处理文章内容，提取句子
         function prepareArticleSentences() {
             // 1. 尝试多个ID选择器
-            let articleContent = document.getElementById('markdown-content');
+            let articleContent = document.getElementsByClassName('markdown-content')[0]
 
             // 2. 如果找不到，尝试类名选择器
             if (!articleContent) {
-                articleContent = document.querySelector('.prose') ||
-                    document.querySelector('.article-content') ||
-                    document.querySelector('article > div');
+                articleContent = document.getElementsByClassName('article-content')[0]
             }
 
             // 3. 如果还是找不到，查找包含大量文本的元素
