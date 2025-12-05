@@ -1,15 +1,16 @@
 from pathlib import Path
 
-from flask import Blueprint, render_template, request, current_app
+from flask import Blueprint, render_template, request
 
-from blueprints.api import api_user_avatar, api_user_profile, api_user_bio, username_exists
-from extensions import cache
 from plugins.diySpace.diy import diy_space_put
 from src.auth import jwt_required
+from src.blueprints.api import api_user_avatar, api_user_profile, api_user_bio, username_exists
+from src.extensions import cache, csrf
 from update import base_dir
 
 TemplateDir = Path(base_dir) / 'plugins' / 'diySpace' / 'templates'
 diySpace_bp = Blueprint('diySpace', __name__, template_folder=str(TemplateDir))
+csrf.exempt(diySpace_bp)
 
 
 # server_started = False  # 添加服务器状态标志
@@ -47,8 +48,8 @@ def diy_space(user_id):
             return diy_space_back(user_id, avatar_url=api_user_avatar(user_id), profiles=api_user_profile(user_id),
                                   user_bio=api_user_bio(user_id))
 
-        if request.method == 'POST':
-            return diy_space_put(base_dir=base_dir, user_id=user_id, encoding=current_app.config['global_encoding'])
+        if request.method == 'PUT':
+            return diy_space_put(base_dir=base_dir, user_id=user_id, encoding='utf-8')
     except Exception as e:
         print(f"An error occurred: {e}")
 
@@ -61,7 +62,7 @@ def user_diy_space(user_name):
         user_path = Path(base_dir) / 'media' / user_id / 'index.html'
         print(user_path)
         if user_path.exists():
-            with user_path.open('r', encoding=current_app.config['global_encoding']) as f:
+            with user_path.open('r', encoding='utf-8') as f:
                 return f.read()
         else:
             return "用户主页未找到", 404
