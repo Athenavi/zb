@@ -83,11 +83,10 @@
             border-bottom-color: #374151;
         }
 
-        :fullscreen .markdown-content {
-            overflow-y: auto;
+        #article-content:fullscreen {
+            overflow: auto;
+            height: 100%;
             width: 100vw;
-            margin: 0;
-            padding: 0;
         }
     </style>
     <script>
@@ -305,11 +304,11 @@
                             <button class="flex items-center text-gray-600 hover:text-green-500"
                                     onclick="toggleFullScreen()">
                                 <i class="fa-brands fa-readme mr-1"></i>
-                                全屏模式（beta）
+                                全屏模式
                             </button>
                             <script>
                                 function toggleFullScreen() {
-                                    var articleContent = document.getElementsByClassName('markdown-content')[0];
+                                    var articleContent = document.getElementById('article-content');
 
                                     if (!document.fullscreenElement) {
                                         // 进入全屏模式
@@ -323,17 +322,7 @@
                                         });
                                     }
                                 }
-
-                                // 添加键盘事件监听器，用于检测ESC键
-                                document.addEventListener('keydown', (event) => {
-                                    if (event.key === 'Escape' && document.fullscreenElement) {
-                                        document.exitFullscreen().catch(err => {
-                                            alert(`Error attempting to exit full-screen mode: ${err.message} (${err.name})`);
-                                        });
-                                    }
-                                });
                             </script>
-
                             <!-- 分享按钮 -->
                             <button class="flex items-center text-gray-600 hover:text-green-500">
                                 <i class="fas fa-share-alt mr-1"></i>
