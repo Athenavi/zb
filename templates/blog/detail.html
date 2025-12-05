@@ -500,8 +500,8 @@
         let filterConfig = {
             filterCode: true,
             filterScripts: true,
-            filterHtmlTags: true,
-            filterSpecialChars: true
+            filterHtmlTags: false,
+            filterSpecialChars: false
         };
 
 // 获取配置元素并添加事件监听
@@ -583,11 +583,34 @@
         }
 
         // 预处理文章内容，提取句子
-        // 预处理文章内容，提取句子（增强版）
         function prepareArticleSentences() {
-            const articleContent = document.getElementById('article-content');
+            // 1. 尝试多个ID选择器
+            let articleContent = document.getElementById('markdown-content');
+
+            // 2. 如果找不到，尝试类名选择器
+            if (!articleContent) {
+                articleContent = document.querySelector('.prose') ||
+                    document.querySelector('.article-content') ||
+                    document.querySelector('article > div');
+            }
+
+            // 3. 如果还是找不到，查找包含大量文本的元素
+            if (!articleContent) {
+                const allDivs = document.querySelectorAll('div');
+                let maxLength = 0;
+                for (let div of allDivs) {
+                    const textLength = div.textContent ? div.textContent.trim().length : 0;
+                    if (textLength > maxLength && textLength < 100000) {
+                        maxLength = textLength;
+                        articleContent = div;
+                    }
+                }
+            }
+
+            // 4. 最终检查
             if (!articleContent) {
                 console.error('找不到文章内容容器');
+                alert('无法找到文章内容，请确保页面已正确加载');
                 return false;
             }
 
@@ -720,7 +743,7 @@
             return processCleanedText(fullText, articleContent);
         }
 
-// 辅助函数：处理清理后的文本
+        // 辅助函数：处理清理后的文本
         function processCleanedText(text, container) {
             // 使用正则表达式分割句子
             const sentenceRegex = /[^。！？；，、.!?;,\n]+[。！？；，、.!?;,\n]*/g;
