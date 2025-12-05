@@ -134,6 +134,35 @@
         </label>
     </div>
 
+    <!-- 在无障碍设置面板中添加 -->
+    <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            内容过滤设置
+        </label>
+
+        <div class="space-y-2">
+            <label class="flex items-center">
+                <input type="checkbox" id="filter-code" class="mr-2" checked>
+                <span class="text-sm text-gray-700 dark:text-gray-300">过滤代码块</span>
+            </label>
+
+            <label class="flex items-center">
+                <input type="checkbox" id="filter-scripts" class="mr-2" checked>
+                <span class="text-sm text-gray-700 dark:text-gray-300">过滤脚本和样式</span>
+            </label>
+
+            <label class="flex items-center">
+                <input type="checkbox" id="filter-html-tags" class="mr-2">
+                <span class="text-sm text-gray-700 dark:text-gray-300">过滤HTML标签</span>
+            </label>
+
+            <label class="flex items-center">
+                <input type="checkbox" id="filter-special-chars" class="mr-2" checked>
+                <span class="text-sm text-gray-700 dark:text-gray-300">过滤特殊字符</span>
+            </label>
+        </div>
+    </div>
+
     <div class="flex justify-between">
         <button id="close-menu"
                 class="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-600 rounded hover:bg-gray-300 dark:hover:bg-gray-500">
@@ -266,11 +295,11 @@
                                     </a>
                                 </div>
                             </div>
-                            <button class="flex items-center text-gray-600 hover:text-green-500"
+                            {#<button class="flex items-center text-gray-600 hover:text-green-500"
                                     onclick="window.open('/p/{{ article.slug }}.md/fullscreen', '_blank');">
                                 <i class="fa-brands fa-readme mr-1"></i>
                                 阅读器模式（beta）
-                            </button>
+                            </button>#}
                             <!-- 分享按钮 -->
                             <button class="flex items-center text-gray-600 hover:text-green-500">
                                 <i class="fas fa-share-alt mr-1"></i>
@@ -468,6 +497,44 @@
         const closeFixedControlsBtn = document.getElementById('close-fixed-controls');
         const progressFill = document.getElementById('reading-progress-fill');
 
+        let filterConfig = {
+            filterCode: true,
+            filterScripts: true,
+            filterHtmlTags: true,
+            filterSpecialChars: true
+        };
+
+// 获取配置元素并添加事件监听
+        const filterCodeCheckbox = document.getElementById('filter-code');
+        const filterScriptsCheckbox = document.getElementById('filter-scripts');
+        const filterHtmlTagsCheckbox = document.getElementById('filter-html-tags');
+        const filterSpecialCharsCheckbox = document.getElementById('filter-special-chars');
+
+        if (filterCodeCheckbox) {
+            filterCodeCheckbox.addEventListener('change', function () {
+                filterConfig.filterCode = this.checked;
+            });
+        }
+
+        if (filterScriptsCheckbox) {
+            filterScriptsCheckbox.addEventListener('change', function () {
+                filterConfig.filterScripts = this.checked;
+            });
+        }
+
+        if (filterHtmlTagsCheckbox) {
+            filterHtmlTagsCheckbox.addEventListener('change', function () {
+                filterConfig.filterHtmlTags = this.checked;
+            });
+        }
+
+        if (filterSpecialCharsCheckbox) {
+            filterSpecialCharsCheckbox.addEventListener('change', function () {
+                filterConfig.filterSpecialChars = this.checked;
+            });
+        }
+
+
         // 新增：上一句/下一句按钮
         let fixedPrevBtn, fixedNextBtn, sentencePositionDisplay;
 
@@ -516,6 +583,7 @@
         }
 
         // 预处理文章内容，提取句子
+        // 预处理文章内容，提取句子（增强版）
         function prepareArticleSentences() {
             const articleContent = document.getElementById('article-content');
             if (!articleContent) {
@@ -526,53 +594,265 @@
             // 移除之前的事件监听器
             removeSentenceClickListeners();
 
-            // 克隆DOM节点以保留原始结构
+            // 深度克隆DOM节点（不复制事件监听器）
             const contentClone = articleContent.cloneNode(true);
 
-            // 移除不需要的元素（如代码块、图片、按钮等）
-            const elementsToRemove = contentClone.querySelectorAll('pre, code, img, button, iframe, .no-read, [data-no-read]');
-            elementsToRemove.forEach(el => el.remove());
+            // 1. 定义需要移除的标签和类名
+            const elementsToRemove = [
+                // 脚本和样式标签
+                'script', 'style', 'noscript', 'template',
+                // 代码相关
+                'pre', 'code', 'kbd', 'samp', 'var',
+                // 交互元素
+                'button', 'input', 'textarea', 'select', 'option', 'form',
+                // 多媒体
+                'img', 'audio', 'video', 'canvas', 'svg', 'iframe', 'object', 'embed',
+                // 导航和广告
+                'nav', 'menu', 'aside.ad', '.advertisement', '[class*="ad-"]',
+                // 隐藏元素
+                '[hidden]', '[aria-hidden="true"]', '[style*="display:none"]', '[style*="display: none"]',
+                '[style*="visibility:hidden"]', '.hidden', '.invisible', '.visually-hidden',
+                // 注释
+                '.comment', '.annotation',
+                // 特定类名排除
+                '.no-read', '.skip-read', '.not-for-tts', '.tts-ignore',
+                '[data-no-read]', '[data-tts-ignore]', '[data-skip-tts]'
+            ];
 
-            // 获取纯文本
+            // 2. 移除不需要的元素
+            elementsToRemove.forEach(selector => {
+                try {
+                    contentClone.querySelectorAll(selector).forEach(el => {
+                        // 如果元素有data-tts-include属性，则保留
+                        if (!el.hasAttribute('data-tts-include')) {
+                            el.remove();
+                        }
+                    });
+                } catch (e) {
+                    console.warn(`移除选择器 ${selector} 时出错:`, e);
+                }
+            });
+
+            // 3. 特殊处理：移除属性但保留内容
+            const elementsToClean = contentClone.querySelectorAll([
+                'a', 'abbr', 'acronym', 'b', 'big', 'cite', 'em', 'i',
+                'small', 'span', 'strong', 'sub', 'sup', 'time', 'u'
+            ].join(','));
+
+            elementsToClean.forEach(el => {
+                // 保留链接文本但移除href（避免朗读URL）
+                if (el.tagName === 'A') {
+                    const text = el.textContent;
+                    const parent = el.parentNode;
+                    const textNode = document.createTextNode(text);
+                    parent.replaceChild(textNode, el);
+                }
+                // 其他内联元素只保留文本
+                else if (el.parentNode) {
+                    const text = el.textContent;
+                    const textNode = document.createTextNode(text);
+                    el.parentNode.replaceChild(textNode, el);
+                }
+            });
+
+            // 4. 清理空白和格式
+            // 移除多余的空格和换行
+            const walker = document.createTreeWalker(
+                contentClone,
+                NodeFilter.SHOW_TEXT,
+                null
+            );
+
+            const textNodes = [];
+            let node;
+            while (node = walker.nextNode()) {
+                textNodes.push(node);
+            }
+
+            textNodes.forEach(node => {
+                // 清理文本节点
+                let text = node.textContent;
+
+                // 移除连续的空格和换行
+                text = text.replace(/\s+/g, ' ');
+
+                // 移除特定模式（如JavaScript代码片段）
+                text = text.replace(/console\.log\(.*?\)/g, '');
+                text = text.replace(/function\s+\w+\(.*?\)\s*{.*?}/gs, '');
+                text = text.replace(/const\s+\w+\s*=\s*.*?;/g, '');
+                text = text.replace(/let\s+\w+\s*=\s*.*?;/g, '');
+                text = text.replace(/var\s+\w+\s*=\s*.*?;/g, '');
+
+                // 移除CSS样式
+                text = text.replace(/\.\w+\s*{.*?}/gs, '');
+                text = text.replace(/#\w+\s*{.*?}/gs, '');
+                text = text.replace(/\[\w+\]\s*{.*?}/gs, '');
+
+                // 移除HTML标签残留
+                text = text.replace(/<[^>]+>/g, '');
+
+                // 移除特殊字符但保留中文标点
+                text = text.replace(/[<>{}[\]\\|]/g, '');
+
+                node.textContent = text.trim();
+            });
+
+            // 5. 获取纯净文本
             const fullText = contentClone.textContent || contentClone.innerText;
 
             if (!fullText || fullText.trim() === '') {
-                console.error('文章内容为空');
-                return false;
-            }
+                console.error('文章内容为空，可能过滤过度');
 
+                // 回退方案：使用原始文本但移除明显不需要的内容
+                const originalText = articleContent.textContent || articleContent.innerText;
+                const cleanedText = cleanTextContent(originalText);
+
+                if (!cleanedText || cleanedText.trim() === '') {
+                    alert('无法提取有效的文章内容');
+                    return false;
+                }
+
+                return processCleanedText(cleanedText, articleContent);
+            }
+            const originalText = articleContent.textContent || articleContent.innerText;
+            const cleanedText = cleanTextContent(originalText);
+            addDebugInfo(originalText, cleanedText);
+            return processCleanedText(fullText, articleContent);
+        }
+
+// 辅助函数：处理清理后的文本
+        function processCleanedText(text, container) {
             // 使用正则表达式分割句子
-            // 中文标点：。！？；，、 英文标点：. ! ? ; ,
             const sentenceRegex = /[^。！？；，、.!?;,\n]+[。！？；，、.!?;,\n]*/g;
-            const rawSentences = fullText.match(sentenceRegex) || [];
+            const rawSentences = text.match(sentenceRegex) || [];
 
             // 过滤空句子和过短句子
             sentences = rawSentences
                 .map(s => s.trim())
-                .filter(s => s.length > 3) // 至少3个字符
-                .filter(s => !s.match(/^\d+$/)) // 过滤纯数字
-                .filter(s => s.length < 500); // 过滤过长的"句子"
+                .filter(s => {
+                    // 过滤条件
+                    if (s.length < 3) return false;
+                    if (s.match(/^\d+$/)) return false; // 纯数字
+                    if (s.length > 500) return false; // 过长
+                    if (s.match(/^[{}[\]()<>]+$/)) return false; // 只有括号
+                    if (s.match(/^[=+*/\\|~^]+$/)) return false; // 只有运算符
 
-            // 保存每个句子对应的DOM元素（用于高亮）
+                    // 检查是否包含代码片段
+                    const codePatterns = [
+                        /function\s*\(/, /=>/, /\.\w+\(/, /\w+\.prototype/,
+                        /var\s+\w+/, /let\s+\w+/, /const\s+\w+/,
+                        /if\s*\(/, /for\s*\(/, /while\s*\(/,
+                        /<\w+>/, /<\/\w+>/, /&[a-z]+;/,
+                        /\w+:\s*\d+px/, /rgb\(/, /#[\da-f]{3,6}/,
+                        /import\s+.*from/, /export\s+(default\s+)?\w+/
+                    ];
+
+                    for (const pattern of codePatterns) {
+                        if (pattern.test(s)) {
+                            console.log('过滤代码片段:', s.substring(0, 50));
+                            return false;
+                        }
+                    }
+
+                    return true;
+                })
+                .map(s => {
+                    // 最后清理
+                    return s.replace(/\s+/g, ' ')
+                        .replace(/^\s+|\s+$/g, '');
+                });
+
+            // 保存每个句子对应的DOM元素
             sentenceElements = [];
             sentenceBlocks = [];
 
-            // 为每个句子在原始DOM中查找对应的文本节点
+            // 为每个句子查找对应的DOM元素
             sentences.forEach((sentence, index) => {
-                const block = createSentenceBlock(articleContent, sentence, index);
+                const block = createSentenceBlock(container, sentence, index);
                 if (block) {
                     sentenceElements.push(block.element);
                     sentenceBlocks.push(block);
                 }
             });
 
-            console.log(`预处理完成，共提取 ${sentences.length} 个句子`);
+            console.log(`预处理完成，从 ${rawSentences.length} 个原始句子中提取 ${sentences.length} 个有效句子`);
 
             // 添加句子块点击事件
             addSentenceClickListeners();
 
             return sentences.length > 0;
         }
+
+// 辅助函数：文本内容清理
+        function cleanTextContent(text, config = filterConfig) {
+            if (!text) return '';
+
+            let cleaned = text;
+
+            const patterns = [];
+
+            // 根据配置添加模式
+            if (config.filterScripts) {
+                patterns.push(
+                    {pattern: /<script\b[^>]*>[\s\S]*?<\/script>/gi, replacement: ''},
+                    {pattern: /<style\b[^>]*>[\s\S]*?<\/style>/gi, replacement: ''}
+                );
+            }
+
+            if (config.filterCode) {
+                patterns.push(
+                    {pattern: /console\.\w+\([^)]*\)/g, replacement: ''},
+                    {pattern: /function\s+\w*\s*\([^)]*\)\s*\{[\s\S]*?\}/g, replacement: ''},
+                    {pattern: /\.\w+\s*\{[^}]*\}/g, replacement: ''},
+                    {pattern: /#\w+\s*\{[^}]*\}/g, replacement: ''}
+                );
+            }
+
+            if (config.filterHtmlTags) {
+                patterns.push(
+                    {pattern: /<\/?\w+[^>]*>/g, replacement: ' '}
+                );
+            }
+
+            if (config.filterSpecialChars) {
+                patterns.push(
+                    {pattern: /&[a-z]+;/g, replacement: ' '},
+                    {pattern: /&#x?[0-9a-f]+;/gi, replacement: ' '}
+                );
+            }
+
+            // 始终应用的基本清理
+            patterns.push(
+                {pattern: /\s+/g, replacement: ' '}
+            );
+
+            patterns.forEach(({pattern, replacement}) => {
+                cleaned = cleaned.replace(pattern, replacement);
+            });
+
+            return cleaned.trim();
+        }
+
+        function addDebugInfo(originalText, cleanedText) {
+            const debugDiv = document.getElementById('tts-debug-info');
+            if (!debugDiv) return;
+
+            const originalLength = originalText.length;
+            const cleanedLength = cleanedText.length;
+            const removedLength = originalLength - cleanedLength;
+            const reductionPercent = ((removedLength / originalLength) * 100).toFixed(1);
+
+            debugDiv.innerHTML = `
+        <div class="text-xs text-gray-600 p-2 bg-gray-100 rounded">
+            <strong>内容过滤报告：</strong><br>
+            原始字符数：${originalLength}<br>
+            清理后字符数：${cleanedLength}<br>
+            移除字符数：${removedLength} (${reductionPercent}%)<br>
+            ${removedLength > 1000 ? '⚠️ 移除了大量非内容字符，可能包含代码' : ''}
+        </div>
+    `;
+        }
+
 
         // 创建句子块（可点击的区域）
         function createSentenceBlock(container, sentence, index) {

@@ -3,6 +3,7 @@ import time
 
 from flask import Blueprint
 
+from extensions import csrf
 from plugins.kuaiMD.kuaiMD import start_server, convert_markdown_to_html, get_main_page
 from plugins.tools import proxy_request
 from src.database import get_db
@@ -51,11 +52,13 @@ def register_plugin(app):
 
 @kuaiMD_bp.route('/kuaiMD', methods=['GET', 'POST', 'PUT', 'DELETE'])
 @kuaiMD_bp.route('/kuaiMD/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE'])
+@csrf.exempt
 def index(path=''):
     return proxy_request(target_url=f'http://localhost:{kuaiMD_port}/{path}')
 
 
 @kuaiMD_bp.route('/p/<slug>.md/fullscreen', methods=['GET', 'POST'])
+@csrf.exempt
 def fullscreen(slug):
     with get_db() as db:
         try:
