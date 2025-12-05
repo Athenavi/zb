@@ -265,7 +265,7 @@
                     <!-- 添加 content 存在性检查 -->
                     <div id="article-content">
                         {% if content and content.content %}
-                            {{ content.content|md2html|safe }}
+                            {{ content.content|md2html(style_theme='dark' if request.cookies.get('theme') == 'dark' else 'light')|safe }}
                         {% else %}
                             <p class="text-gray-500">暂无内容</p>
                         {% endif %}
