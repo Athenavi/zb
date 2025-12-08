@@ -59,15 +59,15 @@ def get_user_port_input():
 
 def run_update():
     """执行更新程序"""
-    print("正在检查更新...")
+    logger.info("正在检查更新...")
     try:
         # 导入并运行更新程序
         from update import main as update_main
         update_main()
-        print("更新完成")
+        logger.info("更新完成")
         return True
     except Exception as e:
-        print(f"更新过程中出错: {str(e)}")
+        logger.error(f"更新过程中出错: {str(e)}")
         return False
 
 
@@ -77,9 +77,9 @@ def main():
 
     # 检查配置文件是否存在
     if not os.path.isfile(".env"):
-        print("=" * 60)
-        print("检测到系统未初始化，正在启动引导程序...")
-        print("=" * 60)
+        logger.info("=" * 60)
+        logger.info("检测到系统未初始化，正在启动引导程序...")
+        logger.info("=" * 60)
 
         # 导入并运行引导程序
         try:
@@ -87,15 +87,15 @@ def main():
             from guide import run_guide_app
             success = run_guide_app(args.host, args.port)
             if success:
-                print("引导程序已结束，请重新启动应用以使用主程序")
+                logger.info("引导程序已结束，请重新启动应用以使用主程序")
             else:
-                print("引导程序运行失败")
+                logger.error("引导程序运行失败")
 
         except ImportError as e:
-            print(f"导入引导程序失败: {str(e)}")
-            print("请确保 standalone_guide.py 文件存在")
+            logger.error(f"导入引导程序失败: {str(e)}")
+            logger.error("请确保 standalone_guide.py 文件存在")
         except Exception as e:
-            print(f"启动引导程序时发生错误: {str(e)}")
+            logger.error(f"启动引导程序时发生错误: {str(e)}")
 
         return
 
@@ -103,26 +103,26 @@ def main():
     if args.pythonanywhere:
         logger = init_pythonanywhere_logger()
         if logger is None:
-            print("PythonAnywhere 环境下日志系统初始化失败")
+            logger.error("PythonAnywhere 环境下日志系统初始化失败")
             sys.exit(1)
         logger.info("PythonAnywhere 环境下日志系统已启动")
     else:
         logger = init_optimized_logger()
         if logger is None:
-            print("日志系统初始化失败")
+            logger.error("日志系统初始化失败")
             sys.exit(1)
         logger.info("日志系统已启动")
 
     # 处理更新选项
     if args.update_only:
         if not run_update():
-            print("更新失败，程序将退出")
+            logger.error("更新失败，程序将退出")
             sys.exit(1)
         return
 
     if args.update:
         if not run_update():
-            print("更新失败，继续使用当前版本启动")
+            logger.warning("更新失败，继续使用当前版本启动")
 
     # 测试数据库连接（仅在配置文件存在时）
     try:
@@ -130,10 +130,10 @@ def main():
         test_database_connection()
         check_db()
     except ImportError:
-        print("警告: 无法导入数据库模块，跳过数据库检查")
+        logger.warning("警告: 无法导入数据库模块，跳过数据库检查")
     except Exception as e:
-        print(f"数据库连接测试失败: {str(e)}")
-        print("建议运行引导程序重新配置数据库")
+        logger.error(f"数据库连接测试失败: {str(e)}")
+        logger.info("建议运行引导程序重新配置数据库")
         response = input("是否立即启动引导程序? (y/N): ")
         if response.lower() in ['y', 'yes']:
             from guide import run_guide_app
@@ -144,30 +144,30 @@ def main():
     # 检查端口可用性
     final_port = args.port
     if not is_port_available(final_port, args.host):
-        print(f"端口 {final_port} 已被占用，正在尝试9421-9430范围内的其他端口...")
+        logger.warning(f"端口 {final_port} 已被占用，正在尝试9421-9430范围内的其他端口...")
         available_port = find_available_port(9421, 9430, args.host)
 
         if available_port:
             final_port = available_port
-            print(f"找到可用端口: {final_port}")
+            logger.info(f"找到可用端口: {final_port}")
         else:
-            print("9421-9430范围内的所有端口已被占用。")
+            logger.error("9421-9430范围内的所有端口已被占用。")
             final_port = get_user_port_input()
 
     # 导入应用
     try:
         from src.app import create_app
     except ImportError as e:
-        print(f"导入应用失败: {str(e)}")
-        print("请检查应用模块是否正确安装")
+        logger.error(f"导入应用失败: {str(e)}")
+        logger.error("请检查应用模块是否正确安装")
         sys.exit(1)
 
     # 显示启动信息
-    print("=" * 50)
-    print("应用程序正在启动...")
-    print(f"服务地址: http://{args.host}:{final_port}")
-    print(f"内部地址: http://127.0.0.1:{final_port}")
-    print("=" * 50)
+    logger.info("=" * 50)
+    logger.info("应用程序正在启动...")
+    logger.info(f"服务地址: http://{args.host}:{final_port}")
+    logger.info(f"内部地址: http://127.0.0.1:{final_port}")
+    logger.info("=" * 50)
 
     # 启动服务
     try:
@@ -175,9 +175,9 @@ def main():
         app = create_app()
         serve(app, host=args.host, port=final_port, threads=8, channel_timeout=60)
     except KeyboardInterrupt:
-        print("\n服务器正在关闭...")
+        logger.info("\n服务器正在关闭...")
     except Exception as e:
-        print(f"服务器启动失败: {str(e)}")
+        logger.error(f"服务器启动失败: {str(e)}")
         sys.exit(1)
 
 

@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from flask import Blueprint, jsonify, current_app, request
@@ -24,6 +25,8 @@ from src.utils.security.safe import is_valid_iso_language_code
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 domain = app_config.domain
+
+logger = logging.getLogger(__name__)
 
 
 @api_bp.route('/theme/upload', methods=['POST'])
@@ -91,14 +94,14 @@ def api_user_avatar(user_identifier=None, identifier_type='id'):
 @api_bp.route('/tags/suggest', methods=['GET'])
 def suggest_tags():
     prefix = request.args.get('q', '')
-    # print(f"prefix: {prefix}")
+    # logger.debug(f"prefix: {prefix}")
 
     # 使用缓存来存储去重后的标签列表
     cache_key = 'unique_tags'  # 使用明确的缓存键名
     unique_tags = cache.get(cache_key)
 
     if not unique_tags:
-        print("缓存未命中，从数据库加载标签...")
+        logger.info("缓存未命中，从数据库加载标签...")
         # 获取所有文章的标签字符串
         tags_results = db.session.execute(select(func.distinct(Article.tags))).scalars().all()
 
@@ -110,14 +113,14 @@ def suggest_tags():
 
         # 去重并排序
         unique_tags = sorted(set(all_tags))
-        print(f"加载并处理完成，唯一标签数量: {len(unique_tags)}")
+        logger.info(f"加载并处理完成，唯一标签数量: {len(unique_tags)}")
 
         # 缓存处理后的结果，避免重复处理
         cache.set(cache_key, unique_tags, timeout=1200)
 
     # 过滤出匹配前缀的标签
     matched_tags = [tag for tag in unique_tags if tag.startswith(prefix)]
-    # print(f"匹配前缀 '{prefix}' 的标签数量: {len(matched_tags)}")
+    # logger.debug(f"匹配前缀 '{prefix}' 的标签数量: {len(matched_tags)}")
 
     # 返回前五个匹配的标签
     return jsonify(matched_tags[:5])
@@ -145,7 +148,7 @@ def get_all_users():
             all_users[username] = str(user_id)
         return all_users
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logger.error(f"An error occurred: {e}")
 
 
 @cache.cached(timeout=3600, key_prefix='all_emails')
@@ -159,7 +162,7 @@ def get_all_emails():
             all_emails.append(email)
         return all_emails
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logger.error(f"An error occurred: {e}")
 
 
 @api_bp.route('/email-exists', methods=['GET'])
@@ -223,7 +226,7 @@ def update_article_status(user_id, article_id):
 @jwt_required
 def upload_cover(user_id):
     cover_path = Path(str(current_app.root_path)).parent / 'static' / 'cover'
-    print(cover_path)
+    logger.debug(cover_path)
     return upload_cover_back(user_id=user_id, base_path=cover_path, domain=domain)
 
 
@@ -273,7 +276,7 @@ def generate_qr():
         })
 
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logger.error(f"An error occurred: {e}")
         return jsonify({
             'success': False,
             'message': 'Failed to generate QR code'
@@ -300,7 +303,7 @@ def upload_user_path(user_id):
         return handle_user_upload(user_id=user_id, allowed_size=current_app.config['UPLOAD_LIMIT'],
                                   allowed_mimes=current_app.config['ALLOWED_MIMES'], check_existing=False)
     except Exception as e:
-        print(e)
+        logger.error(e)
 
 
 from src.upload.public_upload import handle_chunked_upload_init, handle_chunked_upload_chunk, \

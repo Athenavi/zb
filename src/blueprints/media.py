@@ -184,10 +184,19 @@ def media_delete(user_id):
             # 收集需要清理的信息
             cleanup_data = []
             media_hashes = []  # 收集所有涉及的hash
+            valid_target_files = []  # 只处理hash不为null的记录
 
-            # 第一步：先收集所有hash，不修改任何对象
+            # 第一步：先检查所有记录的hash是否有效，过滤掉hash为null的记录
             for media_file in target_files:
-                media_hashes.append(media_file.hash)
+                if media_file.hash is not None:
+                    media_hashes.append(media_file.hash)
+                    valid_target_files.append(media_file)
+                else:
+                    current_app.logger.warning(f"跳过hash为null的媒体记录: ID={media_file.id}")
+
+            # 如果没有有效的记录，直接返回
+            if not valid_target_files:
+                return jsonify({"message": "没有有效的媒体记录可删除"}), 400
 
             # 第二步：批量查询FileHash对象，确保它们属于当前会话
             file_hashes = db.session.query(FileHash).filter(
@@ -198,7 +207,7 @@ def media_delete(user_id):
             file_hash_map = {fh.hash: fh for fh in file_hashes}
 
             # 第三步：执行删除和更新操作
-            for media_file in target_files:
+            for media_file in valid_target_files:
                 db.session.delete(media_file)
 
                 file_hash_obj = file_hash_map.get(media_file.hash)
@@ -220,7 +229,7 @@ def media_delete(user_id):
                        args=(current_app._get_current_object(), cleanup_data)).start()
 
             return jsonify({
-                "deleted_count": len(target_files),
+                "deleted_count": len(valid_target_files),
                 "message": "删除成功，后台清理中"
             }), 200
 

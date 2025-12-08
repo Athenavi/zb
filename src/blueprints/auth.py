@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -22,6 +23,8 @@ from urllib.parse import urlparse, urljoin
 from flask import redirect, current_app, request, make_response
 from functools import wraps
 from flask_principal import identity_changed, AnonymousIdentity, Identity
+
+logger = logging.getLogger(__name__)
 
 
 def babel_language_switch(view_func):
@@ -167,7 +170,7 @@ def register():
                 return redirect(url_for('auth.login'))
 
         except Exception as e:
-            print(e)
+            logger.error(e)
             db.session.rollback()
             if request.is_json:
                 return jsonify({
@@ -366,7 +369,7 @@ def login_post_response(form, mobile_device=False, next_url=None):
                 flash('登录成功', 'success')
                 return response
         except Exception as e:
-            print(e)
+            logger.error(e)
         finally:
             new_session = UserSession(
                 user_id=user.id,

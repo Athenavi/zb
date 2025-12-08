@@ -73,8 +73,11 @@ def init_extensions(app):
     jwt.init_app(app)
 
     # 配置监控面板
-    dashboard.config.init_from(file='dashboard_config.cfg')
-
-    # 绑定应用
-    dashboard.bind(app)
-    csrf.exempt(dashboard.blueprint)
+    try:
+        dashboard.config.init_from(file='dashboard_config.cfg')
+        # 绑定应用
+        dashboard.bind(app)
+        csrf.exempt(dashboard.blueprint)
+    except Exception as e:
+        app.logger.error(f"Failed to initialize Flask-MonitoringDashboard: {str(e)}")
+        # 即使监控面板初始化失败，也不影响主应用运行
