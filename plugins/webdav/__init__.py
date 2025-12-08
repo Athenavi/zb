@@ -245,8 +245,8 @@ def register_plugin(app):
             self.upload_dir = os.path.join(self.base_dir, 'hashed_files')
             self.temp_dir = os.path.join(self.base_dir, 'temp_uploads')
             self.thumbnail_dir = os.path.join(self.base_dir, 'thumbnails')
-            print(f"WebDAV base dir: {self.base_dir}")
-            print(f"WebDAV upload dir: {self.upload_dir}")
+            logger.info(f"WebDAV base dir: {self.base_dir}")
+            logger.info(f"WebDAV upload dir: {self.upload_dir}")
 
             # 确保必要目录存在
             for directory in [self.upload_dir, self.temp_dir, self.thumbnail_dir, self.trash_dir]:
@@ -264,6 +264,7 @@ def register_plugin(app):
                 'sharing': False,  # 可扩展文件分享
                 'reports': True,  # 支持报表生成
             }
+
         def handle_request(self, path, method, user_info):
             """Handle WebDAV requests"""
             try:
