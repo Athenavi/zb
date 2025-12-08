@@ -552,6 +552,7 @@ create table if not exists user_sessions
     platform      varchar(100),
     ip_address    varchar(45),
     location      varchar(255),
+    created_at timestamp default CURRENT_TIMESTAMP not null,
     last_activity timestamp default CURRENT_TIMESTAMP not null,
     expiry_time   timestamp                           not null,
     is_active     boolean   default true
