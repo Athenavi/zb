@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 
-from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 
 from src.extensions import db
@@ -13,7 +13,7 @@ class UserSession(db.Model):
     __tablename__ = 'user_sessions'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
     session_id = Column(String(128), unique=True, nullable=False, index=True)
     access_token = Column(String(512), unique=True, nullable=False)
     refresh_token = Column(String(512), unique=True, nullable=True)
@@ -26,7 +26,7 @@ class UserSession(db.Model):
     device_info = Column(String(512), nullable=True)
 
     # 关联关系
-    user = relationship("User", back_populates="sessions", foreign_keys=[user_id])
+    user = relationship("User", back_populates="sessions")
 
     def __repr__(self):
         return f"<UserSession(id={self.id}, user_id={self.user_id}, session_id='{self.session_id}')>"

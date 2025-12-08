@@ -55,6 +55,9 @@ class User(db.Model, UserMixin):
     vip_subscriptions = db.relationship('VIPSubscription', back_populates='user',
                                         lazy='dynamic', cascade='all, delete')
 
+    # 用户会话关系
+    sessions = db.relationship('UserSession', back_populates='user', lazy='dynamic', cascade='all, delete')
+
     def __repr__(self):
         return f'<User {self.username}>'
 
