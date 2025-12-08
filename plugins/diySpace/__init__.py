@@ -51,7 +51,7 @@ def diy_space(user_id):
         if request.method == 'PUT':
             return diy_space_put(base_dir=base_dir, user_id=user_id, encoding='utf-8')
     except Exception as e:
-        print(f"An error occurred: {e}")
+        app.logger.error(f"An error occurred: {e}")
 
 
 @diySpace_bp.route("/@<user_name>")
@@ -60,7 +60,7 @@ def user_diy_space(user_name):
     def _user_diy_space():
         user_id = username_exists(user_name)
         user_path = Path(base_dir) / 'media' / user_id / 'index.html'
-        print(user_path)
+        app.logger.info(user_path)
         if user_path.exists():
             with user_path.open('r', encoding='utf-8') as f:
                 return f.read()

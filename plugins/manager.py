@@ -16,7 +16,8 @@ class PluginManager:
         self.app = app
         app.plugin_manager = self  # 将管理器附加到app
 
-    def is_plugin_enabled(self, plugin_path):
+    @staticmethod
+    def is_plugin_enabled(plugin_path):
         """检查插件是否启用（没有__off__文件则为启用）"""
         off_file = os.path.join(plugin_path, "__off__")
         return not os.path.exists(off_file)

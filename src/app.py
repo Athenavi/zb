@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 
 from flask import Flask, jsonify, g
@@ -109,7 +110,7 @@ def register_direct_routes(app, config_class):
 
     # 身份加载信号处理器
     @identity_loaded.connect_via(app)
-    def on_identity_loaded(sender, identity):
+    def on_identity_loaded(_sender, identity):
         """当身份加载时，设置用户拥有的角色和权限"""
         if hasattr(identity, 'id') and identity.id:
             from src.models import User
@@ -194,7 +195,7 @@ def register_direct_routes(app, config_class):
     from flask_principal import PermissionDenied
 
     @app.errorhandler(PermissionDenied)
-    def handle_permission_denied(error):
+    def handle_permission_denied(permission_error):
         return jsonify({
             'error': '权限不足',
             'message': '您没有执行此操作的权限'
@@ -238,9 +239,13 @@ def register_blueprints(app):
         session_bp
     ]
 
+    # 找到最长的蓝图名称长度，用于日志格式化
+    max_name_length = max(len(bp.name) for bp in blueprints)
+    
     for bp in blueprints:
         app.register_blueprint(bp)
-        app.logger.info(f"=====Blueprint {bp.name} load success.=====")
+        # 使用固定宽度格式化，使日志输出对齐美观
+        app.logger.info(f"=====Blueprint {bp.name:>{max_name_length}} load success.=====")
         if bp != auth_bp:
             csrf.exempt(bp)
 
@@ -256,18 +261,19 @@ def configure_logging(app):
 
 def print_startup_info(config_class):
     """打印启动信息"""
-    print(f"running at: {config_class.base_dir}")
-    print("sys information")
+    logger = logging.getLogger(__name__)
+    logger.info(f"running at: {config_class.base_dir}")
+    logger.info("sys information")
     domain = config_class.domain.rstrip('/') + '/'
-    print("++++++++++==========================++++++++++")
-    print(
+    logger.info("++++++++++==========================++++++++++")
+    logger.info(
         f'\n domain: {domain} \n title: {config_class.sitename} \n beian: {config_class.beian} \n')
 
     # 安全检查
     if config_class.SECRET_KEY == 'your-secret-key-here':
-        print("WARNING: 应用存在被破解的风险，请修改 SECRET_KEY 变量的值")
-        print("WARNING: 请修改 SECRET_KEY 变量的值")
-        print("WARNING: 请修改 SECRET_KEY 变量的值")
-        print("WARNING: 请修改 SECRET_KEY 变量的值")
+        logger.warning("WARNING: 应用存在被破解的风险，请修改 SECRET_KEY 变量的值")
+        logger.warning("WARNING: 请修改 SECRET_KEY 变量的值")
+        logger.warning("WARNING: 请修改 SECRET_KEY 变量的值")
+        logger.warning("WARNING: 请修改 SECRET_KEY 变量的值")
 
-    print("++++++++++==========================++++++++++")
+    logger.info("++++++++++==========================++++++++++")
