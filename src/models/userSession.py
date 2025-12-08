@@ -17,13 +17,15 @@ class UserSession(db.Model):
     session_id = Column(String(128), unique=True, nullable=False, index=True)
     access_token = Column(String(512), unique=True, nullable=False)
     refresh_token = Column(String(512), unique=True, nullable=True)
+    device_type = Column(String(50), nullable=True)
+    browser = Column(String(100), nullable=True)
+    platform = Column(String(100), nullable=True)
     ip_address = Column(String(45), nullable=True)  # 支持IPv6
-    user_agent = Column(String(512), nullable=True)
+    location = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.now, nullable=False)
     last_activity = Column(DateTime, default=datetime.now, nullable=False)
     expiry_time = Column(DateTime, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
-    device_info = Column(String(512), nullable=True)
 
     # 关联关系
     user = relationship("User", back_populates="sessions")
@@ -39,13 +41,15 @@ class UserSession(db.Model):
             'session_id': self.session_id,
             'access_token': self.access_token,
             'refresh_token': self.refresh_token,
+            'device_type': self.device_type,
+            'browser': self.browser,
+            'platform': self.platform,
             'ip_address': self.ip_address,
-            'user_agent': self.user_agent,
+            'location': self.location,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'last_activity': self.last_activity.isoformat() if self.last_activity else None,
             'expiry_time': self.expiry_time.isoformat() if self.expiry_time else None,
-            'is_active': self.is_active,
-            'device_info': self.device_info
+            'is_active': self.is_active
         }
 
     def update_last_activity(self):
@@ -60,7 +64,8 @@ class UserSession(db.Model):
 
     @classmethod
     def create_session(cls, user_id, session_id, access_token, refresh_token=None,
-                       ip_address=None, user_agent=None, device_info=None, expiry_time=None):
+                       ip_address=None, device_type=None, browser=None, platform=None,
+                       location=None, expiry_time=None):
         """创建新会话"""
         try:
             # 创建会话对象
@@ -69,9 +74,11 @@ class UserSession(db.Model):
                 session_id=session_id,
                 access_token=access_token,
                 refresh_token=refresh_token,
+                device_type=device_type,
+                browser=browser,
+                platform=platform,
                 ip_address=ip_address,
-                user_agent=user_agent,
-                device_info=device_info,
+                location=location,
                 expiry_time=expiry_time,
                 last_activity=datetime.now()
             )
