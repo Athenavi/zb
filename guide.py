@@ -1,3 +1,4 @@
+import logging
 import os
 import secrets
 import socket
@@ -7,6 +8,8 @@ from sqlite3 import connect as sqlite_connect
 import psycopg2
 from flask import Flask, render_template, request, jsonify
 from mysql.connector import connect as mysql_connect
+
+logger = logging.getLogger(__name__)
 
 
 class GuideConfig:
@@ -266,11 +269,11 @@ def get_user_port_input():
                 if is_port_available(user_port):
                     return user_port
                 else:
-                    print(f"端口 {user_port} 已被占用，请尝试其他端口。")
+                    logger.warning(f"端口 {user_port} 已被占用，请尝试其他端口。")
             else:
-                print("端口号必须在 1-65535 范围内。")
+                logger.error("端口号必须在 1-65535 范围内。")
         except ValueError:
-            print("请输入有效的数字端口号。")
+            logger.error("请输入有效的数字端口号。")
 
 
 def run_guide_app(host='0.0.0.0', port=9421):
