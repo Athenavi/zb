@@ -342,6 +342,42 @@ def check_email():
 from src.security import admin_permission, role_required, permission_required, create_permission
 
 
+# 点赞文章功能
+@api_bp.route('/article/<int:article_id>/like', methods=['POST'])
+@jwt_required
+def like_article(user_id, article_id):
+    """用户点赞文章"""
+    try:
+        # 获取文章
+        from src.models.article import ArticleLike
+        article = Article.query.get(article_id)
+        if not article:
+            return jsonify({'success': False, 'message': '文章不存在'}), 404
+
+        # 检查用户是否已经点过赞
+        existing_like = ArticleLike.query.filter_by(user_id=user_id, article_id=article_id).first()
+        if existing_like:
+            return jsonify({'success': False, 'message': '您已经点过赞了'}), 400
+
+        # 增加点赞数
+        article.likes += 1
+
+        # 记录用户点赞
+        new_like = ArticleLike(user_id=user_id, article_id=article_id)
+        db.session.add(new_like)
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': '点赞成功',
+            'likes': article.likes
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': '点赞失败'}), 500
+
+
 # 需要管理员角色
 @api_bp.route('/admin/dashboard')
 @admin_permission.require()  # 或者使用 @role_required('admin')
@@ -387,3 +423,28 @@ def analytics():
         return jsonify({'data': '基础分析数据'})
     else:
         return jsonify({'error': '无权访问分析数据'}), 403
+
+
+@api_bp.route('/user/check-login', methods=['GET'])
+def check_login_status():
+    """检查用户登录状态"""
+    # 检查用户是否通过 Flask-Login 登录
+    from flask_login import current_user
+    if current_user.is_authenticated:
+        user = check_user_exist(current_user.id)
+        if user:
+            return jsonify({
+                'logged_in': True,
+                'user_id': current_user.id,
+            }), 200
+
+    # 用户未登录或无效
+    return jsonify({
+        'logged_in': False,
+        'message': 'Not logged in or invalid user'
+    }), 200
+
+
+@cache.memoize(timeout=300)
+def check_user_exist(user_id):
+    return User.query.get(user_id) is not None

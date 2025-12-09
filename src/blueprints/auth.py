@@ -209,6 +209,15 @@ def resolve_callback(callback, default='profile'):
     if callback.startswith('/') and is_safe_url(callback):
         return callback
 
+    # 如果callback是完整URL且安全，直接使用
+    if callback.startswith(('http://', 'https://')):
+        parsed_url = urlparse(callback)
+        if is_safe_url(callback):
+            return callback
+        else:
+            # 如果URL不安全，只使用路径部分
+            return parsed_url.path
+
     # 如果callback是endpoint名称，尝试解析为URL
     try:
         # 分割可能的端点参数

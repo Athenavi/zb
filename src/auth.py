@@ -1,11 +1,13 @@
 import functools
 from datetime import datetime, timezone
+from typing import Callable, Any
 from urllib.parse import urlparse, urljoin
 
 from flask import request, redirect, url_for, g, current_app, flash
 from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity, decode_token, create_access_token
 from flask_jwt_extended.exceptions import NoAuthorizationError, JWTDecodeError
 from flask_login import current_user as s_current_user
+from werkzeug import Response
 
 from src.setting import app_config
 
@@ -56,7 +58,7 @@ def is_safe_url(target):
     return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
 
 
-def jwt_required(f):
+def jwt_required(f: object) -> Callable[[tuple[Any, ...], dict[str, Any]], Response | Any]:
     """
     简化版认证装饰器 - 主要依赖 Session，JWT 作为辅助
     """

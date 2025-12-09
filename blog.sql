@@ -138,6 +138,21 @@ create table if not exists article_i18n
     unique (article_id, language_code, slug)
 );
 
+-- 添加文章点赞记录表
+create table if not exists article_likes
+(
+    id         serial
+        primary key,
+    user_id    int not null
+        references users
+            on delete cascade,
+    article_id int not null
+        references articles
+            on delete cascade,
+    created_at timestamp default CURRENT_TIMESTAMP,
+    unique (user_id, article_id)
+);
+
 create table if not exists comments
 (
     id         serial
@@ -587,3 +602,24 @@ alter table user_sessions
     add constraint fk_user_sessions_user_id
         foreign key (user_id) references users
             on delete cascade;
+
+create table if not exists article_likes
+(
+    id         serial,
+    user_id    integer not null,
+    article_id integer not null,
+    created_at timestamp
+);
+
+alter table article_likes
+    add primary key (id);
+
+alter table article_likes
+    add constraint uq_user_article_like
+        unique (user_id, article_id);
+
+alter table article_likes
+    add foreign key (user_id) references users;
+
+alter table article_likes
+    add foreign key (article_id) references articles;
