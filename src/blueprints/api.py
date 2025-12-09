@@ -378,6 +378,35 @@ def like_article(user_id, article_id):
         return jsonify({'success': False, 'message': '点赞失败'}), 500
 
 
+@api_bp.route('/article/<int:article_id>/view', methods=['POST'])
+def record_article_view(article_id):
+    """记录文章浏览量（使用缓存异步更新数据库）"""
+    try:
+        # 检查文章是否存在
+        article = db.session.query(Article).filter_by(article_id=article_id).first()
+        if not article:
+            return jsonify({'success': False, 'message': '文章不存在'}), 404
+
+        # 使用缓存来记录浏览量，避免频繁写入数据库
+        cache_key = f"article_views_{article_id}"
+        current_views = cache.get(cache_key)
+
+        if current_views is None:
+            # 如果缓存中没有，则从数据库获取当前浏览量
+            current_views = article.views
+
+        # 增加浏览量计数
+        current_views += 1
+
+        # 将新的浏览量存回缓存
+        cache.set(cache_key, current_views, timeout=300)  # 缓存5分钟
+
+        return jsonify({'success': True, 'message': '浏览量记录成功'})
+
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'记录浏览量失败: {str(e)}'}), 500
+
+
 # 需要管理员角色
 @api_bp.route('/admin/dashboard')
 @admin_permission.require()  # 或者使用 @role_required('admin')
@@ -448,3 +477,4 @@ def check_login_status():
 @cache.memoize(timeout=300)
 def check_user_exist(user_id):
     return User.query.get(user_id) is not None
+

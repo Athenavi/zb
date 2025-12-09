@@ -103,6 +103,58 @@
             }
         }
     </script>
+
+    <script>
+        // 页面浏览量统计功能
+        document.addEventListener('DOMContentLoaded', function () {
+            // 文章ID
+            const articleId = {{ article.article_id }};
+
+            // 开始时间
+            const startTime = Date.now();
+
+            // 页面可见性状态变化监听
+            let isVisible = true;
+            document.addEventListener('visibilitychange', function () {
+                if (document.hidden) {
+                    isVisible = false;
+                } else {
+                    isVisible = true;
+                }
+            });
+
+            // 定时检测用户是否在页面上停留足够长时间
+            const interval = setInterval(function () {
+                if (isVisible) {
+                    const currentTime = Date.now();
+                    const timeOnPage = currentTime - startTime;
+
+                    // 如果用户已在页面停留超过15秒
+                    if (timeOnPage >= 15000) { // 15秒 = 15000毫秒
+                        // 发送请求增加浏览量
+                        fetch('/api/article/' + articleId + '/view', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            credentials: 'same-origin'
+                        }).then(response => {
+                            if (response.ok) {
+                                console.log('浏览量统计成功');
+                            } else {
+                                console.error('浏览量统计失败');
+                            }
+                        }).catch(error => {
+                            console.error('浏览量统计出错:', error);
+                        });
+
+                        // 清除定时器，避免重复发送请求
+                        clearInterval(interval);
+                    }
+                }
+            }, 1000); // 每秒检查一次
+        });
+    </script>
 </head>
 <body>
 <!-- 导航栏 -->
