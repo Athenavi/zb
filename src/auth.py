@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Callable, Any
 from urllib.parse import urlparse, urljoin
 
-from flask import request, redirect, url_for, g, current_app, flash
+from flask import request, redirect, url_for, g, current_app, flash, jsonify
 from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity, decode_token, create_access_token
 from flask_jwt_extended.exceptions import NoAuthorizationError, JWTDecodeError
 from flask_login import current_user as s_current_user
@@ -145,6 +145,50 @@ def admin_required(f):
         return f(s_current_user.id, *args, **kwargs)
 
     return decorated_function
+
+
+def vip_required(minimum_level=1):
+    """
+    VIP权限装饰器
+    
+    :param minimum_level: 最低所需VIP等级
+    """
+
+    def decorator(f):
+        @functools.wraps(f)
+        def decorated_function(user_id, *args, **kwargs):
+            # 首先确保用户已通过身份验证
+            if not s_current_user.is_authenticated:
+                next_url = request.args.get('next') or request.endpoint
+                login_url = url_for('auth.login')
+
+                if next_url and is_safe_url(next_url) and next_url != 'auth.login':
+                    login_url += f'?next={next_url}'
+
+                return redirect(login_url)
+
+            # 检查用户VIP等级
+            if s_current_user.vip_level < minimum_level:
+                # 判断请求是否期望 JSON 响应
+                if request.method != 'GET':
+                    return jsonify({'error': f'此功能需要的VIP{minimum_level}'}), 403
+
+            # 检查VIP是否过期
+            from datetime import datetime
+            if s_current_user.vip_expires_at and s_current_user.vip_expires_at < datetime.now():
+                # 判断请求是否期望 JSON 响应
+                if request.method != 'GET':
+                    return jsonify({'error': '您的VIP已过期，请续费'}), 403
+
+                flash('您的VIP已过期，请续费')
+                return redirect(url_for('vip.plans'))
+
+            # 继续执行原始函数
+            return f(user_id, *args, **kwargs)
+
+        return decorated_function
+
+    return decorator
 
 
 def origin_required(f):

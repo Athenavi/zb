@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from flask import Blueprint, render_template, request
+from flask import Blueprint, render_template, request, current_app, jsonify
 
 from plugins.diySpace.diy import diy_space_put
 from src.auth import jwt_required
@@ -50,8 +50,19 @@ def diy_space(user_id):
 
         if request.method == 'PUT':
             return diy_space_put(base_dir=base_dir, user_id=user_id, encoding='utf-8')
+            
+        # 对于不支持的方法，返回 JSON 错误（如果是 AJAX 请求）或者 405 错误
+        if request.is_json or request.headers.get('Content-Type') == 'application/json':
+            return jsonify({'error': 'Method not allowed'}), 405
+        
+        # 对于普通的浏览器请求，返回 405 错误
+        return "Method not allowed", 405
     except Exception as e:
-        app.logger.error(f"An error occurred: {e}")
+        current_app.logger.error(f"An error occurred: {e}")
+        # 出现异常时，根据请求类型返回合适的错误格式
+        if request.is_json or request.headers.get('Content-Type') == 'application/json':
+            return jsonify({'error': 'Internal server error'}), 500
+        return "Internal server error", 500
 
 
 @diySpace_bp.route("/@<user_name>")
@@ -60,7 +71,7 @@ def user_diy_space(user_name):
     def _user_diy_space():
         user_id = username_exists(user_name)
         user_path = Path(base_dir) / 'media' / user_id / 'index.html'
-        app.logger.info(user_path)
+        current_app.logger.info(user_path)
         if user_path.exists():
             with user_path.open('r', encoding='utf-8') as f:
                 return f.read()
