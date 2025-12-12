@@ -77,6 +77,12 @@ def create_payment():
         if payment_method == 'wechat':
             current_app.logger.info("初始化微信支付服务")
             pay_service = WeChatPayService(current_app)
+            
+            # 检查微信支付是否已正确配置
+            if not pay_service.is_available():
+                current_app.logger.error("微信支付服务未正确配置，请检查相关配置项")
+                return jsonify({'error': '微信支付服务未正确配置，请联系管理员'}), 503
+                
             # 获取用户openid(需通过前端授权)
             openid = data.get('openid')
             current_app.logger.info("调用微信支付创建订单")
@@ -129,6 +135,12 @@ def wechat_notify():
     try:
         data = request.get_data()
         pay_service = WeChatPayService(current_app)
+        
+        # 检查微信支付是否已正确配置
+        if not pay_service.is_available():
+            current_app.logger.error("微信支付服务未正确配置，无法处理回调")
+            return '<xml><return_code><![CDATA[FAIL]]></return_code><return_msg><![CDATA[服务未配置]]></return_msg></xml>', 503
+            
         success = pay_service.handle_notify(data)
 
         if success:

@@ -211,11 +211,29 @@ class WechatPayConfig:
     WECHAT_MCHID = os.getenv('WECHAT_MCHID')  # 商户号
     WECHAT_API_V3_KEY = os.getenv('WECHAT_API_V3_KEY')  # APIv3密钥
 
-    private_key_path = Path('keys/wechat/private_key.pem')
-    WECHAT_PRIVATE_KEY = private_key_path.read_text() if private_key_path.exists() else None  # 商户私钥
+    # 私钥可以是文件路径或者直接的内容
+    private_key_env = os.getenv('WECHAT_PRIVATE_KEY')
+    if private_key_env:
+        # 如果环境变量中提供了私钥内容或者是文件路径
+        WECHAT_PRIVATE_KEY = private_key_env
+    else:
+        # 默认从文件读取
+        private_key_path = Path('keys/wechat/private_key.pem')
+        WECHAT_PRIVATE_KEY = None
+        if private_key_path.exists():
+            try:
+                WECHAT_PRIVATE_KEY = private_key_path.read_text(encoding='utf-8')
+            except UnicodeDecodeError:
+                # 尝试使用其他编码读取文件
+                try:
+                    WECHAT_PRIVATE_KEY = private_key_path.read_text(encoding='gbk')
+                except UnicodeDecodeError:
+                    # 如果仍然失败，以二进制方式读取
+                    WECHAT_PRIVATE_KEY = private_key_path.read_bytes().decode('utf-8', errors='ignore')
+    
     WECHAT_CERT_SERIAL_NO = os.getenv('WECHAT_CERT_SERIAL_NO')  # 证书序列号
     WECHAT_NOTIFY_URL = os.getenv('WECHAT_NOTIFY_URL', 'https://yourdomain.com/api/payment/wechat/notify')
-    WECHAT_CERT_DIR = './cert'
+    WECHAT_CERT_DIR = os.getenv('WECHAT_CERT_DIR', './cert')
 
 
 class AliPayConfig:

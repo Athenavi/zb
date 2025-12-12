@@ -11,8 +11,8 @@ from src.auth import jwt_required
 from src.blueprints.admin_vip import admin_vip_bp
 from src.blueprints.api import api_bp
 from src.blueprints.auth import auth_bp
-from src.blueprints.blog import blog_bp, get_footer, get_site_title, get_banner, get_site_domain, get_site_beian, \
-    get_site_menu, get_current_menu_slug, blog_detail_back, get_username
+from src.blueprints.blog import get_footer, get_site_title, get_banner, get_site_domain, get_site_beian, \
+    get_site_menu, get_current_menu_slug, blog_detail_back, get_username, blog_bp
 from src.blueprints.category import category_bp
 from src.blueprints.dashboard import admin_bp
 from src.blueprints.media import media_bp
@@ -27,7 +27,8 @@ from src.blueprints.vip_routes import vip_bp
 from src.blueprints.website import website_bp
 from src.error import error
 from src.extensions import init_extensions, login_manager, csrf
-from src.other.filters import json_filter, string_split, article_author, md2html, relative_time_filter, category_filter, \
+from src.other.filters import json_filter, string_split, article_author, md2html, relative_time_filter, \
+    category_filter, \
     f2list
 from src.other.search import search_handler
 from src.plugin import plugin_bp, init_plugin_manager
@@ -243,7 +244,7 @@ def register_blueprints(app):
 
     # 找到最长的蓝图名称长度，用于日志格式化
     max_name_length = max(len(bp.name) for bp in blueprints)
-    
+
     for bp in blueprints:
         app.register_blueprint(bp)
         # 使用固定宽度格式化，使日志输出对齐美观
