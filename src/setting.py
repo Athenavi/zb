@@ -239,7 +239,7 @@ class AliPayConfig:
         self.ALIPAY_APPID = os.getenv('ALIPAY_APPID')
         self.ALIPAY_DEBUG = os.getenv('ALIPAY_DEBUG', 'True').lower() == 'true'  # 沙箱模式设为True
         self.ALIPAY_GATEWAY = 'https://openapi.alipaydev.com/gateway.do' if self.ALIPAY_DEBUG else 'https://openapi.alipay.com/gateway.do'
-        self.ALIPAY_RETURN_URL = os.getenv('ALIPAY_RETURN_URL', f'{domain}payment/success')  # 同步回调(网页支付)
+        self.ALIPAY_RETURN_URL = os.getenv('ALIPAY_RETURN_URL', f'{domain}api/payment/alipay/return')  # 同步回调(网页支付)
         self.ALIPAY_NOTIFY_URL = os.getenv('ALIPAY_NOTIFY_URL', f'{domain}api/payment/alipay/notify')  # 异步回调
         # 密钥字符串 (推荐从环境变量或文件读取)
         private_key_path = Path('keys/alipay/app_private_key.pem')

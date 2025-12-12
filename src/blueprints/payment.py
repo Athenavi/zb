@@ -158,3 +158,42 @@ def alipay_notify():
     except Exception as e:
         current_app.logger.error(f"支付宝支付回调处理异常: {str(e)}", exc_info=True)
         return 'fail'
+
+
+@payment_bp.route('/alipay/return', methods=['GET'])
+def alipay_return():
+    """支付宝支付同步回调:return_url"""
+    try:
+        current_app.logger.info("收到支付宝同步回调请求")
+        # 获取所有查询参数
+        data = request.args.to_dict()
+        current_app.logger.info(f"支付宝同步回调参数: {data}")
+        
+        # 验证签名
+        sign = data.pop("sign", None)
+        sign_type = data.pop("sign_type", None)
+        
+        if not sign:
+            current_app.logger.error("支付宝同步回调缺少签名")
+            return jsonify({"error": "缺少签名"}), 400
+            
+        # 验证签名
+        pay_service = AlipayService(current_app)
+        success = pay_service.alipay.verify(data, sign)
+        
+        if success:
+            current_app.logger.info("支付宝同步回调签名验证成功")
+            # 可以在这里添加额外的业务逻辑，比如重定向到成功页面
+            return jsonify({
+                "message": "支付成功", 
+                "data": data,
+                "success": True
+            })
+        else:
+            current_app.logger.error("支付宝同步回调签名验证失败")
+            return jsonify({"error": "签名验证失败"}), 400
+            
+    except Exception as e:
+        current_app.logger.error(f"支付宝同步回调处理异常: {str(e)}", exc_info=True)
+        return jsonify({"error": "处理异常"}), 500
+

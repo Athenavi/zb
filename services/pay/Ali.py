@@ -82,11 +82,15 @@ class AlipayService:
 
             # 根据不同支付方式调用不同API
             logging.info("调用支付宝统一下单API")
+            # 从配置中获取return_url
+            from src.setting import AliPayConfig
+            alipay_config = AliPayConfig()
+            
             order_string = self.alipay.api_alipay_trade_page_pay(
                 out_trade_no=out_trade_no,
                 total_amount=total_amount,
                 subject=subject,
-                return_url=return_url or self.alipay._app_notify_url,
+                return_url=return_url or alipay_config.ALIPAY_RETURN_URL,
                 notify_url=self.alipay._app_notify_url
             )
             logging.info("支付宝统一下单API调用成功")
