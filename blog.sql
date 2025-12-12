@@ -377,6 +377,7 @@ create table vip_plans
     name          varchar(100)   not null,
     description   text,
     price         numeric(10, 2) not null,
+    original_price numeric(10, 2) not null,
     duration_days int not null,
     level         int not null,
     features      text,

@@ -14,6 +14,7 @@ class VIPPlan(db.Model):
     name = db.Column(db.String(100), nullable=False)  # 套餐名称
     description = db.Column(db.Text)  # 套餐描述
     price = db.Column(db.Numeric(10, 2), nullable=False)  # 价格
+    original_price = db.Column(db.Numeric(10, 2))  # 原价，用于显示折扣
     duration_days = db.Column(db.Integer, nullable=False)  # 有效期天数
     level = db.Column(db.Integer, default=1, nullable=False)  # VIP等级
     features = db.Column(db.Text)  # 特权功能JSON
