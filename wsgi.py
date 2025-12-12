@@ -3,6 +3,8 @@ import os
 import socket
 import sys
 
+import logger
+
 from src.logger_config import init_pythonanywhere_logger, init_optimized_logger
 
 
@@ -69,6 +71,11 @@ def run_update():
     except Exception as e:
         logger.error(f"更新过程中出错: {str(e)}")
         return False
+
+
+# 创建 Flask 应用实例，供 Flask 命令行工具使用
+from src.app import create_app
+application = create_app()
 
 
 def main():
@@ -153,14 +160,6 @@ def main():
         else:
             logger.error("9421-9430范围内的所有端口已被占用。")
             final_port = get_user_port_input()
-
-    # 导入应用
-    try:
-        from src.app import create_app
-    except ImportError as e:
-        logger.error(f"导入应用失败: {str(e)}")
-        logger.error("请检查应用模块是否正确安装")
-        sys.exit(1)
 
     # 显示启动信息
     logger.info("=" * 50)
