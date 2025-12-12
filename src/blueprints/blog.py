@@ -8,7 +8,6 @@ from flask_jwt_extended import current_user
 from src.auth import jwt_required
 from src.blog.article.password import get_article_password
 from src.blog.homepage import index_page_back, tag_page_back, featured_page_back
-from src.blueprints.api import domain
 from src.error import error
 from src.extensions import cache, csrf
 from src.models import Article, ArticleContent, ArticleI18n, User, db, Category, VIPPlan
@@ -377,6 +376,8 @@ def setting_profiles(user_id):
 @csrf.exempt
 @jwt_required
 def change_profiles(user_id):
+    # 使用 get_site_domain 函数获取域名
+    domain = get_site_domain()
     return change_profiles_back(user_id, cache, domain)
 
 

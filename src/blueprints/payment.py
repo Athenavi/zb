@@ -13,47 +13,114 @@ payment_bp = Blueprint('payment', __name__, url_prefix='/api/payment')
 @payment_bp.route('/create', methods=['POST'])
 def create_payment():
     """创建支付订单"""
-    data = request.get_json()
-    user_id = data.get('user_id')
-    plan_id = data.get('plan_id')
-    payment_method = data.get('payment_method')  # 'wechat' 或 'alipay'
+    try:
+        current_app.logger.info("开始处理支付请求")
+        
+        # 检查Content-Type头部
+        content_type = request.headers.get('Content-Type', '')
+        current_app.logger.info(f"请求 Content-Type: {content_type}")
+        
+        if 'application/json' in content_type:
+            data = request.get_json()
+        else:
+            # 尝试从表单数据获取
+            data = request.get_json() or {}
+            # 如果还获取不到，手动解析
+            if not data:
+                try:
+                    import json
+                    data = json.loads(request.get_data(as_text=True))
+                except Exception:
+                    pass
+        
+        current_app.logger.info(f"接收到的数据: {data}")
+        
+        if not data:
+            current_app.logger.error("无效的请求数据")
+            return jsonify({'error': '无效的请求数据'}), 400
+            
+        user_id = data.get('user_id')
+        plan_id = data.get('plan_id')
+        payment_method = data.get('payment_method')  # 'wechat' 或 'alipay'
+        
+        current_app.logger.info(f"user_id: {user_id}, plan_id: {plan_id}, payment_method: {payment_method}")
+        
+        if not all([user_id, plan_id, payment_method]):
+            current_app.logger.error("缺少必要的参数")
+            return jsonify({'error': '缺少必要的参数'}), 400
 
-    # 获取VIP套餐
-    vip_plan = VIPPlan.query.filter_by(id=plan_id, is_active=True).first_or_404()
+        # 获取VIP套餐
+        current_app.logger.info("开始查询VIP套餐")
+        vip_plan = VIPPlan.query.filter_by(id=plan_id, is_active=True).first()
+        if not vip_plan:
+            current_app.logger.error(f"指定的VIP套餐不存在或已停用: {plan_id}")
+            return jsonify({'error': '指定的VIP套餐不存在或已停用'}), 404
+        
+        current_app.logger.info(f"找到VIP套餐: {vip_plan.name}")
 
-    # 创建订阅记录(初始状态为待支付)
-    subscription = VIPSubscription(
-        user_id=user_id,
-        plan_id=plan_id,
-        starts_at=datetime.now(),
-        expires_at=datetime.now(),  # 支付成功后更新
-        status='pending_payment',  # 新增待支付状态
-        payment_amount=vip_plan.price
-    )
-    db.session.add(subscription)
-    db.session.commit()
+        # 创建订阅记录(初始状态为待支付)
+        current_app.logger.info("创建订阅记录")
+        subscription = VIPSubscription(
+            user_id=user_id,
+            plan_id=plan_id,
+            starts_at=datetime.now(),
+            expires_at=datetime.now(),  # 支付成功后更新
+            status=0,  # pending_payment状态
+            payment_amount=vip_plan.price
+        )
+        db.session.add(subscription)
+        db.session.flush()  # 获取ID但不提交事务
+        current_app.logger.info(f"订阅记录创建成功，ID: {subscription.id}")
 
-    # 根据支付方式生成支付参数
-    if payment_method == 'wechat':
-        pay_service = WeChatPayService(current_app)
-        # 获取用户openid(需通过前端授权)
-        openid = data.get('openid')
-        payment_data = pay_service.create_payment(subscription, openid)
-    elif payment_method == 'alipay':
-        pay_service = AlipayService(current_app)
-        payment_data = pay_service.create_payment(subscription)
-    else:
-        return jsonify({'error': '不支持的支付方式'}), 400
+        # 根据支付方式生成支付参数
+        current_app.logger.info(f"开始处理支付方式: {payment_method}")
+        if payment_method == 'wechat':
+            current_app.logger.info("初始化微信支付服务")
+            pay_service = WeChatPayService(current_app)
+            # 获取用户openid(需通过前端授权)
+            openid = data.get('openid')
+            current_app.logger.info("调用微信支付创建订单")
+            payment_data = pay_service.create_payment(subscription, openid)
+        elif payment_method == 'alipay':
+            current_app.logger.info("初始化支付宝支付服务")
+            pay_service = AlipayService(current_app)
+            current_app.logger.info("调用支付宝支付创建订单")
+            payment_data = pay_service.create_payment(subscription)
+        else:
+            current_app.logger.error(f"不支持的支付方式: {payment_method}")
+            return jsonify({'error': '不支持的支付方式'}), 400
+        
+        current_app.logger.info(f"支付数据生成成功: {payment_data}")
 
-    # 保存商户订单号到订阅记录
-    subscription.transaction_id = payment_data['out_trade_no']
-    db.session.commit()
+        # 保存商户订单号到订阅记录
+        current_app.logger.info("保存商户订单号")
+        subscription.transaction_id = payment_data['out_trade_no']
+        db.session.commit()
+        current_app.logger.info("数据库提交成功")
 
-    return jsonify({
-        'payment_method': payment_method,
-        'payment_data': payment_data,
-        'subscription_id': subscription.id
-    })
+        response_data = {
+            'payment_method': payment_method,
+            'payment_data': payment_data,
+            'subscription_id': subscription.id
+        }
+        current_app.logger.info(f"返回响应: {response_data}")
+        
+        return jsonify(response_data)
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"创建支付订单失败: {str(e)}", exc_info=True)
+        # 提供更具体的错误信息
+        error_message = str(e)
+        if "appid" in error_message.lower():
+            return jsonify({'error': '支付宝配置错误：APPID不正确'}), 500
+        elif "private key" in error_message.lower():
+            return jsonify({'error': '支付宝配置错误：私钥格式不正确'}), 500
+        elif "public key" in error_message.lower():
+            return jsonify({'error': '支付宝配置错误：公钥格式不正确'}), 500
+        elif "sign" in error_message.lower() or "verify" in error_message.lower():
+            return jsonify({'error': '支付宝配置错误：签名验证失败'}), 500
+        else:
+            return jsonify({'error': f'创建支付订单失败，请稍后重试：{error_message}'}), 500
 
 
 @payment_bp.route('/wechat/notify', methods=['POST'])
@@ -78,13 +145,16 @@ def alipay_notify():
     """支付宝支付异步通知回调:cite[7]"""
     try:
         data = request.form.to_dict()
+        current_app.logger.info(f"收到支付宝回调数据: {data}")
         pay_service = AlipayService(current_app)
         success = pay_service.handle_notify(data)
 
         if success:
+            current_app.logger.info("支付宝回调处理成功")
             return 'success'
         else:
+            current_app.logger.error("支付宝回调处理失败")
             return 'fail'
     except Exception as e:
-        current_app.logger.error(f"支付宝支付回调处理异常: {str(e)}")
+        current_app.logger.error(f"支付宝支付回调处理异常: {str(e)}", exc_info=True)
         return 'fail'

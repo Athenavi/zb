@@ -9,8 +9,6 @@ from flask_jwt_extended.exceptions import NoAuthorizationError, JWTDecodeError
 from flask_login import current_user as s_current_user
 from werkzeug import Response
 
-from src.setting import app_config
-
 
 def refresh_tokens_if_needed():
     """在请求前自动刷新即将过期的 token"""
@@ -152,6 +150,8 @@ def admin_required(f):
 def origin_required(f):
     @functools.wraps(f)
     def decorated_function(*args, **kwargs):
+        # 延迟导入app_config以避免循环导入
+        from src.setting import app_config
         client_domain = request.host.split(':')[0]
         config_domain = app_config.domain.split(':')[0]
 

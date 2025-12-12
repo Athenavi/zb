@@ -18,6 +18,7 @@ from src.blueprints.dashboard import admin_bp
 from src.blueprints.media import media_bp
 from src.blueprints.my import my_bp
 from src.blueprints.noti import noti_bp
+from src.blueprints.payment import payment_bp
 from src.blueprints.relation import relation_bp
 from src.blueprints.role import role_bp
 from src.blueprints.session_views import session_bp
@@ -236,7 +237,8 @@ def register_blueprints(app):
         blog_bp,
         vip_bp,
         admin_vip_bp,
-        session_bp
+        session_bp,
+        payment_bp
     ]
 
     # 找到最长的蓝图名称长度，用于日志格式化
