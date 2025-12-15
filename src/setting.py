@@ -148,7 +148,7 @@ class BaseConfig:
     RTMP_SERVER = os.environ.get('RTMP_SERVER', 'rtmp://localhost/live')
     HTTP_LIVE_SERVER = os.environ.get('HTTP_LIVE_SERVER', 'http://localhost:8080/hls')
     LIVE_SECRET_KEY = os.environ.get('LIVE_SECRET_KEY', 'default_secret')
-    LIVE_LOCAL_MODE = os.environ.get('LIVE_LOCAL_MODE', 'True').lower() == 'true'
+    LIVE_LOCAL_MODE = os.environ.get('LIVE_LOCAL_MODE', 'False').lower() == 'true'
 
     # 安全头配置（Talisman）
     TALISMAN_CONTENT_SECURITY_POLICY = {

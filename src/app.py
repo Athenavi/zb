@@ -243,7 +243,7 @@ def register_blueprints(app):
     ]
 
     # 找到最长的蓝图名称长度，用于日志格式化
-    max_name_length = max(len(bp.name) for bp in blueprints)
+    max_name_length = max(len(bp.name) for bp in blueprints) if blueprints else 0
 
     for bp in blueprints:
         app.register_blueprint(bp)

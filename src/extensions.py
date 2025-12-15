@@ -81,7 +81,7 @@ def init_extensions(app):
     jwt.init_app(app)
 
     # 初始化直播服务
-    from src.services.live import LiveStreamService
+    from services.live import LiveStreamService
     live_service = LiveStreamService(app)
     # 将 live_service 添加到 app 对象上，避免导入问题
     app.live_service = live_service
