@@ -2,6 +2,7 @@ bcrypt==5.0.0
 bleach==6.3.0
 cffi==2.0.0
 configparser==7.2.0
+gevent
 flask==3.1.2
 Flask-Caching==2.3.1
 flask-socketio==5.5.1

@@ -94,6 +94,13 @@ class User(db.Model, UserMixin):
         check_result = bcrypt.checkpw(password.encode('utf-8'), self.password.encode('utf-8'))
         return check_result
 
+    def is_vip(self):
+        """检查用户是否为VIP"""
+        if self.vip_level and self.vip_level > 0:
+            if self.vip_expires_at and self.vip_expires_at > datetime.now():
+                return True
+        return False
+
     def has_role(self, role_name):
         """检查用户是否拥有指定角色"""
         return any(role.name == role_name for role in self.roles)

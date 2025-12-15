@@ -10,6 +10,7 @@ from flask_mail import Mail
 from flask_migrate import Migrate
 from flask_principal import Principal
 from flask_restful import Api
+from flask_socketio import SocketIO
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 
@@ -47,6 +48,9 @@ migrate = Migrate()
 babel = Babel()
 principal = Principal()
 
+# 初始化 SocketIO
+# 明确指定使用 gevent 异步模式，避免与 eventlet 冲突
+socketio = SocketIO(cors_allowed_origins="*", async_mode='gevent')
 
 # --------------------------
 # 扩展初始化函数
@@ -69,15 +73,26 @@ def init_extensions(app):
     login_manager.login_view = 'auth.login'
     login_manager.login_message = '请先登录'
 
+    # 初始化SocketIO
+    # 让 Flask-SocketIO 自动选择最佳异步模式
+    socketio.init_app(app)
+
     # JWT配置
     jwt.init_app(app)
 
+    # 初始化直播服务
+    from src.services.live import LiveStreamService
+    live_service = LiveStreamService(app)
+    # 将 live_service 添加到 app 对象上，避免导入问题
+    app.live_service = live_service
+    
     # 配置监控面板
     try:
         dashboard.config.init_from(file='dashboard_config.cfg')
         # 绑定应用
         dashboard.bind(app)
-        csrf.exempt(dashboard.blueprint)
+        if hasattr(dashboard, 'blueprint'):
+            csrf.exempt(dashboard.blueprint)
     except Exception as e:
         app.logger.error(f"Failed to initialize Flask-MonitoringDashboard: {str(e)}")
         # 即使监控面板初始化失败，也不影响主应用运行

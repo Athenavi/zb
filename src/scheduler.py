@@ -64,7 +64,8 @@ class SessionScheduler:
         )
 
         # 启动调度器
-        self.scheduler.start()
+        if not self.scheduler.running:
+            self.scheduler.start()
 
         # 注册关闭钩子
         atexit.register(lambda: self.scheduler.shutdown())

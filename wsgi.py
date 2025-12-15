@@ -1,11 +1,18 @@
+import sys
+import warnings
+
+from gevent import monkey
+
+monkey.patch_all()
+
 import argparse
 import os
 import socket
-import sys
 
-import logger
-
-from src.logger_config import init_pythonanywhere_logger, init_optimized_logger
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    import logger
+    from src.logger_config import init_pythonanywhere_logger, init_optimized_logger
 
 
 def parse_arguments():
@@ -75,6 +82,8 @@ def run_update():
 
 # 创建 Flask 应用实例，供 Flask 命令行工具使用
 from src.app import create_app
+
+# 为 Flask CLI 创建应用实例
 application = create_app()
 
 
@@ -170,9 +179,15 @@ def main():
 
     # 启动服务
     try:
-        from waitress import serve
         app = create_app()
-        serve(app, host=args.host, port=final_port, threads=8, channel_timeout=60)
+        
+        # 使用 gevent websocket 服务器启动应用
+        from gevent.pywsgi import WSGIServer
+        from geventwebsocket.handler import WebSocketHandler
+        http_server = WSGIServer((args.host, final_port), app, handler_class=WebSocketHandler)
+        logger.info("使用 gevent websocket 服务器启动应用")
+        http_server.serve_forever()
+            
     except KeyboardInterrupt:
         logger.info("\n服务器正在关闭...")
     except Exception as e:
