@@ -297,13 +297,14 @@ def check_qr_status():
 
 @api_bp.route('/media/upload', methods=['POST'])
 @jwt_required
-def upload_user_path(user_id):
-    """Upload media file"""
+def upload_media_file(user_id):
+    """Upload media file for media page"""
     try:
         return handle_user_upload(user_id=user_id, allowed_size=current_app.config['UPLOAD_LIMIT'],
                                   allowed_mimes=current_app.config['ALLOWED_MIMES'], check_existing=False)
     except Exception as e:
         logger.error(e)
+        return jsonify({'message': '上传失败', 'error': str(e)}), 500
 
 
 from src.upload.public_upload import handle_chunked_upload_init, handle_chunked_upload_chunk, \
@@ -477,4 +478,52 @@ def check_login_status():
 @cache.memoize(timeout=300)
 def check_user_exist(user_id):
     return User.query.get(user_id) is not None
+
+
+@api_bp.route('/user/media', methods=['GET'])
+@jwt_required
+def get_user_media(user_id):
+    """获取当前用户的所有媒体文件"""
+    try:
+        from src.models.media import Media
+        media_list = Media.query.filter_by(user_id=user_id).all()
+        
+        media_data = []
+        for media in media_list:
+            media_data.append({
+                'id': media.id,
+                'original_filename': media.original_filename,
+                'mime_type': media.file_hash.mime_type,
+                'created_at': media.created_at.isoformat() if media.created_at else None
+            })
+        
+        return jsonify({'media': media_data})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/media/<int:media_id>', methods=['GET'])
+@jwt_required
+def get_media_details(user_id, media_id):
+    """获取媒体文件详情"""
+    try:
+        from src.models.media import Media
+        media = Media.query.filter_by(id=media_id, user_id=user_id).first()
+        
+        if not media:
+            return jsonify({'error': '媒体文件不存在或无权限访问'}), 404
+        
+        media_data = {
+            'id': media.id,
+            'original_filename': media.original_filename,
+            'hash': media.hash,
+            'mime_type': media.file_hash.mime_type,
+            'file_size': media.file_hash.file_size,
+            'storage_path': media.file_hash.storage_path,
+            'created_at': media.created_at.isoformat() if media.created_at else None
+        }
+        
+        return jsonify({'media': media_data})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
