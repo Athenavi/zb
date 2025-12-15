@@ -2,7 +2,6 @@ from flask import Blueprint, jsonify, render_template, request
 
 from plugins.manager import PluginManager
 from src.auth import admin_required
-from src.extensions import db
 from src.models import User
 
 plugin_bp = Blueprint('plugin_bp', __name__, url_prefix='/api/plugins')
@@ -17,22 +16,6 @@ def init_plugin_manager(app):
     with app.app_context():
         plugins_manager = PluginManager(app)
         plugins_manager.load_plugins()
-        
-        # 特殊处理直播插件的模型和蓝图
-        live_plugin = plugins_manager.plugins.get('live')
-        if live_plugin:
-            # 初始化直播模型
-            from plugins.live.models import init_models
-            live_models = init_models(db)
-            
-            # 初始化直播蓝图
-            from plugins.live.blueprints import init_blueprints
-            live_bp, admin_live_bp = init_blueprints(**live_models)
-            
-            # 注册直播蓝图
-            app.register_blueprint(live_bp)
-            app.register_blueprint(admin_live_bp)
-        
         plugins_manager.register_blueprints()
 
 

@@ -273,7 +273,7 @@ create table if not exists events
         primary key,
     title       varchar(255) not null,
     description text         not null,
-    event_date  timestamp    not null,
+    event_date  timestamp     not null,
     created_at  timestamp default CURRENT_TIMESTAMP
 );
 
@@ -317,7 +317,9 @@ create table if not exists social_accounts
     provider_uid  varchar(255) not null,
     access_token  varchar(512),
     refresh_token varchar(512),
-    expires_at    timestamp
+    expires_at    timestamp,
+    created_at    timestamp default CURRENT_TIMESTAMP,
+    updated_at    timestamp default CURRENT_TIMESTAMP
 );
 
 create index if not exists idx_oauth_user
@@ -517,7 +519,7 @@ alter table search_history
 
 create table if not exists upload_tasks
 (
-    id              uuid        default gen_random_uuid() not null,
+    id              varchar(36) default gen_random_uuid() not null,
     user_id         integer                               not null,
     filename        varchar(255)                          not null,
     total_size      bigint                                not null,
@@ -538,7 +540,7 @@ alter table upload_tasks
 create table if not exists upload_chunks
 (
     id          serial,
-    upload_id   uuid                                not null,
+    upload_id   uuid                         not null,
     chunk_index integer                             not null,
     chunk_hash  varchar(64)                         not null,
     chunk_size  integer                             not null,
@@ -560,7 +562,7 @@ create table if not exists user_sessions
 (
     id            serial,
     user_id       integer                             not null,
-    session_id    varchar(255)                        not null,
+    session_id    varchar(128)                        not null,
     access_token  varchar(512),
     refresh_token varchar(512),
     device_type   varchar(50),

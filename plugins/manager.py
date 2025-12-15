@@ -23,8 +23,11 @@ class PluginManager:
         off_file = os.path.join(plugin_path, "__off__")
         return not os.path.exists(off_file)
 
-    def load_plugins(self):
+    def load_plugins(self, exclude=None):
         """动态加载所有插件，并根据__off__文件判断是否启用"""
+        if exclude is None:
+            exclude = []
+            
         plugin_dir = "plugins"
         plugin_path = os.path.join(os.path.dirname(__file__))
         self.logger.info(f"🔍 正在扫描插件目录: {plugin_path}")
@@ -36,6 +39,11 @@ class PluginManager:
         for plugin_name in os.listdir(plugin_path):
             # 跳过非目录文件和 __pycache__ 目录
             if not os.path.isdir(os.path.join(plugin_path, plugin_name)) or plugin_name == "__pycache__":
+                continue
+                
+            # 跳过排除的插件
+            if plugin_name in exclude:
+                self.logger.info(f"⏭️ 跳过插件: {plugin_name} (在排除列表中)")
                 continue
 
             # 检查插件是否启用
@@ -63,7 +71,8 @@ class PluginManager:
     def register_blueprints(self):
         """注册所有已启用插件的蓝图"""
         for name, plugin in self.plugins.items():
-            if hasattr(plugin, 'blueprint'):
+            # 只有具有blueprint属性且尚未注册的插件才注册
+            if hasattr(plugin, 'blueprint') and name not in self.blueprints:
                 # 存储蓝图引用
                 self.blueprints[name] = plugin.blueprint
                 self.app.register_blueprint(plugin.blueprint)
@@ -71,7 +80,7 @@ class PluginManager:
 
     def register_blueprint_single(self, plugin_name):
         """注册单个插件的蓝图（修复版）"""
-        if plugin_name in self.plugins:
+        if plugin_name in self.plugins and plugin_name not in self.blueprints:
             plugin = self.plugins[plugin_name]
             if hasattr(plugin, 'blueprint'):
                 # 生成唯一的蓝图名称避免冲突

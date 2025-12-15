@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 
 from src.extensions import db
@@ -22,9 +22,9 @@ class UserSession(db.Model):
     platform = Column(String(100), nullable=True)
     ip_address = Column(String(45), nullable=True)  # 支持IPv6
     location = Column(String(255), nullable=True)
-    created_at = Column(DateTime, default=datetime.now, nullable=False)
-    last_activity = Column(DateTime, default=datetime.now, nullable=False)
-    expiry_time = Column(DateTime, nullable=False)
+    created_at = Column(db.TIMESTAMP, default=datetime.now, nullable=False)
+    last_activity = Column(db.TIMESTAMP, default=datetime.now, nullable=False)
+    expiry_time = Column(db.TIMESTAMP, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
 
     # 关联关系

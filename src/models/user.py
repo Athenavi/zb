@@ -24,7 +24,7 @@ class User(db.Model, UserMixin):
     backup_codes = db.Column(db.Text, doc='备用验证码')
     profile_private = db.Column(db.Boolean, default=False, doc='是否私密资料')
     vip_level = db.Column(db.Integer, default=0)  # VIP等级，0表示非VIP
-    vip_expires_at = db.Column(db.DateTime)  # VIP过期时间
+    vip_expires_at = db.Column(db.TIMESTAMP)  # VIP过期时间
     last_login_at = db.Column(db.TIMESTAMP, doc='上次登录时间')
     last_login_ip = db.Column(db.String(45), doc='上次登录IP')
     locale = db.Column(db.String(10), default='zh_CN', doc='语言')

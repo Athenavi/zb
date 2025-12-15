@@ -25,6 +25,7 @@ from src.blueprints.session_views import session_bp
 from src.blueprints.theme import theme_bp
 from src.blueprints.vip_routes import vip_bp
 from src.blueprints.website import website_bp
+from src.database_checker import handle_database_consistency_check
 from src.error import error
 from src.extensions import init_extensions, login_manager, csrf
 from src.other.filters import json_filter, string_split, article_author, md2html, relative_time_filter, \
@@ -59,6 +60,9 @@ def create_app(config_class=app_config):
     # 配置 Jinja2 环境
     app.jinja_env.autoescape = select_autoescape(['html', 'xml'])
     app.jinja_env.add_extension('jinja2.ext.loopcontrols')
+
+    # 检查数据库模型一致性
+    handle_database_consistency_check(app)
 
     # 注册模板过滤器
     register_template_filters(app)
