@@ -385,6 +385,14 @@ def change_profiles(user_id):
 @jwt_required
 def user_space(user_id, target_user_id):
     """用户空间页面 - 显示用户资料和文章"""
+    # 检查会话是否有效
+    from src.auth import check_access_token
+    access_token = request.cookies.get('access_token')
+    if access_token and not check_access_token(access_token):
+        from flask import flash
+        flash("会话已过期，请重新登录", 'error')
+        from flask import url_for
+        return redirect(url_for('auth.logout'))
     try:
         target_user = User.query.get_or_404(target_user_id)
 
@@ -509,6 +517,14 @@ def get_site_domain():
 def get_username(user_id):
     if user_id:
         return User.query.filter_by(id=user_id).first().username
+    else:
+        return '未登录'
+
+
+def get_username_no_check():
+    from flask_login import current_user
+    if current_user.is_authenticated:
+        return current_user.username
     else:
         return '未登录'
 

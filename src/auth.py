@@ -91,31 +91,34 @@ def check_user_banned():
     return False
 
 
-def check_session_expired(session_id, refresh_token):
+def check_access_token(access_token: str, ):
     """检查指定会话是否已过期"""
     from src.extensions import cache
     from src.models.userSession import UserSession
 
-    hash_key = hash(str(session_id) + str(refresh_token))
+    hash_key = hash(str(access_token))
     # 使用哈希键作为缓存键的一部分
-    cache_key = f"session_expired_{hash_key}"
+    cache_key = f"session_{hash_key}"
+    # print(cache_key)
 
     # 尝试从缓存中获取结果
     cached_result = cache.get(cache_key)
     if cached_result is not None:
+        # print("缓存命中")
         return cached_result
-
     # 缓存未命中，查询数据库
     session = UserSession.query.filter_by(
-        session_id=session_id,
-        refresh_token=refresh_token
+        access_token=access_token
     ).first()
-    is_expired = session is None
-
-    # 将结果缓存5分钟
-    cache.set(cache_key, is_expired, timeout=300)
-
-    return is_expired
+    if session is None:
+        # 将结果缓存5分钟(300秒)，统一缓存时间以保持一致性
+        # print("if分支缓存未命中，将结果缓存5分钟")
+        cache.set(cache_key, False, timeout=300)
+        return False
+    else:
+        cache.set(cache_key, True, timeout=300)
+        # print("else分支缓存未命中，将结果缓存5分钟")
+        return True
 
 
 def jwt_required(f: object) -> Callable[[tuple[Any, ...], dict[str, Any]], Response | Any]:
@@ -158,24 +161,6 @@ def jwt_required(f: object) -> Callable[[tuple[Any, ...], dict[str, Any]], Respo
                 flash("身份验证失败，请重新登录", 'error')
                 return redirect(url_for('auth.login'))
 
-        try:
-            # 检查用户是否被封禁
-            if check_user_banned():
-                flash("您的账户已被封禁", 'error')
-                current_app.logger.warning("一个被封禁的账户尝试登录")
-                return redirect(url_for('auth.login'))
-
-            # 检查会话是否过期
-            refresh_token = request.cookies.get('refresh_token')
-            # 获取当前用户的活跃会话
-            if refresh_token and s_current_user.is_authenticated:
-                # 通过 refresh_token 查找对应的 session
-                user_session = s_current_user.sessions.filter_by(refresh_token=refresh_token).first()
-                if user_session and check_session_expired(user_session.session_id, refresh_token):
-                    flash("会话已过期，请重新登录", 'error')
-                    return redirect(url_for('auth.login'))
-        except Exception as e:
-            current_app.logger.error(f"Error during session check: {str(e)}")
         # 传递 user_id 参数给视图函数
         return f(s_current_user.id, *args, **kwargs)
 
@@ -199,11 +184,6 @@ def admin_required(f):
                 login_url += f'?next={next_url}'
 
             return redirect(login_url)
-
-        # 检查用户是否被封禁
-        if check_user_banned():
-            flash("您的账户已被封禁", 'error')
-            return redirect(url_for('auth.login'))
 
         # 验证是否为管理员（假设管理员 ID 为 1）
         if s_current_user.id != 1:
@@ -251,11 +231,6 @@ def vip_required(minimum_level=1):
                     login_url += f'?next={next_url}'
 
                 return redirect(login_url)
-
-            # 检查用户是否被封禁
-            if check_user_banned():
-                flash("您的账户已被封禁", 'error')
-                return redirect(url_for('auth.login'))
 
             # 检查用户VIP等级
             if s_current_user.vip_level < minimum_level:

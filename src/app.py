@@ -12,7 +12,7 @@ from src.blueprints.admin_vip import admin_vip_bp
 from src.blueprints.api import api_bp
 from src.blueprints.auth import auth_bp
 from src.blueprints.blog import get_footer, get_site_title, get_banner, get_site_domain, get_site_beian, \
-    get_site_menu, get_current_menu_slug, blog_detail_back, get_username, blog_bp
+    get_site_menu, get_current_menu_slug, blog_detail_back, blog_bp, get_username_no_check
 from src.blueprints.category import category_bp
 from src.blueprints.dashboard import admin_bp
 from src.blueprints.media import media_bp
@@ -98,7 +98,7 @@ def register_context_processors(app, config_class):
             beian=get_site_beian() or config_class.beian,
             title=get_site_title() or config_class.sitename,
             domain=get_site_domain() or config_class.domain,
-            username=get_username(),
+            username=get_username_no_check(),
             menu=get_site_menu(get_current_menu_slug()) or default_menu_data,
             footer=get_footer(),
             banner=get_banner()
