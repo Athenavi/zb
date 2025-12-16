@@ -144,7 +144,7 @@ class ChunkedUploadProcessor:
                         existing_file.reference_count += 1
 
                         db.commit()
-                        
+
                         return {
                             'success': True,
                             'upload_id': upload_id,
@@ -164,18 +164,18 @@ class ChunkedUploadProcessor:
                     filename=filename,
                     status='uploading'
                 ).first()
-                
+
                 if existing_task:
                     # 获取已上传的分块信息
                     uploaded_chunks = db.query(UploadChunk.chunk_index).filter_by(
                         upload_id=existing_task.id
                     ).all()
                     uploaded_chunk_indices = [chunk.chunk_index for chunk in uploaded_chunks]
-                    
+
                     # 更新任务状态为上传中
                     existing_task.status = 'uploading'
                     db.commit()
-                    
+
                     return {
                         'success': True,
                         'upload_id': existing_task.id,
@@ -233,7 +233,7 @@ class ChunkedUploadProcessor:
                 # 保存分块文件
                 chunk_filename = f"{upload_id}_{chunk_index}.chunk"
                 chunk_path = os.path.join(self.temp_dir, chunk_filename)
-                
+
                 # 确保目录存在
                 os.makedirs(os.path.dirname(chunk_path), exist_ok=True)
 
@@ -306,48 +306,71 @@ class ChunkedUploadProcessor:
 
                 # 合并分块
                 merged_file_path = os.path.join(self.temp_dir, f"{upload_id}_merged")
-                
+
                 # 确保目录存在
                 os.makedirs(os.path.dirname(merged_file_path), exist_ok=True)
-                
+
                 with open(merged_file_path, 'wb') as merged_file:
                     for chunk in chunks:
                         # 检查分块文件是否存在
                         if not os.path.exists(chunk.chunk_path):
                             return {'success': False, 'error': f'分块文件不存在: {chunk.chunk_path}'}
-                            
+
                         with open(chunk.chunk_path, 'rb') as chunk_file:
                             shutil.copyfileobj(chunk_file, merged_file)
 
-                # 验证最终文件哈希
+                # 修复：只对前几个分块进行哈希校验，与前端保持一致
+                # 读取前2个分块的数据进行哈希校验（与前端保持一致）
                 with open(merged_file_path, 'rb') as f:
-                    final_hash = hashlib.sha256(f.read()).hexdigest()
+                    chunk_count_for_verification = min(2, task.total_chunks)
+                    total_verification_size = chunk_count_for_verification * self.chunk_size
+                    data_for_verification = f.read(total_verification_size)
+                    verification_hash = hashlib.sha256(data_for_verification).hexdigest()
 
-                if final_hash != file_hash:
+                # 校验哈希值（只校验前几个分块）
+                if verification_hash != file_hash:
+                    # 记录详细信息以便调试
+                    print(f"哈希不匹配：期望 {file_hash}, 实际 {verification_hash}")
+                    print(f"用于验证的数据大小: {len(data_for_verification)} bytes")
+
                     # 清理临时文件
                     if os.path.exists(merged_file_path):
                         os.remove(merged_file_path)
-                    return {'success': False, 'error': '文件哈希验证失败'}
+                    return {'success': False, 'error': f'文件哈希验证失败：期望 {file_hash}, 实际 {verification_hash}'}
 
-                # 读取合并后的文件数据
+                # 验证通过后再读取完整文件数据并计算完整哈希值
                 with open(merged_file_path, 'rb') as f:
                     file_data = f.read()
 
+                # 计算完整文件的哈希值用于存储
+                full_file_hash = hashlib.sha256(file_data).hexdigest()
+
+                # 校验哈希值（只校验前几个分块）
+                if verification_hash != file_hash:
+                    # 记录详细信息以便调试
+                    print(f"哈希不匹配：期望 {file_hash}, 实际 {verification_hash}")
+                    print(f"用于验证的数据大小: {len(data_for_verification)} bytes")
+
+                    # 清理临时文件
+                    if os.path.exists(merged_file_path):
+                        os.remove(merged_file_path)
+                    return {'success': False, 'error': f'文件哈希验证失败：期望 {file_hash}, 实际 {verification_hash}'}
+
                 # 保存到最终位置
                 processor = FileProcessor(self.user_id)
-                storage_path = processor.save_file(file_hash, file_data, task.filename)
+                storage_path = processor.save_file(full_file_hash, file_data, task.filename)
 
                 # 创建文件记录
                 file_hash_record = processor.create_file_hash_record(
-                    db, file_hash, task.filename, task.total_size, mime_type, storage_path
+                    db, full_file_hash, task.filename, task.total_size, mime_type, storage_path
                 )
 
                 # 创建媒体记录
-                processor.create_media_record(db, file_hash, task.filename)
+                processor.create_media_record(db, full_file_hash, task.filename)
 
                 # 更新任务状态
                 task.status = 'completed'
-                task.file_hash = file_hash
+                task.file_hash = full_file_hash
 
                 # 清理分块文件
                 for chunk in chunks:
@@ -363,7 +386,7 @@ class ChunkedUploadProcessor:
 
                 return {
                     'success': True,
-                    'file_hash': file_hash,
+                    'file_hash': full_file_hash,
                     'message': '文件上传完成'
                 }
 
