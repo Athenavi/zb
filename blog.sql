@@ -562,7 +562,7 @@ create table if not exists user_sessions
 (
     id            serial,
     user_id       integer                             not null,
-    session_id    varchar(128)                        not null,
+    session_id    varchar(255)                        not null,
     access_token  varchar(512),
     refresh_token varchar(512),
     device_type   varchar(50),

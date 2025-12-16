@@ -14,7 +14,7 @@ class UserSession(db.Model):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
-    session_id = Column(String(128), unique=True, nullable=False, index=True)
+    session_id = Column(String(255), unique=True, nullable=False, index=True)
     access_token = Column(String(512), unique=True, nullable=False)
     refresh_token = Column(String(512), unique=True, nullable=True)
     device_type = Column(String(50), nullable=True)
