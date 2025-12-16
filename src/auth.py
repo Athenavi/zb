@@ -6,7 +6,7 @@ from urllib.parse import urlparse, urljoin
 from flask import request, redirect, url_for, g, current_app, flash, jsonify
 from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity, decode_token, create_access_token
 from flask_jwt_extended.exceptions import NoAuthorizationError, JWTDecodeError
-from flask_login import current_user as s_current_user
+from flask_login import current_user as s_current_user, logout_user
 from werkzeug import Response
 
 
@@ -56,6 +56,68 @@ def is_safe_url(target):
     return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
 
 
+def cached_check_user_banned():
+    """检查当前用户是否被封禁(带缓存)"""
+    from src.extensions import cache
+
+    if not s_current_user.is_authenticated:
+        return False
+
+    # 使用用户ID作为缓存键的一部分
+    cache_key = f"user_banned_status_{s_current_user.id}"
+
+    # 尝试从缓存中获取结果
+    cached_result = cache.get(cache_key)
+    if cached_result is not None:
+        return cached_result
+
+    # 缓存未命中，执行实际检查
+    is_banned = s_current_user.has_role('banned')
+
+    # 将结果缓存30分钟
+    cache.set(cache_key, is_banned, timeout=300 * 6)
+
+    return is_banned
+
+
+def check_user_banned():
+    """检查当前用户是否被封禁"""
+    if cached_check_user_banned():
+        # 用户被封禁，登出用户
+        from flask import session
+        logout_user()
+        session.clear()
+        return True
+    return False
+
+
+def check_session_expired(session_id, refresh_token):
+    """检查指定会话是否已过期"""
+    from src.extensions import cache
+    from src.models.userSession import UserSession
+
+    hash_key = hash(str(session_id) + str(refresh_token))
+    # 使用哈希键作为缓存键的一部分
+    cache_key = f"session_expired_{hash_key}"
+
+    # 尝试从缓存中获取结果
+    cached_result = cache.get(cache_key)
+    if cached_result is not None:
+        return cached_result
+
+    # 缓存未命中，查询数据库
+    session = UserSession.query.filter_by(
+        session_id=session_id,
+        refresh_token=refresh_token
+    ).first()
+    is_expired = session is None
+
+    # 将结果缓存5分钟
+    cache.set(cache_key, is_expired, timeout=300)
+
+    return is_expired
+
+
 def jwt_required(f: object) -> Callable[[tuple[Any, ...], dict[str, Any]], Response | Any]:
     """
     简化版认证装饰器 - 主要依赖 Session，JWT 作为辅助
@@ -96,6 +158,24 @@ def jwt_required(f: object) -> Callable[[tuple[Any, ...], dict[str, Any]], Respo
                 flash("身份验证失败，请重新登录", 'error')
                 return redirect(url_for('auth.login'))
 
+        try:
+            # 检查用户是否被封禁
+            if check_user_banned():
+                flash("您的账户已被封禁", 'error')
+                current_app.logger.warning("一个被封禁的账户尝试登录")
+                return redirect(url_for('auth.login'))
+
+            # 检查会话是否过期
+            refresh_token = request.cookies.get('refresh_token')
+            # 获取当前用户的活跃会话
+            if refresh_token and s_current_user.is_authenticated:
+                # 通过 refresh_token 查找对应的 session
+                user_session = s_current_user.sessions.filter_by(refresh_token=refresh_token).first()
+                if user_session and check_session_expired(user_session.session_id, refresh_token):
+                    flash("会话已过期，请重新登录", 'error')
+                    return redirect(url_for('auth.login'))
+        except Exception as e:
+            current_app.logger.error(f"Error during session check: {str(e)}")
         # 传递 user_id 参数给视图函数
         return f(s_current_user.id, *args, **kwargs)
 
@@ -119,6 +199,11 @@ def admin_required(f):
                 login_url += f'?next={next_url}'
 
             return redirect(login_url)
+
+        # 检查用户是否被封禁
+        if check_user_banned():
+            flash("您的账户已被封禁", 'error')
+            return redirect(url_for('auth.login'))
 
         # 验证是否为管理员（假设管理员 ID 为 1）
         if s_current_user.id != 1:
@@ -166,6 +251,11 @@ def vip_required(minimum_level=1):
                     login_url += f'?next={next_url}'
 
                 return redirect(login_url)
+
+            # 检查用户是否被封禁
+            if check_user_banned():
+                flash("您的账户已被封禁", 'error')
+                return redirect(url_for('auth.login'))
 
             # 检查用户VIP等级
             if s_current_user.vip_level < minimum_level:
