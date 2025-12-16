@@ -1,6 +1,8 @@
 # services/pay/WeChat.py
 import logging
+import os
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from flask import json
 from jd_wechatpay import WeChatPay, WeChatPayType  # 或使用 wechatpy
@@ -11,30 +13,80 @@ from src.models import db, VIPSubscription
 class WeChatPayService:
     def __init__(self, app=None):
         self.wxpay = None
+        self.is_configured = False
         if app:
             self.init_app(app)
 
     def init_app(self, app):
         """初始化微信支付实例:cite[1]"""
+        # 检查必要的配置是否存在
+        required_configs = ['WECHAT_MCHID', 'WECHAT_PRIVATE_KEY', 'WECHAT_CERT_SERIAL_NO', 
+                          'WECHAT_APPID', 'WECHAT_API_V3_KEY', 'WECHAT_NOTIFY_URL', 'WECHAT_CERT_DIR']
+        
+        # 从环境变量或配置文件中获取配置
+        wechat_config = {}
+        missing_configs = []
+        
+        for config in required_configs:
+            value = app.config.get(config) or os.getenv(config)
+            if not value:
+                missing_configs.append(config)
+            else:
+                wechat_config[config] = value
+        
+        if missing_configs:
+            logging.warning(f"微信支付配置不完整，缺少配置项: {', '.join(missing_configs)}")
+            self.is_configured = False
+            return
+
         try:
+            # 读取私钥文件
+            private_key = wechat_config['WECHAT_PRIVATE_KEY']
+            if private_key.endswith('.pem'):
+                # 如果是文件路径，则读取文件内容
+                private_key_path = Path(private_key)
+                if private_key_path.exists():
+                    try:
+                        private_key = private_key_path.read_text(encoding='utf-8')
+                    except UnicodeDecodeError:
+                        # 尝试使用其他编码读取文件
+                        try:
+                            private_key = private_key_path.read_text(encoding='gbk')
+                        except UnicodeDecodeError:
+                            # 如果仍然失败，以二进制方式读取
+                            private_key = private_key_path.read_bytes().decode('utf-8', errors='ignore')
+                else:
+                    logging.warning(f"微信支付私钥文件不存在: {private_key}")
+                    self.is_configured = False
+                    return
+            
             self.wxpay = WeChatPay(
-                WeChatPayType.APP,  # 根据前端类型调整: APP, JSAPI, NATIVE等
-                mch_id=app.config['WECHAT_MCHID'],
-                private_key=app.config['WECHAT_PRIVATE_KEY'],
-                cert_serial_no=app.config['WECHAT_CERT_SERIAL_NO'],
-                app_id=app.config['WECHAT_APPID'],
-                api_v3_key=app.config['WECHAT_API_V3_KEY'],
-                notify_url=app.config['WECHAT_NOTIFY_URL'],
-                cert_dir=app.config['WECHAT_CERT_DIR'],
+                WeChatPayType.NATIVE,  # 使用NATIVE支付类型
+                mch_id=wechat_config['WECHAT_MCHID'],
+                private_key=private_key,
+                cert_serial_no=wechat_config['WECHAT_CERT_SERIAL_NO'],
+                app_id=wechat_config['WECHAT_APPID'],
+                api_v3_key=wechat_config['WECHAT_API_V3_KEY'],
+                notify_url=wechat_config['WECHAT_NOTIFY_URL'],
+                cert_dir=wechat_config['WECHAT_CERT_DIR'],
                 logger=logging.getLogger('wechatpay'),
                 partner_mode=False  # 直连模式，服务商模式设为True
             )
+            self.is_configured = True
+            logging.info("微信支付服务初始化成功")
         except Exception as e:
             logging.error(f"初始化微信支付失败: {str(e)}")
-            raise
+            self.is_configured = False
+
+    def is_available(self):
+        """检查微信支付服务是否可用"""
+        return self.is_configured and self.wxpay is not None
 
     def create_payment(self, vip_subscription, user_openid=None):
         """创建微信支付预订单:cite[5]:cite[6]"""
+        if not self.is_available():
+            raise Exception("微信支付服务未正确配置，无法创建支付订单")
+
         out_trade_no = f"VIP{vip_subscription.id}{int(datetime.now().timestamp())}"  # 商户订单号
         description = f"购买VIP套餐: {vip_subscription.plan.name}"
         amount = int(float(vip_subscription.payment_amount) * 100)  # 金额(分)
@@ -45,7 +97,7 @@ class WeChatPayService:
             out_trade_no=out_trade_no,
             amount={'total': amount},
             payer={'openid': user_openid} if user_openid else None,  # JSAPI支付需传openid
-            pay_type=WeChatPayType.APP  # 根据前端调整
+            pay_type=WeChatPayType.NATIVE  # 使用NATIVE支付类型
         )
 
         if code == 200:
@@ -54,13 +106,17 @@ class WeChatPayService:
             return {
                 'prepay_id': prepay_data.get('prepay_id'),
                 'out_trade_no': out_trade_no,
-                'payment_params': self._get_payment_params(prepay_data)  # 生成前端支付参数
+                'payment_params': self._get_payment_params(prepay_data),  # 生成前端支付参数
+                'qr_code_url': prepay_data.get('code_url')  # 二维码链接用于NATIVE支付
             }
         else:
             raise Exception(f"微信预支付失败: {message}")
 
     def _get_payment_params(self, prepay_data):
         """生成前端支付参数(APP/JSAPI):cite[6]"""
+        if not self.is_available():
+            raise Exception("微信支付服务未正确配置")
+
         timestamp = str(int(datetime.now().timestamp()))
         nonce_str = self.wxpay.generate_nonce_str()
         package = f"prepay_id={prepay_data['prepay_id']}"
@@ -87,6 +143,10 @@ class WeChatPayService:
 
     def handle_notify(self, data):
         """处理微信支付异步通知:cite[9]"""
+        if not self.is_available():
+            logging.error("微信支付服务未正确配置，无法处理支付通知")
+            return False
+
         try:
             # 解析并验证通知数据
             result = self.wxpay.callback(data)

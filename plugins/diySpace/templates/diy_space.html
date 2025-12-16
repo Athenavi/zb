@@ -103,15 +103,24 @@
         try {
             const response = await fetch('/diy/space', {
                 method: 'PUT',
-                ContentType: 'application/json',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
                 body: JSON.stringify({html: editor.value}),
                 credentials: 'include'
             });
 
-            if (!response.ok) throw new Error('保存失败');
+            const result = await response.json();
+            
+            if (!response.ok) {
+                // 显示错误信息
+                alert('保存失败: ' + (result.error || '未知错误'));
+                return;
+            }
+            
             alert('保存成功！');
         } catch (error) {
-            alert(error.message);
+            alert('保存失败: ' + error.message);
         }
     }
 

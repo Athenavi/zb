@@ -11,22 +11,25 @@ from src.auth import jwt_required
 from src.blueprints.admin_vip import admin_vip_bp
 from src.blueprints.api import api_bp
 from src.blueprints.auth import auth_bp
-from src.blueprints.blog import blog_bp, get_footer, get_site_title, get_banner, get_site_domain, get_site_beian, \
-    get_site_menu, get_current_menu_slug, blog_detail_back, get_username
+from src.blueprints.blog import get_footer, get_site_title, get_banner, get_site_domain, get_site_beian, \
+    get_site_menu, get_current_menu_slug, blog_detail_back, blog_bp, get_username_no_check
 from src.blueprints.category import category_bp
 from src.blueprints.dashboard import admin_bp
 from src.blueprints.media import media_bp
 from src.blueprints.my import my_bp
 from src.blueprints.noti import noti_bp
+from src.blueprints.payment import payment_bp
 from src.blueprints.relation import relation_bp
 from src.blueprints.role import role_bp
 from src.blueprints.session_views import session_bp
 from src.blueprints.theme import theme_bp
 from src.blueprints.vip_routes import vip_bp
 from src.blueprints.website import website_bp
+from src.database_checker import handle_database_consistency_check
 from src.error import error
 from src.extensions import init_extensions, login_manager, csrf
-from src.other.filters import json_filter, string_split, article_author, md2html, relative_time_filter, category_filter, \
+from src.other.filters import json_filter, string_split, article_author, md2html, relative_time_filter, \
+    category_filter, \
     f2list
 from src.other.search import search_handler
 from src.plugin import plugin_bp, init_plugin_manager
@@ -57,6 +60,9 @@ def create_app(config_class=app_config):
     # 配置 Jinja2 环境
     app.jinja_env.autoescape = select_autoescape(['html', 'xml'])
     app.jinja_env.add_extension('jinja2.ext.loopcontrols')
+
+    # 检查数据库模型一致性
+    handle_database_consistency_check(app)
 
     # 注册模板过滤器
     register_template_filters(app)
@@ -92,7 +98,7 @@ def register_context_processors(app, config_class):
             beian=get_site_beian() or config_class.beian,
             title=get_site_title() or config_class.sitename,
             domain=get_site_domain() or config_class.domain,
-            username=get_username(),
+            username=get_username_no_check(),
             menu=get_site_menu(get_current_menu_slug()) or default_menu_data,
             footer=get_footer(),
             banner=get_banner()
@@ -236,12 +242,13 @@ def register_blueprints(app):
         blog_bp,
         vip_bp,
         admin_vip_bp,
-        session_bp
+        session_bp,
+        payment_bp
     ]
 
     # 找到最长的蓝图名称长度，用于日志格式化
-    max_name_length = max(len(bp.name) for bp in blueprints)
-    
+    max_name_length = max(len(bp.name) for bp in blueprints) if blueprints else 0
+
     for bp in blueprints:
         app.register_blueprint(bp)
         # 使用固定宽度格式化，使日志输出对齐美观

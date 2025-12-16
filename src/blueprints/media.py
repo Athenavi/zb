@@ -54,9 +54,15 @@ def media_thumbnail():
                     generate_video_thumbnail(file_path, thumb_path)
                 else:
                     generate_thumbnail(file_path, thumb_path)
-        finally:
-            return send_file(thumb_path, as_attachment=False, mimetype='image/jpeg', max_age=2592000)
-    return send_file(thumb_path)
+        except Exception as e:
+            # 处理异常但不阻止发送文件
+            print(f"Error generating thumbnail: {e}")
+    
+    # 总是尝试发送缩略图文件
+    if thumb_path.exists():
+        return send_file(thumb_path, as_attachment=False, mimetype='image/jpeg', max_age=2592000)
+    else:
+        return "Thumbnail not found", 404
 
 
 @media_bp.route('/shared', methods=['GET'])
@@ -115,6 +121,7 @@ def media_v2(user_id):
             'storage_total': convert_storage_size(storage_total_bytes),
             'storage_percentage': storage_percentage,
             'canBeUploaded': can_be_uploaded,
+            'totalUsed': storage_used_query  # 添加这一行以修复模板中的引用
         }
 
         return render_template('media.html',

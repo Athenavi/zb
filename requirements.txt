@@ -2,6 +2,7 @@ bcrypt==5.0.0
 bleach==6.3.0
 cffi==2.0.0
 configparser==7.2.0
+gevent
 flask==3.1.2
 Flask-Caching==2.3.1
 flask-socketio==5.5.1
@@ -40,6 +41,8 @@ user_agents==2.2.0
 flask-principal==0.4.0
 flask-jwt-extended==4.7.1
 # linux libmagic
-# windows python-magic-bin
-opencv-python
+# windows python-magic-bin==0.4.14
 wsgidav
+flask_monitoringdashboard
+logger==1.4
+opencv-python

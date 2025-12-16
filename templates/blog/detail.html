@@ -103,6 +103,58 @@
             }
         }
     </script>
+
+    <script>
+        // 页面浏览量统计功能
+        document.addEventListener('DOMContentLoaded', function () {
+            // 文章ID
+            const articleId = {{ article.article_id }};
+
+            // 开始时间
+            const startTime = Date.now();
+
+            // 页面可见性状态变化监听
+            let isVisible = true;
+            document.addEventListener('visibilitychange', function () {
+                if (document.hidden) {
+                    isVisible = false;
+                } else {
+                    isVisible = true;
+                }
+            });
+
+            // 定时检测用户是否在页面上停留足够长时间
+            const interval = setInterval(function () {
+                if (isVisible) {
+                    const currentTime = Date.now();
+                    const timeOnPage = currentTime - startTime;
+
+                    // 如果用户已在页面停留超过15秒
+                    if (timeOnPage >= 15000) { // 15秒 = 15000毫秒
+                        // 发送请求增加浏览量
+                        fetch('/api/article/' + articleId + '/view', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            credentials: 'same-origin'
+                        }).then(response => {
+                            if (response.ok) {
+                                console.log('浏览量统计成功');
+                            } else {
+                                console.error('浏览量统计失败');
+                            }
+                        }).catch(error => {
+                            console.error('浏览量统计出错:', error);
+                        });
+
+                        // 清除定时器，避免重复发送请求
+                        clearInterval(interval);
+                    }
+                }
+            }, 1000); // 每秒检查一次
+        });
+    </script>
 </head>
 <body>
 <!-- 导航栏 -->
@@ -274,7 +326,8 @@
                     <!-- 操作按钮 -->
                     <div class="flex items-center justify-between border-t border-gray-200 pt-4">
                         <div class="flex items-center">
-                            <button id="like-btn" class="flex items-center text-gray-600 hover:text-red-500">
+                            <button type="button" id="like-btn"
+                                    class="flex items-center text-gray-600 hover:text-red-500">
                                 <i class="far fa-heart text-xl mr-1"></i>
                                 <span id="like-count">{{ article.likes or 0 }}</span>
                             </button>
@@ -324,7 +377,8 @@
                                 }
                             </script>
                             <!-- 分享按钮 -->
-                            <button class="flex items-center text-gray-600 hover:text-green-500">
+                            <button class="flex items-center text-gray-600 hover:text-green-500"
+                                    onclick="shareArticle()">
                                 <i class="fas fa-share-alt mr-1"></i>
                                 分享
                             </button>
@@ -409,6 +463,25 @@
     </div>
 </main>
 
+<!-- 登录模态框 -->
+<div id="login-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 w-96 max-w-md">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">请登录</h3>
+            <button id="close-modal" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <p class="mb-4">您需要登录才能点赞这篇文章。</p>
+        <div class="flex justify-end space-x-3">
+            <button id="cancel-login" class="px-4 py-2 text-gray-600 hover:text-gray-800">取消</button>
+            <button id="proceed-login" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                去登录
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- 固定朗读控制面板 -->
 <div id="reading-controls-fixed" class="reading-controls-fixed hidden">
     <div class="flex items-center justify-between mb-3">
@@ -472,7 +545,175 @@
 
         // 初始化无障碍阅读功能
         initAccessibilityReading();
+
+        // 初始化点赞功能
+        initLikeButton();
     });
+
+    // 分享功能实现
+    function shareArticle() {
+        const title = document.querySelector('h1').textContent;
+        const url = window.location.href;
+
+        if (navigator.share) {
+            // 使用原生分享API
+            navigator.share({
+                title: title,
+                url: url
+            }).catch(console.error);
+        } else {
+            // 复制链接到剪贴板
+            navigator.clipboard.writeText(url).then(() => {
+                // 显示提示信息
+                const alertBox = document.createElement('div');
+                alertBox.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+                alertBox.textContent = '链接已复制到剪贴板';
+                alertBox.style.animation = 'fadeInOut 3s forwards';
+
+                document.body.appendChild(alertBox);
+
+                setTimeout(() => {
+                    if (alertBox.parentNode) {
+                        alertBox.parentNode.removeChild(alertBox);
+                    }
+                }, 3000);
+            }).catch(err => {
+                console.error('复制失败:', err);
+                // 降级方案：弹窗显示链接
+                prompt('请手动复制链接:', url);
+            });
+        }
+    }
+
+    // 点赞功能实现
+    function initLikeButton() {
+        const likeBtn = document.getElementById('like-btn');
+        const likeCount = document.getElementById('like-count');
+        const loginModal = document.getElementById('login-modal');
+        const closeModal = document.getElementById('close-modal');
+        const cancelLogin = document.getElementById('cancel-login');
+        const proceedLogin = document.getElementById('proceed-login');
+
+        // 检查用户是否已登录（通过向服务器发送请求验证）
+        async function isLoggedIn() {
+            try {
+                console.log('Checking login status...');
+                const response = await fetch('/api/user/check-login', {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+
+                // 检查响应状态
+                if (!response.ok) {
+                    console.log('Response not OK, status:', response.status);
+                    return false;
+                }
+
+                // 检查响应是否为JSON格式
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    console.log('Response is not JSON');
+                    return false;
+                }
+
+                const data = await response.json();
+                console.log('Login check response:', data);
+                // 确保返回的数据包含logged_in字段且为true
+                return data.hasOwnProperty('logged_in') && data.logged_in === true;
+            } catch (error) {
+                console.error('验证登录状态时出错:', error);
+                return false;
+            }
+        }
+
+        // 显示登录模态框
+        function showLoginModal() {
+            console.log('Showing login modal');
+            loginModal.classList.remove('hidden');
+            loginModal.classList.add('flex');
+        }
+
+        // 隐藏登录模态框
+        function hideLoginModal() {
+            console.log('Hiding login modal');
+            loginModal.classList.add('hidden');
+            loginModal.classList.remove('flex');
+        }
+
+        // 绑定模态框事件
+        closeModal.addEventListener('click', hideLoginModal);
+        cancelLogin.addEventListener('click', hideLoginModal);
+        proceedLogin.addEventListener('click', function () {
+            const currentUrl = encodeURIComponent(window.location.href);
+            window.location.href = `/login?next=${currentUrl}`;
+        });
+
+        likeBtn.addEventListener('click', async function (event) {
+            // 阻止任何默认行为
+            event.preventDefault();
+            event.stopPropagation();
+
+            console.log('Like button clicked');
+
+            // 检查用户是否已登录
+            const loggedIn = await isLoggedIn();
+            console.log('User logged in:', loggedIn);
+
+            if (!loggedIn) {
+                // 未登录则显示登录模态框
+                console.log('User not logged in, showing modal');
+                showLoginModal();
+                return;
+            }
+
+            // 检查是否已经点过赞
+            if (likeBtn.classList.contains('text-red-500')) {
+                // 已经点过赞了
+                console.log('Already liked');
+                return;
+            }
+
+            console.log('Sending like request');
+            // 发送点赞请求
+            const articleId = {{ article.article_id }};
+            fetch(`/api/article/${articleId}/like`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'include'
+            })
+                .then(response => {
+                    // 检查响应是否为JSON格式
+                    const contentType = response.headers.get('content-type');
+                    if (!contentType || !contentType.includes('application/json')) {
+                        throw new Error('服务器响应不是有效的JSON格式');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Like response:', data);
+                    if (data.success) {
+                        // 更新点赞数
+                        likeCount.textContent = data.likes;
+                        // 改变按钮样式表示已点赞
+                        likeBtn.innerHTML = '<i class="fas fa-heart text-xl mr-1"></i>' + data.likes;
+                        likeBtn.classList.add('text-red-500');
+                        likeBtn.classList.remove('hover:text-red-500');
+                        likeBtn.classList.remove('text-gray-600');
+                    } else {
+                        alert('点赞失败: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('点赞失败，请稍后再试');
+                });
+
+            // 阻止事件冒泡
+            return false;
+        });
+    }
 
     // 无障碍阅读功能实现
     function initAccessibilityReading() {
