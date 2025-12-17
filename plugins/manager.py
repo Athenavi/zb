@@ -66,7 +66,7 @@ class PluginManager:
             except ImportError as e:
                 self.logger.error(f"❌ 加载插件 {plugin_name} 失败: {str(e)}")
             except Exception as e:
-                self.logger.error(f"❌ 初始化插件 {plugin_name} 时出错: {str(e)}")
+                self.logger.error(f"❌ 初始化插件 {plugin_name} 时出错: {str(e)}", exc_info=True)
 
     def register_blueprints(self):
         """注册所有已启用插件的蓝图"""
