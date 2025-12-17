@@ -3,6 +3,7 @@
 负责应用工厂函数和核心配置"""
 
 import logging
+import os
 from datetime import datetime, timezone
 
 from flask import Flask, g
@@ -63,8 +64,10 @@ def create_app(config_class=None):
     # 如果没有提供配置类，则使用默认的生产配置
     if config_class is None:
         config_class = ProductionConfig()
-        
-    app = Flask(__name__, template_folder='../templates')
+
+    static_folder = os.path.join(config_class.base_dir, 'static')
+    templates_folder = os.path.join(config_class.base_dir, 'templates')
+    app = Flask(__name__, template_folder=templates_folder, static_folder=static_folder, static_url_path='/static')
     app.config.from_object(config_class)
 
     # 初始化扩展

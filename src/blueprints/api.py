@@ -46,7 +46,9 @@ def api_blog_i18n_content(iso, aid):
     content = db.session.query(ArticleI18n.content).filter(
         ArticleI18n.article_id == aid, ArticleI18n.language_code == iso).first()
     if content:
-        return send_chunk_md(content, aid, iso)
+        # content是一个元组，需要取出其中的实际内容
+        content_text = content[0] if isinstance(content, tuple) else content.content
+        return send_chunk_md(content_text, aid, iso)
     else:
         return jsonify({"error": "Article not found"}), 404
 
