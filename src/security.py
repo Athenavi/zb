@@ -73,7 +73,8 @@ def init_security_headers(app):
     def after_request(response):
         # 添加安全头
         response.headers['X-Content-Type-Options'] = 'nosniff'
-        response.headers['X-Frame-Options'] = 'DENY'
+        # 允许同源iframe嵌套
+        response.headers['X-Frame-Options'] = 'SAMEORIGIN'
         response.headers['X-XSS-Protection'] = '1; mode=block'
         
         # 如果启用了HTTPS，添加Strict-Transport-Security头
