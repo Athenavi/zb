@@ -1,8 +1,10 @@
+import os
 import random
 import string
 
 from sqlalchemy.exc import SQLAlchemyError
 
+from src.blueprints.blog import get_site_domain
 # from src.database import get_db
 from src.models import Url, db
 
@@ -15,7 +17,11 @@ def generate_short_url():
 
 def create_special_url(long_url, user_id):
     try:
+        domain = get_site_domain() or os.getenv('DOMAIN')
         # 查询是否存在该长链接和用户ID对应的短链接
+        if not long_url.startswith(domain):
+            return "只能添加站内链接"
+        long_url = long_url.replace(domain, '')
         existing_url = db.session.query(Url).filter_by(long_url=long_url, user_id=user_id).first()
         if existing_url:
             short_url = existing_url.short_url
@@ -32,10 +38,14 @@ def create_special_url(long_url, user_id):
 
 def redirect_to_long_url(short_url):
     try:
+        domain = get_site_domain() or os.getenv('DOMAIN')
         # 查询短链接对应的长链接
         url_entry = db.session.query(Url).filter_by(short_url=short_url).first()
         if url_entry:
-            long_url = url_entry.long_url
+            # 如果长链接已经以http://或https://开头，则不添加域名
+            if url_entry.long_url.startswith(('http://', 'https://')):
+                return url_entry.long_url
+            long_url = domain + url_entry.long_url.lstrip('/') if url_entry.long_url.startswith('/') else domain + '/' + url_entry.long_url
             return long_url
         else:
             return None
