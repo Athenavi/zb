@@ -56,7 +56,7 @@ class FileProcessor:
     def create_file_hash_record(self, db, file_hash, filename, file_size, mime_type, storage_path, reference_count=1):
         """创建文件哈希记录"""
         # 使用当前会话查询，避免会话冲突
-        existing = db.query(FileHash).filter_by(hash=file_hash, mime_type=mime_type).first()
+        existing = db.query(FileHash).filter_by(hash=file_hash).first()
         if existing:
             existing.reference_count += reference_count
             return existing
@@ -468,43 +468,80 @@ class ChunkedUploadProcessor:
 # 原有的小文件上传函数保持不变
 def upload_cover_back(user_id, base_path, domain):
     """上传封面图片（小文件）"""
+    print(f"[DEBUG] Starting upload_cover_back for user_id={user_id}")
+
+    # 检查是否有文件上传
     if 'cover_image' not in request.files:
+        print("[DEBUG] No cover_image in request.files")
         return jsonify({"code": 400, "msg": "未上传文件"}), 400
 
     file = request.files['cover_image']
+    print(f"[DEBUG] File received: filename={file.filename if file else 'None'}")
+
+    # 检查文件名是否为空
     if not file or file.filename == '':
+        print("[DEBUG] File is empty or filename is empty")
         return jsonify({"code": 400, "msg": "文件名为空"}), 400
 
-    # 保存临时文件
-    temp_filename = str(uuid.uuid4()) + '.png'
-    temp_file_path = os.path.join(base_path, temp_filename)
-    os.makedirs(os.path.dirname(temp_file_path), exist_ok=True)
-    file.save(temp_file_path)
-
     try:
-        # 处理文件
-        with open(temp_file_path, 'rb') as f:
-            file_data = f.read()
+        # 读取文件内容
+        file_data = file.read()
+        print(f"[DEBUG] File read successful, size={len(file_data)} bytes")
 
-        processor = FileProcessor(user_id, allowed_size=8 * 1024 * 1024)
+        # 使用FileProcessor处理文件，支持常见的图片格式，最大8MB
+        processor = FileProcessor(
+            user_id,
+            allowed_mimes={'image/jpeg', 'image/png', 'image/gif', 'image/webp'},
+            allowed_size=8 * 1024 * 1024
+        )
+        print(f"[DEBUG] FileProcessor initialized with user_id={user_id}")
+
+        # 验证并处理文件
+        is_valid, validation_result = processor.validate_file(file_data, file.filename)
+        print(f"[DEBUG] File validation: is_valid={is_valid}, result={validation_result}")
+
+        if not is_valid:
+            return jsonify({"code": 400, "msg": validation_result}), 400
+
+        # 计算文件哈希
+        file_hash = processor.calculate_hash(file_data)
+        print(f"[DEBUG] File hash calculated: {file_hash}")
+
+        # 处理文件并在数据库中创建记录
         result = _process_single_file(processor, file_data, file.filename)
+        print(f"[DEBUG] _process_single_file result: {result}")
 
         if result['success']:
-            s_url = create_special_url(
-                domain + "thumbnail?data=" + result['hash'],
-                user_id=user_id
-            )
-            cover_url = "/s/" + s_url
-            return jsonify({"code": 200, "msg": "上传成功", "data": cover_url}), 200
+            # 确保domain以/结尾
+            if not domain.endswith('/'):
+                domain += '/'
+            print(f"[DEBUG] Domain adjusted to: {domain}")
+
+            # 创建特殊URL用于访问缩略图
+            thumbnail_url = domain + "thumbnail?data=" + result['hash']
+            print(f"[DEBUG] Thumbnail URL: {thumbnail_url}")
+
+            s_url = create_special_url(thumbnail_url, user_id)
+            print(f"[DEBUG] Short URL created: {s_url}")
+
+            if s_url:
+                cover_url = "/s/" + s_url
+                print(f"[DEBUG] Final cover URL: {cover_url}")
+                return jsonify({"code": 200, "msg": "上传成功", "data": cover_url}), 200
+            else:
+                # 即使创建短链接失败，也返回文件哈希，让前端可以构造URL
+                cover_url = "/thumbnail?data=" + result['hash']
+                print(f"[DEBUG] Fallback cover URL: {cover_url}")
+                return jsonify({"code": 200, "msg": "上传成功", "data": cover_url}), 200
         else:
+            print(f"[ERROR] File processing failed: {result['error']}")
             return jsonify({"code": 500, "msg": "文件处理失败", "error": result['error']}), 500
 
     except Exception as e:
+        print(f"[ERROR] Exception occurred: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"code": 500, "msg": "上传失败", "error": str(e)}), 500
-    finally:
-        # 清理临时文件
-        if os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
 
 
 def handle_user_upload(user_id, allowed_size=10 * 1024 * 1024, allowed_mimes=None, check_existing=False):
@@ -645,22 +682,38 @@ def _process_single_file(processor, file_data, filename):
 
             # 检查文件是否已存在 - 使用当前会话查询
             existing_file_hash = db.query(FileHash).filter_by(
-                hash=file_hash, mime_type=mime_type
+                hash=file_hash
             ).first()
 
             if not existing_file_hash:
                 # 保存新文件
                 storage_path = processor.save_file(file_hash, file_data, filename)
-                processor.create_file_hash_record(db, file_hash, filename, file_size, mime_type, storage_path)
+                # 直接创建文件哈希记录，而不是调用processor的方法
+                new_file_hash = FileHash(
+                    hash=file_hash,
+                    filename=filename,
+                    file_size=file_size,
+                    mime_type=mime_type,
+                    storage_path=storage_path,
+                    reference_count=1
+                )
+                db.add(new_file_hash)
+                db.flush()  # 确保对象获得ID
+            else:
+                # 文件已存在，增加引用计数
+                existing_file_hash.reference_count += 1
 
             # 创建媒体记录
-            processor.create_media_record(db, file_hash, filename)
+            processor.create_media_record(db, file_hash, filename, check_existing=True)
             db.commit()
 
             return {'success': True, 'hash': file_hash}
 
         except Exception as e:
             db.rollback()
+            print(f"Error in _process_single_file: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return {'success': False, 'error': str(e)}
 
 
@@ -708,7 +761,7 @@ def _process_multiple_files(user_id, allowed_size, allowed_mimes, check_existing
 
                 # 检查文件是否已存在 - 使用当前会话查询
                 existing_file_hash = db.query(FileHash).filter_by(
-                    hash=file_hash, mime_type=first_file['mime_type']
+                    hash=file_hash
                 ).first()
 
                 if existing_file_hash:
