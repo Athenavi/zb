@@ -157,6 +157,21 @@ def main():
         if not run_update():
             logger.warning("更新失败，继续使用当前版本启动")
 
+    # 数据库一致性检查（现在是必需步骤）
+    logger.info("开始检查数据库模型一致性...")
+    try:
+        from src.database_checker import handle_database_consistency_check
+        # 创建应用实例用于检查
+        config = get_config_by_env(args.env)
+        app = create_app(config)
+        handle_database_consistency_check(app)
+    except ImportError as e:
+        logger.error(f"导入数据库检查模块失败: {str(e)}")
+        sys.exit(1)
+    except Exception as e:
+        logger.error(f"数据库一致性检查过程中出错: {str(e)}")
+        sys.exit(1)
+
     # 测试数据库连接（仅在配置文件存在时）
     try:
         from src.database import test_database_connection, check_db
