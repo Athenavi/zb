@@ -586,15 +586,6 @@ def handle_chunked_upload_complete(user_id):
         processor = ChunkedUploadProcessor(user_id)
         result = processor.complete_upload(upload_id, file_hash, mime_type)
 
-        if result['success']:
-            # 创建短链接（如果需要）
-            domain = request.host_url
-            s_url = create_special_url(
-                domain + "file?hash=" + result['file_hash'],
-                user_id=user_id
-            )
-            result['short_url'] = "/s/" + s_url
-
         return jsonify(result), 200 if result['success'] else 400
 
     except Exception as e:

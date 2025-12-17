@@ -20,7 +20,7 @@ def create_special_url(long_url, user_id):
         domain = get_site_domain() or os.getenv('DOMAIN')
         # 查询是否存在该长链接和用户ID对应的短链接
         if not long_url.startswith(domain):
-            return "只能添加站内链接"
+            return None
         long_url = long_url.replace(domain, '')
         existing_url = db.session.query(Url).filter_by(long_url=long_url, user_id=user_id).first()
         if existing_url:

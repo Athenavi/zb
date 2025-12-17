@@ -8,6 +8,7 @@ from sqlalchemy import select, func
 from src.auth_utils import jwt_required, admin_required, origin_required
 from src.blog.article.password import check_apw_form, get_apw_form
 from src.blog.comment import create_comment_with_anti_spam, comment_page_get
+from src.blueprints.blog import get_site_domain
 from src.extensions import cache, csrf
 from src.models import ArticleI18n, Article, User, db
 from src.other.report import report_back
@@ -227,7 +228,7 @@ def update_article_status(user_id, article_id):
 def upload_cover(user_id):
     cover_path = Path(str(current_app.root_path)).parent / 'static' / 'cover'
     logger.debug(cover_path)
-    return upload_cover_back(user_id=user_id, base_path=cover_path, domain=domain)
+    return upload_cover_back(user_id=user_id, base_path=cover_path, domain=get_site_domain())
 
 
 @api_bp.route('/article/password-form/<int:aid>', methods=['GET'])
