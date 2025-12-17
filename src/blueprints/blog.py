@@ -5,7 +5,7 @@ from flask import request, render_template, jsonify, current_app
 from flask import url_for, flash, redirect
 from flask_jwt_extended import current_user
 
-from src.auth import jwt_required
+from src.auth_utils import jwt_required
 from src.blog.article.password import get_article_password
 from src.blog.homepage import index_page_back, tag_page_back, featured_page_back
 from src.error import error
@@ -386,7 +386,7 @@ def change_profiles(user_id):
 def user_space(user_id, target_user_id):
     """用户空间页面 - 显示用户资料和文章"""
     # 检查会话是否有效
-    from src.auth import check_access_token
+    from src.auth_utils import check_access_token
     access_token = request.cookies.get('access_token')
     if access_token and not check_access_token(access_token):
         from flask import flash

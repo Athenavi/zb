@@ -28,6 +28,8 @@ def parse_arguments():
                         help='仅执行更新而不启动服务器')
     parser.add_argument('--pythonanywhere', action='store_true', default=False,
                         help='在 PythonAnywhere 上运行,将禁用日志文件')
+    parser.add_argument('--env', type=str, choices=['prod', 'dev', 'test', 'production', 'development', 'testing'], 
+                        default='prod', help='指定运行环境: prod/dev/test (默认: prod)')
     return parser.parse_args()
 
 
@@ -84,6 +86,19 @@ def run_update():
 
 # 创建 Flask 应用实例，供 Flask 命令行工具使用
 from src.app import create_app
+from src.setting import ProductionConfig, DevelopmentConfig, TestingConfig
+
+# 根据环境参数选择配置类
+def get_config_by_env(env):
+    # 支持简写和完整形式
+    if env in ['prod', 'production']:
+        return ProductionConfig()
+    elif env in ['dev', 'development']:
+        return DevelopmentConfig()
+    elif env in ['test', 'testing']:
+        return TestingConfig()
+    else:
+        return ProductionConfig()  # 默认使用生产环境配置
 
 # 为 Flask CLI 创建应用实例
 application = create_app()
@@ -177,17 +192,21 @@ def main():
     logger.info("应用程序正在启动...")
     logger.info(f"服务地址: http://{args.host}:{final_port}")
     logger.info(f"内部地址: http://127.0.0.1:{final_port}")
+    logger.info(f"运行环境: {args.env}")
     logger.info("=" * 50)
 
     # 启动服务
     try:
-        app = create_app()
+        # 根据环境参数选择相应的配置类
+        config = get_config_by_env(args.env)
+        app = create_app(config)
         
         # 使用 gevent websocket 服务器启动应用
         from gevent.pywsgi import WSGIServer
         from geventwebsocket.handler import WebSocketHandler
         http_server = WSGIServer((args.host, final_port), app, handler_class=WebSocketHandler)
         logger.info("使用 gevent websocket 服务器启动应用")
+        logger.info(f"运行环境配置: {args.env}")
         http_server.serve_forever()
             
     except KeyboardInterrupt:

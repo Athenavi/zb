@@ -10,10 +10,10 @@ from flask import jsonify
 from flask_principal import identity_loaded, RoleNeed
 from werkzeug.exceptions import NotFound
 
-from src.auth import jwt_required
+from src.auth_utils import jwt_required
 from src.blueprints.admin_vip import admin_vip_bp
 from src.blueprints.api import api_bp
-from src.blueprints.auth import auth_bp
+from src.blueprints.auth_view import auth_bp
 from src.blueprints.blog import blog_bp, get_site_beian, get_site_title, get_site_domain, get_username_no_check, \
     get_site_menu, get_current_menu_slug, get_footer, get_banner, blog_detail_back
 from src.blueprints.category import category_bp
@@ -31,13 +31,13 @@ from src.blueprints.website import website_bp
 from src.error import error
 from src.extensions import csrf, login_manager
 from src.logger_config import init_optimized_logger
-from src.other.filters import json_filter, string_split, article_author, md2html, relative_time_filter, category_filter, \
-    f2list
 from src.other.search import search_handler
 from src.plugin import plugin_bp
 from src.scheduler import init_scheduler
 from src.security import PermissionNeed, init_security_headers
 from src.setting import ProductionConfig
+from src.utils.filters import json_filter, string_split, article_author, md2html, relative_time_filter, category_filter, \
+    f2list
 
 # 在所有其他导入之前导入并应用gevent补丁
 try:

@@ -1,7 +1,7 @@
 from flask import Blueprint, flash
 from flask_login import login_required
 
-from src.auth import jwt_required
+from src.auth_utils import jwt_required
 from src.models import Article
 from src.models import Url, Comment, db
 from src.user.authz.password import validate_password, update_password
