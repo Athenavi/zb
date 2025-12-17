@@ -5,12 +5,11 @@ from flask import Blueprint, jsonify, current_app, request
 from flask_login import login_required
 from sqlalchemy import select, func
 
-from src.auth import jwt_required, admin_required, origin_required
+from src.auth_utils import jwt_required, admin_required, origin_required
 from src.blog.article.password import check_apw_form, get_apw_form
 from src.blog.comment import create_comment_with_anti_spam, comment_page_get
 from src.extensions import cache, csrf
 from src.models import ArticleI18n, Article, User, db
-from src.other.filters import f2list
 from src.other.report import report_back
 from src.setting import app_config
 from src.upload.admin_upload import admin_upload_file
@@ -20,6 +19,7 @@ from src.user.entities import get_avatar
 from src.user.profile.social import get_user_info
 from src.user.views import confirm_email_back
 from src.utils.config.theme import get_all_themes
+from src.utils.filters import f2list
 from src.utils.http.generate_response import send_chunk_md
 from src.utils.security.safe import is_valid_iso_language_code
 

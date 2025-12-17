@@ -8,10 +8,10 @@ monkey.patch_all()
 import argparse
 import os
 import socket
+import logging
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
-    import logger
     from src.logger_config import init_pythonanywhere_logger, init_optimized_logger
 
 
@@ -28,6 +28,8 @@ def parse_arguments():
                         help='仅执行更新而不启动服务器')
     parser.add_argument('--pythonanywhere', action='store_true', default=False,
                         help='在 PythonAnywhere 上运行,将禁用日志文件')
+    parser.add_argument('--env', type=str, choices=['prod', 'dev', 'test', 'production', 'development', 'testing'], 
+                        default='prod', help='指定运行环境: prod/dev/test (默认: prod)')
     return parser.parse_args()
 
 
@@ -68,20 +70,35 @@ def get_user_port_input():
 
 def run_update():
     """执行更新程序"""
-    logger.info("正在检查更新...")
+    logging.info("正在检查更新...")
     try:
         # 导入并运行更新程序
-        from update import main as update_main
+        from update import main as update_main, start_auto_update_thread
+        # 启动自动更新检查线程（如果尚未启动）
+        start_auto_update_thread()
         update_main()
-        logger.info("更新完成")
+        logging.info("更新完成")
         return True
     except Exception as e:
-        logger.error(f"更新过程中出错: {str(e)}")
+        logging.error(f"更新过程中出错: {str(e)}")
         return False
 
 
 # 创建 Flask 应用实例，供 Flask 命令行工具使用
 from src.app import create_app
+from src.setting import ProductionConfig, DevelopmentConfig, TestingConfig
+
+# 根据环境参数选择配置类
+def get_config_by_env(env):
+    # 支持简写和完整形式
+    if env in ['prod', 'production']:
+        return ProductionConfig()
+    elif env in ['dev', 'development']:
+        return DevelopmentConfig()
+    elif env in ['test', 'testing']:
+        return TestingConfig()
+    else:
+        return ProductionConfig()  # 默认使用生产环境配置
 
 # 为 Flask CLI 创建应用实例
 application = create_app()
@@ -93,9 +110,9 @@ def main():
 
     # 检查配置文件是否存在
     if not os.path.isfile(".env"):
-        logger.info("=" * 60)
-        logger.info("检测到系统未初始化，正在启动引导程序...")
-        logger.info("=" * 60)
+        logging.info("=" * 60)
+        logging.info("检测到系统未初始化，正在启动引导程序...")
+        logging.info("=" * 60)
 
         # 导入并运行引导程序
         try:
@@ -103,15 +120,15 @@ def main():
             from guide import run_guide_app
             success = run_guide_app(args.host, args.port)
             if success:
-                logger.info("引导程序已结束，请重新启动应用以使用主程序")
+                logging.info("引导程序已结束，请重新启动应用以使用主程序")
             else:
-                logger.error("引导程序运行失败")
+                logging.error("引导程序运行失败")
 
         except ImportError as e:
-            logger.error(f"导入引导程序失败: {str(e)}")
-            logger.error("请确保 standalone_guide.py 文件存在")
+            logging.error(f"导入引导程序失败: {str(e)}")
+            logging.error("请确保 standalone_guide.py 文件存在")
         except Exception as e:
-            logger.error(f"启动引导程序时发生错误: {str(e)}")
+            logging.error(f"启动引导程序时发生错误: {str(e)}")
 
         return
 
@@ -175,17 +192,21 @@ def main():
     logger.info("应用程序正在启动...")
     logger.info(f"服务地址: http://{args.host}:{final_port}")
     logger.info(f"内部地址: http://127.0.0.1:{final_port}")
+    logger.info(f"运行环境: {args.env}")
     logger.info("=" * 50)
 
     # 启动服务
     try:
-        app = create_app()
+        # 根据环境参数选择相应的配置类
+        config = get_config_by_env(args.env)
+        app = create_app(config)
         
         # 使用 gevent websocket 服务器启动应用
         from gevent.pywsgi import WSGIServer
         from geventwebsocket.handler import WebSocketHandler
         http_server = WSGIServer((args.host, final_port), app, handler_class=WebSocketHandler)
         logger.info("使用 gevent websocket 服务器启动应用")
+        logger.info(f"运行环境配置: {args.env}")
         http_server.serve_forever()
             
     except KeyboardInterrupt:
