@@ -1,22 +1,27 @@
+"""
+主应用文件
+负责应用工厂函数和核心配置"""
+
+import logging
 from datetime import datetime, timezone
 
-from flask import Flask, jsonify, g
+from flask import Flask, g
+from flask import jsonify
 from flask_principal import identity_loaded, RoleNeed
-from jinja2 import select_autoescape
 from werkzeug.exceptions import NotFound
-from werkzeug.middleware.proxy_fix import ProxyFix
 
-from src.auth import jwt_required
+from src.auth_utils import jwt_required
 from src.blueprints.admin_vip import admin_vip_bp
 from src.blueprints.api import api_bp
-from src.blueprints.auth import auth_bp
-from src.blueprints.blog import blog_bp, get_footer, get_site_title, get_banner, get_site_domain, get_site_beian, \
-    get_site_menu, get_current_menu_slug, blog_detail_back, get_username
+from src.blueprints.auth_view import auth_bp
+from src.blueprints.blog import blog_bp, get_site_beian, get_site_title, get_site_domain, get_username_no_check, \
+    get_site_menu, get_current_menu_slug, get_footer, get_banner, blog_detail_back
 from src.blueprints.category import category_bp
 from src.blueprints.dashboard import admin_bp
 from src.blueprints.media import media_bp
 from src.blueprints.my import my_bp
 from src.blueprints.noti import noti_bp
+from src.blueprints.payment import payment_bp
 from src.blueprints.relation import relation_bp
 from src.blueprints.role import role_bp
 from src.blueprints.session_views import session_bp
@@ -24,41 +29,53 @@ from src.blueprints.theme import theme_bp
 from src.blueprints.vip_routes import vip_bp
 from src.blueprints.website import website_bp
 from src.error import error
-from src.extensions import init_extensions, login_manager, csrf
-from src.other.filters import json_filter, string_split, article_author, md2html, relative_time_filter, category_filter, \
-    f2list
+from src.extensions import csrf, login_manager
+from src.logger_config import init_optimized_logger
 from src.other.search import search_handler
-from src.plugin import plugin_bp, init_plugin_manager
-from src.scheduler import session_scheduler
-from src.security import PermissionNeed
-from src.setting import app_config
+from src.plugin import plugin_bp
+from src.scheduler import init_scheduler
+from src.security import PermissionNeed, init_security_headers
+from src.setting import ProductionConfig
+from src.utils.filters import json_filter, string_split, article_author, md2html, relative_time_filter, category_filter, \
+    f2list
+
+# 在所有其他导入之前导入并应用gevent补丁
+try:
+    import gevent.monkey
+
+    gevent.monkey.patch_all()
+    print("Gevent monkey patching applied.")
+except ImportError:
+    try:
+        import eventlet
+
+        eventlet.monkey_patch()
+        print("Eventlet monkey patching applied.")
+    except ImportError:
+        print("No gevent or eventlet found. Skipping monkey patching.")
+
+# 初始化优化的日志系统
+logger = init_optimized_logger()
 
 
-def create_app(config_class=app_config):
+def create_app(config_class=None):
     """应用工厂函数"""
-    app = Flask(
-        __name__,
-        template_folder=f'{config_class.base_dir}/templates',
-        static_folder=f'{config_class.base_dir}/static'
-    )
-
-    # 加载配置
+    # 如果没有提供配置类，则使用默认的生产配置
+    if config_class is None:
+        config_class = ProductionConfig()
+        
+    app = Flask(__name__, template_folder='../templates')
     app.config.from_object(config_class)
 
     # 初始化扩展
+    from src.extensions import init_extensions
     init_extensions(app)
-    # 初始化定时任务
-    session_scheduler.init_app(app)
 
-    # 配置代理中间件
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)
+    # 初始化安全头
+    init_security_headers(app)
 
-    # 配置 Jinja2 环境
-    app.jinja_env.autoescape = select_autoescape(['html', 'xml'])
-    app.jinja_env.add_extension('jinja2.ext.loopcontrols')
-
-    # 注册模板过滤器
-    register_template_filters(app)
+    # 注册蓝图
+    register_blueprints(app)
 
     # 注册上下文处理器
     register_context_processors(app, config_class)
@@ -66,11 +83,18 @@ def create_app(config_class=app_config):
     # 注册直接路由
     register_direct_routes(app, config_class)
 
-    # 注册蓝图
-    register_blueprints(app)
+    # 注册模板过滤器
+    register_template_filters(app)
 
-    # 初始化插件管理器
-    init_plugin_manager(app)
+    # 初始化调度器
+    init_scheduler(app)
+
+    # 初始化监控
+    try:
+        from src.monitoring import monitor
+        monitor.init_app(app)
+    except ImportError:
+        app.logger.warning("监控系统导入失败")
 
     # 配置日志
     configure_logging(app)
@@ -91,7 +115,7 @@ def register_context_processors(app, config_class):
             beian=get_site_beian() or config_class.beian,
             title=get_site_title() or config_class.sitename,
             domain=get_site_domain() or config_class.domain,
-            username=get_username(),
+            username=get_username_no_check(),
             menu=get_site_menu(get_current_menu_slug()) or default_menu_data,
             footer=get_footer(),
             banner=get_banner()
@@ -109,7 +133,7 @@ def register_direct_routes(app, config_class):
 
     # 身份加载信号处理器
     @identity_loaded.connect_via(app)
-    def on_identity_loaded(sender, identity):
+    def on_identity_loaded(_sender, identity):
         """当身份加载时，设置用户拥有的角色和权限"""
         if hasattr(identity, 'id') and identity.id:
             from src.models import User
@@ -194,7 +218,7 @@ def register_direct_routes(app, config_class):
     from flask_principal import PermissionDenied
 
     @app.errorhandler(PermissionDenied)
-    def handle_permission_denied(error):
+    def handle_permission_denied(permission_error):
         return jsonify({
             'error': '权限不足',
             'message': '您没有执行此操作的权限'
@@ -235,12 +259,17 @@ def register_blueprints(app):
         blog_bp,
         vip_bp,
         admin_vip_bp,
-        session_bp
+        session_bp,
+        payment_bp
     ]
+
+    # 找到最长的蓝图名称长度，用于日志格式化
+    max_name_length = max(len(bp.name) for bp in blueprints) if blueprints else 0
 
     for bp in blueprints:
         app.register_blueprint(bp)
-        app.logger.info(f"=====Blueprint {bp.name} load success.=====")
+        # 使用固定宽度格式化，使日志输出对齐美观
+        app.logger.info(f"=====Blueprint {bp.name:>{max_name_length}} load success.=====")
         if bp != auth_bp:
             csrf.exempt(bp)
 
@@ -256,18 +285,19 @@ def configure_logging(app):
 
 def print_startup_info(config_class):
     """打印启动信息"""
-    print(f"running at: {config_class.base_dir}")
-    print("sys information")
+    logger = logging.getLogger(__name__)
+    logger.info(f"running at: {config_class.base_dir}")
+    logger.info("sys information")
     domain = config_class.domain.rstrip('/') + '/'
-    print("++++++++++==========================++++++++++")
-    print(
+    logger.info("++++++++++==========================++++++++++")
+    logger.info(
         f'\n domain: {domain} \n title: {config_class.sitename} \n beian: {config_class.beian} \n')
 
     # 安全检查
     if config_class.SECRET_KEY == 'your-secret-key-here':
-        print("WARNING: 应用存在被破解的风险，请修改 SECRET_KEY 变量的值")
-        print("WARNING: 请修改 SECRET_KEY 变量的值")
-        print("WARNING: 请修改 SECRET_KEY 变量的值")
-        print("WARNING: 请修改 SECRET_KEY 变量的值")
+        logger.warning("WARNING: 应用存在被破解的风险，请修改 SECRET_KEY 变量的值")
+        logger.warning("WARNING: 请修改 SECRET_KEY 变量的值")
+        logger.warning("WARNING: 请修改 SECRET_KEY 变量的值")
+        logger.warning("WARNING: 请修改 SECRET_KEY 变量的值")
 
-    print("++++++++++==========================++++++++++")
+    logger.info("++++++++++==========================++++++++++")

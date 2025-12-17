@@ -8,10 +8,11 @@ import humanize
 from flask import Blueprint, request, render_template, abort, jsonify, send_file, current_app
 from sqlalchemy import func
 
-from src.auth import jwt_required
+from src.auth_utils import jwt_required
 # from src.database import get_db
 from src.extensions import cache
 from src.models import Media, FileHash, db
+from src.models.user import User
 from src.setting import AppConfig, BaseConfig
 from src.utils.image.processing import generate_video_thumbnail, generate_thumbnail
 from src.utils.security.safe import is_valid_hash
@@ -28,6 +29,32 @@ def get_user_storage_used(user_id):
                        .filter(Media.user_id == user_id) \
                        .scalar() or 0
     return used_storage
+
+@cache.memoize(60)
+def get_user_storage_limit(user_id):
+    """
+    根据用户VIP等级获取存储限制
+    普通用户: 512MB
+    VIP 1级: 1GB
+    VIP 2级: 5GB
+    VIP 3级: 20GB
+    """
+    user = User.query.get(user_id)
+    if not user:
+        return BaseConfig.USER_FREE_STORAGE_LIMIT
+        
+    # 基础免费空间
+    base_limit = BaseConfig.USER_FREE_STORAGE_LIMIT  # 512MB
+    
+    # 根据VIP等级增加存储空间
+    if user.vip_level == 1:
+        return base_limit * 2  # 1GB
+    elif user.vip_level == 2:
+        return base_limit * 10  # 5GB
+    elif user.vip_level >= 3:
+        return base_limit * 40  # 20GB
+    else:
+        return base_limit  # 512MB for non-VIP users
 
 
 @media_bp.route('/thumbnail', methods=['GET'])
@@ -54,9 +81,15 @@ def media_thumbnail():
                     generate_video_thumbnail(file_path, thumb_path)
                 else:
                     generate_thumbnail(file_path, thumb_path)
-        finally:
-            return send_file(thumb_path, as_attachment=False, mimetype='image/jpeg', max_age=2592000)
-    return send_file(thumb_path)
+        except Exception as e:
+            # 处理异常但不阻止发送文件
+            print(f"Error generating thumbnail: {e}")
+    
+    # 总是尝试发送缩略图文件
+    if thumb_path.exists():
+        return send_file(thumb_path, as_attachment=False, mimetype='image/jpeg', max_age=2592000)
+    else:
+        return "Thumbnail not found", 404
 
 
 @media_bp.route('/shared', methods=['GET'])
@@ -98,9 +131,10 @@ def media_v2(user_id):
         media_files = pagination.items
 
         storage_used_query = get_user_storage_used(user_id)
-
-        storage_total_bytes = Decimal(str(BaseConfig.USER_FREE_STORAGE_LIMIT))
-        storage_percentage = min(100, int(storage_used_query / storage_total_bytes * 100))
+        storage_total_bytes = Decimal(str(get_user_storage_limit(user_id)))
+        
+        # 修复：允许显示超过100%的存储使用百分比
+        storage_percentage = int(storage_used_query / storage_total_bytes * 100)
         can_be_uploaded = bool(storage_total_bytes - storage_used_query > 1024)
         stats = {
             'image_count': Media.query.filter_by(user_id=user_id)
@@ -115,6 +149,7 @@ def media_v2(user_id):
             'storage_total': convert_storage_size(storage_total_bytes),
             'storage_percentage': storage_percentage,
             'canBeUploaded': can_be_uploaded,
+            'totalUsed': storage_used_query  # 添加这一行以修复模板中的引用
         }
 
         return render_template('media.html',
@@ -184,10 +219,19 @@ def media_delete(user_id):
             # 收集需要清理的信息
             cleanup_data = []
             media_hashes = []  # 收集所有涉及的hash
+            valid_target_files = []  # 只处理hash不为null的记录
 
-            # 第一步：先收集所有hash，不修改任何对象
+            # 第一步：先检查所有记录的hash是否有效，过滤掉hash为null的记录
             for media_file in target_files:
-                media_hashes.append(media_file.hash)
+                if media_file.hash is not None:
+                    media_hashes.append(media_file.hash)
+                    valid_target_files.append(media_file)
+                else:
+                    current_app.logger.warning(f"跳过hash为null的媒体记录: ID={media_file.id}")
+
+            # 如果没有有效的记录，直接返回
+            if not valid_target_files:
+                return jsonify({"message": "没有有效的媒体记录可删除"}), 400
 
             # 第二步：批量查询FileHash对象，确保它们属于当前会话
             file_hashes = db.session.query(FileHash).filter(
@@ -198,7 +242,7 @@ def media_delete(user_id):
             file_hash_map = {fh.hash: fh for fh in file_hashes}
 
             # 第三步：执行删除和更新操作
-            for media_file in target_files:
+            for media_file in valid_target_files:
                 db.session.delete(media_file)
 
                 file_hash_obj = file_hash_map.get(media_file.hash)
@@ -220,7 +264,7 @@ def media_delete(user_id):
                        args=(current_app._get_current_object(), cleanup_data)).start()
 
             return jsonify({
-                "deleted_count": len(target_files),
+                "deleted_count": len(valid_target_files),
                 "message": "删除成功，后台清理中"
             }), 200
 

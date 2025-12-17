@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         # 使用当前稳定版本
-        python-version: ["3.13"]
+        python-version: [ "3.14" ]
 
     steps:
     - name: Checkout code
