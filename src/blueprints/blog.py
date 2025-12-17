@@ -171,7 +171,7 @@ def contribute_back(aid):
             return jsonify({'success': False, 'message': 'All fields are required'}), 400
 
         # 处理slug
-        contribute_slug = re.sub(r'[^\w\s]', '', contribute_slug)  # 移除非字母数字和下划线的字符
+        contribute_slug = re.sub(r'[^\w\s-]', '', contribute_slug)  # 移除非字母数字和下划线的字符
         contribute_slug = re.sub(r'\s+', '_', contribute_slug)
 
         # 验证语言代码
@@ -198,6 +198,8 @@ def contribute_back(aid):
                 existing_i18n.title = contribute_title
                 existing_i18n.slug = contribute_slug
                 existing_i18n.content = contribute_content
+                existing_i18n.excerpt = contribute_content[:200]  # 简单截取作为摘要
+                db.session.commit()
                 return jsonify({
                     'success': True,
                     'message': 'Translation updated successfully',
@@ -214,6 +216,7 @@ def contribute_back(aid):
                     excerpt=contribute_content[:200]  # 简单截取作为摘要
                 )
                 db.session.add(new_i18n)
+                db.session.commit()
                 return jsonify({
                     'success': True,
                     'message': 'Translation submitted successfully',
