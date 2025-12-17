@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
@@ -29,7 +30,7 @@ def get_user_storage_used(user_id):
                        .scalar() or 0
     return used_storage
 
-@cache.momoize(60)
+@cache.memoize(60)
 def get_user_storage_limit(user_id):
     """
     根据用户VIP等级获取存储限制

@@ -8,10 +8,10 @@ monkey.patch_all()
 import argparse
 import os
 import socket
+import logging
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
-    import logger
     from src.logger_config import init_pythonanywhere_logger, init_optimized_logger
 
 
@@ -68,15 +68,17 @@ def get_user_port_input():
 
 def run_update():
     """执行更新程序"""
-    logger.info("正在检查更新...")
+    logging.info("正在检查更新...")
     try:
         # 导入并运行更新程序
-        from update import main as update_main
+        from update import main as update_main, start_auto_update_thread
+        # 启动自动更新检查线程（如果尚未启动）
+        start_auto_update_thread()
         update_main()
-        logger.info("更新完成")
+        logging.info("更新完成")
         return True
     except Exception as e:
-        logger.error(f"更新过程中出错: {str(e)}")
+        logging.error(f"更新过程中出错: {str(e)}")
         return False
 
 
@@ -93,9 +95,9 @@ def main():
 
     # 检查配置文件是否存在
     if not os.path.isfile(".env"):
-        logger.info("=" * 60)
-        logger.info("检测到系统未初始化，正在启动引导程序...")
-        logger.info("=" * 60)
+        logging.info("=" * 60)
+        logging.info("检测到系统未初始化，正在启动引导程序...")
+        logging.info("=" * 60)
 
         # 导入并运行引导程序
         try:
@@ -103,15 +105,15 @@ def main():
             from guide import run_guide_app
             success = run_guide_app(args.host, args.port)
             if success:
-                logger.info("引导程序已结束，请重新启动应用以使用主程序")
+                logging.info("引导程序已结束，请重新启动应用以使用主程序")
             else:
-                logger.error("引导程序运行失败")
+                logging.error("引导程序运行失败")
 
         except ImportError as e:
-            logger.error(f"导入引导程序失败: {str(e)}")
-            logger.error("请确保 standalone_guide.py 文件存在")
+            logging.error(f"导入引导程序失败: {str(e)}")
+            logging.error("请确保 standalone_guide.py 文件存在")
         except Exception as e:
-            logger.error(f"启动引导程序时发生错误: {str(e)}")
+            logging.error(f"启动引导程序时发生错误: {str(e)}")
 
         return
 

@@ -48,3 +48,4 @@ logger==1.4
 python-alipay-sdk==3.4.0
 jd_wechatpay==0.1.1
 opencv-python
+gunicorn
