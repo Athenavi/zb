@@ -247,6 +247,10 @@ def register_template_filters(app):
 
 def register_blueprints(app):
     """注册所有蓝图"""
+    # 初始化插件管理器
+    from src.plugin import init_plugin_manager
+    init_plugin_manager(app)
+    
     blueprints = [
         media_bp,
         theme_bp,
