@@ -73,20 +73,24 @@ class PluginManager:
         for name, plugin in self.plugins.items():
             # 只有具有blueprint属性且尚未注册的插件才注册
             if hasattr(plugin, 'blueprint') and name not in self.blueprints:
-                # 存储蓝图引用
-                self.blueprints[name] = plugin.blueprint
-                self.app.register_blueprint(plugin.blueprint)
-                
-                # 根据插件的 protect 属性决定是否豁免 CSRF 保护
-                protect = getattr(plugin, 'protect', True)  # 默认为True（需要保护）
-                if not protect:  # 当protect为False时豁免
-                    from src.extensions import csrf
-                    csrf.exempt(plugin.blueprint)
-                    self.logger.info(f"🟡 已为插件 {name} 豁免 CSRF 保护")
-                else:
-                    self.logger.info(f"🟢 插件 {name} 需要 CSRF 保护")
+                # 检查blueprint是否为None
+                if plugin.blueprint is not None:
+                    # 存储蓝图引用
+                    self.blueprints[name] = plugin.blueprint
+                    self.app.register_blueprint(plugin.blueprint)
                     
-                self.logger.info(f"🔵 已注册蓝图: {name}")
+                    # 根据插件的 protect 属性决定是否豁免 CSRF 保护
+                    protect = getattr(plugin, 'protect', True)  # 默认为True（需要保护）
+                    if not protect:  # 当protect为False时豁免
+                        from src.extensions import csrf
+                        csrf.exempt(plugin.blueprint)
+                        self.logger.info(f"🟡 已为插件 {name} 豁免 CSRF 保护")
+                    else:
+                        self.logger.info(f"🟢 插件 {name} 需要 CSRF 保护")
+                        
+                    self.logger.info(f"🔵 已注册蓝图: {name}")
+                else:
+                    self.logger.info(f"ℹ️ 插件 {name} 的蓝图为空，跳过注册")
 
     def register_blueprint_single(self, plugin_name):
         """注册单个插件的蓝图（修复版）"""
