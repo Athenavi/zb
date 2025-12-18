@@ -76,6 +76,16 @@ class PluginManager:
                 # 存储蓝图引用
                 self.blueprints[name] = plugin.blueprint
                 self.app.register_blueprint(plugin.blueprint)
+                
+                # 根据插件的 protect 属性决定是否豁免 CSRF 保护
+                protect = getattr(plugin, 'protect', True)  # 默认为True（需要保护）
+                if not protect:  # 当protect为False时豁免
+                    from src.extensions import csrf
+                    csrf.exempt(plugin.blueprint)
+                    self.logger.info(f"🟡 已为插件 {name} 豁免 CSRF 保护")
+                else:
+                    self.logger.info(f"🟢 插件 {name} 需要 CSRF 保护")
+                    
                 self.logger.info(f"🔵 已注册蓝图: {name}")
 
     def register_blueprint_single(self, plugin_name):
@@ -90,6 +100,16 @@ class PluginManager:
                 # 存储蓝图引用
                 self.blueprints[plugin_name] = plugin.blueprint
                 self.app.register_blueprint(plugin.blueprint)
+                
+                # 根据插件的 protect 属性决定是否豁免 CSRF 保护
+                protect = getattr(plugin, 'protect', True)  # 默认为True（需要保护）
+                if not protect:  # 当protect为False时豁免
+                    from src.extensions import csrf
+                    csrf.exempt(plugin.blueprint)
+                    self.logger.info(f"🟡 已为插件 {plugin_name} 豁免 CSRF 保护")
+                else:
+                    self.logger.info(f"🟢 插件 {plugin_name} 需要 CSRF 保护")
+                
                 self.logger.info(f"🔵 已注册蓝图: {plugin_name} -> {unique_name}")
 
                 # 调试：打印新注册的路由
@@ -214,6 +234,7 @@ class PluginManager:
                 'version': 'unknown',
                 'description': 'No description available',
                 'author': 'Unknown',
+                'protect': True,  # 添加默认的 protect 属性，默认为True（需要保护）
                 'routes': []
             }
 
@@ -223,7 +244,8 @@ class PluginManager:
                 plugin_info.update({
                     'version': getattr(plugin, 'version', 'unknown'),
                     'description': getattr(plugin, 'description', 'No description available'),
-                    'author': getattr(plugin, 'author', 'Unknown')
+                    'author': getattr(plugin, 'author', 'Unknown'),
+                    'protect': getattr(plugin, 'protect', True)  # 获取插件的 protect 属性，默认为True（需要保护）
                 })
 
                 # 获取插件注册的路由

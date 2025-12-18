@@ -46,7 +46,6 @@ flask-jwt-extended==4.7.1
 wsgidav
 gunicorn
 pygments
-flask_monitoringdashboard
 logger==1.4
 python-alipay-sdk==3.4.0
 jd_wechatpay==0.1.1

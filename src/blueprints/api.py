@@ -490,7 +490,7 @@ def get_user_media(user_id):
     try:
         from src.models.media import Media
         media_list = Media.query.filter_by(user_id=user_id).all()
-        
+
         media_data = []
         for media in media_list:
             media_data.append({
@@ -499,7 +499,7 @@ def get_user_media(user_id):
                 'mime_type': media.file_hash.mime_type,
                 'created_at': media.created_at.isoformat() if media.created_at else None
             })
-        
+
         return jsonify({'media': media_data})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -512,10 +512,10 @@ def get_media_details(user_id, media_id):
     try:
         from src.models.media import Media
         media = Media.query.filter_by(id=media_id, user_id=user_id).first()
-        
+
         if not media:
             return jsonify({'error': '媒体文件不存在或无权限访问'}), 404
-        
+
         media_data = {
             'id': media.id,
             'original_filename': media.original_filename,
@@ -523,10 +523,10 @@ def get_media_details(user_id, media_id):
             'mime_type': media.file_hash.mime_type,
             'file_size': media.file_hash.file_size,
             'storage_path': media.file_hash.storage_path,
-            'created_at': media.created_at.isoformat() if media.created_at else None
+            'created_at': media.created_at.isoformat() if media.created_at else None,
+            'url': f'/shared?data={media.hash}'
         }
-        
+
         return jsonify({'media': media_data})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-

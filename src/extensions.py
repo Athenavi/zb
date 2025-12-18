@@ -1,4 +1,3 @@
-import flask_monitoringdashboard as dashboard
 from flask import Flask
 from flask_babel import Babel
 from flask_caching import Cache
@@ -26,7 +25,6 @@ babel = Babel()
 principal = Principal()
 socketio = SocketIO()
 jwt = JWTManager()
-dashboard = dashboard
 
 
 def init_extensions(app: Flask):
@@ -48,34 +46,8 @@ def init_extensions(app: Flask):
     login_manager.login_message = '请先登录'
 
     # 初始化SocketIO
-    # 让 Flask-SocketIO 自动选择最佳异步模式
-    socketio.init_app(app)
+    # 明确指定使用gevent异步模式
+    socketio.init_app(app, async_mode='gevent')
 
     # JWT配置
     jwt.init_app(app)
-    
-    # 配置监控面板
-    try:
-        # 检查配置文件是否存在，如果不存在则创建一个基本配置
-        import os
-        config_file = 'dashboard_config.cfg'
-        if not os.path.exists(config_file):
-            with open(config_file, 'w') as f:
-                f.write(f"""
-[dashboard]
-APP_VERSION=1.0
-CUSTOM_LINK=dashboard
-MONITOR_LEVEL=3
-OUTDATED_THRESHOLD=3600
-GIT=
-ENABLE_LOGGING=True
-                    """)
-        
-        dashboard.config.init_from(file=config_file)
-        # 绑定应用
-        dashboard.bind(app)
-        if hasattr(dashboard, 'blueprint'):
-            csrf.exempt(dashboard.blueprint)
-    except Exception as e:
-        app.logger.error(f"Failed to initialize Flask-MonitoringDashboard: {str(e)}")
-        # 即使监控面板初始化失败，也不影响主应用运行

@@ -47,13 +47,7 @@ try:
     gevent.monkey.patch_all()
     print("Gevent monkey patching applied.")
 except ImportError:
-    try:
-        import eventlet
-
-        eventlet.monkey_patch()
-        print("Eventlet monkey patching applied.")
-    except ImportError:
-        print("No gevent or eventlet found. Skipping monkey patching.")
+    print("No gevent found. Skipping monkey patching.")
 
 # 初始化优化的日志系统
 logger = init_optimized_logger()
@@ -131,8 +125,14 @@ def register_direct_routes(app, config_class):
     @login_manager.user_loader
     def load_user(user_id):
         from src.models.user import User, db
-        user = db.session.query(User).filter_by(id=user_id).first()
-        return user
+        try:
+            user = db.session.query(User).filter_by(id=user_id).first()
+            return user
+        except Exception as e:
+            db.session.rollback()
+            # 记录错误但不要让应用程序崩溃
+            app.logger.error(f"Error loading user {user_id}: {str(e)}")
+            return None
 
     # 身份加载信号处理器
     @identity_loaded.connect_via(app)
@@ -250,7 +250,7 @@ def register_blueprints(app):
     # 初始化插件管理器
     from src.plugin import init_plugin_manager
     init_plugin_manager(app)
-    
+
     blueprints = [
         media_bp,
         theme_bp,
