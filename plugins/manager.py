@@ -201,7 +201,7 @@ class PluginManager:
         plugin_base_path = os.path.join(os.path.dirname(__file__))
         # 获取所有插件目录（无论是否启用）
         all_plugins = [name for name in os.listdir(plugin_base_path)
-                       if os.path.isdir(os.path.join(plugin_base_path, name))]
+                       if os.path.isdir(os.path.join(plugin_base_path, name)) and name != "__pycache__"]
 
         for plugin_name in all_plugins:
             plugin_path = os.path.join(plugin_base_path, plugin_name)
