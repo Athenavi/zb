@@ -51,3 +51,7 @@ def init_extensions(app: Flask):
 
     # JWT配置
     jwt.init_app(app)
+
+    # 注册自定义模板过滤器
+    from .utils.cache_protection import staggered_ttl
+    app.jinja_env.globals['staggered_ttl'] = staggered_ttl

@@ -197,10 +197,10 @@ def check_model_consistency(app):
             
         except SQLAlchemyError as e:
             logger.error(f"检查数据库模型一致性时出错: {e}")
-            return []
+            return [{'error': 'sqlalchemy_error', 'message': str(e)}]
         except Exception as e:
             logger.error(f"检查数据库模型一致性时出现未知错误: {e}")
-            return []
+            return [{'error': 'unknown_error', 'message': str(e)}]
 
 
 def prompt_user_for_action(inconsistent_tables):

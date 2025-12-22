@@ -10,6 +10,7 @@ from flask_caching import Cache
 from src.database import redis_client, get_cache_status
 from src.models import Notification, db
 from src.setting import app_config
+from src.utils.cache_protection import ProtectedCache
 
 noti = Flask(__name__, template_folder='../templates')
 # socketio = flask_socketio.SocketIO(noti, cors_allowed_origins='*')
@@ -19,6 +20,9 @@ noti.config['SESSION_COOKIE_NAME'] = 'zb_session'
 
 cache = Cache(config={'CACHE_TYPE': 'simple'})
 cache.init_app(noti)
+
+# 创建带保护的缓存实例
+protected_cache = ProtectedCache(cache)
 
 
 def send_email(sender_email, password, receiver_email, smtp_server, smtp_port, subject, body):
@@ -169,7 +173,17 @@ def _should_send_notification_redis(parent_comment_id, article_title, user_id):
     """Redis版本的防轰炸检查"""
     cache_key = f"notification:{parent_comment_id}:{user_id}"
 
-    cached_data = redis_client.get(cache_key)
+    # 使用带锁机制的缓存获取方式，防止击穿
+    def get_cached_data():
+        return redis_client.get(cache_key)
+
+    cached_data = protected_cache.get_with_lock(
+        f"redis_lock:{cache_key}",
+        get_cached_data,
+        timeout=3 * 3600,
+        lock_timeout=5
+    )
+    
     if cached_data is None:
         return True, 1
     else:
@@ -204,7 +218,17 @@ def _should_send_notification_memory(parent_comment_id, article_title, user_id):
     """内存版本的防轰炸检查"""
     cache_key = f"{parent_comment_id}:{user_id}"
 
-    cached_data = memory_cache.get(cache_key)
+    # 使用带锁机制的缓存获取方式，防止击穿
+    def get_cached_data():
+        return memory_cache.get(cache_key)
+
+    cached_data = protected_cache.get_with_lock(
+        f"memory_lock:{cache_key}",
+        get_cached_data,
+        timeout=3 * 3600,
+        lock_timeout=5
+    )
+    
     if cached_data is None:
         return True, 1
     else:

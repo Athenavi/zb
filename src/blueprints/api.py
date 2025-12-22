@@ -19,6 +19,7 @@ from src.user.authz.qrlogin import check_qr_login_back, phone_scan_back, qr_logi
 from src.user.entities import get_avatar
 from src.user.profile.social import get_user_info
 from src.user.views import confirm_email_back
+from src.utils.cache_protection import ProtectedCache, cache_with_regeneration, cache_with_stale_data
 from src.utils.config.theme import get_all_themes
 from src.utils.filters import f2list
 from src.utils.http.generate_response import send_chunk_md
@@ -29,6 +30,8 @@ domain = app_config.domain
 
 logger = logging.getLogger(__name__)
 
+# 创建带保护的缓存实例
+protected_cache = ProtectedCache(cache)
 
 @api_bp.route('/theme/upload', methods=['POST'])
 @admin_required
@@ -99,27 +102,14 @@ def suggest_tags():
     prefix = request.args.get('q', '')
     # logger.debug(f"prefix: {prefix}")
 
-    # 使用缓存来存储去重后的标签列表
+    # 使用带保护的缓存来存储去重后的标签列表
     cache_key = 'unique_tags'  # 使用明确的缓存键名
-    unique_tags = cache.get(cache_key)
-
-    if not unique_tags:
-        logger.info("缓存未命中，从数据库加载标签...")
-        # 获取所有文章的标签字符串
-        tags_results = db.session.execute(select(func.distinct(Article.tags))).scalars().all()
-
-        # 处理标签数据
-        all_tags = []
-        for tag_string in tags_results:
-            if tag_string:  # 确保不是空字符串  
-                all_tags.extend(f2list(tag_string.strip()))
-
-        # 去重并排序
-        unique_tags = sorted(set(all_tags))
-        logger.info(f"加载并处理完成，唯一标签数量: {len(unique_tags)}")
-
-        # 缓存处理后的结果，避免重复处理
-        cache.set(cache_key, unique_tags, timeout=1200)
+    unique_tags = protected_cache.get_with_stale_data(
+        cache_key,
+        lambda: _generate_unique_tags(),
+        fresh_timeout=600,  # 10分钟新鲜时间
+        stale_timeout=1800  # 30分钟陈旧时间
+    )
 
     # 过滤出匹配前缀的标签
     matched_tags = [tag for tag in unique_tags if tag.startswith(prefix)]
@@ -129,6 +119,24 @@ def suggest_tags():
     return jsonify(matched_tags[:5])
 
 
+def _generate_unique_tags():
+    """生成唯一的标签列表"""
+    logger.info("缓存未命中，从数据库加载标签...")
+    # 获取所有文章的标签字符串
+    tags_results = db.session.execute(select(func.distinct(Article.tags))).scalars().all()
+
+    # 处理标签数据
+    all_tags = []
+    for tag_string in tags_results:
+        if tag_string:  # 确保不是空字符串  
+            all_tags.extend(f2list(tag_string.strip()))
+
+    # 去重并排序
+    unique_tags = sorted(set(all_tags))
+    logger.info(f"加载并处理完成，唯一标签数量: {len(unique_tags)}")
+    return unique_tags
+
+
 # 验证并执行换绑的路由
 @api_bp.route('/change-email/confirm/<token>', methods=['GET'])
 @jwt_required
@@ -136,13 +144,14 @@ def confirm_email_change(user_id, token):
     return confirm_email_back(user_id, cache, token)
 
 
-@cache.memoize(timeout=300)
+# 使用带锁机制的缓存装饰器
+@cache_with_regeneration(cache, timeout=300)
 @api_bp.route('/theme', methods=['GET'])
 def get_current_theme():
     return jsonify(get_all_themes())
 
 
-@cache.cached(timeout=300, key_prefix='all_users')
+@cache.memoize(timeout=300)
 def get_all_users():
     all_users = {}
     try:
@@ -154,7 +163,8 @@ def get_all_users():
         logger.error(f"An error occurred: {e}")
 
 
-@cache.cached(timeout=3600, key_prefix='all_emails')
+# 使用带陈旧数据支持的缓存装饰器
+@cache_with_stale_data(cache, fresh_timeout=600, stale_timeout=3600)
 def get_all_emails():
     all_emails = []
     try:
@@ -202,7 +212,7 @@ def api_user_profile(user_id):
     return get_user_info(user_id)
 
 
-@cache.cached(timeout=600, key_prefix='username_check')
+@cache.cached(timeout=600)
 def api_username_check(username):
     return username_exists(username)
 
