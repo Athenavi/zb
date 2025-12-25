@@ -5,6 +5,7 @@ import bcrypt
 from flask import Blueprint, json
 
 from src.auth_utils import admin_required
+from src.extensions import limiter
 from src.models import User, Article, ArticleContent, ArticleI18n, Category, Comment, db, CategorySubscription, Menus, \
     MenuItems, Pages, SystemSettings, FileHash, Media, Url, SearchHistory, Event, Report
 # from src.error import error
@@ -17,6 +18,7 @@ admin_bp = Blueprint('admin', __name__, template_folder='templates', url_prefix=
 
 @admin_bp.route('/comments', methods=['GET', 'POST', 'DELETE'])
 @admin_required
+@limiter.limit("25 per minute")
 def admin_comments(user_id):
     try:
         # 获取当前用户信息
@@ -150,6 +152,7 @@ def admin_blog(user_id):
 
 @admin_bp.route('/user', methods=['GET'])
 @admin_required
+@limiter.limit("20 per minute")
 def get_users(user_id):
     """获取用户列表 - 支持分页和搜索"""
     try:
@@ -220,6 +223,7 @@ def get_users(user_id):
 
 @admin_bp.route('/user', methods=['POST'])
 @admin_required
+@limiter.limit("5 per minute")
 def create_user(user_id):
     """创建新用户"""
     try:
@@ -470,6 +474,7 @@ def m_display(user_id):
 
 @admin_bp.route('/article', methods=['GET'])
 @admin_required
+@limiter.limit("20 per minute")
 def get_articles(user_id):
     """获取文章列表 - 支持分页和搜索"""
 
@@ -562,6 +567,7 @@ def get_articles(user_id):
 
 @admin_bp.route('/article', methods=['POST'])
 @admin_required
+@limiter.limit("10 per minute")
 def create_article(user_id):
     """创建新文章"""
     try:
@@ -984,6 +990,7 @@ def get_authors(user_id):
 
 @admin_bp.route('/categories', methods=['POST', 'PUT', 'DELETE'])
 @admin_required
+@limiter.limit("10 per minute")
 def admin_categories(user_id):
     try:
         # 获取当前用户信息
@@ -1111,6 +1118,7 @@ def list_categories(user_id):
 
 @admin_bp.route('/settings', methods=['GET', 'POST', 'PUT', 'DELETE'])
 @admin_required
+@limiter.limit("10 per minute")
 def admin_settings(user_id):
     try:
         # 获取当前用户信息
@@ -1556,6 +1564,7 @@ from src.utils.database.backup import create_backup_tool
 
 @admin_bp.route('/backup', methods=['GET', 'POST'])
 @admin_required
+@limiter.limit("5 per minute")
 def backup(user_id):
     try:
         # 获取当前用户信息
@@ -1716,6 +1725,7 @@ from datetime import datetime, timedelta
 
 @admin_bp.route('/misc', methods=['GET', 'POST', 'PUT', 'DELETE'])
 @admin_required
+@limiter.limit("10 per minute")
 def admin_misc(user_id):
     try:
         db_session = db.session()

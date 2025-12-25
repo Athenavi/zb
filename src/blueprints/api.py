@@ -9,7 +9,7 @@ from src.auth_utils import jwt_required, admin_required, origin_required
 from src.blog.article.password import check_apw_form, get_apw_form
 from src.blog.comment import create_comment_with_anti_spam, comment_page_get
 from src.blueprints.blog import get_site_domain
-from src.extensions import cache, csrf
+from src.extensions import cache, csrf, limiter
 from src.models import ArticleI18n, Article, User, db
 from src.other.report import report_back
 from src.setting import app_config
@@ -65,18 +65,21 @@ def api_article_unlock():
 
 @api_bp.route('/comment/<article_id>', methods=['POST'])
 @jwt_required
+@limiter.limit("20 per minute")
 def api_comment(user_id, article_id):
     return create_comment_with_anti_spam(user_id, article_id)
 
 
 @api_bp.route("/comment/<article_id>", methods=['GET'])
 @login_required
+@limiter.limit("30 per minute")
 def comment(article_id):
     return comment_page_get(article_id)
 
 
 @api_bp.route('/report', methods=['POST'])
 @jwt_required
+@limiter.limit("10 per minute")
 def api_report(user_id):
     return report_back(user_id)
 
@@ -179,6 +182,7 @@ def get_all_emails():
 
 
 @api_bp.route('/email-exists', methods=['GET'])
+@limiter.limit("15 per minute")
 def email_exists_back():
     email = request.args.get('email')
     all_emails = cache.get('all_emails')
@@ -189,6 +193,7 @@ def email_exists_back():
 
 
 @api_bp.route('/username-exists/<username>', methods=['GET'])
+@limiter.limit("15 per minute")
 def username_exists(username):
     all_users = cache.get('all_users')
     if all_users is None:
@@ -237,6 +242,7 @@ def update_article_status(user_id, article_id):
 
 @api_bp.route('/upload/cover', methods=['POST'])
 @jwt_required
+@limiter.limit("5 per minute")
 def upload_cover(user_id):
     cover_path = Path(str(current_app.root_path)).parent / 'static' / 'cover'
     logger.debug(cover_path)
@@ -269,6 +275,7 @@ def list_all_routes():
 
 
 @api_bp.route('/qr/generate', methods=['GET'])
+@limiter.limit("10 per minute")
 def generate_qr():
     """Generate QR code for login"""
     try:
@@ -310,6 +317,7 @@ def check_qr_status():
 
 @api_bp.route('/media/upload', methods=['POST'])
 @jwt_required
+@limiter.limit("10 per minute")
 def upload_media_file(user_id):
     """Upload media file for media page"""
     try:
@@ -339,6 +347,7 @@ api_bp.add_url_rule('/upload/chunked/cancel', 'chunked_upload_cancel', handle_ch
 
 @cache.cached(timeout=300)
 @api_bp.route('/check-username')
+@limiter.limit("20 per minute")
 def check_username():
     username = request.args.get('username')
     exists = User.query.filter_by(username=username).first() is not None
@@ -347,6 +356,7 @@ def check_username():
 
 @cache.cached(timeout=300)
 @api_bp.route('/check-email')
+@limiter.limit("20 per minute")
 def check_email():
     email = request.args.get('email')
     exists = User.query.filter_by(email=email).first() is not None
@@ -359,6 +369,7 @@ from src.security import admin_permission, role_required, permission_required, c
 # 点赞文章功能
 @api_bp.route('/article/<int:article_id>/like', methods=['POST'])
 @jwt_required
+@limiter.limit("30 per minute")
 def like_article(user_id, article_id):
     """用户点赞文章"""
     try:
@@ -469,6 +480,7 @@ def analytics():
 
 
 @api_bp.route('/user/check-login', methods=['GET'])
+@limiter.limit("30 per minute")
 def check_login_status():
     """检查用户登录状态"""
     # 检查用户是否通过 Flask-Login 登录
@@ -495,6 +507,7 @@ def check_user_exist(user_id):
 
 @api_bp.route('/user/media', methods=['GET'])
 @jwt_required
+@limiter.limit("15 per minute")
 def get_user_media(user_id):
     """获取当前用户的所有媒体文件"""
     try:
@@ -517,6 +530,7 @@ def get_user_media(user_id):
 
 @api_bp.route('/media/<int:media_id>', methods=['GET'])
 @jwt_required
+@limiter.limit("20 per minute")
 def get_media_details(user_id, media_id):
     """获取媒体文件详情"""
     try:

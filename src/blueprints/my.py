@@ -2,6 +2,7 @@ from flask import Blueprint, flash
 from flask_login import login_required
 
 from src.auth_utils import jwt_required
+from src.extensions import limiter
 from src.models import Article
 from src.models import Url, Comment, db
 from src.user.authz.password import validate_password, update_password
@@ -19,6 +20,7 @@ def user_index():
 
 @my_bp.route('/urls')
 @jwt_required
+@limiter.limit("15 per minute")
 def user_urls(user_id):
     """用户URL管理页面"""
 
@@ -34,6 +36,7 @@ def user_urls(user_id):
 
 @my_bp.route('/urls/create', methods=['POST'])
 @jwt_required
+@limiter.limit("10 per minute")
 def create_short_url(user_id):
     """创建短链接"""
     from src.utils.shortener.links import create_special_url
@@ -76,6 +79,7 @@ def delete_url(user_id, url_id):
 
 @my_bp.route('/comments')
 @jwt_required
+@limiter.limit("15 per minute")
 def user_comments(user_id):
     """用户评论管理页面"""
     page = request.args.get('page', 1, type=int)
@@ -194,6 +198,7 @@ class ConfirmPasswordForm(FlaskForm):
 
 @my_bp.route('/pw/confirm', methods=['GET', 'POST'])
 @jwt_required
+@limiter.limit("5 per minute")
 def confirm_password(user_id):
     if request.method == 'POST' and validate_password(user_id):
         session.permanent = True

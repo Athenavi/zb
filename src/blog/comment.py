@@ -3,12 +3,14 @@ import logging
 from flask import render_template, current_app, abort
 from flask import request, jsonify
 
+from src.extensions import limiter
 from src.models import Comment, Article, Notification, db
 from src.notification import should_send_notification, update_notification_cache
 
 logger = logging.getLogger(__name__)
 
 
+@limiter.limit("5 per minute")
 def create_comment_with_anti_spam(user_id, article_id):
     """
     带有防轰炸功能的评论创建函数
@@ -72,6 +74,7 @@ def create_comment_with_anti_spam(user_id, article_id):
 from sqlalchemy.orm import joinedload
 
 
+@limiter.limit("30 per minute")
 def comment_page_get(article_id):
     article = Article.query.filter_by(article_id=article_id).first()
     if not article:

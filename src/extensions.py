@@ -3,6 +3,9 @@ from flask_babel import Babel
 from flask_caching import Cache
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
+# from flask_talisman import Talisman
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from flask_login import LoginManager
 from flask_mail import Mail
 from flask_migrate import Migrate
@@ -25,6 +28,8 @@ babel = Babel()
 principal = Principal()
 socketio = SocketIO()
 jwt = JWTManager()
+#talisman = Talisman()
+limiter = Limiter(key_func=get_remote_address)
 
 
 def init_extensions(app: Flask):
@@ -37,8 +42,8 @@ def init_extensions(app: Flask):
     api.init_app(app)
     cors.init_app(app)
     migrate.init_app(app, db)  # 需要关联数据库实例
-    # talisman.init_app(app)
-    # limiter.init_app(app)
+    #talisman.init_app(app)
+    limiter.init_app(app)
     babel.init_app(app)
     principal.init_app(app)
     # 登录管理器额外配置
@@ -51,7 +56,3 @@ def init_extensions(app: Flask):
 
     # JWT配置
     jwt.init_app(app)
-
-    # 注册自定义模板过滤器
-    from .utils.cache_protection import staggered_ttl
-    app.jinja_env.globals['staggered_ttl'] = staggered_ttl
