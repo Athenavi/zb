@@ -162,8 +162,8 @@ def register_direct_routes(app, config_class):
                 'access_token',
                 g.new_access_token,
                 httponly=True,
-                secure=app.config(['JWT_COOKIE_SECURE']),
-                samesite=app.config(['JWT_COOKIE_SAMESITE']),
+                secure=app.config.get('JWT_COOKIE_SECURE', False),
+                samesite=app.config.get('JWT_COOKIE_SAMESITE', 'Lax'),
             )
         return response
 
