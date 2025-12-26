@@ -162,8 +162,8 @@ def register_direct_routes(app, config_class):
                 'access_token',
                 g.new_access_token,
                 httponly=True,
-                secure=app.config.get('PREFER_SECURE', True),  # 默认为True以提高安全性
-                samesite='Lax'  # 添加SameSite属性以防范CSRF攻击
+                secure=app.config.get('JWT_COOKIE_SECURE', False),
+                samesite=app.config.get('JWT_COOKIE_SAMESITE', 'Lax'),
             )
         return response
 

@@ -85,7 +85,7 @@ docker run -d -p 9421:9421 --name zyblog-app zyblog
 ### 数据库配置 [6](#0-5) 
 ```env
 DB_HOST=127.0.0.1      # 数据库主机
-DB_PORT=3306           # 数据库端口
+DB_PORT=5432           # 数据库端口
 DB_USER=postgres       # 数据库用户名
 DB_PASSWORD=123456     # 数据库密码
 DB_NAME=flaskblog      # 数据库名称
@@ -94,7 +94,7 @@ DB_NAME=flaskblog      # 数据库名称
 ### 应用配置 [7](#0-6) 
 ```env
 DOMAIN=http://localhost:9421  # 应用访问域名
-TITLE=我的博客               # 网站标题
+TITLE=flask-blog              # 网站标题
 SECRET_KEY=your-secret-key   # 应用密钥（必须修改）
 ```
 
