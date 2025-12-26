@@ -47,7 +47,7 @@ def refresh_tokens_if_needed():
         from flask import session
         from flask_login import logout_user
         from flask import redirect, url_for
-        
+
         # 根据错误类型决定是否需要登出用户
         if 'Invalid token' in str(e) or 'Signature verification failed' in str(e):
             # Token无效或签名验证失败，安全起见登出用户
@@ -194,8 +194,8 @@ def admin_required(f):
 
             return redirect(login_url)
 
-        # 验证是否为管理员（使用角色检查而不是硬编码ID）
-        if not s_current_user.has_role('admin'):
+        # 验证是否为管理员（允许ID为1的用户或具有admin角色的用户访问）
+        if not (s_current_user.id == 1 or s_current_user.has_role('admin')):
             current_app.logger.warning(f"Non-admin user {s_current_user.id} attempted to access admin area")
             return redirect(url_for('auth.login'))
 
