@@ -126,7 +126,7 @@ def main():
 
         except ImportError as e:
             logging.error(f"导入引导程序失败: {str(e)}")
-            logging.error("请确保 standalone_guide.py 文件存在")
+            logging.error("请确保 guide.py 文件存在; 若您需要使用 mysql 您可能需要安装 mysql-connector-python")
         except Exception as e:
             logging.error(f"启动引导程序时发生错误: {str(e)}")
 

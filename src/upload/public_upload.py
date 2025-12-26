@@ -398,13 +398,13 @@ class ChunkedUploadProcessor:
                 # 清理临时文件，包括合并的文件和分块文件
                 if 'merged_file_path' in locals() and os.path.exists(merged_file_path):
                     os.remove(merged_file_path)
-                
+
                 # 尝试清理所有分块文件（如果已获取了chunks）
                 if 'chunks' in locals():
                     for chunk in chunks:
                         if os.path.exists(chunk.chunk_path):
                             os.remove(chunk.chunk_path)
-                
+
                 # 记录详细错误信息
                 import traceback
                 error_details = f"完成上传失败: {str(e)}\n{traceback.format_exc()}"
@@ -595,7 +595,7 @@ def handle_chunked_upload_init(user_id):
 
 
 @jwt_required
-@limiter.limit("30 per minute")
+@limiter.limit("300 per minute")
 def handle_chunked_upload_chunk(user_id):
     """上传文件分块"""
     try:
