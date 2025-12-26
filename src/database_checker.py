@@ -192,15 +192,23 @@ def check_model_consistency(app):
                         'issue': 'column_type_mismatch',
                         'details': f'Column type mismatches: {mismatched_columns}'
                     })
-                    
-            return inconsistent_tables
+            
+            # 检查数据库中是否存在模型中未定义的多余表
+            model_table_names = {model_class.__tablename__ for model_class in model_classes}
+            existing_tables = inspector.get_table_names()
+            extra_tables = set(existing_tables) - model_table_names
+            
+            if extra_tables:
+                logger.warning(f"发现数据库中存在但模型中未定义的多余表: {', '.join(sorted(extra_tables))}")
+            
+            return inconsistent_tables, extra_tables
             
         except SQLAlchemyError as e:
             logger.error(f"检查数据库模型一致性时出错: {e}")
-            return [{'error': 'sqlalchemy_error', 'message': str(e)}]
+            return [{'error': 'sqlalchemy_error', 'message': str(e)}], set()
         except Exception as e:
             logger.error(f"检查数据库模型一致性时出现未知错误: {e}")
-            return [{'error': 'unknown_error', 'message': str(e)}]
+            return [{'error': 'unknown_error', 'message': str(e)}], set()
 
 
 def prompt_user_for_action(inconsistent_tables):
@@ -310,10 +318,23 @@ def handle_database_consistency_check(app):
     :param app: Flask应用实例
     """
     # 检查模型一致性
-    inconsistent_tables = check_model_consistency(app)
+    inconsistent_tables, extra_tables = check_model_consistency(app)
+    
+    if not inconsistent_tables and not extra_tables:
+        logger.info("数据库模型一致性检查通过")
+        return
+    
+    # 如果有多余的表，显示警告但不处理
+    if extra_tables:
+        print("\n" + "="*60)
+        print("警告：发现数据库中存在但模型中未定义的多余表:")
+        print("="*60)
+        print(f"  多余表: {', '.join(sorted(extra_tables))}")
+        print("  这些表不会被自动删除，如有需要可手动处理。")
+        print("="*60)
     
     if not inconsistent_tables:
-        logger.info("数据库模型一致性检查通过")
+        logger.info("数据库中有多余的表，但模型一致性检查通过")
         return
     
     # 提示用户选择操作
