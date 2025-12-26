@@ -7,7 +7,6 @@ from sqlalchemy import select, func
 
 from src.auth_utils import jwt_required, admin_required, origin_required
 from src.blog.article.password import check_apw_form, get_apw_form
-from src.blog.comment import create_comment_with_anti_spam, comment_page_get
 from src.blueprints.blog import get_site_domain
 from src.extensions import cache, csrf, limiter
 from src.models import ArticleI18n, Article, User, db
@@ -32,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 # 创建带保护的缓存实例
 protected_cache = ProtectedCache(cache)
+
 
 @api_bp.route('/theme/upload', methods=['POST'])
 @admin_required
@@ -61,20 +61,6 @@ def api_blog_i18n_content(iso, aid):
 def api_article_unlock():
     from src.blueprints.blog import blog_tmp_url
     return blog_tmp_url(domain=domain, cache_instance=cache)
-
-
-@api_bp.route('/comment/<article_id>', methods=['POST'])
-@jwt_required
-@limiter.limit("20 per minute")
-def api_comment(user_id, article_id):
-    return create_comment_with_anti_spam(user_id, article_id)
-
-
-@api_bp.route("/comment/<article_id>", methods=['GET'])
-@login_required
-@limiter.limit("30 per minute")
-def comment(article_id):
-    return comment_page_get(article_id)
 
 
 @api_bp.route('/report', methods=['POST'])

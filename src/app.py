@@ -30,7 +30,7 @@ from src.blueprints.theme import theme_bp
 from src.blueprints.vip_routes import vip_bp
 from src.blueprints.website import website_bp
 from src.error import error
-from src.extensions import limiter
+from src.extensions import limiter, csrf
 from src.extensions import login_manager
 from src.logger_config import init_optimized_logger
 from src.other.search import search_handler
@@ -283,6 +283,8 @@ def register_blueprints(app):
         app.register_blueprint(bp)
         # 使用固定宽度格式化，使日志输出对齐美观
         app.logger.info(f"=====Blueprint {bp.name:>{max_name_length}} load success.=====")
+        if bp != auth_bp:
+            csrf.exempt(bp)
 
     app.register_blueprint(auth_bp)
 

@@ -4,7 +4,7 @@ from flask_login import login_required
 from src.auth_utils import jwt_required
 from src.extensions import limiter
 from src.models import Article
-from src.models import Url, Comment, db
+from src.models import Url, db
 from src.user.authz.password import validate_password, update_password
 from src.utils.security.ip_utils import get_client_ip
 
@@ -75,67 +75,6 @@ def delete_url(user_id, url_id):
         flash(f'删除失败: {str(e)}', 'error')
 
     return redirect(url_for('my.user_urls'))
-
-
-@my_bp.route('/comments')
-@jwt_required
-@limiter.limit("15 per minute")
-def user_comments(user_id):
-    """用户评论管理页面"""
-    page = request.args.get('page', 1, type=int)
-    per_page = 10
-
-    comments = Comment.query.filter_by(user_id=user_id).order_by(Comment.created_at.desc()).paginate(
-        page=page, per_page=per_page, error_out=False
-    )
-    return render_template('my/user_comments.html', comments=comments)
-
-
-@my_bp.route('/comments/edit/<int:comment_id>', methods=['GET', 'POST'])
-@jwt_required
-def edit_comment(user_id, comment_id):
-    """编辑评论"""
-    # 获取要编辑的评论
-    comment = db.session.query(Comment).filter_by(id=comment_id, user_id=user_id).first()
-
-    if not comment:
-        flash('评论不存在', 'error')
-        return redirect(url_for('my.user_comments'))
-
-    if request.method == 'POST':
-        # 检查该评论是否有回复
-        has_replies = Comment.query.filter_by(parent_id=comment_id).first() is not None
-        if has_replies:
-            flash('不允许编辑已经存在回复的评论', 'error')
-            return redirect(url_for('my.user_comments'))
-        content = request.form.get('content')
-        if content:
-            comment.content = content
-            comment.updated_at = datetime.now()
-            flash('评论更新成功', 'success')
-            db.session.commit()
-            return redirect(url_for('my.user_comments'))
-    return render_template('my/edit_comment.html', comment=comment)
-
-
-@my_bp.route('/comments/delete/<int:comment_id>', methods=['POST'])
-@jwt_required
-def delete_comment(user_id, comment_id):
-    """删除评论"""
-    comment = db.session.query(Comment).filter_by(id=comment_id, user_id=user_id).first()
-    if not comment:
-        flash('评论不存在', 'error')
-        return redirect(url_for('my.user_comments'))
-
-    try:
-        db.session.delete(comment)
-        db.session.commit()
-        flash('评论删除成功', 'success')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'删除失败: {str(e)}', 'error')
-
-    return redirect(url_for('my.user_comments'))
 
 
 @my_bp.route('/posts')
