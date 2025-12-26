@@ -9,6 +9,15 @@ class Event(db.Model):
     event_date = db.Column(db.TIMESTAMP, nullable=False)
     created_at = db.Column(db.TIMESTAMP, server_default=db.func.current_timestamp())
 
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'description': self.description,
+            'event_date': self.event_date.isoformat() if self.event_date else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
 
 class Report(db.Model):
     __tablename__ = 'reports'
@@ -27,6 +36,16 @@ class Report(db.Model):
     # 关系定义
     reporter = db.relationship('User', back_populates='reports')
 
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'reported_by': self.reported_by,
+            'content_type': self.content_type,
+            'content_id': self.content_id,
+            'reason': self.reason,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
 
 class Url(db.Model):
     __tablename__ = 'urls'
@@ -44,6 +63,15 @@ class Url(db.Model):
         db.UniqueConstraint('user_id', 'long_url', name='uq_user_long_url')
     )
 
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'long_url': self.long_url,
+            'short_url': self.short_url,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'user_id': self.user_id
+        }
+
 
 class SearchHistory(db.Model):
     __tablename__ = 'search_history'
@@ -53,3 +81,12 @@ class SearchHistory(db.Model):
     keyword = db.Column(db.String(255), nullable=False)
     results_count = db.Column(db.Integer, nullable=False)
     created_at = db.Column(db.TIMESTAMP, server_default=db.func.current_timestamp())
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'keyword': self.keyword,
+            'results_count': self.results_count,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }

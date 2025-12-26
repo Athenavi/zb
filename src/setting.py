@@ -138,8 +138,8 @@ class BaseConfig:
     JWT_ACCESS_COOKIE_NAME = 'access_token'
     JWT_REFRESH_COOKIE_NAME = 'refresh_token'
     JWT_TOKEN_LOCATION = ['cookies']
-    JWT_COOKIE_SECURE = True  # 默认为True以提高安全性
-    JWT_COOKIE_CSRF_PROTECT = True  # 启用CSRF保护
+    JWT_COOKIE_SECURE = False
+    JWT_COOKIE_CSRF_PROTECT = False
     JWT_COOKIE_SAMESITE = 'Lax'  # 添加SameSite属性以防范CSRF攻击
     JWT_SESSION_COOKIE = False
     REMEMBER_COOKIE_DURATION = timedelta(days=30)  # 记住登录状态30天
@@ -161,11 +161,12 @@ class BaseConfig:
 
 class AppConfig(BaseConfig):
     """应用配置类，可以继承基础配置并进行覆盖或添加"""
+
     def __init__(self):
         super().__init__()
         # 初始化数据库URI
         self.SQLALCHEMY_DATABASE_URI = self._get_database_uri()
-        
+
     db_engine = os.environ.get('DB_ENGINE') or os.getenv('DB_ENGINE', 'postgresql')
     db_host = os.environ.get('DB_HOST') or os.getenv('DATABASE_HOST', 'localhost')
     db_user = os.environ.get('DB_USER') or os.getenv('DATABASE_USER', 'postgres')
@@ -239,7 +240,7 @@ class WechatPayConfig:
                 except UnicodeDecodeError:
                     # 如果仍然失败，以二进制方式读取
                     WECHAT_PRIVATE_KEY = private_key_path.read_bytes().decode('utf-8', errors='ignore')
-    
+
     WECHAT_CERT_SERIAL_NO = os.getenv('WECHAT_CERT_SERIAL_NO')  # 证书序列号
     WECHAT_NOTIFY_URL = os.getenv('WECHAT_NOTIFY_URL', 'https://yourdomain.com/api/payment/wechat/notify')
     WECHAT_CERT_DIR = os.getenv('WECHAT_CERT_DIR', './cert')
@@ -259,7 +260,7 @@ class AliPayConfig:
             # 如果获取失败，则使用环境变量或默认值
             domain = os.getenv('DOMAIN', 'http://localhost:9421/')
             domain = (domain.rstrip('/') + '/') if domain is not None else '/'
-        
+
         if domain is None:
             print("域名配置有问题")
 
@@ -286,7 +287,7 @@ class AliPayConfig:
                 self.ALIPAY_PRIVATE_KEY_STRING = None
         else:
             self.ALIPAY_PRIVATE_KEY_STRING = None
-        
+
         public_key_path = Path('keys/alipay/alipay_public_key.pem')
         if public_key_path.exists():
             try:
@@ -326,22 +327,25 @@ app_config = get_app_config()
 
 class ProductionConfig(AppConfig):
     """生产环境配置"""
+
     def __init__(self):
         super().__init__()
         self.DEBUG = False
         self.TESTING = False
 
-    
+
 class DevelopmentConfig(AppConfig):
     """开发环境配置"""
+
     def __init__(self):
         super().__init__()
         self.DEBUG = True
         self.TESTING = False
 
-    
+
 class TestingConfig(AppConfig):
     """测试环境配置"""
+
     def __init__(self):
         super().__init__()
         self.DEBUG = True
