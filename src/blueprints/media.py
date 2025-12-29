@@ -16,6 +16,7 @@ from src.models.user import User
 from src.setting import AppConfig, BaseConfig
 from src.utils.image.processing import generate_video_thumbnail, generate_thumbnail
 from src.utils.security.safe import is_valid_hash
+from src.utils.storage.s3_storage import s3_storage
 
 media_bp = Blueprint('media', __name__, template_folder='templates')
 
@@ -74,13 +75,40 @@ def media_thumbnail():
             if not file_hash:
                 print("No result found for the given f_hash")
                 return "File not found", 404
-            file_path = Path(base_dir) / file_hash.storage_path
-            thumb_path = Path(base_dir) / f"thumbnails/{f_hash}.jpg"
-            if not os.path.exists(thumb_path):
+            
+            # 检查存储路径是否为S3路径
+            if file_hash.storage_path.startswith('s3://'):
+                # 从S3下载文件到临时位置以生成缩略图
+                file_data = s3_storage.load_file(file_hash.storage_path)
+                if file_data is None:
+                    return "File not found in S3 storage", 404
+                
+                # 将文件数据写入临时文件
+                temp_file_path = Path(base_dir) / f"temp/{f_hash}"
+                temp_dir = Path(base_dir) / "temp"
+                if not temp_dir.exists():
+                    temp_dir.mkdir(parents=True, exist_ok=True)
+                
+                with open(temp_file_path, 'wb') as temp_file:
+                    temp_file.write(file_data)
+                
+                # 生成缩略图
                 if f_type == "video":
-                    generate_video_thumbnail(file_path, thumb_path)
+                    generate_video_thumbnail(temp_file_path, thumb_path)
                 else:
-                    generate_thumbnail(file_path, thumb_path)
+                    generate_thumbnail(temp_file_path, thumb_path)
+                
+                # 删除临时文件
+                if temp_file_path.exists():
+                    os.remove(temp_file_path)
+            else:
+                # 使用本地文件路径
+                file_path = Path(base_dir) / file_hash.storage_path
+                if not os.path.exists(thumb_path):
+                    if f_type == "video":
+                        generate_video_thumbnail(file_path, thumb_path)
+                    else:
+                        generate_thumbnail(file_path, thumb_path)
         except (IOError, OSError) as e:
             # 处理文件操作相关的异常
             current_app.logger.error(f"File operation error generating thumbnail: {e}")
@@ -105,8 +133,41 @@ def media_shared():
         if not file_hash:
             print("No result found for the given f_hash")
             return "File not found", 404
-        file_path = Path(base_dir) / file_hash.storage_path
-        return send_file(file_path, as_attachment=False, mimetype=file_hash.mime_type, max_age=2592000)
+        
+        # 检查存储路径是否为S3路径
+        if file_hash.storage_path.startswith('s3://'):
+            # 从S3下载文件到临时位置
+            file_data = s3_storage.load_file(file_hash.storage_path)
+            if file_data is None:
+                return "File not found in S3 storage", 404
+            
+            # 将文件数据写入临时文件
+            temp_file_path = Path(base_dir) / f"temp/{f_hash}"
+            temp_dir = Path(base_dir) / "temp"
+            if not temp_dir.exists():
+                temp_dir.mkdir(parents=True, exist_ok=True)
+            
+            with open(temp_file_path, 'wb') as temp_file:
+                temp_file.write(file_data)
+            
+            # 发送临时文件
+            response = send_file(temp_file_path, as_attachment=False, mimetype=file_hash.mime_type, max_age=2592000)
+            
+            # 设置响应后删除临时文件
+            def remove_file(response):
+                try:
+                    if temp_file_path.exists():
+                        os.remove(temp_file_path)
+                except Exception as e:
+                    current_app.logger.error(f"Error removing temp file: {e}")
+                return response
+            
+            response.call_on_close(lambda: remove_file(None))
+            return response
+        else:
+            # 使用本地文件路径
+            file_path = Path(base_dir) / file_hash.storage_path
+            return send_file(file_path, as_attachment=False, mimetype=file_hash.mime_type, max_age=2592000)
     except FileNotFoundError:
         abort(404)
 
@@ -288,11 +349,20 @@ def async_file_cleanup(app, cleanup_data):
             storage_path = file_info['storage_path']
             # 只进行文件清理，不在后台进行数据库操作
             try:
-                if os.path.exists(storage_path):
-                    os.remove(storage_path)
-                    app.logger.info(f"成功删除文件: {storage_path}")
+                if storage_path.startswith('s3://'):
+                    # 从S3删除文件
+                    success = s3_storage.delete_file(storage_path)
+                    if success:
+                        app.logger.info(f"成功从S3删除文件: {storage_path}")
+                    else:
+                        app.logger.error(f"从S3删除文件失败: {storage_path}")
                 else:
-                    app.logger.warning(f"文件不存在: {storage_path}")
+                    # 从本地删除文件
+                    if os.path.exists(storage_path):
+                        os.remove(storage_path)
+                        app.logger.info(f"成功删除本地文件: {storage_path}")
+                    else:
+                        app.logger.warning(f"本地文件不存在: {storage_path}")
             except Exception as e:
                 app.logger.error(f"文件删除失败: {storage_path} - {str(e)}")
 

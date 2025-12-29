@@ -52,4 +52,5 @@ python-alipay-sdk==3.4.0
 jd_wechatpay==0.1.1
 psycopg2==2.9.11
 opencv-python
+boto3==1.42.17
 
