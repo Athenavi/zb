@@ -9,7 +9,7 @@
 
 一个功能丰富、易于部署的现代化博客系统，支持主题定制、插件扩展和响应式页面。
 
-[功能特性](#-功能特性) • [快速开始](#-快速开始) • [配置说明](#-配置说明) • [开发指南](#-开发指南) • [API文档](#-api文档)
+[功能特性](#-功能特性) • [快速开始](#-快速开始) • [配置说明](#-配置说明) • [开发指南](#-开发指南) • [API文档](#-api文档) • [Docker部署](#-docker部署)
 
 </div>
 
@@ -54,7 +54,7 @@
 
 ### 方式一：手动部署
 
-```bash
+```
 # 1. 克隆项目
 git clone https://github.com/Athenavi/zb.git
 cd zb
@@ -72,19 +72,45 @@ cp .env_example .env
 
 # 5. 初始化数据库
 createdb -U postgres flaskblog
-psql -U postgres -d flaskblog -f blog.sql
+psql -U postgres -d flaskblog -f sql/blog.sql
 
 # 6. 启动应用
 python wsgi.py
 ```
 
-### 方式二：Docker部署
+## 🐳 Docker部署
 
-```bash
-# 构建并运行
+### Docker快速部署
+
+```
+# 1. 复制环境变量配置
+cp .env_example .env
+# 编辑 .env 文件以配置数据库和其他设置
+
+# 2. 构建并启动服务
+docker-compose up -d
+
+# 3. 访问应用
+# 应用将在 http://localhost:80 或 http://localhost:9421 可用
+```
+
+### Docker镜像构建
+
+```
+# 构建镜像
 docker build -t zyblog .
+
+# 运行容器（需要数据库等依赖服务）
 docker run -d -p 9421:9421 --name zyblog-app zyblog
 ```
+
+### Docker Compose服务
+
+Docker Compose配置包括以下服务：
+- **app**: Flask应用服务器，运行zyBLOG主程序
+- **db**: PostgreSQL数据库，存储应用数据
+- **redis**: Redis缓存，提供会话和缓存支持
+- **nginx**: 反向代理服务器，处理静态文件和SSL
 
 ## 🔧 配置说明
 
@@ -98,6 +124,7 @@ DB_PORT=5432           # 数据库端口
 DB_USER=postgres       # 数据库用户名
 DB_PASSWORD=123456     # 数据库密码
 DB_NAME=flaskblog      # 数据库名称
+DB_ENGINE=postgresql   # 数据库引擎 (postgresql/mysql/sqlite)
 ```
 
 ### 应用配置 [7](#0-6)
@@ -106,6 +133,7 @@ DB_NAME=flaskblog      # 数据库名称
 DOMAIN=http://localhost:9421  # 应用访问域名
 TITLE=flask-blog              # 网站标题
 SECRET_KEY=your-secret-key   # 应用密钥（必须修改）
+TIME_ZONE=Asia/Shanghai      # 时区设置
 ```
 
 ### 邮件配置 [8](#0-7)
@@ -114,6 +142,7 @@ SECRET_KEY=your-secret-key   # 应用密钥（必须修改）
 MAIL_HOST=smtp.163.com       # SMTP服务器
 MAIL_PORT=465               # SMTP端口
 MAIL_USER=your@email.com    # 发件邮箱
+MAIL_PASSWORD=your-password # 邮箱密码或授权码
 ```
 
 ## 📁 项目结构
