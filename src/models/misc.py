@@ -31,7 +31,7 @@ class Report(db.Model):
     reason = db.Column(db.String(255), nullable=False)  # 报告原因
     description = db.Column(db.Text)  # 详细描述
     status = db.Column(db.String(20), default='pending')  # 状态: pending, reviewed, resolved
-    created_at = db.Column(db.DateTime, server_default=db.func.current_timestamp())
+    created_at = db.Column(db.TIMESTAMP, server_default=db.func.current_timestamp())
 
     # 关系
     user = relationship("User", back_populates="reports")
