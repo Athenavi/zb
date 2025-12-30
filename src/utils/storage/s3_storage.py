@@ -21,9 +21,10 @@ class S3Storage:
         """初始化应用配置"""
         self.app = app
         
-        # S3配置
-        self.s3_enabled = app.config.get('S3_ENABLED', False)
+        # S3配置 - 现在默认启用
+        self.s3_enabled = app.config.get('S3_ENABLED', True)
         if not self.s3_enabled:
+            print("警告: S3存储被禁用，但应用媒体需要存储功能。建议启用S3存储。")
             return
             
         self.s3_endpoint = app.config.get('S3_ENDPOINT_URL')
@@ -57,7 +58,9 @@ class S3Storage:
         if self.s3_endpoint:
             client_config['endpoint_url'] = self.s3_endpoint
             client_config['use_ssl'] = self.s3_use_ssl
-            client_config['verify'] = False  # 对于自签名证书
+            # 只有在使用SSL时才设置verify
+            if self.s3_use_ssl:
+                client_config['verify'] = True  # 对于自签名证书可以设为False，但默认设为True
         
         # 创建S3客户端
         s3_client = boto3.client('s3', **client_config)
@@ -92,10 +95,7 @@ class S3Storage:
         保存文件到S3存储
         返回存储路径（格式：s3://bucket/key）
         """
-        if not self.s3_enabled:
-            # 如果S3未启用，使用本地存储
-            return self._save_local_file(file_hash, file_data, original_filename)
-        
+        # 强制使用S3存储，不再支持本地存储
         try:
             # 构建S3对象键（路径）
             # 使用哈希的前两个字符作为目录，提高性能
@@ -125,10 +125,7 @@ class S3Storage:
         """
         从S3存储加载文件
         """
-        if not self.s3_enabled:
-            # 如果S3未启用，从本地加载
-            return self._load_local_file(storage_path)
-        
+        # 强制使用S3存储，不再支持本地存储
         try:
             if storage_path.startswith('s3://'):
                 # 解析S3路径
@@ -141,8 +138,9 @@ class S3Storage:
                 file_data = response['Body'].read()
                 return file_data
             else:
-                # 可能是本地路径，尝试从本地加载
-                return self._load_local_file(storage_path)
+                # 不再支持本地路径，直接报错
+                print(f"错误: 不再支持本地存储路径: {storage_path}")
+                return None
                 
         except ClientError as e:
             print(f"从S3加载文件失败: {str(e)}")
@@ -155,10 +153,7 @@ class S3Storage:
         """
         从S3存储删除文件
         """
-        if not self.s3_enabled:
-            # 如果S3未启用，删除本地文件
-            return self._delete_local_file(storage_path)
-        
+        # 强制使用S3存储，不再支持本地存储
         try:
             if storage_path.startswith('s3://'):
                 # 解析S3路径
@@ -170,8 +165,9 @@ class S3Storage:
                 self.s3_client.delete_object(Bucket=bucket, Key=key)
                 return True
             else:
-                # 可能是本地路径，尝试删除本地文件
-                return self._delete_local_file(storage_path)
+                # 不再支持本地路径，直接报错
+                print(f"错误: 不再支持本地存储路径: {storage_path}")
+                return False
                 
         except ClientError as e:
             print(f"从S3删除文件失败: {str(e)}")
@@ -184,10 +180,7 @@ class S3Storage:
         """
         检查S3中文件是否存在
         """
-        if not self.s3_enabled:
-            # 如果S3未启用，检查本地文件
-            return self._local_file_exists(storage_path)
-        
+        # 强制使用S3存储，不再支持本地存储
         try:
             if storage_path.startswith('s3://'):
                 # 解析S3路径
@@ -199,8 +192,9 @@ class S3Storage:
                 self.s3_client.head_object(Bucket=bucket, Key=key)
                 return True
             else:
-                # 可能是本地路径，检查本地文件
-                return self._local_file_exists(storage_path)
+                # 不再支持本地路径，直接报错
+                print(f"错误: 不再支持本地存储路径: {storage_path}")
+                return False
                 
         except ClientError as e:
             if e.response['Error']['Code'] == '404':
@@ -216,9 +210,7 @@ class S3Storage:
         """
         生成S3文件的预签名URL（用于临时访问）
         """
-        if not self.s3_enabled:
-            return None  # 本地存储无法生成预签名URL
-        
+        # 强制使用S3存储，不再支持本地存储
         try:
             if storage_path.startswith('s3://'):
                 # 解析S3路径
@@ -234,46 +226,13 @@ class S3Storage:
                 )
                 return url
             else:
+                # 不再支持本地路径
+                print(f"错误: 不再支持本地存储路径: {storage_path}")
                 return None
                 
         except Exception as e:
             print(f"生成S3预签名URL失败: {str(e)}")
             return None
-    
-    def _save_local_file(self, file_hash: str, file_data: bytes, original_filename: str) -> str:
-        """保存文件到本地存储（兼容模式）"""
-        hash_prefix = file_hash[:2]
-        hash_subdir = os.path.join('hashed_files', hash_prefix)
-        os.makedirs(hash_subdir, exist_ok=True)
-
-        storage_path = os.path.join(hash_subdir, file_hash)
-        with open(storage_path, 'wb') as f:
-            f.write(file_data)
-
-        return storage_path
-    
-    def _load_local_file(self, storage_path: str) -> Optional[bytes]:
-        """从本地存储加载文件"""
-        if os.path.exists(storage_path):
-            with open(storage_path, 'rb') as f:
-                return f.read()
-        return None
-    
-    def _delete_local_file(self, storage_path: str) -> bool:
-        """删除本地存储文件"""
-        if os.path.exists(storage_path):
-            try:
-                os.remove(storage_path)
-                return True
-            except Exception as e:
-                print(f"删除本地文件失败: {str(e)}")
-                return False
-        return False
-    
-    def _local_file_exists(self, storage_path: str) -> bool:
-        """检查本地文件是否存在"""
-        return os.path.exists(storage_path)
-
 
 # 全局S3存储实例
 s3_storage = S3Storage()

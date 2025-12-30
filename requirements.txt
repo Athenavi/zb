@@ -50,7 +50,7 @@ pygments
 logger==1.4
 python-alipay-sdk==3.4.0
 jd_wechatpay==0.1.1
-psycopg2==2.9.11
+psycopg2-binary==2.9.11
 opencv-python
 boto3==1.42.17
 gevent-websocket

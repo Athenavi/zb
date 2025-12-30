@@ -9,7 +9,7 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
       - ./static:/app/static
-      - ./hashed_files:/app/hashed_files
+      - ./thumbnails:/app/thumbnails
       - ./temp_uploads:/app/temp_uploads
       - ./logs:/app/logs
       - ./cert:/etc/nginx/cert
@@ -22,7 +22,7 @@ services:
     ports:
       - "9421:9421"
     volumes:
-      - ./hashed_files:/app/hashed_files
+      - ./thumbnails:/app/thumbnails
       - ./temp_uploads:/app/temp_uploads
       - ./logs:/app/logs
       - ./.env:/app/.env

@@ -152,7 +152,7 @@ class BaseConfig:
     LIVE_LOCAL_MODE = os.environ.get('LIVE_LOCAL_MODE', 'False').lower() == 'true'
 
     # S3存储配置
-    S3_ENABLED = os.environ.get('S3_ENABLED', 'False').lower() == 'true'
+    S3_ENABLED = os.environ.get('S3_ENABLED', 'True').lower() == 'true'
     S3_ENDPOINT_URL = os.environ.get('S3_ENDPOINT_URL')  # S3服务端点，如使用AWS S3可不设置
     S3_ACCESS_KEY = os.environ.get('S3_ACCESS_KEY')  # S3访问密钥
     S3_SECRET_KEY = os.environ.get('S3_SECRET_KEY')  # S3密钥

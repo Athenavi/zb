@@ -37,7 +37,7 @@ COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/pytho
 COPY . .
 
 # 创建必要的目录
-RUN mkdir -p logs temp_uploads hashed_files thumbnails && \
+RUN mkdir -p logs temp_uploads thumbnails && \
     touch logs/gunicorn_access.log logs/gunicorn_error.log
 
 # 暴露端口

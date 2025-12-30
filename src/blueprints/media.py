@@ -165,9 +165,10 @@ def media_shared():
             response.call_on_close(lambda: remove_file(None))
             return response
         else:
-            # 使用本地文件路径
-            file_path = Path(base_dir) / file_hash.storage_path
-            return send_file(file_path, as_attachment=False, mimetype=file_hash.mime_type, max_age=2592000)
+            # 不再支持本地存储路径
+            current_app.logger.error(f"不支持的存储路径格式: {file_hash.storage_path}")
+            return "不支持的存储路径格式", 400
+
     except FileNotFoundError:
         abort(404)
 
@@ -356,13 +357,7 @@ def async_file_cleanup(app, cleanup_data):
                         app.logger.info(f"成功从S3删除文件: {storage_path}")
                     else:
                         app.logger.error(f"从S3删除文件失败: {storage_path}")
-                else:
-                    # 从本地删除文件
-                    if os.path.exists(storage_path):
-                        os.remove(storage_path)
-                        app.logger.info(f"成功删除本地文件: {storage_path}")
-                    else:
-                        app.logger.warning(f"本地文件不存在: {storage_path}")
+                
             except Exception as e:
                 app.logger.error(f"文件删除失败: {storage_path} - {str(e)}")
 
