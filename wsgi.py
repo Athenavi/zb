@@ -9,6 +9,7 @@ import argparse
 import os
 import socket
 import logging
+import glob
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
@@ -28,8 +29,10 @@ def parse_arguments():
                         help='仅执行更新而不启动服务器')
     parser.add_argument('--pythonanywhere', action='store_true', default=False,
                         help='在 PythonAnywhere 上运行,将禁用日志文件')
-    parser.add_argument('--env', type=str, choices=['prod', 'dev', 'test', 'production', 'development', 'testing'], 
+    parser.add_argument('--env', type=str, choices=['prod', 'dev', 'test', 'production', 'development', 'testing'],
                         default='prod', help='指定运行环境: prod/dev/test (默认: prod)')
+    parser.add_argument('--run-debug-scripts', action='store_true',
+                        help='执行 debug 目录下的脚本 (默认: 生产环境自动执行, 开发环境不执行)')
     return parser.parse_args()
 
 
@@ -88,6 +91,7 @@ def run_update():
 from src.app import create_app
 from src.setting import ProductionConfig, DevelopmentConfig, TestingConfig
 
+
 # 根据环境参数选择配置类
 def get_config_by_env(env):
     # 支持简写和完整形式
@@ -99,6 +103,51 @@ def get_config_by_env(env):
         return TestingConfig()
     else:
         return ProductionConfig()  # 默认使用生产环境配置
+
+
+def execute_debug_scripts():
+    """执行 debug 目录下的所有 Python 脚本"""
+    debug_dir = os.path.join(os.path.dirname(__file__), 'debug')
+
+    # 获取 debug 目录下所有 .py 文件
+    debug_scripts = glob.glob(os.path.join(debug_dir, '*.py'))
+
+    # 按文件名排序，确保按顺序执行
+    debug_scripts.sort()
+
+    logging.info("开始执行 debug 目录下的脚本...")
+    for script_path in debug_scripts:
+        try:
+            script_name = os.path.basename(script_path)
+            logging.info(f"正在执行: {script_name}")
+
+            # 执行脚本并捕获输出，添加项目根目录到PYTHONPATH
+            import subprocess
+            import sys
+            # 注意：这里不需要再次导入 os，因为它已经在文件顶部导入了
+
+            # 复制当前环境变量并添加项目根目录到PYTHONPATH
+            env = os.environ.copy()
+            project_root = os.path.dirname(__file__)
+            if 'PYTHONPATH' in env:
+                env['PYTHONPATH'] = f"{project_root};{env['PYTHONPATH']}"
+            else:
+                env['PYTHONPATH'] = project_root
+
+            result = subprocess.run([sys.executable, script_path],
+                                    capture_output=True, text=True, cwd=os.path.dirname(__file__), env=env)
+
+            if result.stdout:
+                logging.info(f"{script_name} 输出:\n{result.stdout}")
+            if result.stderr:
+                logging.error(f"{script_name} 错误:\n{result.stderr}")
+
+            logging.info(f"完成执行: {script_name} (返回码: {result.returncode})")
+        except Exception as e:
+            logging.error(f"执行 {script_name} 时出错: {str(e)}")
+
+    logging.info("debug 目录下的脚本执行完成")
+
 
 # 为 Flask CLI 创建应用实例
 application = create_app()
@@ -214,8 +263,14 @@ def main():
     try:
         # 根据环境参数选择相应的配置类
         config = get_config_by_env(args.env)
+
+        # 在生产模式下默认执行 debug 脚本，或者当提供了 --run-debug-scripts 参数时执行
+        should_run_debug_scripts = args.run_debug_scripts or args.env in ['prod', 'production']
+        if should_run_debug_scripts and not args.env in ['dev', 'development']:
+            execute_debug_scripts()
+
         app = create_app(config)
-        
+
         # 使用 gevent websocket 服务器启动应用
         from gevent.pywsgi import WSGIServer
         from geventwebsocket.handler import WebSocketHandler
@@ -223,7 +278,7 @@ def main():
         logger.info("使用 gevent websocket 服务器启动应用")
         logger.info(f"运行环境配置: {args.env}")
         http_server.serve_forever()
-            
+
     except KeyboardInterrupt:
         logger.info("\n服务器正在关闭...")
     except Exception as e:
