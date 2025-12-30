@@ -943,7 +943,6 @@ def register_plugin(app):
                     return self.not_found()
                 
                 # 将文件数据写入临时文件
-                import tempfile
                 temp_file_path = os.path.join(self.temp_dir, f"temp_serve_{file_hash.hash}")
                 
                 with open(temp_file_path, 'wb') as temp_file:
@@ -1035,22 +1034,33 @@ def register_plugin(app):
             size_min = request.args.get('size_min', '')
             size_max = request.args.get('size_max', '')
 
+            # 验证和清理输入参数以防止SQL注入
+            from src.utils.security.safe import validate_input
+            is_valid_search, clean_search = validate_input(search_query, r'^[a-zA-Z0-9_\-\s\.]+$')
+            if not is_valid_search:
+                return self.error_response(400, "Invalid search query")
+            
+            is_valid_type, clean_type = validate_input(file_type, r'^[a-zA-Z0-9\-\s\.]+$')
+            if not is_valid_type:
+                return self.error_response(400, "Invalid file type filter")
+
             with get_db() as db:
                 query = db.query(Media).filter(Media.user_id == user_info['id'])
 
-                if search_query:
-                    query = query.filter(Media.original_filename.contains(search_query))
+                if clean_search:
+                    # 使用参数化查询防止SQL注入
+                    query = query.filter(Media.original_filename.contains(clean_search))
 
-                if file_type:
-                    # 连接 FileHash 表进行文件类型过滤
-                    query = query.join(FileHash).filter(FileHash.mime_type.contains(file_type))
+                if clean_type:
+                    # 连接 FileHash 表进行文件类型过滤，使用参数化查询
+                    query = query.join(FileHash).filter(FileHash.mime_type.contains(clean_type))
 
                 results = query.all()
 
                 if method == 'PROPFIND':
-                    return _handle_propfind_search_results(results, user_info, search_query)
+                    return _handle_propfind_search_results(results, user_info, clean_search)
                 else:
-                    return self._serve_search_results(results, user_info, search_query)
+                    return self._serve_search_results(results, user_info, clean_search)
 
         def _serve_thumbnail(self, file_hash, filename):
             """提供缩略图"""
@@ -1065,7 +1075,6 @@ def register_plugin(app):
                     return self.not_found()
                 
                 # 将文件数据写入临时文件
-                import tempfile
                 temp_file_path = os.path.join(self.temp_dir, f"temp_thumb_{file_hash.hash}")
                 
                 with open(temp_file_path, 'wb') as temp_file:
