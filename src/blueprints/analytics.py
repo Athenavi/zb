@@ -20,7 +20,7 @@ from src.utils.analytics import (
     get_behavior_insights
 )
 
-analytics_bp = Blueprint('analytics', __name__, url_prefix='/analytics')
+analytics_bp = Blueprint('analytics', __name__, url_prefix='/api/analytics')
 
 
 @analytics_bp.route('/dashboard', methods=['GET'])
@@ -139,6 +139,76 @@ def user_activity_stats(current_user_id, user_id):
         return jsonify({
             'success': True,
             'data': stats
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'获取用户活动统计时出错: {str(e)}'
+        }), 500
+
+
+@analytics_bp.route('/user-activities', methods=['GET'])
+@admin_required
+def user_activities_stats(user_id):
+    """
+    获取所有用户活动统计
+    """
+    try:
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 20))
+
+        # 计算分页偏移量
+        offset = (page - 1) * per_page
+
+        # 查询所有用户活动，支持分页和日期筛选
+        query = db.session.query(UserActivity)
+
+        if start_date:
+            query = query.filter(UserActivity.created_at >= start_date)
+        if end_date:
+            query = query.filter(UserActivity.created_at <= end_date)
+
+        # 获取总数
+        total_activities = query.count()
+
+        # 获取分页数据
+        activities = query.offset(offset).limit(per_page).all()
+
+        # 按用户分组统计活动
+        user_activity_stats = {}
+        for activity in activities:
+            user_id = activity.user_id
+            if user_id not in user_activity_stats:
+                user_activity_stats[user_id] = {
+                    'user_id': user_id,
+                    'activity_count': 0,
+                    'activity_types': {}
+                }
+
+            user_activity_stats[user_id]['activity_count'] += 1
+            activity_type = activity.activity_type
+            user_activity_stats[user_id]['activity_types'][activity_type] = \
+                user_activity_stats[user_id]['activity_types'].get(activity_type, 0) + 1
+
+        # 获取用户名（如果可能）
+        for user_data in user_activity_stats.values():
+            user = User.query.get(user_data['user_id'])
+            user_data['username'] = user.username if user else 'Unknown'
+
+        # 转换为列表格式
+        stats_list = list(user_activity_stats.values())
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'activities': stats_list,
+                'total': total_activities,
+                'page': page,
+                'per_page': per_page,
+                'pages': (total_activities + per_page - 1) // per_page
+            }
         }), 200
     except Exception as e:
         return jsonify({
