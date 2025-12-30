@@ -2,9 +2,9 @@ name: Compatibility Check
 
 on:
   push:
-    branches: [alpha]
+    branches: [canary]
   pull_request:
-    branches: [alpha]
+    branches: [canary]
   workflow_dispatch:
 
 jobs:
