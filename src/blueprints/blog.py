@@ -53,9 +53,9 @@ def edit_article_back(user_id, article_id):
             if article.hidden == 1:
                 article.is_vip_only = False
 
-            # 处理slug，允许包含 -
-            article.slug = re.sub(r'[^\w\s-]', '', article.slug)
-            article.slug = re.sub(r'\s+', '_', article.slug)
+            # 处理slug，使其更SEO友好
+            from src.utils.seo import slugify
+            article.slug = slugify(article.slug if article.slug else article.title)
 
             # 更新或创建文章内容
             content_value = request.form.get('content')
@@ -108,9 +108,10 @@ def new_article_back(user_id):
         article_ad = request.form.get('article_ad')
         cover_image = request.form.get('cover_image')
         # 创建新文章
+        from src.utils.seo import slugify
         new_article = Article(
             title=title,
-            slug=slug,
+            slug=slugify(slug if slug else title),
             excerpt=excerpt,
             tags=tags,
             is_featured=is_featured,
@@ -170,9 +171,9 @@ def contribute_back(aid):
                     contribute_title, contribute_slug]):
             return jsonify({'success': False, 'message': 'All fields are required'}), 400
 
-        # 处理slug
-        contribute_slug = re.sub(r'[^\w\s-]', '', contribute_slug)  # 移除非字母数字和下划线的字符
-        contribute_slug = re.sub(r'\s+', '_', contribute_slug)
+        # 处理slug，使其更SEO友好
+        from src.utils.seo import slugify
+        contribute_slug = slugify(contribute_slug)
 
         # 验证语言代码
         if not is_valid_iso_language_code(contribute_language):
@@ -256,11 +257,18 @@ def blog_detail_aid_back(aid, safe_mode=True):
             print(f'2. content: {content}')
             print(f'3. i18n: {i18n_versions}')
 
+            # 为SEO优化添加meta信息
+            description = article.excerpt if article.excerpt else (content.content[:150] if content and content.content else f'阅读这篇关于{article.title}的精彩文章')
+            keywords = article.tags.replace(',', ', ') if article.tags else article.title
+            
             return render_template('blog/detail.html',
                                    article=article,
                                    content=content,
                                    author=author,
                                    i18n_versions=i18n_versions,
+                                   description=description,
+                                   keywords=keywords,
+                                   author_name=author.username if author else '未知作者'
                                    )
         return error(message='Article not found', status_code=404)
     except Exception as e:
@@ -680,11 +688,18 @@ def blog_detail_back(blog_slug, safe_mode=True):
         # print(f'2. content: {content}')
         # print(f'3. i18n: {i18n_versions}')
 
+        # 为SEO优化添加meta信息
+        description = article.excerpt if article.excerpt else (content.content[:150] if content and content.content else f'阅读这篇关于{article.title}的精彩文章')
+        keywords = article.tags.replace(',', ', ') if article.tags else article.title
+        
         return render_template('blog/detail.html',
                                article=article,
                                content=content,
                                author=author,
-                               i18n_versions=i18n_versions
+                               i18n_versions=i18n_versions,
+                               description=description,
+                               keywords=keywords,
+                               author_name=author.username if author else '未知作者'
                                )
 
     except Exception as e:

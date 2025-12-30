@@ -31,6 +31,7 @@ from src.blueprints.session_views import session_bp
 from src.blueprints.theme import theme_bp
 from src.blueprints.vip_routes import vip_bp
 from src.blueprints.website import website_bp
+from src.blueprints.seo import seo_bp
 from src.error import error
 from src.extensions import limiter, csrf
 from src.extensions import login_manager
@@ -280,6 +281,7 @@ def register_blueprints(app):
         admin_vip_bp,
         session_bp,
         payment_bp,
+        seo_bp,
         #supabase_api_bp,
         #supabase_auth_bp
     ]
