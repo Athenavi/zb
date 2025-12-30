@@ -151,6 +151,16 @@ class BaseConfig:
     LIVE_SECRET_KEY = os.environ.get('LIVE_SECRET_KEY', 'default_secret')
     LIVE_LOCAL_MODE = os.environ.get('LIVE_LOCAL_MODE', 'False').lower() == 'true'
 
+    # S3存储配置
+    S3_ENABLED = os.environ.get('S3_ENABLED', 'False').lower() == 'true'
+    S3_ENDPOINT_URL = os.environ.get('S3_ENDPOINT_URL')  # S3服务端点，如使用AWS S3可不设置
+    S3_ACCESS_KEY = os.environ.get('S3_ACCESS_KEY')  # S3访问密钥
+    S3_SECRET_KEY = os.environ.get('S3_SECRET_KEY')  # S3密钥
+    S3_BUCKET_NAME = os.environ.get('S3_BUCKET_NAME', 'media-bucket')  # S3存储桶名称
+    S3_REGION = os.environ.get('S3_REGION', 'us-east-1')  # S3区域
+    S3_USE_SSL = os.environ.get('S3_USE_SSL', 'True').lower() == 'true'  # 是否使用SSL
+    S3_SIGNATURE_VERSION = os.environ.get('S3_SIGNATURE_VERSION', 's3v4')  # 签名版本
+
     # 安全头配置（Talisman）
     TALISMAN_CONTENT_SECURITY_POLICY = {
         'default-src': "'self'",

@@ -26,6 +26,8 @@ from src.blueprints.payment import payment_bp
 from src.blueprints.relation import relation_bp
 from src.blueprints.role import role_bp
 from src.blueprints.session_views import session_bp
+# from src.blueprints.supabase_api import supabase_api_bp
+# from src.blueprints.supabase_auth import supabase_auth_bp
 from src.blueprints.theme import theme_bp
 from src.blueprints.vip_routes import vip_bp
 from src.blueprints.website import website_bp
@@ -40,6 +42,7 @@ from src.security import PermissionNeed, init_security_headers
 from src.setting import ProductionConfig
 from src.utils.filters import json_filter, string_split, article_author, md2html, relative_time_filter, category_filter, \
     f2list
+from src.utils.storage.s3_storage import s3_storage
 
 # 在所有其他导入之前导入并应用gevent补丁
 try:
@@ -68,6 +71,9 @@ def create_app(config_class=None):
     # 初始化扩展
     from src.extensions import init_extensions
     init_extensions(app)
+
+    # 初始化S3存储
+    s3_storage.init_app(app)
 
     # 初始化安全头
     init_security_headers(app)
@@ -273,7 +279,9 @@ def register_blueprints(app):
         vip_bp,
         admin_vip_bp,
         session_bp,
-        payment_bp
+        payment_bp,
+        #supabase_api_bp,
+        #supabase_auth_bp
     ]
 
     # 找到最长的蓝图名称长度，用于日志格式化
