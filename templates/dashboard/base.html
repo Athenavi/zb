@@ -135,6 +135,11 @@
                     <i class="fas fa-puzzle-piece mr-3"></i>
                     <span>插件管理</span>
                 </a>
+                <a href="{{ url_for('admin.admin_comment_config') }}"
+                   class="flex items-center px-4 py-3 rounded-lg {% if request.endpoint == 'admin.admin_comment_config' %}text-primary bg-blue-50 font-medium{% else %}text-gray-600 hover:bg-gray-100{% endif %}">
+                    <i class="fas fa-comments mr-3"></i>
+                    <span>评论配置</span>
+                </a>
                 <a href="{{ url_for('admin.admin_misc') }}"
                    class="flex items-center px-4 py-3 rounded-lg {% if request.endpoint == 'admin.admin_misc' %}text-primary bg-blue-50 font-medium{% else %}text-gray-600 hover:bg-gray-100{% endif %}">
                     <i class="fas fa-th-large mr-3"></i>
