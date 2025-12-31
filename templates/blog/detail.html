@@ -470,22 +470,41 @@
             <div class="shadow rounded-lg p-6 mb-6">
                 <h3 class="text-lg font-bold text-gray-900 mb-4">评论</h3>
                 <div class="giscus-container">
-                    <script src="https://giscus.app/client.js"
-                            data-repo="Athenavi/flask-blog"
-                            data-repo-id="R_kgDOP3N1ZQ"
-                            data-category="Show and tell"
-                            data-category-id="DIC_kwDOP3N1Zc4C0Po4"
-                            data-mapping="pathname"
-                            data-strict="0"
-                            data-reactions-enabled="1"
-                            data-emit-metadata="1"
-                            data-input-position="top"
-                            data-theme="preferred_color_scheme"
-                            data-lang="zh-CN"
-                            data-loading="lazy"
-                            crossorigin="anonymous"
-                            async>
-                    </script>
+                    {% if giscus_config %}
+                        <script src="https://giscus.app/client.js"
+                                data-repo="{{ giscus_config.get('giscus_repo', 'Athenavi/flask-blog') }}"
+                                data-repo-id="{{ giscus_config.get('giscus_repo_id', 'R_kgDOP3N1ZQ') }}"
+                                data-category="{{ giscus_config.get('giscus_category', 'Show and tell') }}"
+                                data-category-id="{{ giscus_config.get('giscus_category_id', 'DIC_kwDOP3N1Zc4C0Po4') }}"
+                                data-mapping="{{ giscus_config.get('giscus_mapping', 'pathname') }}"
+                                data-strict="{{ giscus_config.get('giscus_strict', '0') }}"
+                                data-reactions-enabled="{{ giscus_config.get('giscus_reactions_enabled', '1') }}"
+                                data-emit-metadata="{{ giscus_config.get('giscus_emit_metadata', '1') }}"
+                                data-input-position="{{ giscus_config.get('giscus_input_position', 'top') }}"
+                                data-theme="{{ giscus_config.get('giscus_theme', 'preferred_color_scheme') }}"
+                                data-lang="{{ giscus_config.get('giscus_lang', 'zh-CN') }}"
+                                data-loading="{{ giscus_config.get('giscus_loading', 'lazy') }}"
+                                crossorigin="anonymous"
+                                async>
+                        </script>
+                    {% else %}
+                        <script src="https://giscus.app/client.js"
+                                data-repo="Athenavi/flask-blog"
+                                data-repo-id="R_kgDOP3N1ZQ"
+                                data-category="Show and tell"
+                                data-category-id="DIC_kwDOP3N1Zc4C0Po4"
+                                data-mapping="pathname"
+                                data-strict="0"
+                                data-reactions-enabled="1"
+                                data-emit-metadata="1"
+                                data-input-position="top"
+                                data-theme="preferred_color_scheme"
+                                data-lang="zh-CN"
+                                data-loading="lazy"
+                                crossorigin="anonymous"
+                                async>
+                        </script>
+                    {% endif %}
                 </div>
             </div>
             <!-- 广告位 -->
