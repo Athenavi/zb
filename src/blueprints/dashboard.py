@@ -6,7 +6,7 @@ from flask import Blueprint, json
 from src.auth_utils import admin_required
 from src.extensions import limiter
 from src.models import User, Article, ArticleContent, ArticleI18n, Category, db, CategorySubscription, Menus, \
-    MenuItems, Pages, SystemSettings, FileHash, Media, Url, SearchHistory, Event, Report
+    MenuItems, Pages, SystemSettings, FileHash, Media, Url, SearchHistory, Event, Report, PageView, UserActivity
 # from src.error import error
 from src.utils.config.theme import get_all_themes
 from src.utils.security.safe import validate_email_base
@@ -25,11 +25,77 @@ def admin_index(user_id):
         articles_count = db.session.query(Article).count()
         # 获取评论数量
         comments_count = 0
+
+        # 获取最近活动数据
+        recent_activities = db.session.query(UserActivity).order_by(UserActivity.created_at.desc()).limit(5).all()
+
+        # 准备活动数据
+        activities = []
+        for activity in recent_activities:
+            user = User.query.get(activity.user_id)
+            activity_data = {
+                'user_name': user.username if user else 'Unknown User',
+                'activity_type': activity.activity_type,
+                'target_type': activity.target_type,
+                'target_id': activity.target_id,
+                'details': activity.details,
+                'created_at': activity.created_at,
+                'icon': 'fas fa-chart-bar' if activity.activity_type == 'view' else \
+                    'fas fa-user-plus' if activity.activity_type == 'register' else \
+                        'fas fa-file-alt' if activity.activity_type == 'create_article' else \
+                            'fas fa-heart' if activity.activity_type == 'like' else \
+                                'fas fa-comment' if activity.activity_type == 'comment' else \
+                                    'fas fa-share-alt' if activity.activity_type == 'share' else \
+                                        'fas fa-chart-line'
+            }
+            activities.append(activity_data)
+        
         current_user = db.session.query(User).filter_by(id=user_id).first()
         return render_template('dashboard/index.html', users_count=users_count, articles_count=articles_count,
-                               comments_count=comments_count, current_user=current_user)
+                               comments_count=comments_count, current_user=current_user, activities=activities)
     except Exception as e:
         return jsonify({'error': str(e)})
+
+
+@admin_bp.route('/recent-activities', methods=['GET'])
+@admin_required
+def get_recent_activities(user_id):
+    """获取最近活动数据API"""
+    try:
+        # 获取最近活动数据
+        recent_activities = db.session.query(UserActivity).order_by(UserActivity.created_at.desc()).limit(10).all()
+
+        # 准备活动数据
+        activities = []
+        for activity in recent_activities:
+            user = User.query.get(activity.user_id)
+            activity_data = {
+                'id': activity.id,
+                'user_name': user.username if user else 'Unknown User',
+                'activity_type': activity.activity_type,
+                'target_type': activity.target_type,
+                'target_id': activity.target_id,
+                'details': activity.details,
+                'created_at': activity.created_at.isoformat() if activity.created_at else None,
+                'icon': 'fas fa-chart-bar' if activity.activity_type == 'view' else \
+                    'fas fa-user-plus' if activity.activity_type == 'register' else \
+                        'fas fa-file-alt' if activity.activity_type == 'create_article' else \
+                            'fas fa-heart' if activity.activity_type == 'like' else \
+                                'fas fa-comment' if activity.activity_type == 'comment' else \
+                                    'fas fa-share-alt' if activity.activity_type == 'share' else \
+                                        'fas fa-chart-line'
+            }
+            activities.append(activity_data)
+
+        return jsonify({
+            'success': True,
+            'data': activities
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'获取最近活动失败: {str(e)}'
+        }), 500
 
 
 @admin_bp.route('/', methods=['GET'])
@@ -47,6 +113,70 @@ def admin_user(user_id):
 def admin_blog(user_id):
     current_user = db.session.query(User).filter_by(id=user_id).first()
     return render_template('dashboard/blog.html', current_user=current_user)
+
+
+@admin_bp.route('/analytics', methods=['GET'])
+@admin_required
+def admin_analytics(user_id):
+    """分析仪表板页面"""
+    current_user = db.session.query(User).filter_by(id=user_id).first()
+    return render_template('dashboard/analytics.html', current_user=current_user)
+
+
+@admin_bp.route('/analytics/data', methods=['GET'])
+@admin_required
+def admin_analytics_data(user_id):
+    """获取分析数据API"""
+    try:
+        # 获取总体统计数据
+        total_page_views = PageView.query.count()
+        total_user_activities = UserActivity.query.count()
+        total_unique_users = db.session.query(PageView.user_id).distinct(PageView.user_id).count()
+
+        # 获取最近7天的数据
+        from datetime import datetime, timedelta
+        start_date = datetime.utcnow() - timedelta(days=7)
+
+        recent_page_views = PageView.query.filter(PageView.created_at >= start_date).count()
+        recent_user_activities = UserActivity.query.filter(UserActivity.created_at >= start_date).count()
+
+        # 获取最活跃的用户
+        active_users = db.session.query(
+            UserActivity.user_id,
+            func.count(UserActivity.id).label('activity_count')
+        ).filter(
+            UserActivity.created_at >= start_date
+        ).group_by(UserActivity.user_id).order_by(
+            func.count(UserActivity.id).desc()
+        ).limit(5).all()
+
+        # 获取最活跃的页面
+        from src.utils.analytics import get_top_pages
+        popular_pages = get_top_pages(limit=5, start_date=start_date)
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'total_page_views': total_page_views,
+                'total_user_activities': total_user_activities,
+                'total_unique_users': total_unique_users,
+                'recent_page_views': recent_page_views,
+                'recent_user_activities': recent_user_activities,
+                'active_users': [
+                    {
+                        'user_id': user.user_id,
+                        'activity_count': user.activity_count,
+                        'username': User.query.get(user.user_id).username if User.query.get(user.user_id) else 'Unknown'
+                    } for user in active_users
+                ],
+                'popular_pages': popular_pages
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'获取分析数据时出错: {str(e)}'
+        }), 500
 
 
 @admin_bp.route('/user', methods=['GET'])
@@ -398,7 +528,23 @@ def get_articles(user_id):
 
         # 状态筛选
         if status:
-            query = query.filter(Article.status == status)
+            # 将字符串状态转换为整数状态
+            status_mapping = {
+                'Draft': 0,
+                'Published': 1,
+                'Deleted': -1,
+                '0': 0,
+                '1': 1,
+                '-1': -1
+            }
+            if status in status_mapping:
+                query = query.filter(Article.status == status_mapping[status])
+            else:
+                # 如果状态值不在映射中，返回错误
+                return jsonify({
+                    'success': False,
+                    'message': f'无效的状态值: {status}. 有效值为: Draft, Published, Deleted, 0, 1, -1'
+                }), 400
 
         # 按创建时间倒序排列
         query = query.order_by(Article.created_at.desc())

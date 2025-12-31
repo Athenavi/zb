@@ -41,8 +41,13 @@ def get_sqlalchemy_uri(db_config):
         sqlalchemy_uri = f"mssql+pyodbc://{db_user}{password_part}@{db_host}:{db_port}/{db_name}?driver=ODBC+Driver+17+for+SQL+Server"
 
     else:  # PostgreSQL (默认)
+        # 对于IPv6地址，需要使用方括号包围主机地址
+        if ':' in db_host and not db_host.startswith('[') and not db_host.endswith(']'):  # 检查是否为IPv6地址
+            formatted_host = f"[{db_host}]"
+        else:
+            formatted_host = db_host
         password_part = f":{db_password}" if db_password else ""
-        sqlalchemy_uri = f"postgresql+psycopg2://{db_user}{password_part}@{db_host}:{db_port}/{db_name}"
+        sqlalchemy_uri = f"postgresql+psycopg2://{db_user}{password_part}@{formatted_host}:{db_port}/{db_name}"
 
     # 安全日志，如果密码存在则隐藏
     if db_password:

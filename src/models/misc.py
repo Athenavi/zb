@@ -108,7 +108,7 @@ class PageView(db.Model):
     platform = db.Column(db.String(100), nullable=True)  # 操作系统平台
     country = db.Column(db.String(100), nullable=True)  # 国家
     city = db.Column(db.String(100), nullable=True)  # 城市
-    created_at = db.Column(db.DateTime, server_default=db.func.current_timestamp())  # 访问时间
+    created_at = db.Column(db.TIMESTAMP, server_default=db.func.current_timestamp())  # 访问时间
 
     # 为常用查询创建索引
     __table_args__ = (
@@ -148,7 +148,7 @@ class UserActivity(db.Model):
     details = db.Column(db.Text)  # 活动详细信息
     ip_address = db.Column(db.String(45), nullable=True)  # IP地址
     user_agent = db.Column(db.String(500), nullable=True)  # 用户代理
-    created_at = db.Column(db.DateTime, server_default=db.func.current_timestamp())  # 活动时间
+    created_at = db.Column(db.TIMESTAMP, server_default=db.func.current_timestamp())  # 活动时间
 
     # 关系
     user = relationship("User", back_populates="activities")
