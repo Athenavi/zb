@@ -136,34 +136,29 @@ def media_shared():
         
         # 检查存储路径是否为S3路径
         if file_hash.storage_path.startswith('s3://'):
-            # 从S3下载文件到临时位置
-            file_data = s3_storage.load_file(file_hash.storage_path)
-            if file_data is None:
-                return "File not found in S3 storage", 404
-            
-            # 将文件数据写入临时文件
-            temp_file_path = Path(base_dir) / f"temp/{f_hash}"
-            temp_dir = Path(base_dir) / "temp"
-            if not temp_dir.exists():
-                temp_dir.mkdir(parents=True, exist_ok=True)
-            
-            with open(temp_file_path, 'wb') as temp_file:
-                temp_file.write(file_data)
-            
-            # 发送临时文件
-            response = send_file(temp_file_path, as_attachment=False, mimetype=file_hash.mime_type, max_age=2592000)
-            
-            # 设置响应后删除临时文件
-            def remove_file(response):
-                try:
-                    if temp_file_path.exists():
-                        os.remove(temp_file_path)
-                except Exception as e:
-                    current_app.logger.error(f"Error removing temp file: {e}")
-                return response
-            
-            response.call_on_close(lambda: remove_file(None))
-            return response
+            # 构建缓存文件路径 - 使用 hash.扩展名 的格式
+            file_extension = file_hash.filename.split('.')[-1] if '.' in file_hash.filename else 'bin'
+            cache_file_path = Path(base_dir) / f"cache/{f_hash}.{file_extension}"
+            cache_dir = Path(base_dir) / "cache"
+            if not cache_dir.exists():
+                cache_dir.mkdir(parents=True, exist_ok=True)
+
+            # 检查本地缓存文件是否存在
+            if cache_file_path.exists():
+                # 直接发送缓存文件
+                return send_file(cache_file_path, as_attachment=False, mimetype=file_hash.mime_type, max_age=2592000)
+            else:
+                # 从S3下载文件到本地缓存
+                file_data = s3_storage.load_file(file_hash.storage_path)
+                if file_data is None:
+                    return "File not found in S3 storage", 404
+
+                # 将文件数据写入缓存文件
+                with open(cache_file_path, 'wb') as cache_file:
+                    cache_file.write(file_data)
+
+                # 发送缓存文件
+                return send_file(cache_file_path, as_attachment=False, mimetype=file_hash.mime_type, max_age=2592000)
         else:
             # 不再支持本地存储路径
             current_app.logger.error(f"不支持的存储路径格式: {file_hash.storage_path}")

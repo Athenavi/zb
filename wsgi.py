@@ -27,8 +27,8 @@ def parse_arguments():
                         help='启动前执行更新检查')
     parser.add_argument('--update-only', action='store_true',
                         help='仅执行更新而不启动服务器')
-    parser.add_argument('--pythonanywhere', action='store_true', default=False,
-                        help='在 PythonAnywhere 上运行,将禁用日志文件')
+    parser.add_argument('--nolog', action='store_true', default=False,
+                        help='禁用日志文件')
     parser.add_argument('--env', type=str, choices=['prod', 'dev', 'test', 'production', 'development', 'testing'],
                         default='prod', help='指定运行环境: prod/dev/test (默认: prod)')
     parser.add_argument('--run-debug-scripts', action='store_true',
@@ -187,7 +187,7 @@ def main():
         return
 
     # 初始化日志系统
-    if args.pythonanywhere:
+    if args.nolog:
         logger = init_pythonanywhere_logger()
         if logger is None:
             logger.error("PythonAnywhere 环境下日志系统初始化失败")

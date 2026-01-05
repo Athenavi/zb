@@ -13,5 +13,6 @@ from . import (
     media,  # 媒体管理
     backup,  # 备份功能
     misc,  # 杂项管理（事件、举报、短链接、搜索历史等）
-    comment_config  # 评论配置
+    comment_config,  # 评论配置
+    config_manager  # 配置管理
 )

@@ -20,7 +20,7 @@ class GuideConfig:
             {'id': 'database', 'title': '数据库', 'description': '数据库连接配置'},
             {'id': 'app', 'title': '应用配置', 'description': '基础应用设置'},
             {'id': 'admin', 'title': '管理员', 'description': '创建管理员账户'},
-            {'id': 'optional', 'title': '可选配置', 'description': '其他功能配置'},
+            {'id': 'optional', 'title': '其他配置', 'description': '其他功能配置'},
             {'id': 'complete', 'title': '完成', 'description': '系统初始化完成'}
         ]
 

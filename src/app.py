@@ -43,6 +43,7 @@ from src.scheduler import init_scheduler
 from src.security import PermissionNeed, init_security_headers
 from src.setting import ProductionConfig
 from src.utils.analytics import record_page_view
+from src.utils.config_manager import config_manager
 from src.utils.filters import json_filter, string_split, article_author, md2html, relative_time_filter, category_filter, \
     f2list
 from src.utils.storage.s3_storage import s3_storage
@@ -83,6 +84,14 @@ def create_app(config_class=None):
     except Exception as e:
         print(f"！！！警告: S3存储初始化失败: {str(e)}")
         print("！！！系统将继续运行，但媒体功能受限")
+
+    # 初始化配置管理器
+    try:
+        config_manager.refresh_all_configs(app)
+        print("配置管理器初始化成功")
+    except Exception as e:
+        print(f"！！！警告: 配置管理器初始化失败: {str(e)}")
+        print("！！！系统将继续运行，但配置可能无法实时更新")
 
     # 初始化安全头
     init_security_headers(app)

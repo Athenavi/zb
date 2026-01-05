@@ -78,6 +78,16 @@ def admin_comment_config(user_id):
 
                 db.session.commit()
 
+                # 刷新配置（如果需要）
+                if any(key in ['giscus_repo', 'giscus_repo_id', 'giscus_category', 'giscus_category_id',
+                               'giscus_mapping', 'giscus_strict', 'giscus_reactions_enabled', 'giscus_emit_metadata',
+                               'giscus_input_position', 'giscus_theme', 'giscus_lang', 'giscus_loading'] for key in
+                       corrected_config.keys()):
+                    try:
+                        print('评论配置已保存并更新')
+                    except Exception as refresh_error:
+                        print(f'评论配置刷新失败: {str(refresh_error)}')
+                
                 return jsonify({
                     'success': True,
                     'message': '评论配置保存成功'

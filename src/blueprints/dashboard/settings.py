@@ -11,6 +11,7 @@ from flask import request, render_template, jsonify
 from src.auth_utils import admin_required
 from src.extensions import limiter
 from src.models import User, db, Menus, MenuItems, Pages, SystemSettings
+from src.utils.config_manager import config_manager
 from . import admin_bp
 
 
@@ -50,6 +51,22 @@ def admin_settings(user_id):
                         )
                         db.session.add(setting)
                 db.session.commit()
+
+                db.session.commit()
+
+                # 刷新配置（如果需要）
+                config_keys = ['mail_host', 'mail_port', 'mail_user', 'mail_password',
+                               'redis_host', 'redis_port', 'redis_password', 'redis_db',
+                               's3_enabled', 's3_endpoint', 's3_access_key', 's3_secret_key',
+                               's3_bucket', 's3_region', 's3_use_ssl']
+
+                if any(key in config_keys for key in settings.keys()):
+                    try:
+                        config_manager.refresh_all_configs()
+                        print('配置已实时更新')
+                    except Exception as refresh_error:
+                        print(f'配置刷新失败: {str(refresh_error)}')
+                
                 return jsonify({'success': True, 'message': '设置已保存'})
             except Exception as e:
                 return jsonify({'success': False, 'message': f'保存失败: {str(e)}'})
