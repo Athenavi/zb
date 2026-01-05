@@ -7,8 +7,6 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     build-essential \
     pkg-config \
-    libmariadb-dev \
-    libmariadb-dev-compat \
     libpq-dev \
     libmagic-dev \
     && rm -rf /var/lib/apt/lists/*

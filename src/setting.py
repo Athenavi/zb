@@ -28,9 +28,7 @@ def get_sqlalchemy_uri(db_config):
         # SQLite使用文件路径
         sqlalchemy_uri = f"sqlite:///{db_name or 'app.db'}"
 
-    elif db_engine == 'mysql':
-        password_part = f":{db_password}" if db_password else ""
-        sqlalchemy_uri = f"mysql+pymysql://{db_user}{password_part}@{db_host}:{db_port}/{db_name}"
+
 
     elif db_engine == 'oracle':
         password_part = f":{db_password}" if db_password else ""

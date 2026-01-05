@@ -33,6 +33,8 @@ def parse_arguments():
                         default='prod', help='指定运行环境: prod/dev/test (默认: prod)')
     parser.add_argument('--run-debug-scripts', action='store_true',
                         help='执行 debug 目录下的脚本 (默认: 生产环境自动执行, 开发环境不执行)')
+    parser.add_argument('--guide', action='store_true', default=False,
+                        help='强制启动系统初始化引导 (默认: False)')
     return parser.parse_args()
 
 
@@ -157,10 +159,13 @@ def main():
     # 解析命令行参数
     args = parse_arguments()
 
-    # 检查配置文件是否存在
-    if not os.path.isfile(".env"):
+    # 检查配置文件是否存在或强制启动引导程序
+    if not os.path.isfile(".env") or args.guide:
         logging.info("=" * 60)
-        logging.info("检测到系统未初始化，正在启动引导程序...")
+        if not os.path.isfile(".env"):
+            logging.info("检测到系统未初始化，正在启动引导程序...")
+        else:
+            logging.info("强制启动系统初始化引导...")
         logging.info("=" * 60)
 
         # 导入并运行引导程序
@@ -175,7 +180,7 @@ def main():
 
         except ImportError as e:
             logging.error(f"导入引导程序失败: {str(e)}")
-            logging.error("请确保 guide.py 文件存在; 若您需要使用 mysql 您可能需要安装 mysql-connector-python")
+            logging.error("请确保 guide.py 文件存在")
         except Exception as e:
             logging.error(f"启动引导程序时发生错误: {str(e)}")
 

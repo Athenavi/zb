@@ -130,7 +130,7 @@ DB_PORT=5432           # 数据库端口
 DB_USER=postgres       # 数据库用户名
 DB_PASSWORD=123456     # 数据库密码
 DB_NAME=flaskblog      # 数据库名称
-DB_ENGINE=postgresql   # 数据库引擎 (postgresql/mysql/sqlite)
+DB_ENGINE=postgresql   # 数据库引擎 (postgresql/sqlite)
 ```
 
 ### 应用配置 [7](#0-6)
