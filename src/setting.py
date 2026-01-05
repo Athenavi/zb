@@ -28,9 +28,7 @@ def get_sqlalchemy_uri(db_config):
         # SQLite使用文件路径
         sqlalchemy_uri = f"sqlite:///{db_name or 'app.db'}"
 
-    elif db_engine == 'mysql':
-        password_part = f":{db_password}" if db_password else ""
-        sqlalchemy_uri = f"mysql+pymysql://{db_user}{password_part}@{db_host}:{db_port}/{db_name}"
+
 
     elif db_engine == 'oracle':
         password_part = f":{db_password}" if db_password else ""
@@ -41,8 +39,13 @@ def get_sqlalchemy_uri(db_config):
         sqlalchemy_uri = f"mssql+pyodbc://{db_user}{password_part}@{db_host}:{db_port}/{db_name}?driver=ODBC+Driver+17+for+SQL+Server"
 
     else:  # PostgreSQL (默认)
+        # 对于IPv6地址，需要使用方括号包围主机地址
+        if ':' in db_host and not db_host.startswith('[') and not db_host.endswith(']'):  # 检查是否为IPv6地址
+            formatted_host = f"[{db_host}]"
+        else:
+            formatted_host = db_host
         password_part = f":{db_password}" if db_password else ""
-        sqlalchemy_uri = f"postgresql+psycopg2://{db_user}{password_part}@{db_host}:{db_port}/{db_name}"
+        sqlalchemy_uri = f"postgresql+psycopg2://{db_user}{password_part}@{formatted_host}:{db_port}/{db_name}"
 
     # 安全日志，如果密码存在则隐藏
     if db_password:
@@ -152,7 +155,7 @@ class BaseConfig:
     LIVE_LOCAL_MODE = os.environ.get('LIVE_LOCAL_MODE', 'False').lower() == 'true'
 
     # S3存储配置
-    S3_ENABLED = os.environ.get('S3_ENABLED', 'False').lower() == 'true'
+    S3_ENABLED = os.environ.get('S3_ENABLED', 'True').lower() == 'true'
     S3_ENDPOINT_URL = os.environ.get('S3_ENDPOINT_URL')  # S3服务端点，如使用AWS S3可不设置
     S3_ACCESS_KEY = os.environ.get('S3_ACCESS_KEY')  # S3访问密钥
     S3_SECRET_KEY = os.environ.get('S3_SECRET_KEY')  # S3密钥

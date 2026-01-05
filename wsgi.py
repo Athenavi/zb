@@ -27,12 +27,14 @@ def parse_arguments():
                         help='启动前执行更新检查')
     parser.add_argument('--update-only', action='store_true',
                         help='仅执行更新而不启动服务器')
-    parser.add_argument('--pythonanywhere', action='store_true', default=False,
-                        help='在 PythonAnywhere 上运行,将禁用日志文件')
+    parser.add_argument('--nolog', action='store_true', default=False,
+                        help='禁用日志文件')
     parser.add_argument('--env', type=str, choices=['prod', 'dev', 'test', 'production', 'development', 'testing'],
                         default='prod', help='指定运行环境: prod/dev/test (默认: prod)')
     parser.add_argument('--run-debug-scripts', action='store_true',
-                        help='执行 debug 目录下的脚本 (默认: 生产环境自动执行, 开发环境不执行)')
+                        help='执行 debug 目录下的脚本 (默认操作: 执行')
+    parser.add_argument('--guide', action='store_true', default=False,
+                        help='强制启动系统初始化引导 (默认: False)')
     return parser.parse_args()
 
 
@@ -157,10 +159,13 @@ def main():
     # 解析命令行参数
     args = parse_arguments()
 
-    # 检查配置文件是否存在
-    if not os.path.isfile(".env"):
+    # 检查配置文件是否存在或强制启动引导程序
+    if not os.path.isfile(".env") or args.guide:
         logging.info("=" * 60)
-        logging.info("检测到系统未初始化，正在启动引导程序...")
+        if not os.path.isfile(".env"):
+            logging.info("检测到系统未初始化，正在启动引导程序...")
+        else:
+            logging.info("强制启动系统初始化引导...")
         logging.info("=" * 60)
 
         # 导入并运行引导程序
@@ -175,14 +180,14 @@ def main():
 
         except ImportError as e:
             logging.error(f"导入引导程序失败: {str(e)}")
-            logging.error("请确保 guide.py 文件存在; 若您需要使用 mysql 您可能需要安装 mysql-connector-python")
+            logging.error("请确保 guide.py 文件存在")
         except Exception as e:
             logging.error(f"启动引导程序时发生错误: {str(e)}")
 
         return
 
     # 初始化日志系统
-    if args.pythonanywhere:
+    if args.nolog:
         logger = init_pythonanywhere_logger()
         if logger is None:
             logger.error("PythonAnywhere 环境下日志系统初始化失败")
@@ -206,12 +211,19 @@ def main():
         if not run_update():
             logger.warning("更新失败，继续使用当前版本启动")
 
+    # 在数据库连接前执行debug脚本
+    config = get_config_by_env(args.env)
+
+    # 默认执行 debug 脚本，无论环境如何（除非明确禁用）
+    should_run_debug_scripts = args.run_debug_scripts or True  # 默认为True
+    if should_run_debug_scripts and not args.env in ['dev', 'development']:
+        execute_debug_scripts()
+
     # 数据库一致性检查（现在是必需步骤）
     logger.info("开始检查数据库模型一致性...")
     try:
         from src.database_checker import handle_database_consistency_check
         # 创建应用实例用于检查
-        config = get_config_by_env(args.env)
         app = create_app(config)
         handle_database_consistency_check(app)
     except ImportError as e:
@@ -259,14 +271,14 @@ def main():
     logger.info(f"运行环境: {args.env}")
     logger.info("=" * 50)
 
-    # 启动服务
+    # 在启动服务前执行debug脚本
     try:
         # 根据环境参数选择相应的配置类
         config = get_config_by_env(args.env)
 
-        # 在生产模式下默认执行 debug 脚本，或者当提供了 --run-debug-scripts 参数时执行
-        should_run_debug_scripts = args.run_debug_scripts or args.env in ['prod', 'production']
-        if should_run_debug_scripts and not args.env in ['dev', 'development']:
+        # 默认执行 debug 脚本，无论环境如何
+        should_run_debug_scripts = args.run_debug_scripts or True  # 默认为True
+        if should_run_debug_scripts:
             execute_debug_scripts()
 
         app = create_app(config)

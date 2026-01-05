@@ -20,15 +20,21 @@
 - **文章管理** - 支持Markdown编辑器、标签分类、全文搜索
 - **用户系统** - 完整的用户注册/登录、权限管理、个人主页
 - **评论系统** - Giscus
-- **媒体管理** - 图片上传、自动缩略图生成
+- **媒体管理** - 基于S3协议的图片上传、本地的自动缩略图生成
 - **SEO优化** - 自动sitemap生成、友好URL、元标签优化
 
 ### 扩展功能
 
 - **主题系统** - 支持切换主题、主题开发API
 - **插件架构** - 模块化插件系统，支持功能扩展
-- **数据统计** - 访问量统计、用户行为分析
-- **安全防护** - SQL注入防护、XSS过滤
+- **数据统计** - 
+  - 访问量统计：记录页面访问、用户行为、设备信息
+  - 用户行为分析：追踪用户活动、分析用户模式、生成洞察报告
+  - 统计API：提供仪表板、页面统计、用户活动等API端点
+- **安全防护** - 
+  - SQL注入防护：参数化查询、输入验证、安全查询构建器
+  - XSS过滤：HTML转义、内容过滤、安全输出
+  - 输入验证：多种验证函数、安全装饰器、文件名清理
 - **API接口** - RESTful API设计，支持第三方集成
 
 ### 技术特性
@@ -124,7 +130,7 @@ DB_PORT=5432           # 数据库端口
 DB_USER=postgres       # 数据库用户名
 DB_PASSWORD=123456     # 数据库密码
 DB_NAME=flaskblog      # 数据库名称
-DB_ENGINE=postgresql   # 数据库引擎 (postgresql/mysql/sqlite)
+DB_ENGINE=postgresql   # 数据库引擎 (postgresql/sqlite)
 ```
 
 ### 应用配置 [7](#0-6)
@@ -193,6 +199,24 @@ plugins/myplugin/
 ### API接口
 
 应用提供RESTful API接口，详细文档请访问：`/api/docs`
+
+#### 统计与分析API
+
+系统提供以下统计分析API端点：
+
+- `GET /api/analytics/dashboard` - 获取仪表板统计数据
+- `GET /api/analytics/page-views` - 获取页面访问统计
+- `GET /api/analytics/user-activities` - 获取用户活动统计
+- `GET /api/analytics/top-pages` - 获取热门页面统计
+- `GET /api/analytics/user-behavior/<user_id>` - 获取用户行为分析
+
+#### 安全功能API
+
+安全相关的API和工具函数：
+
+- `src.utils.security.safe` - 安全工具模块
+- `src.utils.analytics` - 统计分析工具模块
+- `src.models.misc` - 统计相关数据模型
 
 ## 🤝 贡献指南
 
