@@ -28,15 +28,23 @@ def admin_settings(user_id):
             try:
                 settings = json.loads(settings_data)
                 for key, value in settings.items():
+                    # 将值序列化为JSON字符串以存储到数据库
+                    # 处理 None、空字典和其他特殊值
+                    if value is None:
+                        serialized_value = None
+                    elif isinstance(value, (dict, list)):
+                        serialized_value = json.dumps(value, ensure_ascii=False)
+                    else:
+                        serialized_value = str(value)
                     setting = db.session.query(SystemSettings).filter_by(key=key).first()
                     if setting:
-                        setting.value = value
+                        setting.value = serialized_value
                         setting.updated_at = datetime.now()
                         setting.updated_by = user_id
                     else:
                         setting = SystemSettings(
                             key=key,
-                            value=value,
+                            value=serialized_value,
                             updated_at=datetime.now(),
                             updated_by=user_id
                         )
@@ -45,6 +53,91 @@ def admin_settings(user_id):
                 return jsonify({'success': True, 'message': '设置已保存'})
             except Exception as e:
                 return jsonify({'success': False, 'message': f'保存失败: {str(e)}'})
+
+        # 处理站点图像上传
+        if request.method == 'POST' and request.form.get('action') == 'upload_site_image':
+            try:
+                from flask import current_app
+                from werkzeug.utils import secure_filename
+                import os
+                import hashlib
+
+                # 检查是否有文件上传
+                if 'file' not in request.files:
+                    return jsonify({'success': False, 'message': '没有上传文件'}), 400
+
+                file = request.files['file']
+                if file.filename == '':
+                    return jsonify({'success': False, 'message': '没有选择文件'}), 400
+
+                # 验证文件类型
+                allowed_extensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp']
+                if not any(file.filename.lower().endswith(ext) for ext in allowed_extensions):
+                    return jsonify(
+                        {'success': False, 'message': '不支持的文件类型，仅支持PNG, JPG, JPEG, GIF, WEBP'}), 400
+
+                # 检查文件大小
+                file.seek(0, 2)  # 移动到文件末尾
+                file_size = file.tell()
+                file.seek(0)  # 重置文件指针
+
+                if file_size > 5 * 1024 * 1024:  # 5MB
+                    return jsonify({'success': False, 'message': '文件大小不能超过5MB'}), 400
+
+                # 读取文件内容
+                file_content = file.read()
+
+                # 计算文件哈希
+                file_hash = hashlib.sha256(file_content).hexdigest()
+
+                # 保存文件到存储位置
+                upload_dir = os.path.join(current_app.root_path, '..', 'static', 'site_images')
+                os.makedirs(upload_dir, exist_ok=True)
+
+                # 生成安全的文件名
+                file_ext = os.path.splitext(secure_filename(file.filename))[1]
+                safe_filename = f"{file_hash}{file_ext}"
+                file_path = os.path.join(upload_dir, safe_filename)
+
+                # 保存文件
+                with open(file_path, 'wb') as f:
+                    f.write(file_content)
+
+                # 构建文件URL
+                file_url = f"{request.url_root}static/site_images/{safe_filename}"
+
+                # 保存到系统设置
+                setting = db.session.query(SystemSettings).filter_by(key='site_img').first()
+                # 将文件URL作为字符串值保存
+                serialized_file_url = str(file_url) if file_url is not None else None
+                if setting:
+                    setting.value = serialized_file_url
+                    setting.updated_at = datetime.now()
+                    setting.updated_by = user_id
+                else:
+                    setting = SystemSettings(
+                        key='site_img',
+                        value=serialized_file_url,
+                        updated_at=datetime.now(),
+                        updated_by=user_id
+                    )
+                    db.session.add(setting)
+                db.session.commit()
+
+                # 返回成功响应
+                return jsonify({
+                    'success': True,
+                    'message': '站点图像上传成功',
+                    'uploaded': [{
+                        'filename': file.filename,
+                        'url': file_url,
+                        'hash': file_hash
+                    }]
+                })
+
+            except Exception as e:
+                db.session.rollback()
+                return jsonify({'success': False, 'message': f'上传失败: {str(e)}'}), 500
 
         # 处理菜单操作
         if request.method == 'POST' and 'menu_action' in request.form:
@@ -181,7 +274,7 @@ def admin_settings(user_id):
                 if not title or not slug:
                     return jsonify({'success': False, 'message': '页面标题和别名不能为空'})
 
-                existing_page = db.query(Pages).filter_by(slug=slug).first()
+                existing_page = db.session.query(Pages).filter_by(slug=slug).first()
                 if existing_page:
                     return jsonify({'success': False, 'message': '页面别名已存在'})
 
@@ -202,8 +295,8 @@ def admin_settings(user_id):
                     updated_at=datetime.now(),
                     published_at=datetime.now() if status == 1 else None
                 )
-                db.add(page)
-                db.commit()
+                db.session.add(page)
+                db.session.commit()
                 return jsonify({'success': True, 'message': '页面创建成功', 'page_id': page.id})
 
             elif action == 'update_page':
@@ -268,7 +361,17 @@ def admin_settings(user_id):
         # GET请求 - 显示设置页面
         # 获取系统设置
         system_settings = db.session.query(SystemSettings).all()
-        settings_dict = {setting.key: setting.value for setting in system_settings}
+        settings_dict = {}
+        for setting in system_settings:
+            if setting.value is None:
+                settings_dict[setting.key] = None
+            else:
+                try:
+                    # 尝试将值反序列化为JSON对象
+                    settings_dict[setting.key] = json.loads(setting.value)
+                except (json.JSONDecodeError, TypeError):
+                    # 如果不是JSON格式，则直接使用原始值
+                    settings_dict[setting.key] = setting.value
 
         # 获取菜单
         menus = db.session.query(Menus).order_by(Menus.created_at.desc()).all()
