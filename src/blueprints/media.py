@@ -64,8 +64,10 @@ def media_thumbnail():
     f_type = request.args.get('type')
     if not is_valid_hash(64, f_hash):
         return "Invalid file hash", 400
-    thumb_path = Path(base_dir) / f"thumbnails/{f_hash}.jpg"
-    thumb_dir = Path(base_dir) / "thumbnails"
+    # 构建缩略图文件路径 - 使用 hash.扩展名 的格式，以哈希值前两位进行分库
+    hash_prefix = f_hash[:2]
+    thumb_path = Path(base_dir) / f"thumbnails/{hash_prefix}/{f_hash}.jpg"
+    thumb_dir = Path(base_dir) / f"thumbnails/{hash_prefix}"
     if not thumb_dir.exists():
         thumb_dir.mkdir(parents=True, exist_ok=True)
 
@@ -82,10 +84,11 @@ def media_thumbnail():
                 file_data = s3_storage.load_file(file_hash.storage_path)
                 if file_data is None:
                     return "File not found in S3 storage", 404
-                
-                # 将文件数据写入临时文件
-                temp_file_path = Path(base_dir) / f"temp/{f_hash}"
-                temp_dir = Path(base_dir) / "temp"
+
+                # 将文件数据写入临时文件，以哈希值前两位进行分库
+                hash_prefix = f_hash[:2]
+                temp_file_path = Path(base_dir) / f"temp/{hash_prefix}/{f_hash}"
+                temp_dir = Path(base_dir) / f"temp/{hash_prefix}"
                 if not temp_dir.exists():
                     temp_dir.mkdir(parents=True, exist_ok=True)
                 
@@ -99,8 +102,8 @@ def media_thumbnail():
                     generate_thumbnail(temp_file_path, thumb_path)
                 
                 # 删除临时文件
-                if temp_file_path.exists():
-                    os.remove(temp_file_path)
+                # if temp_file_path.exists():
+                #    os.remove(temp_file_path)
             else:
                 # 使用本地文件路径
                 file_path = Path(base_dir) / file_hash.storage_path
@@ -136,10 +139,11 @@ def media_shared():
         
         # 检查存储路径是否为S3路径
         if file_hash.storage_path.startswith('s3://'):
-            # 构建缓存文件路径 - 使用 hash.扩展名 的格式
+            # 构建缓存文件路径 - 使用 hash.扩展名 的格式，以哈希值前两位进行分库
             file_extension = file_hash.filename.split('.')[-1] if '.' in file_hash.filename else 'bin'
-            cache_file_path = Path(base_dir) / f"cache/{f_hash}.{file_extension}"
-            cache_dir = Path(base_dir) / "cache"
+            hash_prefix = f_hash[:2]
+            cache_file_path = Path(base_dir) / f"cache/{hash_prefix}/{f_hash}.{file_extension}"
+            cache_dir = Path(base_dir) / f"cache/{hash_prefix}"
             if not cache_dir.exists():
                 cache_dir.mkdir(parents=True, exist_ok=True)
 
