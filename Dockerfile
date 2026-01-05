@@ -7,8 +7,6 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     build-essential \
     pkg-config \
-    libmariadb-dev \
-    libmariadb-dev-compat \
     libpq-dev \
     libmagic-dev \
     && rm -rf /var/lib/apt/lists/*
@@ -37,7 +35,7 @@ COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/pytho
 COPY . .
 
 # 创建必要的目录
-RUN mkdir -p logs temp_uploads hashed_files thumbnails && \
+RUN mkdir -p logs temp_uploads thumbnails && \
     touch logs/gunicorn_access.log logs/gunicorn_error.log
 
 # 暴露端口

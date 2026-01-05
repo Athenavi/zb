@@ -4,6 +4,7 @@ S3存储功能测试脚本 - 支持真实S3配置
 from unittest.mock import MagicMock
 import os
 
+
 def test_s3_storage_basic():
     """测试S3存储基本功能 - 使用真实配置"""
     try:
@@ -44,6 +45,7 @@ def test_s3_storage_basic():
     except Exception as e:
         print(f"S3存储基本功能测试失败: {str(e)}")
         return False
+
 
 def test_s3_storage_with_mock():
     """使用模拟对象测试S3存储功能 - 保留用于单元测试"""
@@ -100,61 +102,6 @@ def test_s3_storage_with_mock():
         traceback.print_exc()
         return False
 
-def test_local_fallback():
-    """测试本地存储回退功能"""
-    try:
-        from src.utils.storage.s3_storage import S3Storage
-        import tempfile
-        import os
-
-        print("测试本地存储回退功能...")
-
-        # 创建S3存储实例但不启用S3
-        s3_storage = S3Storage()
-
-        # 模拟禁用S3的配置
-        class MockApp:
-            config = {
-                'S3_ENABLED': False,
-                'S3_ENDPOINT_URL': os.getenv('S3_ENDPOINT_URL', 'https://s3.amazonaws.com'),
-                'S3_ACCESS_KEY': os.getenv('S3_ACCESS_KEY'),
-                'S3_SECRET_KEY': os.getenv('S3_SECRET_KEY'),
-                'S3_BUCKET_NAME': os.getenv('S3_BUCKET_NAME'),
-                'S3_REGION': os.getenv('S3_REGION', 'us-east-1'),
-                'S3_USE_SSL': True
-            }
-
-        s3_storage.init_app(MockApp())
-
-        # 测试保存文件（应该使用本地存储）
-        test_hash = 'test_hash_value'
-        test_data = b'test file content'
-        test_filename = 'test_file.txt'
-
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # 临时更改当前工作目录以测试本地存储
-            original_cwd = os.getcwd()
-            os.chdir(temp_dir)
-
-            try:
-                result_path = s3_storage.save_file(test_hash, test_data, test_filename)
-
-                # 验证文件是否在本地创建
-                expected_local_path = os.path.join('hashed_files', test_hash[:2], test_hash)
-                if os.path.exists(expected_local_path):
-                    print("本地存储回退功能测试通过")
-                    return True
-                else:
-                    print(f"本地存储回退功能测试失败: 文件未创建在 {expected_local_path}")
-                    return False
-            finally:
-                os.chdir(original_cwd)
-
-    except Exception as e:
-        print(f"本地存储回退功能测试失败: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return False
 
 def test_file_processor_integration():
     """测试FileProcessor与S3存储的集成 - 使用真实配置"""
@@ -216,6 +163,7 @@ def test_file_processor_integration():
         traceback.print_exc()
         return False
 
+
 def run_all_tests():
     """运行所有测试"""
     print("=" * 50)
@@ -223,7 +171,6 @@ def run_all_tests():
     print("=" * 50)
 
     tests = [
-        ("本地存储回退功能", test_local_fallback),
         ("S3存储基本功能", test_s3_storage_basic),
         ("S3存储模拟测试", test_s3_storage_with_mock),
         ("FileProcessor集成测试", test_file_processor_integration),
@@ -252,6 +199,7 @@ def run_all_tests():
     print(f"\n总计: {passed}/{total} 个测试通过")
 
     return passed == total
+
 
 if __name__ == "__main__":
     success = run_all_tests()

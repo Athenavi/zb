@@ -6,13 +6,14 @@ import logging
 import os
 from datetime import datetime, timezone
 
-from flask import Flask, g
+from flask import Flask, g, request
 from flask import jsonify
 from flask_principal import identity_loaded, RoleNeed
 from werkzeug.exceptions import NotFound
 
 from src.auth_utils import jwt_required
 from src.blueprints.admin_vip import admin_vip_bp
+from src.blueprints.analytics import analytics_bp
 from src.blueprints.api import api_bp
 from src.blueprints.auth_view import auth_bp
 from src.blueprints.blog import blog_bp, get_site_beian, get_site_title, get_site_domain, get_username_no_check, \
@@ -25,6 +26,7 @@ from src.blueprints.noti import noti_bp
 from src.blueprints.payment import payment_bp
 from src.blueprints.relation import relation_bp
 from src.blueprints.role import role_bp
+from src.blueprints.seo import seo_bp
 from src.blueprints.session_views import session_bp
 # from src.blueprints.supabase_api import supabase_api_bp
 # from src.blueprints.supabase_auth import supabase_auth_bp
@@ -40,6 +42,8 @@ from src.plugin import plugin_bp
 from src.scheduler import init_scheduler
 from src.security import PermissionNeed, init_security_headers
 from src.setting import ProductionConfig
+from src.utils.analytics import record_page_view
+from src.utils.config_manager import config_manager
 from src.utils.filters import json_filter, string_split, article_author, md2html, relative_time_filter, category_filter, \
     f2list
 from src.utils.storage.s3_storage import s3_storage
@@ -65,6 +69,8 @@ def create_app(config_class=None):
 
     static_folder = os.path.join(config_class.base_dir, 'static')
     templates_folder = os.path.join(config_class.base_dir, 'templates')
+
+    # 导入Blueprints以避免循环导入
     app = Flask(__name__, template_folder=templates_folder, static_folder=static_folder, static_url_path='/static')
     app.config.from_object(config_class)
 
@@ -73,7 +79,19 @@ def create_app(config_class=None):
     init_extensions(app)
 
     # 初始化S3存储
-    s3_storage.init_app(app)
+    try:
+        s3_storage.init_app(app)
+    except Exception as e:
+        print(f"！！！警告: S3存储初始化失败: {str(e)}")
+        print("！！！系统将继续运行，但媒体功能受限")
+
+    # 初始化配置管理器
+    try:
+        config_manager.refresh_all_configs(app)
+        print("配置管理器初始化成功")
+    except Exception as e:
+        print(f"！！！警告: 配置管理器初始化失败: {str(e)}")
+        print("！！！系统将继续运行，但配置可能无法实时更新")
 
     # 初始化安全头
     init_security_headers(app)
@@ -103,9 +121,51 @@ def create_app(config_class=None):
     # 配置日志
     configure_logging(app)
 
+    # 添加访问统计中间件
+    @app.before_request
+    def track_page_view():
+        # 排除静态资源和API健康检查等路径
+        excluded_paths = ['/static', '/health', '/api/check-login', '/api/monitoring', '/api/health']
+        if not any(request.path.startswith(path) for path in excluded_paths):
+            from flask_login import current_user
+            user_id = current_user.id if current_user.is_authenticated else None
+            record_page_view(
+                user_id=user_id,
+                page_url=request.url,
+                page_title=get_page_title(),
+                referrer=request.referrer
+            )
+
     print_startup_info(config_class)
 
     return app
+
+
+def get_page_title():
+    """根据当前请求获取页面标题"""
+    from flask import g
+
+    # 尝试从全局变量获取页面标题
+    if hasattr(g, 'page_title'):
+        return g.page_title
+
+    # 根据endpoint确定页面标题
+    endpoint = request.endpoint
+    if endpoint:
+        title_map = {
+            'blog_bp.index': '首页',
+            'blog_bp.detail': '文章详情',
+            'blog_bp.category_list': '分类列表',
+            'auth_bp.login': '登录',
+            'auth_bp.register': '注册',
+            'my_bp.profile': '个人资料',
+            'my_bp.dashboard': '仪表板',
+            'admin_bp.admin_user': '管理后台',
+            'admin_bp.admin_blog': '博客管理',
+        }
+        return title_map.get(endpoint, endpoint)
+
+    return request.endpoint or '未知页面'
 
 
 def register_context_processors(app, config_class):
@@ -280,6 +340,8 @@ def register_blueprints(app):
         admin_vip_bp,
         session_bp,
         payment_bp,
+        seo_bp,
+        analytics_bp,
         #supabase_api_bp,
         #supabase_auth_bp
     ]
