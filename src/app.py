@@ -70,7 +70,6 @@ def create_app(config_class=None):
     templates_folder = os.path.join(config_class.base_dir, 'templates')
 
     # 导入Blueprints以避免循环导入
-    from src.blueprints.noti import noti_bp
     app = Flask(__name__, template_folder=templates_folder, static_folder=static_folder, static_url_path='/static')
     app.config.from_object(config_class)
 
@@ -79,7 +78,11 @@ def create_app(config_class=None):
     init_extensions(app)
 
     # 初始化S3存储
-    s3_storage.init_app(app)
+    try:
+        s3_storage.init_app(app)
+    except Exception as e:
+        print(f"！！！警告: S3存储初始化失败: {str(e)}")
+        print("！！！系统将继续运行，但媒体功能受限")
 
     # 初始化安全头
     init_security_headers(app)

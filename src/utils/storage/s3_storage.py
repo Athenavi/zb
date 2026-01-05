@@ -1,4 +1,3 @@
-import os
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -37,6 +36,10 @@ class S3Storage:
         
         # 创建S3客户端
         self.s3_client = self._create_s3_client()
+
+        # 如果S3客户端未成功创建，记录警告
+        if self.s3_client is None:
+            print("警告: S3客户端未成功初始化，媒体上传功能可能不可用")
     
     def _create_s3_client(self):
         """创建S3客户端"""
@@ -45,7 +48,11 @@ class S3Storage:
             
         # 检查必要的配置
         if not all([self.s3_access_key, self.s3_secret_key, self.s3_bucket_name]):
-            raise ValueError("S3配置不完整：缺少访问密钥、密钥或存储桶名称")
+            print("警告: S3配置不完整，将禁用S3存储功能")
+            print(f"S3_ACCESS_KEY: {'已配置' if self.s3_access_key else '未配置'}")
+            print(f"S3_SECRET_KEY: {'已配置' if self.s3_secret_key else '未配置'}")
+            print(f"S3_BUCKET_NAME: {'已配置' if self.s3_bucket_name else '未配置'}")
+            return None
         
         # 配置S3客户端参数
         client_config = {
@@ -55,7 +62,7 @@ class S3Storage:
         }
         
         # 如果有自定义端点（如MinIO），添加endpoint_url
-        if self.s3_endpoint:
+        if self.s3_endpoint and self.s3_endpoint.strip():
             client_config['endpoint_url'] = self.s3_endpoint
             client_config['use_ssl'] = self.s3_use_ssl
             # 只有在使用SSL时才设置verify
