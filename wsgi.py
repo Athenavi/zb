@@ -1,3 +1,67 @@
+# -*- coding: utf-8 -*-
+"""
+WSGI应用入口点
+"""
+
+import os
+import sys
+from pathlib import Path
+
+# 添加项目根目录到Python路径
+project_root = Path(__file__).resolve().parent
+sys.path.insert(0, str(project_root))
+
+# 从环境变量获取运行模式
+RUN_MODE = os.environ.get('RUN_MODE', 'default')  # 'default', 'vercel', 'gunicorn'
+
+if RUN_MODE == 'vercel':
+    # 在Vercel环境中，不使用gevent
+    from src.app import create_app
+
+    application = create_app()
+else:
+    # 在其他环境中，可选择使用gevent
+    try:
+        from gevent import monkey
+
+        monkey.patch_all()
+        GEVENT_AVAILABLE = True
+        print("Gevent monkey patching applied.")
+    except ImportError:
+        GEVENT_AVAILABLE = False
+        print("Gevent not available, running in standard mode.")
+
+    from src.app import create_app
+
+    application = create_app()
+
+    # 在非Vercel环境中提供Gevent WSGI服务器选项
+    if __name__ == '__main__':
+        if GEVENT_AVAILABLE and '--gevent' in sys.argv:
+            from gevent.pywsgi import WSGIServer
+
+            try:
+                from geventwebsocket.handler import WebSocketHandler
+
+                # 如果需要WebSocket支持，包含WebSocketHandler
+                server = WSGIServer(('0.0.0.0', int(os.environ.get('PORT', 5000))),
+                                    application,
+                                    handler_class=WebSocketHandler)
+            except ImportError:
+                # 如果没有WebSocket支持，使用标准WSGI服务器
+                server = WSGIServer(('0.0.0.0', int(os.environ.get('PORT', 5000))),
+                                    application)
+
+            print(f"Starting gevent server on port {os.environ.get('PORT', 5000)}...")
+            server.serve_forever()
+        else:
+            # 使用Flask内置开发服务器
+            application.run(
+                host='0.0.0.0',
+                port=int(os.environ.get('PORT', 5000)),
+                debug=os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+            )
+
 import sys
 import warnings
 

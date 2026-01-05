@@ -5,8 +5,6 @@ Vercel兼容的入口文件
 import os
 from pathlib import Path
 
-from src.app import create_app
-
 # 设置环境变量以适应Vercel环境
 if os.environ.get('VERCEL'):
     # 在Vercel环境中，使用环境变量或默认值
@@ -29,11 +27,21 @@ base_dir = Path(__file__).parent
 static_folder = base_dir / 'static'
 templates_folder = base_dir / 'templates'
 
-# 创建Flask应用实例
-app = create_app()
+
+def create_app_with_conditional_imports():
+    """条件导入以减少函数大小"""
+    # 在函数内部导入，避免全局导入大库
+    from src.app import create_app
+    return create_app()
+
+
+# 创建Flask应用实例（仅在首次调用时创建，利用Vercel的缓存机制）
+if 'application' not in globals():
+    application = create_app_with_conditional_imports()
+
 
 # Vercel期望名为application的WSGI应用
-application = app
+application = application
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    application.run(debug=True)

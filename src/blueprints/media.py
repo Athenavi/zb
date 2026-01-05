@@ -14,7 +14,7 @@ from src.extensions import cache
 from src.models import Media, FileHash, db
 from src.models.user import User
 from src.setting import AppConfig, BaseConfig
-from src.utils.image.processing import generate_video_thumbnail, generate_thumbnail
+from src.utils.image.processing import create_video_thumbnail, optimize_image as generate_thumbnail
 from src.utils.security.safe import is_valid_hash
 from src.utils.storage.s3_storage import s3_storage
 
@@ -97,7 +97,7 @@ def media_thumbnail():
                 
                 # 生成缩略图
                 if f_type == "video":
-                    generate_video_thumbnail(temp_file_path, thumb_path)
+                    create_video_thumbnail(temp_file_path, thumb_path)
                 else:
                     generate_thumbnail(temp_file_path, thumb_path)
                 
@@ -109,7 +109,7 @@ def media_thumbnail():
                 file_path = Path(base_dir) / file_hash.storage_path
                 if not os.path.exists(thumb_path):
                     if f_type == "video":
-                        generate_video_thumbnail(file_path, thumb_path)
+                        create_video_thumbnail(file_path, thumb_path)
                     else:
                         generate_thumbnail(file_path, thumb_path)
         except (IOError, OSError) as e:

@@ -39,7 +39,6 @@ from src.extensions import login_manager
 from src.logger_config import init_optimized_logger
 from src.other.search import search_handler
 from src.plugin import plugin_bp
-from src.scheduler import init_scheduler
 from src.security import PermissionNeed, init_security_headers
 from src.setting import ProductionConfig
 from src.utils.analytics import record_page_view
@@ -48,14 +47,13 @@ from src.utils.filters import json_filter, string_split, article_author, md2html
     f2list
 from src.utils.storage.s3_storage import s3_storage
 
-# 在所有其他导入之前导入并应用gevent补丁
+# 条件导入大型库以减少函数大小
 try:
     import gevent.monkey
-
     gevent.monkey.patch_all()
     print("Gevent monkey patching applied.")
 except ImportError:
-    print("No gevent found. Skipping monkey patching.")
+    print("No gevent found. Skipping monkey patching. This is expected in serverless environments.")
 
 # 初始化优化的日志系统
 logger = init_optimized_logger()
@@ -108,8 +106,10 @@ def create_app(config_class=None):
     # 注册模板过滤器
     register_template_filters(app)
 
-    # 初始化调度器
-    init_scheduler(app)
+    # 条件初始化调度器（在serverless环境中可能不需要）
+    if not os.environ.get('VERCEL'):
+        from src.scheduler import init_scheduler
+        init_scheduler(app)
 
     # 初始化监控
     try:
