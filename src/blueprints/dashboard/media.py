@@ -130,30 +130,22 @@ def media_preview(user_id, media_id):
         file_record = db.session.query(FileHash).filter_by(hash=media.hash).first()
         if not file_record:
             return jsonify({'error': '文件哈希记录不存在'}), 404
-
-        # 检查文件是否存在
-        file_dir = Path(base_dir) / file_record.storage_path
-        if not os.path.exists(file_dir):
-            return jsonify({'error': '文件不存在'}), 404
-
         # 根据MIME类型决定返回方式
         file_type = 'unknown'
         if file_record.mime_type.startswith('image/'):
             file_type = 'image'
-        if file_record.mime_type.startswith('video/'):
+        elif file_record.mime_type.startswith('video/'):
             file_type = 'video'
         elif file_record.mime_type.startswith('text/'):
-            try:
-                with open(file_dir, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                    file_type = 'text'
-                return jsonify({
-                    'type': file_type,
-                    'content': content,
-                    'mime_type': file_record.mime_type
-                })
-            except IOError as e:
-                return jsonify({'error': str(e)}), 500
+            return jsonify({
+                'type': file_type,
+                'filename': file_record.filename,
+                'mime_type': file_record.mime_type,
+                'size': file_record.file_size,
+                'error': '文件已丢失',
+                'view_url': None,
+                'url': None
+            })
         return jsonify({
             'type': file_type,
             'filename': file_record.filename,

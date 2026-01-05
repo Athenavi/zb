@@ -131,6 +131,15 @@
             // 文章ID
             const articleId = {{ article.article_id }};
 
+            // 检查是否已经记录过浏览量
+            const hasRecorded = isArticleViewRecorded(articleId);
+
+            // 如果已经记录过浏览量，则不执行统计
+            if (hasRecorded) {
+                console.log('浏览量已记录，跳过统计');
+                return;
+            }
+
             // 开始时间
             const startTime = Date.now();
 
@@ -162,6 +171,8 @@
                         }).then(response => {
                             if (response.ok) {
                                 console.log('浏览量统计成功');
+                                // 记录浏览量已统计，避免重复统计
+                                recordArticleView(articleId);
                             } else {
                                 console.error('浏览量统计失败');
                             }
@@ -175,6 +186,83 @@
                 }
             }, 1000); // 每秒检查一次
         });
+
+        // 检查文章是否已经记录过浏览量
+        function isArticleViewRecorded(articleId) {
+            // 从localStorage获取已记录的文章列表
+            const recordedArticles = JSON.parse(localStorage.getItem('article_views_recorded') || '[]');
+
+            // 检查当前文章是否在列表中
+            if (recordedArticles.includes(articleId.toString())) {
+                return true;
+            }
+
+            // 从cookie获取已记录的文章列表
+            const cookieRecorded = getCookie('article_views_recorded');
+            if (cookieRecorded) {
+                try {
+                    const cookieArticles = JSON.parse(decodeURIComponent(cookieRecorded));
+                    return cookieArticles.includes(articleId.toString());
+                } catch (e) {
+                    console.error('解析cookie中的文章记录失败:', e);
+                    return false;
+                }
+            }
+
+            return false;
+        }
+
+        // 记录文章浏览量已统计
+        function recordArticleView(articleId) {
+            // 获取当前已记录的文章列表
+            let recordedArticles = JSON.parse(localStorage.getItem('article_views_recorded') || '[]');
+
+            // 如果文章ID不在列表中，则添加
+            if (!recordedArticles.includes(articleId.toString())) {
+                recordedArticles.push(articleId.toString());
+                localStorage.setItem('article_views_recorded', JSON.stringify(recordedArticles));
+            }
+
+            // 同时更新cookie中的记录
+            let cookieRecorded = [];
+            const cookieData = getCookie('article_views_recorded');
+            if (cookieData) {
+                try {
+                    cookieRecorded = JSON.parse(decodeURIComponent(cookieData));
+                } catch (e) {
+                    console.error('解析cookie中的文章记录失败:', e);
+                    cookieRecorded = [];
+                }
+            }
+
+            if (!cookieRecorded.includes(articleId.toString())) {
+                cookieRecorded.push(articleId.toString());
+                setCookie('article_views_recorded', encodeURIComponent(JSON.stringify(cookieRecorded)), 30); // 30天过期
+            }
+        }
+
+        // Cookie操作辅助函数
+        function setCookie(name, value, days) {
+            if (days) {
+                const date = new Date();
+                date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+                const expires = "expires=" + date.toUTCString();
+                document.cookie = name + "=" + value + ";" + expires + ";path=/;SameSite=Lax";
+            } else {
+                document.cookie = name + "=" + value + ";path=/;SameSite=Lax";
+            }
+        }
+
+        function getCookie(name) {
+            const nameEQ = name + "=";
+            const ca = document.cookie.split(";");
+            for (let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) === " ") c = c.substring(1, c.length);
+                if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+            }
+            return null;
+        }
     </script>
 </head>
 <body>

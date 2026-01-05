@@ -30,11 +30,36 @@ def install_plugin():
 
 @plugin_bp.route('/uninstall/<plugin_name>', methods=['DELETE'])
 def uninstall_plugin(plugin_name):  # 修复：添加缺失的参数
-    # 实际应用中这里应该处理插件的卸载
-    return jsonify({
-        'status': 'error',
-        'message': f'Plugin {plugin_name} uninstallation not implemented yet'
-    })
+    """卸载插件：删除插件目录并从系统中移除"""
+    import os
+    import shutil
+    from pathlib import Path
+
+    plugin_dir = Path(os.path.dirname(__file__)).parent / 'plugins' / plugin_name
+
+    # 检查插件是否存在
+    if not plugin_dir.exists():
+        return jsonify({
+            'status': 'error',
+            'message': f'Plugin {plugin_name} does not exist'
+        })
+
+    try:
+        # 先禁用插件（如果已启用）
+        plugins_manager.disable_plugin(plugin_name)
+
+        # 删除插件目录
+        shutil.rmtree(plugin_dir)
+
+        return jsonify({
+            'status': 'success',
+            'message': f'Plugin {plugin_name} uninstalled successfully'
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Failed to uninstall plugin: {str(e)}'
+        })
 
 
 @plugin_bp.route('/')
