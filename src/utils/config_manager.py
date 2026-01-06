@@ -36,9 +36,16 @@ class ConfigManager:
     def refresh_mail_config(self, app=None):
         """刷新邮件配置"""
         if app is None:
-            if not current_app:
+            try:
+                # 检查是否在应用上下文中
+                if not current_app:
+                    print("错误: 无法在应用上下文外刷新邮件配置")
+                    return
+                app = current_app
+            except RuntimeError:
+                # 如果不在应用上下文中，返回而不执行操作
+                print("错误: 当前不在应用上下文中，无法刷新邮件配置")
                 return
-            app = current_app
 
         # 从数据库加载邮件配置
         config = self.load_config_from_db()
@@ -77,9 +84,16 @@ class ConfigManager:
     def refresh_s3_config(self, app=None):
         """刷新S3配置"""
         if app is None:
-            if not current_app:
+            try:
+                # 检查是否在应用上下文中
+                if not current_app:
+                    print("错误: 无法在应用上下文外刷新S3配置")
+                    return
+                app = current_app
+            except RuntimeError:
+                # 如果不在应用上下文中，返回而不执行操作
+                print("错误: 当前不在应用上下文中，无法刷新S3配置")
                 return
-            app = current_app
 
         try:
             config = self.load_config_from_db()
@@ -114,6 +128,18 @@ class ConfigManager:
     def refresh_all_configs(self, app=None):
         """刷新所有配置"""
         print("开始刷新所有配置...")
+        if app is None:
+            try:
+                # 检查是否在应用上下文中
+                if not current_app:
+                    print("错误: 无法在应用上下文外刷新配置")
+                    return
+                app = current_app
+            except RuntimeError:
+                # 如果不在应用上下文中，返回而不执行操作
+                print("错误: 当前不在应用上下文中，无法刷新配置")
+                return
+        
         self.refresh_mail_config(app)
         self.refresh_s3_config(app)
         print("所有配置已刷新完成")

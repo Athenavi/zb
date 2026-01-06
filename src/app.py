@@ -86,7 +86,8 @@ def create_app(config_class=None):
 
     # 初始化配置管理器
     try:
-        config_manager.refresh_all_configs(app)
+        with app.app_context():  # 使用应用上下文确保配置管理器正确初始化
+            config_manager.refresh_all_configs(app)
         print("配置管理器初始化成功")
     except Exception as e:
         print(f"！！！警告: 配置管理器初始化失败: {str(e)}")

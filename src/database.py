@@ -183,58 +183,6 @@ def get_database_info():
     }
 
 
-# Redis连接配置
-redis_client = None
-try:
-    import redis
-
-    redis_client = redis.Redis(
-        **app_config.RedisConfig
-    )
-    redis_client.ping()
-    logger.info("Redis连接成功")
-except ImportError:
-    redis = None
-    logger.warning("Redis Python客户端未安装，将使用内存缓存")
-    redis_client = None
-except Exception as e:
-    redis = None
-    logger.warning(f"Redis连接失败，将使用内存缓存: {e}")
-    redis_client = None
-
-
-# 辅助函数：检查当前使用的缓存类型205
-def get_cache_status():
-    """获取当前缓存状态"""
-    if redis_client is not None:
-        try:
-            redis_client.ping()
-            return "redis"
-        except redis.exceptions.ConnectionError:
-            return "memory"
-    return "memory"
-
-
-# 辅助函数：手动切换缓存类型（用于测试或特殊场景）
-def switch_cache_type(cache_type):
-    """手动切换缓存类型（主要用于测试）"""
-    global redis_client
-    if cache_type == "redis":
-        try:
-            import redis
-            redis_client = redis.Redis(**app_config.RedisConfig)
-            redis_client.ping()
-            logger.info("已切换到Redis缓存")
-        except Exception as err:
-            logger.error(f"无法切换到Redis: {err}")
-            redis_client = None
-    elif cache_type == "memory":
-        redis_client = None
-        logger.info("已切换到内存缓存")
-    else:
-        logger.warning("不支持或不可用的缓存类型")
-
-
 if __name__ == "__main__":
     # 测试代码
     db_info = get_database_info()

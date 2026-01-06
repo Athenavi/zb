@@ -1,4 +1,4 @@
-pymdown-extensions==10.19.1
+pymdown-extensions==10.20
 bcrypt==5.0.0
 bleach==6.3.0
 cffi==2.0.0
@@ -41,12 +41,12 @@ logger==1.4
 python-alipay-sdk==3.4.0
 jd_wechatpay==0.1.1
 psycopg2-binary==2.9.11
-boto3==1.42.17
+boto3==1.42.22
 gunicorn
-# 注意：vercel下需要移除了以下大型依赖以减小函数大小
-# gevent
-# flask-socketio
-# opencv-python
-# psutil
-# gevent-websocket
-# waitress
+# 注意：vercel下需要移除以下大型依赖以减小函数大小
+gevent
+flask-socketio
+opencv-python
+psutil==7.2.1
+gevent-websocket
+waitress
