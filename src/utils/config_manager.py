@@ -4,7 +4,6 @@
 import json
 from typing import Dict, Any
 
-import redis
 from flask import current_app
 from flask_mail import Mail
 
@@ -16,7 +15,6 @@ from src.utils.storage.s3_storage import s3_storage
 class ConfigManager:
     def __init__(self):
         self.mail = Mail()
-        self.redis_client = None
         self.s3_storage = s3_storage
 
     def load_config_from_db(self) -> Dict[str, Any]:
@@ -76,44 +74,6 @@ class ConfigManager:
         except Exception as e:
             print(f"邮件配置刷新失败: {e}")
 
-    def refresh_redis_config(self, app=None):
-        """刷新Redis配置"""
-        if app is None:
-            if not current_app:
-                return
-            app = current_app
-
-        try:
-            config = self.load_config_from_db()
-
-            # 获取Redis配置
-            redis_host = config.get('redis_host', 'localhost')
-            redis_port = config.get('redis_port', 6379)
-            redis_password = config.get('redis_password', '')
-            redis_db = config.get('redis_db', 0)
-
-            # 创建新的Redis连接
-            redis_config = {
-                "host": redis_host,
-                "port": int(redis_port),
-                "db": int(redis_db),
-                "decode_responses": True,
-                "socket_connect_timeout": 3,
-                "socket_timeout": 3,
-                "retry_on_timeout": True,
-                "max_connections": 10
-            }
-
-            if redis_password:
-                redis_config["password"] = redis_password
-
-            self.redis_client = redis.Redis(**redis_config)
-            # 测试连接
-            self.redis_client.ping()
-            print("Redis配置已刷新")
-        except Exception as e:
-            print(f"Redis配置刷新失败: {e}")
-
     def refresh_s3_config(self, app=None):
         """刷新S3配置"""
         if app is None:
@@ -155,7 +115,6 @@ class ConfigManager:
         """刷新所有配置"""
         print("开始刷新所有配置...")
         self.refresh_mail_config(app)
-        self.refresh_redis_config(app)
         self.refresh_s3_config(app)
         print("所有配置已刷新完成")
 

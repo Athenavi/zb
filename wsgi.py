@@ -308,16 +308,8 @@ def main():
     logger.info(f"运行环境: {args.env}")
     logger.info("=" * 50)
 
-    # 在启动服务前执行debug脚本
+    # 在启动服务前使用已创建的应用
     try:
-        # 根据环境参数选择相应的配置类
-        config = get_config_by_env(args.env)
-
-        # 默认执行 debug 脚本，无论环境如何
-        should_run_debug_scripts = args.run_debug_scripts or True  # 默认为True
-        if should_run_debug_scripts:
-            execute_debug_scripts()
-
         app = create_app(config)
 
         # 使用 gevent websocket 服务器启动应用

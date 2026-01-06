@@ -134,7 +134,6 @@ def admin_settings(user_id):
 
                 # 刷新配置（如果需要）
                 config_keys = ['mail_host', 'mail_port', 'mail_user', 'mail_password',
-                               'redis_host', 'redis_port', 'redis_password', 'redis_db',
                                's3_enabled', 's3_endpoint', 's3_access_key', 's3_secret_key',
                                's3_bucket', 's3_region', 's3_use_ssl']
 

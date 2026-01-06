@@ -272,13 +272,20 @@ def register_direct_routes(app, config_class):
         # 记录详细错误信息到日志
         app.logger.error(f"Error: {str(e)}")
 
-        # 根据异常类型返回不同的响应
-        if isinstance(e, NotFound):
-            # 返回 404 错误页面或 JSON 响应
-            return error(404, "Page Not Found")
-        else:
-            # 返回 500 错误页面或 JSON 响应
-            return error(500, "Internal Server Error")
+        # 避免在错误处理中再次出现错误导致循环
+        try:
+            # 根据异常类型返回不同的响应
+            if isinstance(e, NotFound):
+                # 返回 404 错误页面或 JSON 响应
+                return error(404, "Page Not Found")
+            else:
+                # 返回 500 错误页面或 JSON 响应
+                return error(500, "Internal Server Error")
+        except Exception as render_error:
+            # 如果错误页面渲染失败，返回简单的错误响应
+            app.logger.error(f"Error rendering error page: {str(render_error)}")
+            from flask import jsonify
+            return jsonify({'error': 'Internal Server Error', 'message': 'An error occurred'}), 500
 
     from flask_principal import PermissionDenied
 

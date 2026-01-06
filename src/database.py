@@ -105,7 +105,6 @@ def get_database_version_query():
     version_queries = {
         'postgresql': "SELECT version()",
         'sqlite': "SELECT sqlite_version()",
-        'oracle': "SELECT * FROM v$version WHERE banner LIKE 'Oracle%'",
         'mssql': "SELECT @@version"
     }
     return version_queries.get(app_config.db_engine, "SELECT version()")
