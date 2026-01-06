@@ -53,6 +53,7 @@ try:
     gevent.monkey.patch_all()
     print("Gevent monkey patching applied.")
 except ImportError:
+    gevent = None  # 定义 gevent 为 None 以避免未定义变量
     print("No gevent found. Skipping monkey patching. This is expected in serverless environments.")
 
 # 初始化优化的日志系统
@@ -116,6 +117,7 @@ def create_app(config_class=None):
         from src.monitoring import monitor
         monitor.init_app(app)
     except ImportError:
+        monitor = None
         app.logger.warning("监控系统导入失败")
 
     # 配置日志
@@ -251,15 +253,6 @@ def register_direct_routes(app, config_class):
     @app.route('/p/<slug_name>', methods=['GET', 'POST'])
     def blog_detail(slug_name):
         return blog_detail_back(blog_slug=slug_name)
-
-    @app.route('/health')
-    def health_check():
-        """健康检查端点"""
-        return jsonify({
-            "status": "healthy",
-            "message": "Application is running",
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }), 200
 
     from flask_login import login_required
     @app.route('/debug')

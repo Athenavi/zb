@@ -112,7 +112,7 @@ def mark_notification_as_read(notification_id: int, user_id: int) -> bool:
 
     if notification and not notification.is_read:
         notification.is_read = True
-        notification.read_at = datetime.utcnow()
+        notification.read_at = datetime.now()
         db.session.commit()
         return True
 
@@ -134,7 +134,7 @@ def mark_all_notifications_as_read(user_id: int) -> int:
         is_read=False
     ).update({
         'is_read': True,
-        'read_at': datetime.utcnow()
+        'read_at': datetime.now()
     })
 
     db.session.commit()

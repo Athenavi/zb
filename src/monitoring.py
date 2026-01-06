@@ -14,6 +14,7 @@ try:
 
     PSUTIL_AVAILABLE = True
 except ImportError:
+    psutil = None
     PSUTIL_AVAILABLE = False
     print("psutil not available, system monitoring features will be limited")
 
@@ -68,7 +69,7 @@ class SystemMonitor:
             disk = psutil.disk_usage('/')
             
             return jsonify({
-                'timestamp': datetime.utcnow().isoformat(),
+                'timestamp': datetime.now().isoformat(),
                 'cpu': {
                     'percent': cpu_percent
                 },

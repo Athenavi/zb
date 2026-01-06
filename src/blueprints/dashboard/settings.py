@@ -311,7 +311,7 @@ def admin_settings(user_id):
 
                     # 检查循环依赖：不能将菜单项设置为其自身的子项或间接子项
                     # 创建时没有原始父ID，所以传入None
-                    if has_circular_dependency(parent_id, None, int(menu_id), None):
+                    if has_circular_dependency(parent_id, None, int(menu_id)):
                         return jsonify({'success': False, 'message': '不能形成循环依赖：所选父菜单项是当前菜单项的子项'})
 
                 item = MenuItems(
@@ -354,7 +354,7 @@ def admin_settings(user_id):
                             return jsonify({'success': False, 'message': '父菜单项不存在或不属于当前菜单'})
 
                         # 检查循环依赖：不能将菜单项设置为其自身的子项或间接子项
-                        if has_circular_dependency(parent_id, item.id, item.menu_id, original_parent_id):
+                        if has_circular_dependency(parent_id, item.id, item.menu_id):
                             return jsonify(
                                 {'success': False, 'message': '不能形成循环依赖：所选父菜单项是当前菜单项的子项'})
 

@@ -21,6 +21,26 @@ if os.environ.get('VERCEL'):
     temp_dir = '/tmp'
     os.environ.setdefault('TEMP_FOLDER', temp_dir)
 
+    # 设置安全密钥
+    os.environ.setdefault('SECRET_KEY', os.environ.get('SECRET_KEY', 'your-vercel-secret-key'))
+
+    # 邮件配置
+    os.environ.setdefault('MAIL_SERVER', os.environ.get('MAIL_SERVER', 'smtp.gmail.com'))
+    os.environ.setdefault('MAIL_PORT', os.environ.get('MAIL_PORT', '587'))
+    os.environ.setdefault('MAIL_USE_TLS', os.environ.get('MAIL_USE_TLS', 'True'))
+    os.environ.setdefault('MAIL_USERNAME', os.environ.get('MAIL_USERNAME', ''))
+    os.environ.setdefault('MAIL_PASSWORD', os.environ.get('MAIL_PASSWORD', ''))
+
+    # S3存储配置
+    os.environ.setdefault('S3_ENABLED', os.environ.get('S3_ENABLED', 'True'))
+    os.environ.setdefault('S3_ENDPOINT_URL', os.environ.get('S3_ENDPOINT_URL', ''))
+    os.environ.setdefault('S3_ACCESS_KEY', os.environ.get('S3_ACCESS_KEY', ''))
+    os.environ.setdefault('S3_SECRET_KEY', os.environ.get('S3_SECRET_KEY', ''))
+    os.environ.setdefault('S3_BUCKET_NAME', os.environ.get('S3_BUCKET_NAME', 'media-bucket'))
+    os.environ.setdefault('S3_REGION', os.environ.get('S3_REGION', 'us-east-1'))
+    os.environ.setdefault('S3_USE_SSL', os.environ.get('S3_USE_SSL', 'True'))
+    os.environ.setdefault('S3_SIGNATURE_VERSION', os.environ.get('S3_SIGNATURE_VERSION', 's3v4'))
+
 # 在Vercel环境下，需要使用正确的静态文件路径
 # 由于Vercel的文件系统限制，我们使用项目根目录下的static文件夹
 base_dir = Path(__file__).parent

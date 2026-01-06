@@ -13,7 +13,7 @@ from flask import request
 @noti_bp.route('/api/messages/read', methods=['POST'])
 @jwt_required
 def read_notification(user_id):
-    nid = request.args.get('nid')
+    nid = int(request.args.get('nid'))
     return mark_notification_as_read(user_id, nid)
 
 

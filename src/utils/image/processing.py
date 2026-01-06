@@ -109,6 +109,7 @@ def create_video_thumbnail(video_path: str, thumbnail_path: str, time: float = 1
         import cv2
         CV2_AVAILABLE = True
     except ImportError:
+        cv2 = None
         CV2_AVAILABLE = False
 
     if not CV2_AVAILABLE:

@@ -35,33 +35,6 @@ else:
 
     application = create_app()
 
-    # 在非Vercel环境中提供Gevent WSGI服务器选项
-    if __name__ == '__main__':
-        if GEVENT_AVAILABLE and '--gevent' in sys.argv:
-            from gevent.pywsgi import WSGIServer
-
-            try:
-                from geventwebsocket.handler import WebSocketHandler
-
-                # 如果需要WebSocket支持，包含WebSocketHandler
-                server = WSGIServer(('0.0.0.0', int(os.environ.get('PORT', 5000))),
-                                    application,
-                                    handler_class=WebSocketHandler)
-            except ImportError:
-                # 如果没有WebSocket支持，使用标准WSGI服务器
-                server = WSGIServer(('0.0.0.0', int(os.environ.get('PORT', 5000))),
-                                    application)
-
-            print(f"Starting gevent server on port {os.environ.get('PORT', 5000)}...")
-            server.serve_forever()
-        else:
-            # 使用Flask内置开发服务器
-            application.run(
-                host='0.0.0.0',
-                port=int(os.environ.get('PORT', 5000)),
-                debug=os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
-            )
-
 import sys
 import warnings
 

@@ -32,6 +32,7 @@ try:
     socketio = SocketIO()
     SOCKETIO_AVAILABLE = True
 except ImportError:
+    SocketIO = None
     # 创建一个模拟的SocketIO对象，用于serverless环境
     class MockSocketIO:
         def init_app(self, app, **kwargs):
@@ -96,7 +97,8 @@ def init_extensions(app):
             self.id = -1
             self.permissions = []
 
-        def can(self, perm):
+        @staticmethod
+        def can(perm):
             # 匿名用户没有任何权限
             return False
 
