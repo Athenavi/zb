@@ -1,4 +1,3 @@
-import inspect
 from datetime import datetime
 
 from flask import Blueprint, session as flask_session
@@ -65,8 +64,8 @@ def admin_sessions(user_id):
         device_type = request.args.get('device_type', '')
         status = request.args.get('status', '')
 
-        # 构建查询
-        query = UserSession.query.join(User)
+        # 构建查询 - 使用 outerjoin 以确保即使用户被删除也能显示会话
+        query = UserSession.query.outerjoin(User)
 
         if search:
             query = query.filter(
@@ -85,7 +84,7 @@ def admin_sessions(user_id):
         # 分页 - 按用户名排序，然后按最后活动时间排序，以便前端可以正确分组
         pagination = query.order_by(
             User.username,
-            UserSession.last_activity.desc()
+            UserSession.last_activity.desc().nullslast()
         ).paginate(
             page=page, per_page=20, error_out=False
         )
@@ -98,6 +97,8 @@ def admin_sessions(user_id):
         mobile_sessions = UserSession.query.filter_by(device_type='mobile').count()
         today_sessions = UserSession.query.filter(
             UserSession.last_activity >= datetime.now().date()
+        ).filter(
+            UserSession.last_activity.isnot(None)
         ).count()
         total_users = User.query.count()
 
@@ -112,10 +113,10 @@ def admin_sessions(user_id):
             today_sessions=today_sessions,
             total_users=total_users
         )
-    finally:
-        current_func_name = inspect.currentframe().f_code.co_name
-        # 输出当前视图名称和操作人ID
-        print(f"==>{current_func_name}, User ID: {user_id}")
+    except Exception as e:
+        print(f"Error: {e}")
+        from flask import abort
+        return abort(500)
 
 
 @session_bp.route('/admin/user/<int:user_id>/ban', methods=['POST'])
